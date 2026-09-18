@@ -11,7 +11,7 @@ const output = path.resolve("outputs/tests/reading.cjs");
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
   stdin: {
-    contents: `export * from './app/reading/decorations'; export * from './app/reading/structure'; export * from './app/reading/tokens';`,
+    contents: `export * from './app/reading/decorations'; export * from './app/reading/structure'; export * from './app/reading/tokens'; export * from './app/reading/layout';`,
     resolveDir: process.cwd(),
     loader: "ts",
   },
@@ -23,6 +23,7 @@ buildSync({
 });
 const {
   readingStructure,
+  readingLayout,
   readingVariables,
   commandEnd,
   readingDecorations,
@@ -220,5 +221,147 @@ test("CodeMirror fold mapping tracks edits before a scene before persistence val
   assert.deepEqual(
     restoreReadingFolds(readingStructure(state.doc.toString()), mapped),
     mapped,
+  );
+});
+
+test("semantic groups add breathing room even when the source has no blank lines", () => {
+  const compact = source(
+    'Mira: first\n<<play_sound "wind">>\n<<set $gold = 2>>\nMira: next',
+  );
+  const spaced = compact.replace("first\n", "first\n\n\n");
+  function groupGaps(text) {
+    const lines = readingStructure(text),
+      layout = readingLayout(lines);
+    return lines.flatMap((line, index) =>
+      line.kind === "blank"
+        ? []
+        : [
+            {
+              text: line.text,
+              before: layout[index].before,
+              after: layout[index].after,
+            },
+          ],
+    );
+  }
+  assert.deepEqual(groupGaps(compact), groupGaps(spaced));
+  const gaps = groupGaps(compact);
+  assert.equal(
+    gaps.find((line) => line.text.startsWith("<<play_sound")).before,
+    12,
+  );
+  assert.equal(gaps.find((line) => line.text.startsWith("<<set")).before, 0);
+  assert.equal(gaps.find((line) => line.text === "Mira: next").before, 12);
+  assert.equal(decorations(spaced).state.doc.toString(), spaced);
+});
+
+test("every branch has balanced leading and trailing content spacing", () => {
+  const lines = readingStructure(
+    source(
+      "<<if $key>>\nMira: yes\n<<jump Yes>>\n<<else>>\nMira: no\n<<jump No>>\n<<endif>>\nMira: together",
+    ),
+  );
+  const layout = readingLayout(lines);
+  const item = (text) => layout[lines.findIndex((line) => line.text === text)];
+  assert.equal(item("<<if $key>>").before, item("<<else>>").before);
+  assert.equal(item("Mira: yes").before, 8);
+  assert.equal(item("Mira: no").before, 8);
+  assert.equal(item("<<jump Yes>>").after, 16);
+  assert.equal(item("<<jump No>>").after, 16);
+  assert.equal(item("Mira: together").before, 20);
+  assert.ok(item("Mira: together").classes.includes("reading-after-region"));
+});
+
+test("scene separators own their spacing rather than source blank lines", () => {
+  for (const blanks of ["", "\n", "\n\n\n"]) {
+    const text =
+      source("Mira: first") +
+      blanks +
+      source("Mira: second").replace("title: Start", "title: Next");
+    const lines = readingStructure(text),
+      layout = readingLayout(lines);
+    const nextTitle = lines.findIndex((line) => line.text === "title: Next");
+    assert.equal(layout[nextTitle].before, 0);
+    assert.ok(
+      layout[lines.findIndex((line) => line.kind === "end")].classes.includes(
+        "reading-scene-boundary",
+      ),
+    );
+    for (let index = nextTitle - 1; lines[index]?.kind === "blank"; index--)
+      assert.equal(layout[index].collapseBlank, true);
+  }
+});
+
+test("visual blank collapsing keeps selected source lines accessible", () => {
+  const text = source("Mira: first\n\n\nMira: second");
+  const position = text.indexOf("\n\n\n") + 1;
+  const resting = decorations(text, text.length, true);
+  assert.ok(
+    resting.ranges.some(
+      (range) =>
+        range.from === position &&
+        range.spec.attributes?.class.includes("reading-blank-collapsed"),
+    ),
+  );
+  const selected = decorations(text, position);
+  const line = selected.ranges.find(
+    (range) => range.from === position && range.spec.attributes,
+  );
+  assert.ok(line.spec.attributes.class.includes("reading-blank-active"));
+  assert.ok(!line.spec.attributes.class.includes("reading-blank-collapsed"));
+  assert.equal(selected.state.doc.toString(), text);
+});
+
+test("inline option conditions are quiet source-mapped annotations", () => {
+  const text = source("-> Buy <<if $gold > 3>>");
+  const result = decorations(text);
+  assert.ok(
+    result.widgets.some(
+      (range) =>
+        range.spec.widget.className === "reading-inline-keyword" &&
+        range.spec.widget.label === "若 ",
+    ),
+  );
+  assert.ok(result.widgets.some((range) => range.spec.widget.label === "gold"));
+  assert.ok(
+    result.ranges.some(
+      (range) => range.spec.class === "reading-inline-condition",
+    ),
+  );
+  assert.equal(result.state.doc.toString(), text);
+});
+
+test("editing an inline condition delimiter reveals the complete expression", () => {
+  const text = source("-> Buy <<if $gold > 3>>");
+  const begin = text.indexOf("<<if"),
+    end = text.indexOf(">>") + 2;
+  for (const cursor of [begin + 2, end - 1]) {
+    const result = decorations(text, cursor);
+    assert.ok(
+      !result.widgets.some((range) => range.from >= begin && range.to <= end),
+    );
+    assert.equal(result.state.doc.toString(), text);
+  }
+});
+
+test("unknown commands retain their source while keeping branch containment and spacing", () => {
+  const text = source(
+    "<<if $key>>\n<<unregistered $gold>>\n<<else>>\nMira: no\n<<endif>>",
+  );
+  const result = decorations(text);
+  const from = text.indexOf("<<unregistered");
+  const row = result.ranges.find(
+    (range) => range.from === from && range.spec.attributes,
+  );
+  assert.ok(row.spec.attributes.class.includes("reading-raw"));
+  assert.ok(row.spec.attributes.class.includes("reading-region"));
+  assert.ok(row.spec.attributes.style.includes("--reading-gap-before:8px"));
+  assert.ok(row.spec.attributes.style.includes("--reading-gap-after:16px"));
+  assert.ok(
+    !result.widgets.some(
+      (range) =>
+        range.from >= from &&
+        range.to <= from + "<<unregistered $gold>>".length,
+    ),
   );
 });

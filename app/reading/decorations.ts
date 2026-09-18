@@ -3,6 +3,7 @@ import { Decoration, WidgetType } from "@codemirror/view";
 import { builtins } from "../parser";
 import { readingStructure, type ReadingLine } from "./structure";
 import { commandEnd, readingVariables } from "./tokens";
+import { readingLayout } from "./layout";
 import { readingIcon, type ReadingIcon } from "./icons";
 
 class Token extends WidgetType {
@@ -28,6 +29,7 @@ class Token extends WidgetType {
     const span = document.createElement("span");
     span.className = this.className;
     if (this.title) span.title = this.title;
+    if (this.icon) span.appendChild(readingIcon(this.icon));
     if (this.context.length) {
       const context = document.createElement("span");
       context.className = "reading-context";
@@ -35,7 +37,6 @@ class Token extends WidgetType {
       context.title = this.context.join(" / ");
       span.appendChild(context);
     }
-    if (this.icon) span.appendChild(readingIcon(this.icon));
     span.appendChild(document.createTextNode(this.label));
     return span;
   }
@@ -52,6 +53,7 @@ export function readingDecorations(
   readOnly = false,
 ) {
   const ranges: Range<Decoration>[] = [];
+  const layout = readingLayout(lines);
   const touched = (from: number, to: number) =>
     !readOnly &&
     state.selection.ranges.some(
@@ -96,14 +98,20 @@ export function readingDecorations(
         !line.command ||
         builtins.includes(line.command) ||
         commands.includes(line.command),
-      classes = ["reading-line"];
+      rhythm = layout[index],
+      classes = ["reading-line", ...rhythm.classes];
     if (
       !line.valid ||
       (line.kind === "command" && !known) ||
       (line.command && commandEnd(trim) < 0)
     ) {
       ranges.push(
-        Decoration.line({ class: "reading-line reading-raw" }).range(line.from),
+        Decoration.line({
+          attributes: {
+            class: `reading-line reading-raw${line.valid && line.depth > 0 ? " reading-region" : ""}`,
+            style: `--reading-gap-before:${rhythm.before}px;--reading-gap-after:${rhythm.after}px`,
+          },
+        }).range(line.from),
       );
       continue;
     }
@@ -115,15 +123,8 @@ export function readingDecorations(
     if (line.kind === "comment") classes.push("reading-comment");
     if (line.kind === "blank") {
       classes.push(active ? "reading-blank-active" : "reading-blank");
-      let previous = index - 1,
-        next = index + 1;
-      while (previous >= 0 && lines[previous].kind === "blank") previous--;
-      while (next < lines.length && lines[next].kind === "blank") next++;
-      if (
-        !active &&
-        (lines[previous]?.kind === "end" || lines[next]?.kind === "title")
-      )
-        classes.push("reading-scene-space");
+      if (!active && rhythm.collapseBlank)
+        classes.push("reading-blank-collapsed");
     }
     if (line.kind === "option") {
       classes.push("reading-option");
@@ -152,10 +153,12 @@ export function readingDecorations(
       Decoration.line({
         attributes: {
           class: classes.join(" "),
+          style: `--reading-gap-before:${rhythm.before}px;--reading-gap-after:${rhythm.after}px`,
           ...(active && structural ? { "data-structure-label": hint } : {}),
         },
       }).range(line.from),
     );
+    let rawInline: { from: number; to: number } | undefined;
     if (line.kind === "blank") continue;
     if (active && structural) continue;
     if (
@@ -187,17 +190,43 @@ export function readingDecorations(
     } else if (line.kind === "comment") {
       add(from, from + 2, "", "reading-hidden");
       continue;
-    } else if (line.kind === "option")
+    } else if (line.kind === "option") {
       add(
         from,
-        from + 2,
+        from + (trim.match(/^->\s*/)?.[0].length || 2),
         "",
-        "reading-option-marker",
+        "reading-option-marker reading-leading",
         "option",
         line.context.length > line.depth ? line.context : [],
         "選項",
       );
-    else if (
+      const inline = trim.match(/<<\s*if\s+/);
+      if (inline?.index !== undefined) {
+        const begin = from + inline.index;
+        const end = commandEnd(trim.slice(inline.index));
+        if (
+          end >= 0 &&
+          (touched(begin, begin + inline[0].length) ||
+            touched(begin + end, begin + end + 2))
+        )
+          rawInline = { from: begin, to: begin + end + 2 };
+        if (
+          end >= 0 &&
+          !touched(begin, begin + inline[0].length) &&
+          !touched(begin + end, begin + end + 2)
+        ) {
+          mark(begin, begin + end + 2, "reading-inline-condition");
+          add(
+            begin,
+            begin + inline[0].length,
+            "若 ",
+            "reading-inline-keyword",
+            "branch",
+          );
+          add(begin + end, begin + end + 2, "", "reading-hidden");
+        }
+      }
+    } else if (
       (line.kind === "command" || line.kind === "condition") &&
       line.command
     ) {
@@ -261,10 +290,10 @@ export function readingDecorations(
           from + prefix,
           display.label,
           line.kind === "condition"
-            ? "reading-keyword"
+            ? "reading-keyword reading-leading"
             : line.command === "jump"
-              ? "reading-target"
-              : "reading-function",
+              ? "reading-target reading-leading"
+              : "reading-function reading-leading",
           display.icon,
           context,
           display.title,
@@ -285,13 +314,26 @@ export function readingDecorations(
       const role = line.text.match(/^\s*[^:<>]+:/);
       if (role) mark(from, line.from + role[0].length, "reading-role");
     }
-    for (const variable of readingVariables(line))
+    for (const variable of readingVariables(line)) {
+      if (
+        rawInline &&
+        line.from + variable.from >= rawInline.from &&
+        line.from + variable.to <= rawInline.to
+      ) {
+        mark(
+          line.from + variable.from,
+          line.from + variable.to,
+          "reading-variable-source",
+        );
+        continue;
+      }
       add(
         line.from + variable.from,
         line.from + variable.to,
         variable.name,
         "reading-variable",
       );
+    }
   }
   const builder = new RangeSetBuilder<Decoration>();
   ranges.sort(

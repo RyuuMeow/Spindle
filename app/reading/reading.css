@@ -4,13 +4,15 @@
   --reading-size: 16px;
   --reading-height: 29px;
   --reading-width: 760px;
+  --reading-text-inset: 40px;
+  --reading-region: #202022;
   user-select: text;
 }
 .reading-editor .cm-scroller {
   font-size: var(--reading-size);
   line-height: var(--reading-height);
   overflow: auto;
-  padding: 24px max(12px, calc((100% - var(--reading-width) - 28px) / 2)) 48px;
+  padding: 32px max(12px, calc((100% - var(--reading-width) - 28px) / 2)) 56px;
 }
 .reading-editor .cm-content {
   flex: 1 1 auto;
@@ -18,8 +20,11 @@
   min-width: 0;
   max-width: var(--reading-width);
 }
+/* The surface edge, 16px icon rail, and text start are shared by every line.
+   Leading SVGs hang in the rail; their natural width never moves the text. */
 .reading-editor .cm-line {
-  padding: 0 12px;
+  padding: var(--reading-gap-before, 0px) 16px var(--reading-gap-after, 0px)
+    var(--reading-text-inset);
   overflow-wrap: anywhere;
 }
 .reading-editor .cm-foldGutter {
@@ -47,14 +52,14 @@
 }
 .reading-editor .reading-icon {
   display: inline-block;
-  width: 1em;
-  height: 1em;
+  width: 16px;
+  height: 16px;
   vertical-align: -0.15em;
   flex: 0 0 auto;
 }
-.reading-editor .reading-fold-marker .reading-icon {
-  width: 16px;
-  height: 16px;
+.reading-editor .reading-leading > .reading-icon {
+  margin-left: -24px;
+  margin-right: 8px;
 }
 .reading-editor .reading-title {
   font-size: calc(var(--reading-size) * 1.4);
@@ -87,22 +92,21 @@
 .reading-editor .reading-tags {
   font-size: calc(var(--reading-size) * 0.75);
   line-height: 1.85;
-  padding-top: 6px;
 }
 .reading-editor .reading-tag {
-  padding: 1px 6px;
+  padding: 1px 5px;
   margin-right: 4px;
-  background: #2a2a2a;
-  color: #aaa;
-  border-radius: 4px;
+  background: #262626;
+  color: #999;
+  border-radius: 3px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
 .reading-editor .reading-variable {
-  background: #36303e;
-  color: #d0bbdf;
-  padding: 1px 5px;
-  border-radius: 4px;
+  background: #2c2930;
+  color: #bfb4c9;
+  padding: 1px 4px;
+  border-radius: 3px;
   font-family: Consolas, monospace;
   font-size: calc(var(--reading-size) * 0.9);
   line-height: inherit;
@@ -112,32 +116,26 @@
 .reading-editor .reading-variable-source,
 .reading-editor .reading-keyword,
 .reading-editor .reading-assignment {
-  color: #c1add2;
+  color: #b0a7b8;
 }
 .reading-editor .reading-function {
-  color: #99bdb5;
+  color: #a3afab;
 }
 .reading-editor .reading-target,
 .reading-editor .reading-option-marker {
-  color: #a9c1dc;
-}
-.reading-editor .reading-function .reading-icon,
-.reading-editor .reading-target .reading-icon,
-.reading-editor .reading-keyword .reading-icon,
-.reading-editor .reading-option-marker .reading-icon {
-  margin-right: 6px;
+  color: #aeb9c5;
 }
 .reading-editor .reading-assignment {
   padding: 0 7px;
 }
 .reading-editor .reading-role {
-  color: #cbbb9d;
+  color: #c2beb5;
   font-weight: 500;
 }
 .reading-editor .reading-header,
 .reading-editor .reading-comment {
   font-size: calc(var(--reading-size) * 0.8);
-  line-height: 1.7;
+  line-height: var(--reading-height);
   color: #929292;
 }
 .reading-editor .reading-header {
@@ -147,81 +145,112 @@
 .reading-editor .reading-condition {
   font-family: Consolas, "Microsoft JhengHei", monospace;
   font-size: calc(var(--reading-size) * 0.875);
-  line-height: 1.65;
+  /* Secondary text is quieter, not squeezed into a shorter line box. */
+  line-height: var(--reading-height);
   color: #aaa;
 }
 .reading-editor .reading-region {
-  background: #232127;
+  background: var(--reading-region);
 }
-.reading-editor .reading-region-start {
-  border-top: 1px solid #39343f;
-  padding-top: 10px;
-}
+.reading-editor .reading-region-start,
 .reading-editor .reading-region-split {
-  border-top: 1px solid #39343f;
-  padding-top: 8px;
+  border-top: 1px solid #303034;
 }
 .reading-editor .reading-region-end {
-  border-bottom: 1px solid #39343f;
-  min-height: 12px;
-  line-height: 12px;
-  padding-bottom: 12px;
+  border-bottom: 1px solid #303034;
+  min-height: 0;
+  line-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.reading-editor .reading-region-nested-end {
+  border-bottom-style: dotted;
+  border-bottom-color: #2a2a2e;
 }
 .reading-editor .reading-context {
-  display: inline-block;
   max-width: 30ch;
   margin-right: 8px;
-  overflow: hidden;
-  vertical-align: bottom;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
   font-size: 0.85em;
   color: #929099;
+  overflow-wrap: anywhere;
 }
 .reading-editor .reading-option {
-  padding-top: 10px;
-  color: #a9c1dc;
+  color: #c4cbd3;
 }
-.reading-editor .reading-option-first {
-  border-top: 1px solid #34323a;
-  padding-top: 8px;
-}
+.reading-editor .reading-option-first,
 .reading-editor .reading-option-end {
-  border-top: 1px solid #34323a;
-  padding-top: 12px;
+  border-top: 1px solid #303034;
 }
+.reading-editor .reading-inline-condition {
+  font-size: calc(var(--reading-size) * 0.875);
+  color: #aaa5ae;
+}
+.reading-editor .reading-inline-keyword {
+  margin-left: 8px;
+}
+.reading-editor .reading-inline-keyword .reading-icon {
+  margin-right: 4px;
+  width: 14px;
+  height: 14px;
+}
+/* A scene boundary has its own balanced rhythm; no dependence on the number
+   of source blank lines, or on a heading's font metrics. */
 .reading-editor .reading-scene-end {
-  border-bottom: 1px solid #323232;
-  min-height: 16px;
-  line-height: 16px;
-  padding-bottom: 16px;
+  position: relative;
+  min-height: 0;
+  line-height: 0;
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+.reading-editor .reading-scene-end::before {
+  content: "";
+  position: absolute;
+  top: 24px;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #303030;
+  pointer-events: none;
 }
 .reading-editor .reading-scene-start {
-  min-height: 16px;
-  line-height: 16px;
+  min-height: 0;
+  line-height: 0;
+  padding-bottom: 24px;
 }
 .reading-editor .reading-blank {
   min-height: 12px;
   line-height: 12px;
 }
-.reading-editor .reading-scene-space {
+.reading-editor .reading-blank-collapsed {
   min-height: 0;
   line-height: 0;
   height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .reading-editor .reading-raw {
   font-family: Consolas, monospace;
 }
 .reading-editor .reading-editing-syntax {
   font:
-    calc(var(--reading-size) * 0.8)/1.8 Consolas,
+    calc(var(--reading-size) * 0.8)/var(--reading-height) Consolas,
     monospace;
   border: 0;
   color: #aaa;
-  background: #25252a;
-  padding-top: 2px;
-  padding-bottom: 2px;
+  background: #242426;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.reading-editor .reading-editing-syntax.reading-scene-end {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.reading-editor .reading-editing-syntax.reading-scene-start {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.reading-editor .reading-editing-syntax::before {
+  display: none;
 }
 .reading-editor .reading-editing-syntax::after {
   content: attr(data-structure-label);
@@ -244,11 +273,13 @@
   font-size: 13px;
 }
 @media (max-width: 800px) {
+  .reading-editor {
+    --reading-text-inset: 32px;
+  }
   .reading-editor .cm-scroller {
-    padding: 16px 4px 40px;
+    padding: 24px 4px 40px;
   }
   .reading-editor .cm-line {
-    padding-left: 8px;
     padding-right: 8px;
   }
   .reading-editor .cm-foldGutter {
