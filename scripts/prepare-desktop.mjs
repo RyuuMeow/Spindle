@@ -1,0 +1,51 @@
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { build } from "esbuild";
+
+const root = new URL("../", import.meta.url);
+const destination = new URL("dist-desktop/app/", root);
+const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
+await mkdir(new URL("desktop/", destination), { recursive: true });
+await cp(
+  new URL("desktop/main.cjs", root),
+  new URL("desktop/main.cjs", destination),
+);
+await cp(
+  new URL("desktop/preload.cjs", root),
+  new URL("desktop/preload.cjs", destination),
+);
+await build({
+  entryPoints: [
+    new URL("desktop/workspace-service.ts", root).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    ),
+  ],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outfile: new URL(
+    "desktop/workspace-service.cjs",
+    destination,
+  ).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
+  target: "node22",
+});
+await cp(
+  new URL("dist-desktop/renderer/", root),
+  new URL("dist-desktop/renderer/", destination),
+  { recursive: true },
+);
+await writeFile(
+  new URL("package.json", destination),
+  JSON.stringify(
+    {
+      name: "yarn-workbench",
+      version: pkg.version,
+      private: true,
+      description: "Local-first Yarn Spinner dialogue editor",
+      author: "Yarn Workbench",
+      main: "desktop/main.cjs",
+    },
+    null,
+    2,
+  ),
+);
