@@ -5,6 +5,8 @@ import {
   type Project,
   type WindowSession,
   type TabView,
+  type FileSortMode,
+  type NavigationLocation,
 } from "./types";
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -84,7 +86,17 @@ function validateTabState(tab: TabView) {
     )
       throw Error("文字編輯器布局損毀");
   }
-  return tab;
+  if (tab.views) {
+    if (!record(tab.views)) throw Error("文件視圖快取損毀");
+    for (const view of Object.values(tab.views)) {
+      if (!record(view) || !["source", "rendered", "graph"].includes(String(view.mode)) || !finite(view.line) || !finite(view.column)) throw Error("文件視圖快取損毀");
+      validateTabState({ mode: view.mode, line: view.line, column: view.column, scrollTop: view.scrollTop, selection: view.selection, folded: view.folded, sourceView: view.sourceView, graph: view.graph } as TabView);
+    }
+  }
+  for (const stack of [tab.past, tab.future]) {
+    if (stack !== undefined && (!Array.isArray(stack) || stack.some(location => !record(location) || typeof location.documentId !== "string" || !["source", "rendered", "graph"].includes(String(location.mode)) || !finite(location.line) || !finite(location.column)))) throw Error("分頁導航歷史損毀");
+  }
+  return { ...tab, past: tab.past?.slice(-100) as NavigationLocation[] | undefined, future: tab.future?.slice(-100) as NavigationLocation[] | undefined };
 }
 export function restoreSession(
   value: unknown,
@@ -123,6 +135,9 @@ export function restoreSession(
     tabs: tabs(v.tabs),
     closedTabs: tabs(v.closedTabs),
     sidebarWidth: Math.max(180, Math.min(420, Number(v.sidebarWidth) || 240)),
+    rightPanelWidth: Math.max(220, Math.min(420, Number(v.rightPanelWidth) || 260)),
+    problemsHeight: Math.max(90, Math.min(420, Number(v.problemsHeight) || 140)),
+    fileSortByProject: record(v.fileSortByProject) ? Object.fromEntries(Object.entries(v.fileSortByProject).filter(([, mode]) => ["manual", "name-asc", "name-desc"].includes(String(mode)))) as Record<string, FileSortMode> : {},
     readingSize: Math.max(12, Math.min(28, Number(v.readingSize) || 16)),
     readingWidth: v.readingWidth === "wide" ? "wide" : "standard",
     outline: Object.fromEntries(

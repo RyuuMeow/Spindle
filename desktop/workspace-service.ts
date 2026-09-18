@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { appendedScene, renamedSceneByName } from "../app/workspace/authoring";
 export { restoreSession } from "../app/workspace/storage";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -509,7 +510,8 @@ export class WorkspaceService {
           status: "saved" as const,
         };
       });
-    p.documents = loaded;
+    const savedOrder = new Map((metadata.files || []).map((file, index) => [file.name.toLowerCase(), index]));
+    p.documents = loaded.sort((a, b) => (savedOrder.get(a.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER) - (savedOrder.get(b.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER));
     validateProject(p);
     this.engine.projects.push(p);
     this.currentProjectId = p.id;
@@ -593,6 +595,11 @@ export class WorkspaceService {
       } else if (a.type === "transaction") {
         this.engine.transaction(p.id, a.label, a.documents);
         for (const d of p.documents) this.schedule(p, d);
+      } else if (a.type === "createScene" || a.type === "renameScene") {
+        const documents = a.type === "createScene" ? appendedScene(p, a.documentId, a.version, a.name) : renamedSceneByName(p, a.documentId, a.version, a.fromName, a.name).documents;
+        this.engine.transaction(p.id, a.type === "createScene" ? "新增場景" : "更名場景", documents);
+        documentId = a.documentId;
+        for (const d of p.documents) this.schedule(p, d);
       } else if (a.type === "composition") {
         const d = this.engine.document(p.id, a.documentId);
         d.composing = a.active;
@@ -645,6 +652,11 @@ export class WorkspaceService {
             d.status = "saved";
             this.metadata(p);
           } catch (error) {
+            if (!d.path) {
+              // Failed exclusive create must not leave a phantom document that blocks retry.
+              p.documents = p.documents.filter(document => document.id !== d.id);
+              throw error;
+            }
             d.status = "error";
             d.error = String(error);
           }

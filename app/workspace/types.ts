@@ -46,7 +46,13 @@ export type TabView = {
   folded?: { from: number; to: number }[];
   sourceView?: import("monaco-editor").editor.ICodeEditorViewState;
   graph?: import("../Graph").GraphState;
+  views?: Record<string, DocumentViewState>;
+  past?: NavigationLocation[];
+  future?: NavigationLocation[];
 };
+export type DocumentViewState = Pick<TabView, "mode" | "line" | "column" | "scrollTop" | "selection" | "folded" | "sourceView" | "graph">;
+export type NavigationLocation = DocumentViewState & { documentId: string };
+export type FileSortMode = "manual" | "name-asc" | "name-desc";
 export type WindowSession = {
   id: string;
   projectId: string;
@@ -56,6 +62,9 @@ export type WindowSession = {
   left: boolean;
   lineNumbers: boolean;
   sidebarWidth: number;
+  rightPanelWidth?: number;
+  problemsHeight?: number;
+  fileSortByProject?: Record<string, FileSortMode>;
   readingSize: number;
   readingLineHeight: number;
   readingWidth?: "standard" | "wide";
@@ -85,6 +94,8 @@ export type WorkspaceAction =
   | { type: "createProject"; name: string; root?: string }
   | { type: "renameProject"; projectId: string; name: string }
   | { type: "createDocument"; projectId: string; name: string; text: string }
+  | { type: "createScene"; projectId: string; documentId: string; version: number; name: string }
+  | { type: "renameScene"; projectId: string; documentId: string; version: number; fromName: string; name: string }
   | {
       type: "renameDocument";
       projectId: string;
@@ -211,6 +222,9 @@ export function defaultSession(id: string, projectId: string): WindowSession {
     left: true,
     lineNumbers: false,
     sidebarWidth: 220,
+    rightPanelWidth: 260,
+    problemsHeight: 140,
+    fileSortByProject: {},
     readingSize: 16,
     readingLineHeight: 29,
     readingWidth: "standard",

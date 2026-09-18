@@ -1,3 +1,4 @@
+import { appendedScene, renamedSceneByName } from "./authoring";
 import { EditorState, ChangeSet, Text } from "@codemirror/state";
 import {
   collab,
@@ -85,11 +86,16 @@ class BrowserService {
         this.engine.undo(p.id, a.documentId, a.type === "redo");
       else if (a.type === "transaction")
         this.engine.transaction(p.id, a.label, a.documents);
-      else if (a.type === "createDocument")
+      else if (a.type === "createScene" || a.type === "renameScene") {
+        const documents = a.type === "createScene" ? appendedScene(p, a.documentId, a.version, a.name) : renamedSceneByName(p, a.documentId, a.version, a.fromName, a.name).documents;
+        this.engine.transaction(p.id, a.type === "createScene" ? "新增場景" : "更名場景", documents);
+        documentId = a.documentId;
+      } else if (a.type === "createDocument")
         documentId = this.engine.create(p.id, a.name, a.text).id;
       else if (a.type === "renameProject") p.name = a.name;
       else if (a.type === "renameDocument") {
         const d = this.engine.document(p.id, a.documentId);
+        if (d.name === a.name) return { snapshot: this.snapshot(), projectId, documentId: d.id };
         const temporary = this.engine.create(p.id, a.name, d.text);
         p.documents = p.documents.filter((x) => x.id !== temporary.id);
         d.name = a.name;

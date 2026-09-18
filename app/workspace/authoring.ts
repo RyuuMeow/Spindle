@@ -82,3 +82,20 @@ export function renamedScene(p: Project, node: Node, name: string) {
     .filter((d) => d.edits.length);
   return { documents, references };
 }
+
+export function appendedScene(p: Project, documentId: string, version: number, name: string) {
+  const d = p.documents.find(document => document.id === documentId);
+  if (!d || d.version !== version) throw Error("劇本已有變更，請重新確認後重試");
+  if (!validSceneName(name)) throw Error("場景名稱須以英文字母起始，僅含英文字母、數字與底線");
+  if (parse(p.documents, p.commands).nodes.some(node => node.name === name)) throw Error("專案已有同名場景");
+  const nl = d.text.includes("\r\n") ? "\r\n" : "\n";
+  const prefix = d.text ? (d.text.endsWith(nl) ? nl : nl + nl) : "";
+  return [{ id: d.id, version, edits: [{ from: d.text.length, to: d.text.length, insert: prefix + "title: " + name + nl + "---" + nl + nl + "===" + nl }] }];
+}
+export function renamedSceneByName(p: Project, documentId: string, version: number, fromName: string, name: string) {
+  const d = p.documents.find(document => document.id === documentId);
+  if (!d || d.version !== version) throw Error("劇本已有變更，請重新確認後重試");
+  const node = parse(p.documents, p.commands).nodes.find(node => node.file === d.name && node.name === fromName);
+  if (!node) throw Error("找不到原場景，請重新選取");
+  return renamedScene(p, node, name);
+}

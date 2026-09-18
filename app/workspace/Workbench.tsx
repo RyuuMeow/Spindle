@@ -24,6 +24,8 @@ import {
   Settings2,
   ArchiveRestore,
   ArrowDownAZ,
+  ArrowUpZA,
+  ListOrdered,
   CircleCheck,
   LoaderCircle,
   FilePlus2,
@@ -74,7 +76,6 @@ import {
   uniqueSceneName,
   validSceneName,
   sceneRange,
-  renamedScene,
 } from "./authoring";
 import {
   defaultSession,
@@ -97,6 +98,9 @@ import {
 import { HistoryList, HistoryPreview } from "./HistoryView";
 import RecoveryView from "./RecoveryView";
 import type { RecoveryEntry } from "./types";
+import { navigateSession, navigateHistory } from "./navigation";
+import { orderedDocuments, uniqueDocumentName, folderOf, reorderWithinFolder } from "./file-order";
+import { InlineNameEditor, type InlineDraft } from "./InlineNameEditor";
 import "./workspace.css";
 
 type Prompt = {
@@ -108,17 +112,6 @@ type Prompt = {
   submitLabel?: string;
   run: (value: string) => Promise<void> | void;
 };
-type Location = Pick<
-  TabView,
-  | "documentId"
-  | "mode"
-  | "line"
-  | "column"
-  | "selection"
-  | "scrollTop"
-  | "sourceView"
-  | "graph"
->;
 const modes = { source: "純文字", rendered: "閱讀編輯", graph: "流程圖" };
 const utilityNames: Record<string, string> = {
   "@commands": "自訂指令",
@@ -127,25 +120,6 @@ const utilityNames: Record<string, string> = {
 };
 const pendingWrite = (doc: DocumentRecord) =>
   ["pending", "saving"].includes(doc.status);
-const locationOf = ({
-  documentId,
-  mode,
-  line,
-  column,
-  selection,
-  scrollTop,
-  sourceView,
-  graph,
-}: TabView): Location => ({
-  documentId,
-  mode,
-  line,
-  column,
-  selection,
-  scrollTop,
-  sourceView,
-  graph,
-});
 const saveLabels = {
   saved: "已儲存至原檔",
   pending: "等待自動儲存",
@@ -178,6 +152,10 @@ export default function Workbench({
     [promptValue, setPromptValue] = useState(""),
     [promptError, setPromptError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [inlineDraft, setInlineDraft] = useState<InlineDraft | null>(null);
+  const inlineSubmitting = useRef(false), inlineOrigin = useRef<HTMLElement | null>(null);
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
+  const [fileDrop, setFileDrop] = useState("");
   const [toast, setToast] = useState(""),
     [quick, setQuick] = useState<"files" | null>(null),
     [searchOpen, setSearchOpen] = useState(false),
@@ -220,20 +198,8 @@ export default function Workbench({
     readingActions = useRef<ReadingActions | null>(null),
     commandActions = useRef<CommandActions | null>(null);
   const input = useRef<HTMLInputElement>(null),
-    past = useRef<Location[]>([]),
-    future = useRef<Location[]>([]),
     dragCancelled = useRef(false),
     documentDrag = useRef("");
-  const [navigationAvailable, setNavigationAvailable] = useState({
-    back: false,
-    forward: false,
-  });
-  function updateNavigation() {
-    setNavigationAvailable({
-      back: past.current.length > 0,
-      forward: future.current.length > 0,
-    });
-  }
   const project =
     snapshot.projects.find((p) => p.id === session.projectId) ||
     snapshot.projects[0];
@@ -243,6 +209,7 @@ export default function Workbench({
       project?.documents.some((d) => d.id === t.documentId),
   );
   const active = tabs.find((t) => t.id === session.activeId) || tabs[0];
+  const navigationAvailable = { back: !!active?.past?.length, forward: !!active?.future?.length };
   const doc = project?.documents.find((d) => d.id === active?.documentId),
     mode = active?.mode || "source";
   const analysis = useMemo(
@@ -268,17 +235,22 @@ export default function Workbench({
           },
         ));
   const outlineOpen = !!session.outline?.[mode];
-  const [outlineTemporary, setOutlineTemporary] = useState(false);
+  const [narrowPanels, setNarrowPanels] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1279px)");
+    const update = () => setNarrowPanels(media.matches);
+    update(); media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const [historyToolbar, setHistoryToolbar] = useState<HTMLDivElement | null>(
     null,
   );
   const [sideFocus, setSideFocus] = useState<"left" | "right">("left");
   const showOutline =
-    !!doc && (outlineOpen || outlineTemporary) && !historyOpen;
+    !!doc && outlineOpen && !historyOpen && (!narrowPanels || sideFocus === "right" || !session.left);
   function resetTransient() {
     setHistorySelection(null);
     setHistoryOpen(false);
-    setOutlineTemporary(false);
   }
   function showSearch() {
     setHistoryOpen(false);
@@ -414,10 +386,14 @@ export default function Workbench({
   function capture() {
     if (active && editorRef.current && mode === "source") {
       const state = editorRef.current.saveViewState();
-      if (state) editorViews.current[active.id] = state;
+      if (state) {
+        editorViews.current[active.id + ":" + active.documentId] = state;
+        setSession(s => ({ ...s, tabs: s.tabs.map(t => t.id === active.id ? { ...t, sourceView: state } : t) }));
+      }
     }
   }
   function activate(id: string) {
+    setInlineDraft(null);
     capture();
     resetTransient();
     setSession((s) => ({ ...s, activeId: id }));
@@ -425,96 +401,43 @@ export default function Workbench({
     setSelected("");
   }
   function openDocument(
-    id: string,
-    newTab = false,
-    line = 1,
-    column = 1,
-    record = true,
-    forcedMode?: TabView["mode"],
+    id: string, newTab = false, line?: number, column?: number, record = true, forcedMode?: TabView["mode"],
   ) {
+    setInlineDraft(null);
     resetTransient();
-    if (record && active) {
-      past.current.push(locationOf(active));
-      future.current = [];
-      updateNavigation();
-    }
     capture();
-    const document = project.documents.find((d) => d.id === id);
-    setSession((s) => {
-      const current = s.tabs.find((t) => t.id === s.activeId),
-        existing = !newTab
-          ? s.tabs.find((t) => t.documentId === id)
-          : undefined;
-      if (existing)
-        return {
-          ...s,
-          activeId: existing.id,
-          tabs: s.tabs.map((t) =>
-            t.id === existing.id
-              ? {
-                  ...t,
-                  line,
-                  column,
-                  selection: undefined,
-                  ...(forcedMode ? { mode: forcedMode } : {}),
-                }
-              : t,
-          ),
-        };
-      const tab: TabView = {
-        id:
-          !newTab &&
-          current &&
-          !current.pinned &&
-          !utilityNames[id] &&
-          !utilityNames[current.documentId]
-            ? current.id
-            : uuid(),
-        documentId: id,
-        mode: forcedMode || current?.mode || "source",
-        line,
-        column,
-      };
-      return {
-        ...s,
-        activeId: tab.id,
-        tabs: s.tabs.some((t) => t.id === tab.id)
-          ? s.tabs.map((t) => (t.id === tab.id ? tab : t))
-          : [...s.tabs, tab],
-      };
+    const document = project.documents.find(d => d.id === id);
+    setSession(current => {
+      // Utility pages are explicitly selected by their own menu, not discovered by file navigation.
+      if (utilityNames[id] && !newTab) {
+        const existing = current.tabs.find(t => t.documentId === id);
+        if (existing) return { ...current, activeId: existing.id };
+        return navigateSession(current, id, { newTab: true, line, column, mode: forcedMode, record }, uuid());
+      }
+      return navigateSession(current, id, { newTab, line, column, mode: forcedMode, record }, uuid());
     });
     setSelected("");
-    if (document)
-      setGoto((previous) => ({
-        file: document.name,
-        line,
-        column,
-        nonce: (previous?.nonce || 0) + 1,
-      }));
+    if (document && line !== undefined) setGoto(previous => ({ file: document.name, line, column: column ?? 1, nonce: (previous?.nonce || 0) + 1 }));
+    else setGoto(null);
   }
   function go(file: string, line: number, column = 1) {
-    const d = project.documents.find((d) => d.name === file);
+    const d = project.documents.find(d => d.name === file);
     if (d) openDocument(d.id, false, line, column, true, "source");
   }
   function history(back: boolean) {
-    const from = back ? past : future,
-      to = back ? future : past,
-      target = from.current.pop();
-    if (!target) return;
-    if (active) to.current.push(locationOf(active));
-    updateNavigation();
-    openDocument(
-      target.documentId,
-      false,
-      target.line,
-      target.column,
-      false,
-      target.mode,
-    );
-    setSession((s) => ({
-      ...s,
-      tabs: s.tabs.map((t) => (t.id === s.activeId ? { ...t, ...target } : t)),
-    }));
+    setInlineDraft(null);
+    capture();
+    resetTransient();
+    setGoto(null);
+    setSelected("");
+    const validIds = new Set(project.documents.map(d => d.id));
+    const target = [...(back ? active?.past || [] : active?.future || [])].reverse().find(location => validIds.has(location.documentId));
+    if (active && target) {
+      const key = active.id + ":" + target.documentId;
+      if (target.sourceView) editorViews.current[key] = target.sourceView;
+      else delete editorViews.current[key];
+    }
+    setSession(current => navigateHistory(current, back, validIds));
   }
   function modeChange(next: TabView["mode"]) {
     capture();
@@ -598,6 +521,7 @@ export default function Workbench({
   }
   async function selectProject(id: string, force = false) {
     if (id === project.id) return;
+    setInlineDraft(null); setActiveFolder(null);
     resetTransient();
     const result = await perform({ type: "save", projectId: project.id });
     if (!result) return;
@@ -642,13 +566,11 @@ export default function Workbench({
         ? { ...previous, id: client.windowId }
         : defaultSession(client.windowId, id),
     );
-    past.current = [];
-    future.current = [];
-    updateNavigation();
   }
   async function adopt(result: ActionResult | undefined, force = false) {
     if (!result || result.cancelled) return;
     const id = result.projectId;
+    setInlineDraft(null); setActiveFolder(null);
     if (id) {
       if (!force && project && project.id !== id) {
         const saved = await perform({ type: "save", projectId: project.id });
@@ -680,62 +602,88 @@ export default function Workbench({
       });
     }
   }
-  function newDocument() {
-    ask({
-      title: "新增劇本",
-      label: "檔名或相對路徑",
-      value: "Untitled.yarn",
-      run: async (name) => {
-        const scene = uniqueSceneName(project);
-        const r = await perform({
-          type: "createDocument",
-          projectId: project.id,
-          name,
-          text: `title: ${scene}\n---\n\n===\n`,
-        });
-        if (!r) throw Error("建立失敗");
-        if (r.documentId) openDocument(r.documentId, true);
-      },
-    });
+  function cancelInline() {
+    if (inlineSubmitting.current) return;
+    setInlineDraft(null);
+    requestAnimationFrame(() => inlineOrigin.current?.isConnected && inlineOrigin.current.focus());
+  }
+  function beginInline(next: InlineDraft) {
+    if (inlineSubmitting.current) return;
+    inlineOrigin.current = document.activeElement as HTMLElement;
+    setInlineDraft(next);
+  }
+  function newDocument(inNewTab = false) {
+    const candidate = activeFolder ?? folderOf(doc?.name || "");
+    const folder = candidate && !project.documents.some(d => d.name.startsWith(candidate + "/")) ? "" : candidate;
+    setSearchOpen(false);
+    setSideFocus("left");
+    setSession(s => ({ ...s, left: true }));
+    setCollapsed(previous => { const next = new Set(previous); const parts = folder.split("/"); parts.forEach((_, index) => next.delete(parts.slice(0, index + 1).join("/"))); return next; });
+    beginInline({ kind: "new-document", folder, value: uniqueDocumentName(project.documents, folder), newTab: inNewTab });
+  }
+  function renameDocumentInline(d: DocumentRecord) {
+    setSearchOpen(false); setSideFocus("left"); setSession(s => ({ ...s, left: true }));
+    beginInline({ kind: "rename-document", documentId: d.id, folder: folderOf(d.name), value: d.name.split("/").at(-1)! });
   }
   function newScene() {
     if (!doc) return;
-    ask({
-      title: "新增場景",
-      label: "場景名稱",
-      value: uniqueSceneName(project),
-      run: async (name) => {
-        if (!validSceneName(name))
-          throw Error("名稱须以英文字母起始，僅含英文字母、數字與底線");
-        if (analysis.nodes.some((n) => n.name === name))
-          throw Error("專案已有同名場景");
-        const nl = doc.text.includes("\r\n") ? "\r\n" : "\n",
-          prefix = doc.text ? (doc.text.endsWith(nl) ? nl : nl + nl) : "";
-        const r = await perform({
-          type: "transaction",
-          projectId: project.id,
-          label: "新增場景",
-          documents: [
-            {
-              id: doc.id,
-              version: doc.version,
-              edits: [
-                {
-                  from: doc.text.length,
-                  to: doc.text.length,
-                  insert: prefix + `title: ${name}${nl}---${nl}${nl}===${nl}`,
-                },
-              ],
-            },
-          ],
-        });
-        if (!r) throw Error("建立失敗");
-        go(
-          doc.name,
-          doc.text.split("\n").length + prefix.split("\n").length + 1,
-        );
-      },
-    });
+    setHistoryOpen(false); setHistorySelection(null); setSideFocus("right"); setSceneQuery("");
+    setSession(s => ({ ...s, outline: { ...s.outline, [mode]: true } }));
+    beginInline({ kind: "new-scene", documentId: doc.id, version: doc.version, value: uniqueSceneName(project) });
+  }
+  function renameSceneInline(node: YarnNode) {
+    const target = project.documents.find(d => d.name === node.file);
+    if (!target) return;
+    if (target.id !== doc?.id) openDocument(target.id);
+    setHistoryOpen(false); setSideFocus("right"); setSceneQuery("");
+    setSession(s => ({ ...s, outline: { ...s.outline, [mode]: true } }));
+    beginInline({ kind: "rename-scene", documentId: target.id, version: target.version, sceneName: node.name, value: node.name });
+  }
+  async function submitInline() {
+    const draft = inlineDraft;
+    if (!draft || inlineSubmitting.current) return;
+    const name = draft.value.trim();
+    inlineSubmitting.current = true;
+    setInlineDraft(previous => previous ? { ...previous, busy: true, error: undefined } : previous);
+    try {
+      await client.flush();
+      const latest = client.getSnapshot().projects.find(p => p.id === project.id);
+      if (!latest) throw Error("專案已關閉");
+      if (draft.kind === "new-document" || draft.kind === "rename-document") {
+        if (!name || /[\\/]/.test(name)) throw Error("請輸入檔名；移動資料夾請使用移動操作");
+        const filename = name.endsWith(".yarn") ? name : name + ".yarn";
+        const relative = (draft.folder ? draft.folder + "/" : "") + filename;
+        const existing = latest.documents.find(d => d.id === (draft.documentId || draft.createdId));
+        const result = await client.action(existing ? { type: "renameDocument", projectId: project.id, documentId: existing.id, name: relative } : { type: "createDocument", projectId: project.id, name: relative, text: "title: " + uniqueSceneName(latest) + "\n---\n\n===\n" });
+        const created = result.snapshot.projects.find(p => p.id === project.id)?.documents.find(d => d.id === (result.documentId || existing?.id));
+        if (created && ["error", "missing", "conflict"].includes(created.status)) {
+          setInlineDraft(previous => previous ? { ...previous, createdId: created.id } : previous);
+          throw Error(created.error || "建立未完成，請重試");
+        }
+        if (!created) throw Error("找不到建立結果");
+        setInlineDraft(null);
+        if (draft.kind === "new-document") openDocument(created.id, !!draft.newTab);
+      } else {
+        const target = latest.documents.find(d => d.id === draft.documentId);
+        if (!target) throw Error("劇本已移除");
+        if (!validSceneName(name)) throw Error("名稱須以英文字母起始，僅含英文字母、數字與底線");
+        if (draft.kind === "rename-scene" && name === draft.sceneName) { setInlineDraft(null); return; }
+        const result = await client.action(draft.kind === "new-scene" ? { type: "createScene", projectId: project.id, documentId: target.id, version: target.version, name } : { type: "renameScene", projectId: project.id, documentId: target.id, version: target.version, fromName: draft.sceneName!, name });
+        const updated = result.snapshot.projects.find(p => p.id === project.id)!;
+        const node = parse(updated.documents, updated.commands).nodes.find(n => n.file === target.name && n.name === name);
+        setInlineDraft(null);
+        if (node) {
+          openDocument(target.id, false, node.body, 1, true, mode);
+          setSelected(node.id);
+          if (mode === "graph") setFocus(f => f + 1);
+        }
+      }
+    } catch (error) {
+      setInlineDraft(previous => previous ? { ...previous, busy: false, error: error instanceof Error ? error.message : String(error) } : previous);
+    } finally { inlineSubmitting.current = false; }
+  }
+  function inlineName() {
+    return inlineDraft ? <InlineNameEditor draft={inlineDraft} onChange={value => setInlineDraft(previous => previous ? { ...previous, value, error: undefined } : previous)} onSubmit={() => void submitInline()} onCancel={cancelInline}/> : null;
   }
   function showMenu(event: MouseEvent | KeyboardEvent, actions: MenuAction[]) {
     event.preventDefault();
@@ -847,7 +795,12 @@ export default function Workbench({
         },
       },
       {
-        label: "更名／移至資料夾…",
+        label: "更名",
+        icon: <FilePenLine size={15} />,
+        run: () => renameDocumentInline(d),
+      },
+      {
+        label: "移至資料夾…",
         icon: <FilePenLine size={15} />,
         run: () =>
           ask({
@@ -884,7 +837,7 @@ export default function Workbench({
                 text: d.text,
               });
               if (!r) throw Error("複製失敗");
-              if (r.documentId) openDocument(r.documentId, true);
+              if (r.documentId) openDocument(r.documentId);
             },
           }),
       },
@@ -993,28 +946,8 @@ export default function Workbench({
       },
       null,
       {
-        label: "更名並更新引用…",
-        run: () =>
-          ask({
-            title: "更名場景",
-            description:
-              "同步更新已辨識的靜態 jump／detour 引用；動態表達式保留。",
-            label: "場景名稱",
-            value: node.name,
-            run: async (name) => {
-              const change = renamedScene(project, node, name);
-              if (
-                !(await perform({
-                  type: "transaction",
-                  projectId: project.id,
-                  label: "更名場景",
-                  documents: change.documents,
-                }))
-              )
-                throw Error("修改失敗");
-              notify(`已更新場景與 ${change.references} 個靜態引用`);
-            },
-          }),
+        label: "更名並更新引用",
+        run: () => renameSceneInline(node),
       },
       {
         label: "複製場景…",
@@ -1176,7 +1109,7 @@ export default function Workbench({
             projectId: project.id,
             ...entry,
           });
-          if (r?.documentId) openDocument(r.documentId, true);
+          if (r?.documentId) openDocument(r.documentId);
         }
       }
     } catch (e) {
@@ -1193,8 +1126,7 @@ export default function Workbench({
         setHistorySelection(null);
         return;
       }
-      setOutlineTemporary(false);
-      dragCancelled.current = true;
+        dragCancelled.current = true;
       void window.yarnDesktop?.windows.cancelDrag();
     }
     if (mod && key === "s") {
@@ -1372,9 +1304,12 @@ export default function Workbench({
       (issueScope === "all" || i.file === doc?.name) &&
       (issueSeverity === "all" || i.severity === issueSeverity),
   );
+  const fileSort = session.fileSortByProject?.[project.id] || "manual";
+  const displayedDocuments = orderedDocuments(project.documents, fileSort);
+  function setFileSort(value: "manual" | "name-asc" | "name-desc") { setSession(s => ({ ...s, fileSortByProject: { ...s.fileSortByProject, [project.id]: value } })); }
   const folders = [
     ...new Set(
-      project.documents.flatMap((d) => {
+      displayedDocuments.flatMap((d) => {
         const parts = d.name.split("/");
         return parts
           .slice(0, -1)
@@ -1392,22 +1327,23 @@ export default function Workbench({
         .map((f) => (
           <div key={f}>
             <button
-              className="folder-row"
+              className={"folder-row " + (fileDrop === "folder:" + f ? "folder-drop-target" : "")}
               style={{ paddingLeft: 15 + f.split("/").length * 10 }}
-              onClick={() =>
+              onClick={() => {
+                setActiveFolder(f);
                 setCollapsed((previous) => {
                   const next = new Set(previous);
                   if (next.has(f)) next.delete(f);
                   else next.add(f);
                   return next;
-                })
-              }
-              onDragOver={(e) => {
-                if (e.dataTransfer.types.includes("application/x-yarn-file"))
-                  e.preventDefault();
+                });
               }}
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes("application/x-yarn-file")) { e.preventDefault(); setFileDrop("folder:" + f); }
+              }}
+              onDragLeave={() => setFileDrop("")}
               onDrop={(e) => {
-                e.preventDefault();
+                e.preventDefault(); setFileDrop("");
                 const id = e.dataTransfer.getData("application/x-yarn-file"),
                   d = project.documents.find((d) => d.id === id);
                 if (d)
@@ -1431,7 +1367,8 @@ export default function Workbench({
             {!collapsed.has(f) && renderFiles(f)}
           </div>
         ))}
-      {project.documents
+      {inlineDraft?.kind === "new-document" && inlineDraft.folder === folder && inlineName()}
+      {displayedDocuments
         .filter(
           (d) =>
             (d.name.includes("/")
@@ -1441,41 +1378,40 @@ export default function Workbench({
         .map((d) => (
           <div
             key={d.id}
-            className={"file-entry " + (doc?.id === d.id ? "active" : "")}
+            className={"file-entry " + (doc?.id === d.id ? "active " : "") + (fileDrop === d.id ? "file-drop-before" : "")}
             style={{
               marginLeft: 10 + folder.split("/").filter(Boolean).length * 10,
             }}
-            draggable
+            draggable={!inlineDraft}
             onDragStart={(e) => {
               documentDrag.current = d.id;
               e.dataTransfer.setData("application/x-yarn-file", d.id);
             }}
+            onDragEnd={() => { documentDrag.current = ""; setFileDrop(""); }}
             onDragOver={(e) => {
-              if (e.dataTransfer.types.includes("application/x-yarn-file"))
-                e.preventDefault();
+              const from = project.documents.find(item => item.id === documentDrag.current);
+              if (e.dataTransfer.types.includes("application/x-yarn-file") && from && folderOf(from.name) === folderOf(d.name)) { e.preventDefault(); setFileDrop(d.id); }
             }}
+            onDragLeave={() => setFileDrop("")}
             onDrop={(e) => {
               if (!e.dataTransfer.types.includes("application/x-yarn-file"))
                 return;
               e.preventDefault();
-              const from = e.dataTransfer.getData("application/x-yarn-file"),
-                ids = project.documents
-                  .map((d) => d.id)
-                  .filter((id) => id !== from);
-              ids.splice(ids.indexOf(d.id), 0, from);
-              void perform({
-                type: "sortDocuments",
-                projectId: project.id,
-                documentIds: ids,
-              });
+              setFileDrop("");
+              const from = e.dataTransfer.getData("application/x-yarn-file");
+              const source = project.documents.find(item => item.id === from);
+              if (!source || folderOf(source.name) !== folderOf(d.name) || from === d.id) return;
+              const order = reorderWithinFolder(displayedDocuments, from, d.id);
+              void perform({ type: "sortDocuments", projectId: project.id, documentIds: order }).then(result => { if (result) setFileSort("manual"); });
             }}
             onContextMenu={(e) => showMenu(e, fileMenu(d))}
-            onKeyDown={(e) => menuKeys(e, fileMenu(d))}
+            onKeyDown={(e) => { if (e.key === "F2") { e.preventDefault(); renameDocumentInline(d); } else menuKeys(e, fileMenu(d)); }}
           >
+            {inlineDraft?.kind === "rename-document" && inlineDraft.documentId === d.id ? inlineName() : <>
             <button
               className="file-row"
               title={d.path || d.name}
-              onClick={(e) => openDocument(d.id, e.ctrlKey || e.metaKey)}
+              onClick={(e) => { setActiveFolder(folderOf(d.name)); openDocument(d.id, e.ctrlKey || e.metaKey); }}
               onAuxClick={(e) => {
                 if (e.button === 1) {
                   e.preventDefault();
@@ -1503,6 +1439,7 @@ export default function Workbench({
             >
               <MoreHorizontal size={15} />
             </button>
+            </>}
           </div>
         ))}
     </>
@@ -1857,13 +1794,7 @@ export default function Workbench({
                         setHistoryOpen(false);
                         setSideFocus("right");
                         setHistorySelection(null);
-                        if (showOutline) {
-                          setOutlineTemporary(false);
-                          setSession((s) => ({
-                            ...s,
-                            outline: { ...s.outline, [mode]: false },
-                          }));
-                        } else setOutlineTemporary(true);
+                        setSession(s => ({ ...s, outline: { ...s.outline, [mode]: !showOutline } }));
                       }}
                     >
                       <ListTree size={16} />
@@ -1955,7 +1886,7 @@ export default function Workbench({
           ((showOutline || historyOpen) && !utility ? " has-document-side" : "")
         }
       >
-        {session.left && !utility && (
+        {session.left && (!utility || inlineDraft?.kind.endsWith("document")) && (
           <aside
             className="workspace-sidebar"
             style={{ width: session.sidebarWidth }}
@@ -1975,29 +1906,27 @@ export default function Workbench({
                 <div className="section-heading">
                   <span>劇本</span>
                   <div>
-                    <button
-                      title="依檔名排序"
-                      aria-label="依檔名排序"
-                      onClick={() =>
-                        void perform({
-                          type: "sortDocuments",
-                          projectId: project.id,
-                          documentIds: [...project.documents]
-                            .sort((a, b) =>
-                              a.name.localeCompare(b.name, undefined, {
-                                numeric: true,
-                              }),
-                            )
-                            .map((d) => d.id),
-                        })
-                      }
+                    <ChromeButton
+                      title={fileSort === "name-asc" ? "名稱升冪；點擊改為降冪" : fileSort === "name-desc" ? "名稱降冪；點擊改為升冪" : "手動排序；點擊依名稱升冪，右鍵選擇排序方式"}
+                      aria-label={fileSort === "name-asc" ? "名稱升冪" : fileSort === "name-desc" ? "名稱降冪" : "手動排序"}
+                      onClick={() => setFileSort(fileSort === "name-asc" ? "name-desc" : "name-asc")}
+                      onContextMenu={e => showMenu(e, [
+                        { label: "手動排序", run: () => setFileSort("manual") },
+                        { label: "名稱升冪", run: () => setFileSort("name-asc") },
+                        { label: "名稱降冪", run: () => setFileSort("name-desc") },
+                      ])}
+                      onKeyDown={e => menuKeys(e, [
+                        { label: "手動排序", run: () => setFileSort("manual") },
+                        { label: "名稱升冪", run: () => setFileSort("name-asc") },
+                        { label: "名稱降冪", run: () => setFileSort("name-desc") },
+                      ])}
                     >
-                      <ArrowDownAZ size={15} />
-                    </button>
+                      {fileSort === "name-desc" ? <ArrowUpZA size={15}/> : fileSort === "name-asc" ? <ArrowDownAZ size={15}/> : <ListOrdered size={15}/>}
+                    </ChromeButton>
                     <ChromeButton
                       title="新增劇本"
                       aria-label="新增劇本"
-                      onClick={newDocument}
+                      onClick={() => newDocument()}
                     >
                       <Plus size={15} />
                     </ChromeButton>
@@ -2008,7 +1937,7 @@ export default function Workbench({
                   {!project.documents.length && (
                     <p className="empty-small">
                       尚無劇本。
-                      <button onClick={newDocument}>建立第一份劇本</button>
+                      <button onClick={() => newDocument()}>建立第一份劇本</button>
                     </p>
                   )}
                 </div>
@@ -2177,7 +2106,7 @@ export default function Workbench({
                       snapshot.projects.findIndex((p) => p.id === project.id) +
                       1
                     }
-                    viewKey={active.id}
+                    viewKey={active.id + ":" + doc.id}
                     viewStates={editorViews}
                     goTo={goto}
                     lineNumbers={session.lineNumbers}
@@ -2276,7 +2205,7 @@ export default function Workbench({
                   : "建立劇本，或開啟已有的專案資料夾。"}
               </p>
               <div className="empty-actions">
-                <button className="primary" onClick={newDocument}>
+                <button className="primary" onClick={() => newDocument()}>
                   新增劇本
                 </button>
                 <button
@@ -2391,31 +2320,6 @@ export default function Workbench({
               </strong>
               <div>
                 <ChromeButton
-                  title={outlineOpen ? "取消固定大綱" : "固定大綱"}
-                  aria-pressed={outlineOpen}
-                  onClick={() => {
-                    setSession((s) => ({
-                      ...s,
-                      outline: { ...s.outline, [mode]: !outlineOpen },
-                    }));
-                    setOutlineTemporary(true);
-                  }}
-                >
-                  {outlineOpen ? <PinOff size={14} /> : <Pin size={14} />}
-                </ChromeButton>
-                <ChromeButton
-                  title="關閉大綱"
-                  onClick={() => {
-                    setOutlineTemporary(false);
-                    setSession((s) => ({
-                      ...s,
-                      outline: { ...s.outline, [mode]: false },
-                    }));
-                  }}
-                >
-                  <X size={15} />
-                </ChromeButton>
-                <ChromeButton
                   title="新增場景"
                   aria-label="新增場景"
                   disabled={!doc}
@@ -2452,7 +2356,7 @@ export default function Workbench({
                     .toLowerCase()
                     .includes(sceneQuery.toLowerCase()),
                 )
-                .map((n) => (
+                .map((n) => inlineDraft?.kind === "rename-scene" && inlineDraft.documentId === doc?.id && inlineDraft.sceneName === n.name ? <div key={n.id}>{inlineName()}</div> : (
                   <button
                     key={n.id}
                     className={
@@ -2484,12 +2388,13 @@ export default function Workbench({
                         openDocument(doc.id, false, n.body, 1, true, mode);
                     }}
                     onContextMenu={(e) => showMenu(e, sceneMenu(n))}
-                    onKeyDown={(e) => menuKeys(e, sceneMenu(n))}
+                    onKeyDown={(e) => { if (e.key === "F2") { e.preventDefault(); renameSceneInline(n); } else menuKeys(e, sceneMenu(n)); }}
                   >
                     <FileText size={13} />
                     <span>{n.name}</span>
                   </button>
                 ))}
+              {inlineDraft?.kind === "new-scene" && inlineDraft.documentId === doc?.id && inlineName()}
             </div>
           </aside>
         )}
@@ -2657,7 +2562,7 @@ export default function Workbench({
             className="secondary"
             onClick={() => {
               setQuick(null);
-              newDocument();
+              newDocument(quickNewTab);
             }}
           >
             <Plus size={14} />
