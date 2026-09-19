@@ -53,3 +53,9 @@ Workbench 組合 SettingsView、SearchOverlay、CommandManager、HistoryView 及
 ### 關閉握手（0.5.1）
 
 主程序攔截 close，以每次隨機 token 向該 renderer 請求 prepare-close。renderer 暫停操作，檢查組字並 flush 未同步交易、保存 session 後回覆。主程序核對 sender 與 token，再 flush 磁碟；重複 close 合併，15 秒未回覆保留視窗，錯誤可返回編輯。正常關閉不需要使用者確認；保存失敗沿用問題文件提示與草稿保護。
+
+### Spindle 品牌相容性（0.6.0）
+
+顯示名稱與可執行檔改為 Spindle；保留 com.yarnworkbench.desktop 安裝識別、Yarn Workbench profile 路徑、localStorage key、.yarn-workbench 與備份格式。顯式 --user-data-dir 優先，不改動隔離測試或使用者指定路徑。
+
+Ctrl 連結由共用 sceneLink 解析來源範圍，解析後先確認唯一存在的目標。Monaco 與 CodeMirror 都用同一命中範圍顯示和導航；裝飾不新增內容交易。指令提示共享 metadata，Monaco 跳脫 Markdown，CodeMirror 用 textContent 建構 DOM。

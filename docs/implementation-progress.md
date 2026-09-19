@@ -1,11 +1,13 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.5.1**，2026-09-19。依據 M0–M6、第二輪 R01–R08 及最新安靜自動保存回饋。安裝版與 portable 已打包，portable 啟動與本輪互動驗證通過；完整工作流另以隔離 Electron 驗證。
+版本：Windows x64 **0.6.0**，2026-09-19。依據 M0–M6、第二輪 R01–R08 及 Spindle 品牌／跳轉提示回饋。安裝版與 portable 已打包，portable 啟動與本輪互動驗證通過；完整工作流另以隔離 Electron 驗證。
 
 ## 本版完成
 
 | 範圍 | 成果 |
 |---|---|
+| 品牌與跳轉 | Spindle；SVG 入庫並產生 Windows／favicon／portable 圖示。Ctrl 懸浮在可解析目標變色加底線，三種編輯器共用精確來源範圍。 |
+| 指令提示 | 標題、識別字、描述、位置參數列與範例分區；虛擬參數提示使用相同資料。 |
 | 指令與搜尋 | 自訂指令使用與設定一致的工具 tab；保留非法草稿，支援一般分頁切換／關閉。顯示名稱與參數說明可選填，灰色小標籤及單一搜尋焦點框減少雜訊。搜尋／Ctrl+P 共用中央偏上的輕量即時結果浮層；方向鍵選取，Enter 定位，Ctrl+Enter／中鍵新分頁，整體失焦關閉。 |
 | 導航與新增 | 普通導航保持目前 TabId，不跳另一個同稿視圖；每 tab 有獨立歷史及文件視圖快取。劇本／場景新增與更名採行內反白輸入，Esc 取消，錯誤就地保留。排序 SVG 隨方向改變，不破壞手排。 |
 | 閱讀 | 正文優先，附屬資訊降低彩度；命令與正文維持相同行框。場景分隔前後 24px，分支首尾 16px，圖示與文字起點一致。保留連續編輯、來源揭露、跨區塊選取與 Undo；Monaco 原有字體與配色保留，另加虛擬參數提示。 |
@@ -17,13 +19,14 @@
 
 ## 驗證證據
 
-- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。全產品與測試腳本 lint 仍只有 `app/CodeEditor.tsx` 的既有 **17 errors／2 warnings**，見 [lint 報告](../outputs/quiet-release-lint.json)。未為清理基線改動純文字編輯器。
-- 單元與服務回歸 **83／83**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
-- [本版保存與關閉驗證](../outputs/quiet-autosave-portable-0.5.1/results.json)：持續輸入 tab 寬度穩定、無日常圓點／轉圈、關閉保存面板、磁碟衝突保留視窗、立即關閉寫入最後編輯。
+- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。全產品與測試腳本 lint 仍只有 `app/CodeEditor.tsx` 的既有 **17 errors／2 warnings**，見 [lint 報告](../outputs/spindle-lint.json)。未為清理基線改動純文字編輯器。
+- 單元與服務回歸 **86／86**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- [本版品牌／導航／提示](../outputs/spindle-portable-0.6.0/results.json)：名稱、隔離 profile、Monaco／閱讀／節點 Ctrl 懸浮與釋放、分層提示、跨檔不增 tab。
+- [保存與關閉基線（0.5.1）](../outputs/quiet-autosave-portable-0.5.1/results.json)：持續輸入 tab 寬度穩定、無日常圓點／轉圈、關閉保存面板、磁碟衝突保留視窗、立即關閉寫入最後編輯。
 - [0.5.0 桌面互動基線](../outputs/command-display-portable-0.5.0/results.json)：目前分頁導航、行內新增／取消、排序、大綱、搜尋浮層、指令 tab／草稿／虛擬提示與懸浮說明、面板及實際節點共享來源。
 - [0.5.0 歷史與UI回歸基線](../outputs/command-ui-regression/results.json)：跨模式收合、草稿保存、歷史唯讀／差異／過期保護、設定輸入與 800／1100／1440px 面板。
-- [磁碟及多視窗工作流](../outputs/quiet-workspace-regression/results.json)：原檔自動寫回、BOM／CRLF、跨模式及跨窗 Undo／Redo、同名子路徑、外部衝突、圖表布局歷史、非法指令草稿與損毀布局重啟。
-- [Portable 啟動專項](../outputs/portable-startup-0.5.1/results.json)：原生可見性、兩個隔離執行個體、重複啟動喚回及解壓資源存活。測試不以強制 `show()` 取代自行顯示。
+- [磁碟及多視窗工作流](../outputs/spindle-workspace-regression/results.json)：原檔自動寫回、BOM／CRLF、跨模式及跨窗 Undo／Redo、同名子路徑、外部衝突、圖表布局歷史、非法指令草稿與損毀布局重啟。
+- [Portable 啟動專項](../outputs/portable-startup-0.6.0/results.json)：原生可見性、兩個隔離執行個體、重複啟動喚回及解壓資源存活。測試不以強制 `show()` 取代自行顯示。
 - 0.4.0 基線證據：[節點獨立測試](../outputs/graph-inline-edit/results.json)：連續編輯、CRLF／BOM、共享歷史、未完成語法、外部位移、改名、跨檔、拒絕提交後重新載入取回草稿。
 - 0.4.0 基線證據：[閱讀幾何](../outputs/reading-refinement/harness/results.json)與[行內輸入](../outputs/inline-name-ui/results.json)：實際 CodeMirror 間距／對齊、跨場景貼上及 Undo／Redo、反白、Esc、衝突重試。組字事件為合成測試，不能替代原生 IME。
 - 發行包大小、SHA256 與驗證摘要：[release-verification.json](../outputs/release-verification.json)。Installer 和 portable 使用相同離線編輯器及主程序服務；安裝精靈未操作。
@@ -40,4 +43,4 @@
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/quiet-autosave` 提交安靜自動保存、關閉握手及發行文件。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `feat/spindle-navigation` 提交 Spindle 品牌、精確 Ctrl 跳轉及結構化提示。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
