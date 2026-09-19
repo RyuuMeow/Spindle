@@ -20,11 +20,13 @@ Windows 的暫時性 EPERM／EBUSY／EACCES 最多重試三次，每次仍重新
 
 專案 `.yarn-workbench/project.json` 保存名稱、有效指令、相對路徑與文件 ID。profile 的 `workspace-v2.json` 保存專案工作集、草稿與快照，`windows-v2.json` 保存視窗／tab 狀態。開啟同一資料夾重用專案；複製專案目錄時避免與已開啟專案重用文件 ID。
 
-每分鐘對有變更內容建立快照，每文件保留 50 份；刪除前先持久化復原副本，再刪磁碟檔案。最近刪除保留 30 天。復原遇到同名檔案使用新的 recovered 名稱，不覆蓋既有檔案。無路徑草稿與非法指令表單也保留在 profile。
+每分鐘對有變更內容建立快照，每文件保留 50 份；刪除前先持久化復原副本，再透過 Electron `shell.trashItem` 送入系統垃圾桶；失敗保留文件及錯誤，不回退永久刪除。最近刪除保留 30 天。復原遇到同名檔案使用新的 recovered 名稱，不覆蓋既有檔案。無路徑草稿與非法指令表單也保留在 profile。
 
 ## 編輯面
 
 Monaco 保留純文字呈現。CodeMirror 使用來源範圍裝飾，不以 DOM 重新序列化劇本；未修改文字、註解、BOM 與換行保留。觸及的token與被選取範圍揭露原文，未知命令與未閉合區域回退來源。折疊與聚焦只影響閱讀；折疊使用正規化來源範圍、隨CM修改映射並在還原時驗證場景邊界。
+
+Monaco React 重用保留的 model 時不保證套用最新 value，因此在掛載及 model 切換後、恢復視圖前，以當前文件同步 model；程式同步不提交交易。
 
 兩個編輯器的 Undo／Redo 接到文件引擎；模式切換沒有文字交易。圖表布局歷史獨立保存於該 tab，跨模式保留。文字 undo stack 在本次 App 生命週期內共用，持久化快照負責重啟後內容恢復。
 
@@ -59,3 +61,11 @@ Workbench 組合 SettingsView、SearchOverlay、CommandManager、HistoryView 及
 顯示名稱與可執行檔改為 Spindle；保留 com.yarnworkbench.desktop 安裝識別、Yarn Workbench profile 路徑、localStorage key、.yarn-workbench 與備份格式。顯式 --user-data-dir 優先，不改動隔離測試或使用者指定路徑。
 
 Ctrl 連結由共用 sceneLink 解析來源範圍，解析後先確認唯一存在的目標。Monaco 與 CodeMirror 都用同一命中範圍顯示和導航；裝飾不新增內容交易。指令提示共享 metadata，Monaco 跳脫 Markdown，CodeMirror 用 textContent 建構 DOM。
+
+### 內建指令與變數補全（0.6.4）
+
+`command-catalog.ts` 提供純顯示 metadata，不寫入自訂指令設定。三個編輯入口共用內建／自訂候選、懸浮說明與參數提示；`set`／`declare` 的名稱與值分開，條件與右側運算式不依空格拆成位置參數。內建語法不增加重複的 inline 參數標籤。補全清單開啟時暫停參數提示，關閉後再定位當前參數。
+
+`variable-completion.ts` 索引整個專案的完整 declare／set 定義，宣告優先、同名去重，保留型別、文件、行數及緊鄰的 /// 說明。`set` 左側不提供唯讀 smart variable；條件、運算式及插值中的 `$` 提供定義候選，排除註解、字串與普通台詞。這是編輯輔助，不代替官方編譯器的型別分析。
+
+語義來源：[變數、declare、set 與型別](https://yarnspinner.dev/docs/yarn/02-fundamentals/05-logic-and-variables/)、[detour／return 與 v3 語法](https://docs.yarnspinner.dev/2.5/coming-in-v3)、[once](https://docs.yarnspinner.dev/write-yarn-scripts/scripting-fundamentals/once)、[函式與 call](https://docs.yarnspinner.dev/api/csharp/yarn.unity/yarn.unity.dialoguerunner/yarn.unity.dialoguerunner.addfunction)、[wait／stop](https://docs.yarnspinner.dev/2.3/getting-started/writing-in-yarn/commands?fallback=true)。

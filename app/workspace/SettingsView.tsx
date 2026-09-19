@@ -389,7 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.6.3：保留閱讀空白行、頂部新增與雙擊改名，修正補全清單及提示定位。
+                    0.6.4：靜默更名與可復原刪除、即時模式同步、內建指令說明及專案變數補全。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

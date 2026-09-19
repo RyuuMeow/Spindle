@@ -1,8 +1,16 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.6.3**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
+版本：Windows x64 **0.6.4**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
 
-## 0.6.3 修正
+## 0.6.4 修正
+
+- 劇本直接移到垃圾桶：刪除前持久化復原副本，磁碟檔案使用系統資源回收筒；失敗保留原文件，沒有永久刪除 fallback。
+- 行內新增／更名與套用定義不顯示轉圈，保留錯誤及重複提交防護。
+- 修復 Monaco 保留 model 在重新掛載時仍顯示舊稿；跨模式、節點與第一筆輸入／共用 Undo 已實測。
+- 補齊 14 個支援的內建指令說明；三種編輯入口共用專案變數補全與語義參數位置，候選不被提示遮擋。
+- [開發版互動](../outputs/sync-language-ui/results.json)包含 Windows 資源回收筒與 App 復原；[既有輔助回歸](../outputs/sync-language-assistance/results.json)包含窄窗、App 縮放、補全幾何與來源留白。
+
+## 0.6.3 基線修正
 
 - 閱讀空白逐行保留，活動／非活動高度一致，已有空白取代外部段落留白；條件與選項保留邊界內距。BOM／CRLF 原文字節不變。
 - 新增劇本在目前資料夾文件頂部完成，保留當下可見順序並同步切回手動排序；雙擊原位改名，反白主檔名，不新增或跳其他 tab。
@@ -27,8 +35,9 @@
 
 ## 驗證證據
 
-- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。本輪改動範圍 lint 仍只有 `app/CodeEditor.tsx` 的既有 **13 errors／2 warnings**，見 [lint 報告](../outputs/refinement-lint.json) 與 [修正後複查](../outputs/refinement-lint-followup.json)；未冒稱全專案 lint 清零。
-- 單元與服務回歸 **90／90**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。本輪改動範圍 lint 仍只有 `app/CodeEditor.tsx` 的既有 **13 errors／2 warnings**，見 [lint 報告](../outputs/sync-language-lint.json)；未冒稱全專案 lint 清零。
+- 單元與服務回歸 **95／95**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- [0.6.4 Portable 互動](../outputs/sync-language-portable-0.6.4/results.json)：純文字／閱讀／圖表即時同步與共享 Undo、跨檔變數補全、內建指令參數說明、靜默更名、無確認刪除、Windows 資源回收筒與 App 復原，全數通過且無頁面錯誤。
 - [0.6.3 Portable 互動](../outputs/refinement-portable-0.6.3/results.json)：三個編輯入口、相同 29px 補全列高與參數文字寬度、空白行與 BOM／CRLF 保留、頂部新增與雙擊改名、800px 窄窗及 100／125／150% App 縮放提示定位，全數通過且無頁面錯誤。
 - [0.6.2 portable 基線互動](../outputs/assistance-portable-0.6.2/results.json)：三種編輯入口、補全／參數／Esc／貼上／Undo、失焦、模式切換、診斷數量與窄窗浮窗。
 - [0.6.0 品牌／導航／提示基線](../outputs/spindle-portable-0.6.0/results.json)：名稱、隔離 profile、Monaco／閱讀／節點 Ctrl 懸浮與釋放、分層提示、跨檔不增 tab。
@@ -53,4 +62,4 @@
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/editor-overlay-and-sidebar` 修正來源留白、文件操作與編輯浮窗；前版基線為 `v0.6.2`，本輪交付標記為 `v0.6.3`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/quiet-actions-and-editor-sync` 修正垃圾桶、靜默操作、來源同步與語言輔助；前版基線為 `v0.6.3`，本輪交付標記為 `v0.6.4`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。

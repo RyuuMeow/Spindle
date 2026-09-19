@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -28,7 +28,9 @@
     "desktop:assets": "node scripts/prepare-brand-assets.mjs",
     "test:spindle-ui": "node scripts/test-spindle-ui.cjs",
     "test:command-context-ui": "node scripts/test-command-context-ui.cjs",
-    "test:editor-assistance": "node scripts/test-editor-assistance.cjs"
+    "test:editor-assistance": "node scripts/test-editor-assistance.cjs",
+    "test:sync-language": "node scripts/test-sync-and-language.cjs",
+    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
