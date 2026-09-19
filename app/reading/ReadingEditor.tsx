@@ -1,10 +1,12 @@
 "use client";
+import { commandInput } from "../command-hints";
 import { sceneLinks } from "./scene-links";
 import { commandTooltips } from "./command-tooltips";
 
 import { useEffect, useRef } from "react";
 import {
   Annotation,
+  RangeSet,
   EditorState,
   StateField,
   StateEffect,
@@ -12,6 +14,8 @@ import {
 } from "@codemirror/state";
 import {
   EditorView,
+  GutterMarker,
+  gutterLineClass,
   keymap,
   drawSelection,
   placeholder,
@@ -44,6 +48,7 @@ import {
   restoreReadingFolds,
   type ReadingFold,
 } from "./structure";
+import { readingLayout } from "./layout";
 import { readingDecorations } from "./decorations";
 import { readingIcon } from "./icons";
 import "./reading.css";
@@ -168,6 +173,21 @@ export default function ReadingEditor(props: Props) {
         drawSelection(),
         highlightSelectionMatches(),
         placeholder("在這裡開始撰寫 Yarn 劇本"),
+        gutterLineClass.compute([structure], (state) => {
+          const lines = state.field(structure);
+          const layout = readingLayout(lines);
+          class HeadingGap extends GutterMarker {
+            elementClass = "reading-fold-heading-gap";
+          }
+          const marker = new HeadingGap();
+          return RangeSet.of(
+            lines.flatMap((line, index) =>
+              line.kind === "title" && layout[index].before > 0
+                ? [marker.range(line.from)]
+                : [],
+            ),
+          );
+        }),
         foldGutter({
           markerDOM: (open) => {
             const marker = document.createElement("span");
@@ -295,6 +315,12 @@ export default function ReadingEditor(props: Props) {
         autocompletion({
           override: [
             (context) => {
+              const line = context.state.doc.lineAt(context.pos);
+              if (
+                commandInput(line.text.slice(0, context.pos - line.from))
+                  ?.kind !== "name"
+              )
+                return null;
               const word = context.matchBefore(/[\w$]*/);
               if (!word || (!context.explicit && word.from === word.to))
                 return null;

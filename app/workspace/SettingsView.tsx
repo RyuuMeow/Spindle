@@ -389,7 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.6.0：Spindle 品牌與 App 圖示；Ctrl
+                    0.6.1：修正指令參數提示與場景摺疊對齊；Ctrl
                     懸浮跳轉連結及分層指令提示。
                   </p>
                   <p className="setting-help">

@@ -1,8 +1,14 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.6.0**，2026-09-19。依據 M0–M6、第二輪 R01–R08 及 Spindle 品牌／跳轉提示回饋。安裝版與 portable 已打包，portable 啟動與本輪互動驗證通過；完整工作流另以隔離 Electron 驗證。
+版本：Windows x64 **0.6.1**，2026-09-19。依據 M0–M6、第二輪 R01–R08 及 Spindle 品牌／跳轉提示回饋。安裝版與 portable 已打包，portable 啟動與本輪互動驗證通過；完整工作流另以隔離 Electron 驗證。
 
-## 本版完成
+## 0.6.1 修正
+
+指令名稱補全與參數簽名分流，帶空格字串／群組保持正確位置；閱讀與節點補全限制在指令名稱範圍。摺疊 gutter 排除標題前語義留白，展開及收合對齊。
+
+[本輪 portable 互動](../outputs/context-portable-0.6.1/results.json)：真實鍵盤輸入、當前參數高亮與可見摺疊箭頭幾何。
+
+## 累積完成
 
 | 範圍 | 成果 |
 |---|---|
@@ -19,14 +25,14 @@
 
 ## 驗證證據
 
-- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。全產品與測試腳本 lint 仍只有 `app/CodeEditor.tsx` 的既有 **17 errors／2 warnings**，見 [lint 報告](../outputs/spindle-lint.json)。未為清理基線改動純文字編輯器。
-- 單元與服務回歸 **86／86**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
-- [本版品牌／導航／提示](../outputs/spindle-portable-0.6.0/results.json)：名稱、隔離 profile、Monaco／閱讀／節點 Ctrl 懸浮與釋放、分層提示、跨檔不增 tab。
+- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。本輪改動範圍 lint 仍只有 `app/CodeEditor.tsx` 的既有 **17 errors／2 warnings**，見 [lint 報告](../outputs/context-lint.json)。未為清理基線改動純文字編輯器。
+- 單元與服務回歸 **87／87**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- [0.6.0 品牌／導航／提示基線](../outputs/spindle-portable-0.6.0/results.json)：名稱、隔離 profile、Monaco／閱讀／節點 Ctrl 懸浮與釋放、分層提示、跨檔不增 tab。
 - [保存與關閉基線（0.5.1）](../outputs/quiet-autosave-portable-0.5.1/results.json)：持續輸入 tab 寬度穩定、無日常圓點／轉圈、關閉保存面板、磁碟衝突保留視窗、立即關閉寫入最後編輯。
 - [0.5.0 桌面互動基線](../outputs/command-display-portable-0.5.0/results.json)：目前分頁導航、行內新增／取消、排序、大綱、搜尋浮層、指令 tab／草稿／虛擬提示與懸浮說明、面板及實際節點共享來源。
 - [0.5.0 歷史與UI回歸基線](../outputs/command-ui-regression/results.json)：跨模式收合、草稿保存、歷史唯讀／差異／過期保護、設定輸入與 800／1100／1440px 面板。
 - [磁碟及多視窗工作流](../outputs/spindle-workspace-regression/results.json)：原檔自動寫回、BOM／CRLF、跨模式及跨窗 Undo／Redo、同名子路徑、外部衝突、圖表布局歷史、非法指令草稿與損毀布局重啟。
-- [Portable 啟動專項](../outputs/portable-startup-0.6.0/results.json)：原生可見性、兩個隔離執行個體、重複啟動喚回及解壓資源存活。測試不以強制 `show()` 取代自行顯示。
+- [0.6.0 Portable 啟動基線](../outputs/portable-startup-0.6.0/results.json)：原生可見性、兩個隔離執行個體、重複啟動喚回及解壓資源存活。測試不以強制 `show()` 取代自行顯示。
 - 0.4.0 基線證據：[節點獨立測試](../outputs/graph-inline-edit/results.json)：連續編輯、CRLF／BOM、共享歷史、未完成語法、外部位移、改名、跨檔、拒絕提交後重新載入取回草稿。
 - 0.4.0 基線證據：[閱讀幾何](../outputs/reading-refinement/harness/results.json)與[行內輸入](../outputs/inline-name-ui/results.json)：實際 CodeMirror 間距／對齊、跨場景貼上及 Undo／Redo、反白、Esc、衝突重試。組字事件為合成測試，不能替代原生 IME。
 - 發行包大小、SHA256 與驗證摘要：[release-verification.json](../outputs/release-verification.json)。Installer 和 portable 使用相同離線編輯器及主程序服務；安裝精靈未操作。

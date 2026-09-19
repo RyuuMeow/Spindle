@@ -162,3 +162,43 @@ export function commandMarkdown(command: Command, parameterIndex = -1) {
     .filter(Boolean)
     .join("\n\n");
 }
+
+/** Cursor-prefix context: whitespace inside quotes/groups never advances a parameter. */
+export function commandInput(
+  prefix: string,
+): { kind: "name" } | { kind: "argument"; name: string; index: number } | null {
+  if (/^\s*<<\s*[A-Za-z_]*\w*$/.test(prefix)) return { kind: "name" };
+  const match = /^\s*<<\s*([A-Za-z_]\w*)[ \t]+(.*)$/.exec(prefix);
+  if (!match) return null;
+  let index = 0,
+    token = false,
+    quote = "",
+    escaped = false;
+  const stack: string[] = [];
+  const text = match[2];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quote) quote = "";
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      token = true;
+    } else if (text.slice(i, i + 2) === ">>" && !stack.length) return null;
+    else if ("([{".includes(char)) {
+      stack.push(char);
+      token = true;
+    } else if (")]}".includes(char)) {
+      if (stack.pop() !== { ")": "(", "]": "[", "}": "{" }[char]) return null;
+    } else if (/\s/.test(char) && !stack.length) {
+      if (token) {
+        index++;
+        token = false;
+      }
+    } else token = true;
+  }
+  return { kind: "argument", name: match[1], index };
+}

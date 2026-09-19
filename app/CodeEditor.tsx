@@ -11,7 +11,7 @@ import {
   commandLabel,
   parameterLabel,
   parameterHelp,
-  argumentSpans,
+  commandInput,
 } from "./command-hints";
 import { yarnEditorTheme } from "./editor-theme";
 import { loadEditorLocale } from "./editor-locale";
@@ -253,7 +253,7 @@ export default function CodeEditor({
                   startColumn: word.startColumn,
                   endColumn: pos.column,
                 };
-              if (/<<\s*(jump|detour)\s+\w*$/.test(prefix))
+              if (/^\s*<<\s*(jump|detour)\s+\w*$/.test(prefix))
                 return {
                   suggestions: latest.current.nodes.map((n) => ({
                     label: n.name,
@@ -263,7 +263,8 @@ export default function CodeEditor({
                     range,
                   })),
                 };
-              if (!prefix.includes("<<")) return { suggestions: [] };
+              if (commandInput(prefix)?.kind !== "name")
+                return { suggestions: [] };
               return {
                 suggestions: [
                   ...latest.current.commands.map((c) => ({
@@ -359,14 +360,12 @@ export default function CodeEditor({
               const line = model
                 .getLineContent(pos.lineNumber)
                 .slice(0, pos.column - 1);
-              const match = line.match(/^\s*<<\s*(\w+)\s+(.*)$/);
+              const input = commandInput(line);
+              if (input?.kind !== "argument") return null;
               const c = latest.current.commands.find(
-                (c) => c.name === match?.[1],
+                (c) => c.name === input.name,
               );
-              if (!c || !match || commandCall(line, latest.current.commands))
-                return null;
-              const argumentsSoFar = argumentSpans(match[2]);
-              if (!argumentsSoFar) return null;
+              if (!c || !c.params[input.index]) return null;
               return {
                 value: {
                   signatures: [
@@ -395,10 +394,7 @@ export default function CodeEditor({
                     },
                   ],
                   activeSignature: 0,
-                  activeParameter: Math.max(
-                    0,
-                    argumentsSoFar.length - (/\s$/.test(match[2]) ? 0 : 1),
-                  ),
+                  activeParameter: input.index,
                 },
                 dispose() {},
               };

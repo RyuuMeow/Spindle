@@ -14,6 +14,7 @@ buildSync({
   format: "cjs",
 });
 const {
+  commandInput,
   argumentSpans,
   commandCall,
   commandHover,
@@ -137,4 +138,30 @@ test("dynamic, incomplete and commented targets never become scene links", () =>
     "<<jump Village extra>>",
   ])
     assert.equal(sceneLink(text), null);
+});
+
+test("completion stops at the name and tracks incomplete positional arguments", () => {
+  for (const text of ["<<", "<<fa", "  <<play_sound"])
+    assert.deepEqual(commandInput(text), { kind: "name" });
+  for (const [text, index] of [
+    ["<<play_sound ", 0],
+    ['<<play_sound "wind ', 0],
+    ['<<play_sound "wind >> sea" ', 1],
+    ["<<play_sound (1 + ", 0],
+    ["<<play_sound (1 + 2)   ", 1],
+    ['<<play_sound "wind" 0.', 1],
+  ]) {
+    assert.deepEqual(commandInput(text), {
+      kind: "argument",
+      name: "play_sound",
+      index,
+    });
+  }
+  for (const text of [
+    "// <<play_sound ",
+    "Mira: <<play_sound ",
+    '<<play_sound "wind" >>',
+    "<<fade_in>> ",
+  ])
+    assert.equal(commandInput(text), null);
 });

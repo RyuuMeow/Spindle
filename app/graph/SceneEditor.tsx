@@ -1,4 +1,5 @@
 "use client";
+import { commandInput } from "../command-hints";
 import { sceneLinks } from "../reading/scene-links";
 import { commandTooltips } from "../reading/command-tooltips";
 
@@ -271,6 +272,13 @@ export default function SceneEditor(props: Props) {
           autocompletion({
             override: [
               (context) => {
+                const inputLine = context.state.doc.lineAt(context.pos);
+                const inputPrefix = inputLine.text.slice(
+                  0,
+                  context.pos - inputLine.from,
+                );
+                const commandName = commandInput(inputPrefix)?.kind === "name";
+                if (inputPrefix.includes("<<") && !commandName) return null;
                 const word = context.matchBefore(/[\w$]*/);
                 if (!word || (!context.explicit && word.from === word.to))
                   return null;
@@ -288,13 +296,21 @@ export default function SceneEditor(props: Props) {
                 return {
                   from: word.from,
                   options: [
-                    ...latest.current.commands.map((c) => ({
-                      label: c.name,
-                      type: "function",
-                      info: c.description,
+                    ...(commandName ? latest.current.commands : []).map(
+                      (c) => ({
+                        label: c.name,
+                        type: "function",
+                        info: c.description,
+                      }),
+                    ),
+                    ...(commandName ? builtins : []).map((label) => ({
+                      label,
+                      type: "keyword",
                     })),
-                    ...builtins.map((label) => ({ label, type: "keyword" })),
-                    ...characters.map((label) => ({ label, type: "variable" })),
+                    ...(commandName ? [] : characters).map((label) => ({
+                      label,
+                      type: "variable",
+                    })),
                   ],
                 };
               },
