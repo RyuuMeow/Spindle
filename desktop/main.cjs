@@ -110,10 +110,17 @@ function createWindow(id = randomUUID(), initial) {
   windows.set(id, { id, window, ready, signalReady });
   if (initial) sessions[id] = { ...sessions[id], session: initial };
   window.removeMenu();
-  window.once("ready-to-show", () => {
+  let shown = false;
+  function showInitialWindow() {
+    if (shown || window.isDestroyed()) return;
+    shown = true;
     if (remembered?.maximized) window.maximize();
     window.show();
-  });
+  }
+  window.once("ready-to-show", showInitialWindow);
+  // A hidden secondary process can finish its workspace without a first paint.
+  // The validated renderer handshake is also sufficient to show it, once only.
+  void ready.then(showInitialWindow);
   window.webContents.setWindowOpenHandler(({ url }) => {
     openExternal(url);
     return { action: "deny" };

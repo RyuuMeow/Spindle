@@ -4,11 +4,18 @@ const { spawn } = require("node:child_process");
 const net = require("node:net");
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function unusedPort() {
-  const server = net.createServer();
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const port = server.address().port;
-  await new Promise((resolve) => server.close(resolve));
-  return port;
+  // Windows may allocate a low ephemeral port (e.g. 6566) that fetch forbids.
+  // Probe only high ports, then release the reservation for Electron.
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const server = net.createServer();
+    try {
+      await new Promise((resolve, reject) => { server.once('error', reject); server.listen(require('node:crypto').randomInt(16384, 65536), '127.0.0.1', resolve); });
+      const port = server.address().port;
+      await new Promise(resolve => server.close(resolve));
+      return port;
+    } catch { if (server.listening) server.close(); }
+  }
+  throw Error('No local debugger port is available');
 }
 exports.launch = async function (playwright, options) {
   const inspectorPort = await unusedPort(),

@@ -858,4 +858,4 @@
   .workspace-body > .document-side { right: 6px; top: 6px; bottom: 6px; }
 }
 
-@media (max-width: 999px) { .workspace-body > .document-side { position: absolute; } }
+@media (max-width: 999px) { .workspace-body > .document-side { position: absolute; height: auto; } }

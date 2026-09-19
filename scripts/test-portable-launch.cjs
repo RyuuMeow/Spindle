@@ -72,6 +72,15 @@ const open = (profile) =>
     results.initial = initial;
     second = await open(otherProfile);
     const secondPage = await second.firstWindow();
+    await secondPage.getByRole("button", {name:"Chapter_01.yarn",exact:true}).waitFor({timeout:30000});
+    const secondDeadline = Date.now() + 10000;
+    let secondVisible = false;
+    while (Date.now() < secondDeadline) {
+      secondVisible = await second.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows()[0].isVisible());
+      if (secondVisible) break;
+      await new Promise(resolve => setTimeout(resolve,100));
+    }
+    assert(secondVisible, "Second isolated startup window was not shown");
     await secondPage.bringToFront();
     await (await second.browserWindow(secondPage)).evaluate((w) => w.focus());
     await (
@@ -133,7 +142,7 @@ const open = (profile) =>
   } catch (error) {
     results.passed = false;
     results.error = error.stack;
-    for (const [index, page] of (first?.windows() || []).entries())
+    for (const [index, page] of [...(first?.windows() || []), ...(second?.windows() || [])].entries())
       await page
         .screenshot({ path: path.join(out, `failure-${index}.png`) })
         .catch(() => {});

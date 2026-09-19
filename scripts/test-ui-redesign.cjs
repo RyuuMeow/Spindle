@@ -296,6 +296,8 @@ async function shot(name) {
           await page.locator(".workspace-sidebar").isVisible(),
           false,
         );
+      const outlineBounds = await page.getByRole("complementary", {name:"場景大綱"}).boundingBox();
+      assert(outlineBounds.y + outlineBounds.height <= 795, "outline respects the bottom application gutter");
       await shot("outline-" + width);
     }
     await page.getByRole("button", { name: "場景大綱", exact: true }).click();
