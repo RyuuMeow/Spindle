@@ -365,6 +365,23 @@ export class WorkspaceClient {
     this.emit();
     void this.flush().catch((error) => this.fail(error));
   }
+  get hasPendingWrites() {
+    return (
+      this.composing.size > 0 ||
+      [...this.states.values()].some(
+        (state) => sendableUpdates(state).length > 0,
+      ) ||
+      this.state.projects.some((p) =>
+        p.documents.some((d) => ["pending", "saving"].includes(d.status)),
+      )
+    );
+  }
+  async prepareClose() {
+    if (this.composing.size)
+      throw Error("文字仍在組字中，請完成輸入後再關閉。");
+    await this.flush();
+    if (this.error) throw Error(this.error);
+  }
   flush(): Promise<void> {
     if (this.pumping) return this.pumping;
     this.pumping = (async () => {

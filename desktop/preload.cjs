@@ -40,6 +40,11 @@ contextBridge.exposeInMainWorld("yarnDesktop", {
       subscribe("workspace:transferred", ({ tabId }) => callback(tabId)),
     onDropIndex: (callback) => subscribe("workspace:drop-index", callback),
   },
+  onPrepareClose: (callback) => subscribe("workspace:prepare-close", callback),
+  onCloseCancelled: (callback) =>
+    subscribe("workspace:close-cancelled", callback),
+  closePrepared: (token, error) =>
+    ipcRenderer.send("workspace:close-prepared", { token, error }),
   onOpened: (callback) => subscribe("workspace:opened", callback),
   paths: (files) => files.map((f) => webUtils.getPathForFile(f)),
   zoom: (factor) => webFrame.setZoomFactor(factor),

@@ -185,6 +185,9 @@ export type DesktopBridge = {
       callback: (value: { tabId: string; targetIndex: number }) => void,
     ) => () => void;
   };
+  onPrepareClose: (callback: (token: string) => void) => () => void;
+  onCloseCancelled: (callback: () => void) => () => void;
+  closePrepared: (token: string, error?: string) => void;
   onOpened: (callback: (result: ActionResult) => void) => () => void;
   paths: (files: File[]) => string[];
   zoom: (factor: number) => void;

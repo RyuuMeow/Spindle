@@ -129,8 +129,6 @@ export default function WorkspaceTabs({
               "@recovery": "專案復原",
             };
             const name = utilityNames[tab.file] || tab.file;
-            const duplicate =
-              tabs.filter((item) => item.file === tab.file).length > 1;
             const mode = utilityNames[tab.file]
               ? "設定"
               : tab.mode === "graph"
@@ -244,17 +242,6 @@ export default function WorkspaceTabs({
                     {tab.pinned && <Pin size={11} aria-label="已固定" />}
                     {name.replace(/\.yarn$/, "")}
                   </span>
-                  {duplicate && (
-                    <small className="tab-context">
-                      {mode}{" "}
-                      {tabs
-                        .filter((item) => item.file === tab.file)
-                        .findIndex((item) => item.id === tab.id) + 1}
-                    </small>
-                  )}
-                  {tab.dirty && (
-                    <i className="dirty-dot" aria-label="尚未儲存" />
-                  )}
                 </TabsTrigger>
                 <ControlTooltip label="關閉分頁">
                   <button

@@ -364,9 +364,9 @@ export default function CommandManager({
 
   return (
     <div className="command-workspace">
-      <aside className="command-list" aria-label="自訂指令">
+      <aside className="command-list" aria-label="指令列表">
         <div className="section-heading">
-          <span>自訂指令</span>
+          <span>指令列表</span>
           <ControlTooltip label="新增指令">
             <Button
               variant="ghost"

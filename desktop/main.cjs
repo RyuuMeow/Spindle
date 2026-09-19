@@ -131,8 +131,56 @@ function createWindow(id = randomUUID(), initial) {
       openExternal(url);
     }
   });
+  let closeApproved = false,
+    closePending = false;
   window.on("close", (event) => {
-    if (quitting) return;
+    if (quitting || closeApproved) return;
+    event.preventDefault();
+    if (closePending) return;
+    closePending = true;
+    const token = randomUUID();
+    const finish = async (error) => {
+      clearTimeout(timer);
+      ipcMain.removeListener("workspace:close-prepared", acknowledged);
+      if (window.isDestroyed()) return;
+      if (error) {
+        window.webContents.send("workspace:close-cancelled");
+        await dialog.showMessageBox(window, {
+          type: "warning",
+          title: "尚未完成保存",
+          message: "視窗已保留，請重試保存後再關閉。",
+          detail: error,
+          buttons: ["繼續編輯"],
+        });
+        closePending = false;
+        return;
+      }
+      try {
+        completeClose();
+      } catch (error) {
+        closePending = false;
+        window.webContents.send("workspace:close-cancelled");
+        await dialog.showMessageBox(window, {
+          type: "error",
+          message: "保存未完成，視窗已保留。",
+          detail: String(error),
+          buttons: ["繼續編輯"],
+        });
+      }
+    };
+    const acknowledged = (reply, value) => {
+      if (reply.sender.id !== window.webContents.id || value?.token !== token)
+        return;
+      void finish(typeof value.error === "string" ? value.error : undefined);
+    };
+    const timer = setTimeout(
+      () => void finish("編輯器尚未回應，未關閉視窗以保留內容。"),
+      15000,
+    );
+    ipcMain.on("workspace:close-prepared", acknowledged);
+    window.webContents.send("workspace:prepare-close", token);
+  });
+  function completeClose() {
     const failures = service.flush();
     if (failures.length || service.profileError) {
       const choice = dialog.showMessageBoxSync(window, {
@@ -156,7 +204,8 @@ function createWindow(id = randomUUID(), initial) {
         cancelId: 0,
       });
       if (choice === 0) {
-        event.preventDefault();
+        closePending = false;
+        window.webContents.send("workspace:close-cancelled");
         return;
       }
     }
@@ -172,7 +221,9 @@ function createWindow(id = randomUUID(), initial) {
     } catch (error) {
       console.error("視窗布局保存失敗", error);
     }
-  });
+    closeApproved = true;
+    window.close();
+  }
   window.on("closed", () => {
     windows.delete(id);
   });

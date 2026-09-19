@@ -26,7 +26,6 @@ import {
   ArrowDownAZ,
   ArrowUpZA,
   ListOrdered,
-  CircleCheck,
   LoaderCircle,
   FilePlus2,
   Pin,
@@ -336,6 +335,37 @@ export default function Workbench({
     }, 250);
     return () => clearTimeout(timer);
   }, [session, project?.id, client]);
+  const [closing, setClosing] = useState(false);
+  const [closeSaving, setCloseSaving] = useState(false);
+  const prepareClose = useEffectEvent(async (token: string) => {
+    setCloseSaving(client.hasPendingWrites);
+    setClosing(true);
+    try {
+      // Let the pending-save panel paint before main-process disk writes.
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      await client.prepareClose();
+      await client.saveSession({
+        ...session,
+        projectId: project?.id || session.projectId,
+      });
+      window.yarnDesktop?.closePrepared(token);
+    } catch (error) {
+      setClosing(false);
+      window.yarnDesktop?.closePrepared(token, String(error));
+    }
+  });
+  useEffect(() => {
+    const desktop = window.yarnDesktop;
+    if (!desktop) return;
+    const prepare = desktop.onPrepareClose((token) => void prepareClose(token));
+    const cancel = desktop.onCloseCancelled(() => setClosing(false));
+    return () => {
+      prepare();
+      cancel();
+    };
+  }, []);
   const persistStructure = useEffectEvent(() => {
     void client
       .saveSession({ ...session, projectId: project?.id || session.projectId })
@@ -1637,13 +1667,6 @@ export default function Workbench({
                 >
                   <FileText size={14} />
                   <span>{d.name.split("/").at(-1)}</span>
-                  {pendingWrite(d) && (
-                    <LoaderCircle
-                      className="save-spinner"
-                      size={12}
-                      aria-label="正在保存"
-                    />
-                  )}
                   {["conflict", "error", "missing"].includes(d.status) && (
                     <AlertTriangle size={13} />
                   )}
@@ -1945,7 +1968,7 @@ export default function Workbench({
                   utilityNames[active?.documentId || ""] ||
                   "工作區"}
               </span>
-              {doc && (
+              {doc && ["error", "conflict", "missing"].includes(doc.status) && (
                 <span
                   className={"save-status " + doc.status}
                   role="status"
@@ -1954,13 +1977,7 @@ export default function Workbench({
                     (doc.path ? " · " + doc.path : " · 僅保留在此裝置")
                   }
                 >
-                  {pendingWrite(doc) ? (
-                    <LoaderCircle size={13} className="save-spinner" />
-                  ) : ["error", "conflict", "missing"].includes(doc.status) ? (
-                    <AlertTriangle size={13} />
-                  ) : (
-                    <CircleCheck size={13} />
-                  )}
+                  <AlertTriangle size={13} />
                   <span>{saveLabels[doc.status]}</span>
                 </span>
               )}
@@ -2858,6 +2875,24 @@ export default function Workbench({
           </div>
         </DialogContent>
       </Dialog>
+      {closing && (
+        <div
+          className="close-save-overlay"
+          tabIndex={-1}
+          ref={(element) => element?.focus()}
+          onKeyDownCapture={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          {closeSaving && (
+            <div className="close-save-panel" role="status" aria-live="polite">
+              <LoaderCircle size={20} className="save-spinner" />
+              <span>正在保存…</span>
+            </div>
+          )}
+        </div>
+      )}
       {toast && !prompt && (
         <div className="toast" role="status">
           <span>{toast}</span>
