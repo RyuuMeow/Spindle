@@ -30,6 +30,8 @@ export type Project = {
   documents: DocumentRecord[];
   commands: Command[];
   excluded: string[];
+  folders?: string[];
+  treeOrder?: string[];
   recovery: RecoveryEntry[];
   commandDraft?: unknown;
 };
@@ -38,6 +40,7 @@ export type TabView = {
   id: string;
   documentId: string;
   mode: EditorMode;
+  dialogueOnly?: boolean;
   pinned?: boolean;
   line: number;
   column: number;
@@ -142,6 +145,9 @@ export type WorkspaceAction =
   | { type: "reveal"; projectId: string; documentId?: string }
   | { type: "export"; projectId: string; documentId?: string }
   | { type: "import"; project: Project }
+  | { type: "createFolder"; projectId: string; name: string }
+  | { type: "moveEntry"; projectId: string; entry: string; parent: string; name?: string; before?: string }
+  | { type: "trashFolder"; projectId: string; name: string }
   | { type: "sortDocuments"; projectId: string; documentIds: string[] };
 export type ActionResult = {
   snapshot: WorkspaceSnapshot;

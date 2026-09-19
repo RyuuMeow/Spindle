@@ -73,6 +73,7 @@ type Props = {
   onUndo: (redo?: boolean) => void;
   onCursor: (line: number, column: number, scrollTop: number) => void;
   onComposition: (active: boolean) => void;
+  goTo?: { file: string; line: number; column?: number; nonce: number } | null;
   line: number;
   column: number;
   scrollTop?: number;
@@ -516,6 +517,28 @@ export default function ReadingEditor(props: Props) {
         annotations: remote.of(true),
       });
   }, [props.doc.text]);
+  useEffect(() => {
+    const view = viewRef.current,
+      target = props.goTo;
+    if (!view || !target || target.file !== props.doc.name) return;
+    const line = view.state.doc.line(
+      Math.max(1, Math.min(target.line, view.state.doc.lines)),
+    );
+    const anchor = Math.min(
+      line.to,
+      line.from + Math.max(0, (target.column || 1) - 1),
+    );
+    const effects: ReturnType<typeof unfoldEffect.of>[] = [];
+    foldedRanges(view.state).between(0, view.state.doc.length, (from, to) => {
+      if (anchor >= from && anchor <= to)
+        effects.push(unfoldEffect.of({ from, to }));
+    });
+    view.dispatch({
+      selection: { anchor },
+      effects: [...effects, EditorView.scrollIntoView(anchor, { y: "center" })],
+    });
+    view.focus();
+  }, [props.goTo, props.doc.id, props.doc.name]);
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: readOnlyConfig.current.reconfigure([

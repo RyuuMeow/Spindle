@@ -1,10 +1,17 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { FileText } from "lucide-react";
+import { FileText, Folder } from "lucide-react";
 import "./inline-name.css";
 export type InlineDraft = {
-  kind: "new-document" | "rename-document" | "new-scene" | "rename-scene";
+  kind:
+    | "new-document"
+    | "rename-document"
+    | "new-scene"
+    | "rename-scene"
+    | "new-folder"
+    | "rename-folder";
   value: string;
   folder?: string;
+  originalFolder?: string;
   documentId?: string;
   sceneName?: string;
   version?: number;
@@ -48,17 +55,31 @@ export function InlineNameEditor({
       className="inline-name-editor"
       role="group"
       aria-label={
-        draft.kind.includes("scene") ? "場景名稱編輯" : "劇本名稱編輯"
+        draft.kind.includes("folder")
+          ? "資料夾名稱編輯"
+          : draft.kind.includes("scene")
+            ? "場景名稱編輯"
+            : "劇本名稱編輯"
       }
     >
       <div className="inline-name-row">
-        <FileText size={14} />
+        {draft.kind.includes("folder") ? (
+          <Folder size={14} />
+        ) : (
+          <FileText size={14} />
+        )}
         <input
           ref={input}
           value={draft.value}
           readOnly={draft.busy}
           aria-busy={!!draft.busy}
-          aria-label={draft.kind.includes("scene") ? "場景名稱" : "劇本名稱"}
+          aria-label={
+            draft.kind.includes("folder")
+              ? "資料夾名稱"
+              : draft.kind.includes("scene")
+                ? "場景名稱"
+                : "劇本名稱"
+          }
           aria-invalid={!!draft.error}
           aria-describedby={draft.error ? "inline-name-error" : undefined}
           onChange={(e) => onChange(e.target.value)}

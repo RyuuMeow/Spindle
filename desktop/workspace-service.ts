@@ -1,3 +1,4 @@
+import { addFolder, applyTreeMove, planTreeMove, projectFolders, validFolderName, withinFolder } from "../app/workspace/file-tree";
 import fs from "node:fs";
 import { appendedScene, renamedSceneByName } from "../app/workspace/authoring";
 export { restoreSession } from "../app/workspace/storage";
@@ -163,6 +164,8 @@ export class WorkspaceService {
             .filter((d) => d.path)
             .map((d) => ({ id: d.id, name: d.name })),
           excluded: p.excluded,
+          folders: p.folders,
+          treeOrder: p.treeOrder,
         },
         null,
         2,
@@ -348,7 +351,7 @@ export class WorkspaceService {
       this.notices.push("無法監看資料夾：" + String(error));
     }
   }
-  private listFiles(root: string): string[] {
+  private listFiles(root: string, folders?: string[]): string[] {
     const found: string[] = [];
     const visit = (directory: string) => {
       for (const e of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -358,7 +361,7 @@ export class WorkspaceService {
         )
           continue;
         const file = path.join(directory, e.name);
-        if (e.isDirectory()) visit(file);
+        if (e.isDirectory()) { folders?.push(path.relative(root,file).replace(/\\/g,"/")); visit(file); }
         else if (e.isFile() && e.name.endsWith(".yarn"))
           found.push(path.relative(root, file).replace(/\\/g, "/"));
       }
@@ -371,7 +374,9 @@ export class WorkspaceService {
   private scan(p: Project) {
     if (!p.root) return;
     try {
-      const names = this.listFiles(p.root);
+      const folders: string[] = [];
+      const names = this.listFiles(p.root, folders);
+      p.folders = folders;
       for (const d of p.documents.filter((d) => d.path)) {
         if (!fs.existsSync(d.path!)) {
           d.status = "missing";
@@ -430,6 +435,8 @@ export class WorkspaceService {
       commands?: Project["commands"];
       files?: { id: string; name: string }[];
       excluded?: string[];
+      folders?: string[];
+      treeOrder?: string[];
     } = {};
     if (fs.existsSync(configFile)) {
       try {
@@ -488,7 +495,9 @@ export class WorkspaceService {
         ? metadata.id
         : p.id;
     p.excluded = Array.isArray(metadata.excluded) ? metadata.excluded : [];
-    const loaded = this.listFiles(root)
+    p.folders = [];
+    p.treeOrder = Array.isArray(metadata.treeOrder) ? metadata.treeOrder.filter(k=>typeof k==="string") : [];
+    const loaded = this.listFiles(root, p.folders)
       .filter((name) => !p.excluded.includes(name))
       .map((name) => {
         const file = withinRoot(root, name),
@@ -739,6 +748,39 @@ export class WorkspaceService {
           projectId = target.id;
           documentId = copy.id;
         }
+      } else if (a.type === "createFolder") {
+        const draft=structuredClone(p);
+        addFolder(draft,a.name);
+        if (p.root) fs.mkdirSync(path.dirname(withinRoot(p.root,a.name+"/folder.yarn")));
+        p.folders=draft.folders; p.treeOrder=draft.treeOrder;
+        this.metadata(p);
+      } else if (a.type === "moveEntry") {
+        const plan=planTreeMove(p,a.entry,a.parent,a.name,a.before);
+        if (p.root && plan.path!==plan.target) {
+          for (const d of plan.documents) if (d.path && !this.saveDocument(p,d)) throw Error(d.error||"請先完成儲存");
+          const from=plan.folder?path.dirname(withinRoot(p.root,plan.path+"/folder.yarn")):withinRoot(p.root,plan.path);
+          const to=plan.folder?path.dirname(withinRoot(p.root,plan.target+"/folder.yarn")):withinRoot(p.root,plan.target);
+          if (fs.existsSync(to) && from.toLowerCase()!==to.toLowerCase()) throw Error("目的位置已存在");
+          // Both paths are verified inside the project, including symlink ancestors.
+          if (plan.folder || plan.documents.some(d=>d.path)) fs.renameSync(from,to);
+          for (const d of plan.documents) if (d.path) d.path=withinRoot(p.root,plan.mapPath(d.name));
+        }
+        applyTreeMove(p,plan);
+        this.metadata(p);
+      } else if (a.type === "trashFolder") {
+        if (!validFolderName(a.name) || !projectFolders(p).includes(a.name)) throw Error("資料夾已不存在");
+        const children=p.documents.filter(d=>withinFolder(d.name,a.name));
+        for(const d of children) this.engine.checkpoint(p.id,d.id,"刪除資料夾",true);
+        this.persist();
+        if (p.root) {
+          const target=path.dirname(withinRoot(p.root,a.name+"/folder.yarn"));
+          if(!this.services.trash) throw Error("目前無法使用垃圾桶，資料夾已保留");
+          await this.services.trash(target);
+        }
+        for(const d of children) clearTimeout(this.timers.get(d.id));
+        p.folders=projectFolders(p).filter(f=>f!==a.name&&!withinFolder(f,a.name));
+        p.documents=p.documents.filter(d=>!children.includes(d));
+        this.metadata(p);
       } else if (a.type === "renameDocument") {
         const d = this.engine.document(p.id, a.documentId),
           name = a.name.replace(/\\/g, "/");
@@ -901,6 +943,7 @@ export class WorkspaceService {
                     text: d.text,
                   })),
                   commands: p.commands,
+                  folders: p.folders,
                 },
                 null,
                 2,

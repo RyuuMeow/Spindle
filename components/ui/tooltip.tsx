@@ -58,7 +58,7 @@ function ControlTooltip({ label, children }: { label: string; children: React.Re
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
+        <TooltipContent side="bottom" collisionPadding={{ top: 48, right: 8, bottom: 8, left: 8 }}>{label}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )

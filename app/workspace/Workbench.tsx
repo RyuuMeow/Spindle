@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Plus,
   Search,
-  MoreHorizontal,
   Network,
   PenLine,
   BookOpen,
@@ -43,6 +42,8 @@ import {
   ArrowLeft,
   ArrowRight,
   AlertTriangle,
+  CircleAlert,
+  FolderPlus,
   X,
   Check,
 } from "lucide-react";
@@ -72,7 +73,8 @@ import { type SearchHit, type SearchScope } from "./search";
 import { ProblemsPanel } from "./ProblemsPanel";
 import { PanelResizeHandle } from "@/components/PanelResizeHandle";
 import ReadingEditor, { type ReadingActions } from "../reading/ReadingEditor";
-import { authorStatistics } from "../reading/structure";
+import DialogueReader from "../reading/DialogueReader";
+import StatisticsPanel from "./StatisticsPanel";
 import { parse, type Node as YarnNode } from "../parser";
 import { WorkspaceClient } from "./client";
 import { restoreSession } from "./storage";
@@ -95,13 +97,10 @@ import { HistoryList, HistoryPreview } from "./HistoryView";
 import RecoveryView from "./RecoveryView";
 import type { RecoveryEntry } from "./types";
 import { navigateSession, navigateHistory } from "./navigation";
-import {
-  orderedDocuments,
-  uniqueDocumentName,
-  folderOf,
-  reorderWithinFolder,
-} from "./file-order";
+import { orderedDocuments, uniqueDocumentName, folderOf } from "./file-order";
 import { InlineNameEditor, type InlineDraft } from "./InlineNameEditor";
+import FileTree from "./FileTree";
+import { projectFolders, uniqueCopyName } from "./file-tree";
 import "./workspace.css";
 
 type Prompt = {
@@ -157,7 +156,7 @@ export default function Workbench({
   const inlineSubmitting = useRef(false),
     inlineOrigin = useRef<HTMLElement | null>(null);
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
-  const [fileDrop, setFileDrop] = useState("");
+
   const [toast, setToast] = useState(""),
     [searchOpen, setSearchOpen] = useState(false),
     [searchQuery, setSearchQuery] = useState(""),
@@ -170,6 +169,7 @@ export default function Workbench({
   const [selected, setSelected] = useState(""),
     [focus, setFocus] = useState(0),
     [historyOpen, setHistoryOpen] = useState(false),
+    [statisticsOpen, setStatisticsOpen] = useState(false),
     [historySelection, setHistorySelection] = useState<{
       entry: RecoveryEntry;
       text: string;
@@ -181,20 +181,18 @@ export default function Workbench({
     [conflict, setConflict] = useState<DocumentRecord | null>(null),
     [commandDirty, setCommandDirty] = useState(false);
   const [goto, setGoto] = useState<{
-      file: string;
-      line: number;
-      column?: number;
-      nonce: number;
-    } | null>(null),
-    [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+    file: string;
+    line: number;
+    column?: number;
+    nonce: number;
+  } | null>(null);
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null),
     monacoRef = useRef<unknown>(null),
     editorViews = useRef<Record<string, MonacoEditor.ICodeEditorViewState>>({}),
     readingActions = useRef<ReadingActions | null>(null),
     commandActions = useRef<CommandActions | null>(null);
   const input = useRef<HTMLInputElement>(null),
-    dragCancelled = useRef(false),
-    documentDrag = useRef("");
+    dragCancelled = useRef(false);
   const project =
     snapshot.projects.find((p) => p.id === session.projectId) ||
     snapshot.projects[0];
@@ -253,10 +251,12 @@ export default function Workbench({
     !!doc &&
     outlineOpen &&
     !historyOpen &&
+    !statisticsOpen &&
     (!narrowPanels || sideFocus === "right" || !session.left);
   function resetTransient() {
     setHistorySelection(null);
     setHistoryOpen(false);
+    setStatisticsOpen(false);
   }
   function showSearch() {
     setQuickNewTab(false);
@@ -319,7 +319,10 @@ export default function Workbench({
     });
   }
   const nodes = analysis.nodes.filter((n) => n.file === doc?.name),
-    stats = useMemo(() => authorStatistics(doc?.text || ""), [doc?.text]);
+    errorCount = analysis.issues.filter((i) => i.severity === "error").length,
+    warningCount = analysis.issues.filter(
+      (i) => i.severity === "warning",
+    ).length;
   useEffect(() => {
     window.yarnDesktop?.zoom(session.zoom);
   }, [session.zoom]);
@@ -682,22 +685,10 @@ export default function Workbench({
   }
   function newDocument(inNewTab = false) {
     const candidate = activeFolder ?? folderOf(doc?.name || "");
-    const folder =
-      candidate &&
-      !project.documents.some((d) => d.name.startsWith(candidate + "/"))
-        ? ""
-        : candidate;
+    const folder = projectFolders(project).includes(candidate) ? candidate : "";
     setSearchOpen(false);
     setSideFocus("left");
     setSession((s) => ({ ...s, left: true }));
-    setCollapsed((previous) => {
-      const next = new Set(previous);
-      const parts = folder.split("/");
-      parts.forEach((_, index) =>
-        next.delete(parts.slice(0, index + 1).join("/")),
-      );
-      return next;
-    });
     beginInline({
       kind: "new-document",
       folder,
@@ -715,6 +706,119 @@ export default function Workbench({
       folder: folderOf(d.name),
       value: d.name.split("/").at(-1)!,
     });
+  }
+  function newFolder(parent = activeFolder ?? "") {
+    const folders = projectFolders(project);
+    let value = "New Folder",
+      index = 2;
+    while (folders.includes((parent ? parent + "/" : "") + value))
+      value = "New Folder " + index++;
+    setSession((s) => ({ ...s, left: true }));
+    setSideFocus("left");
+    beginInline({ kind: "new-folder", folder: parent, value });
+  }
+  function renameFolderInline(path: string) {
+    beginInline({
+      kind: "rename-folder",
+      folder: folderOf(path),
+      originalFolder: path,
+      value: path.split("/").at(-1)!,
+    });
+  }
+  function folderMenu(path: string): MenuAction[] {
+    return [
+      {
+        label: "新增資料夾",
+        icon: <FolderPlus size={15} />,
+        run: () => newFolder(path),
+      },
+      {
+        label: "新增劇本",
+        icon: <FilePlus2 size={15} />,
+        run: () => {
+          setSession((s) => ({ ...s, left: true }));
+          beginInline({
+            kind: "new-document",
+            folder: path,
+            value: uniqueDocumentName(project.documents, path),
+          });
+        },
+      },
+      {
+        label: "更名",
+        icon: <FilePenLine size={15} />,
+        run: () => renameFolderInline(path),
+      },
+      {
+        label: "移至資料夾",
+        icon: <Folder size={15} />,
+        run: () => moveMenu("folder:" + path),
+      },
+      null,
+      {
+        label: "移到垃圾桶",
+        icon: <Trash2 size={15} />,
+        danger: true,
+        run: () =>
+          void perform({
+            type: "trashFolder",
+            projectId: project.id,
+            name: path,
+          }),
+      },
+    ];
+  }
+  function moveMenu(entry: string) {
+    const origin = menu;
+    requestAnimationFrame(() =>
+      setMenu({
+        x: origin?.x || 200,
+        y: origin?.y || 180,
+        actions: ["", ...projectFolders(project)]
+          .filter(
+            (parent) =>
+              !entry.startsWith("folder:") ||
+              (parent !== entry.slice(7) &&
+                !parent.startsWith(entry.slice(7) + "/")),
+          )
+          .map((parent) => ({
+            label: parent || "專案最外層",
+            icon: <Folder size={15} />,
+            run: () =>
+              void perform({
+                type: "moveEntry",
+                projectId: project.id,
+                entry,
+                parent,
+              }).then((r) => {
+                if (r) setFileSort("manual");
+              }),
+          })),
+      }),
+    );
+  }
+  async function duplicateDocument(d: DocumentRecord) {
+    await client.flush();
+    const latest = client
+      .getSnapshot()
+      .projects.find((p) => p.id === project.id)!;
+    const source = latest.documents.find((x) => x.id === d.id);
+    if (!source) return;
+    const result = await perform({
+      type: "createDocument",
+      projectId: project.id,
+      name: uniqueCopyName(latest, source.name),
+      text: source.text,
+      firstInOrder: displayedDocuments.map((d) => d.id),
+    });
+    const created = result?.snapshot.projects
+      .find((p) => p.id === project.id)
+      ?.documents.find((d) => d.id === result.documentId);
+    if (created) {
+      openDocument(created.id);
+      setFileSort("manual");
+      renameDocumentInline(created);
+    }
   }
   function newScene() {
     if (!doc) return;
@@ -760,7 +864,27 @@ export default function Workbench({
         .getSnapshot()
         .projects.find((p) => p.id === project.id);
       if (!latest) throw Error("專案已關閉");
-      if (draft.kind === "new-document" || draft.kind === "rename-document") {
+      if (draft.kind === "new-folder" || draft.kind === "rename-folder") {
+        if (!name || /[\\/]/.test(name)) throw Error("請輸入資料夾名稱");
+        const path = (draft.folder ? draft.folder + "/" : "") + name;
+        await client.action(
+          draft.kind === "new-folder"
+            ? { type: "createFolder", projectId: project.id, name: path }
+            : {
+                type: "moveEntry",
+                projectId: project.id,
+                entry: "folder:" + draft.originalFolder,
+                parent: draft.folder || "",
+                name,
+              },
+        );
+        setActiveFolder(path);
+        setFileSort("manual");
+        setInlineDraft(null);
+      } else if (
+        draft.kind === "new-document" ||
+        draft.kind === "rename-document"
+      ) {
         if (!name || /[\\/]/.test(name))
           throw Error("請輸入檔名；移動資料夾請使用移動操作");
         const filename = name.endsWith(".yarn") ? name : name + ".yarn";
@@ -985,46 +1109,14 @@ export default function Workbench({
         run: () => renameDocumentInline(d),
       },
       {
-        label: "移至資料夾…",
-        icon: <FilePenLine size={15} />,
-        run: () =>
-          ask({
-            title: "更名或移動劇本",
-            label: "專案內相對路徑",
-            value: d.name,
-            run: async (name) => {
-              if (
-                !(await perform({
-                  type: "renameDocument",
-                  projectId: project.id,
-                  documentId: d.id,
-                  name,
-                }))
-              )
-                throw Error("更名失敗");
-            },
-          }),
+        label: "移至資料夾",
+        icon: <Folder size={15} />,
+        run: () => moveMenu("file:" + d.id),
       },
       {
-        label: "複製劇本…",
+        label: "複製劇本",
         icon: <Copy size={15} />,
-        run: () =>
-          ask({
-            title: "複製劇本",
-            description: "複製後保留場景名稱，重複名稱會顯示診斷。",
-            label: "新檔名",
-            value: d.name.replace(/\.yarn$/, "-copy.yarn"),
-            run: async (name) => {
-              const r = await perform({
-                type: "createDocument",
-                projectId: project.id,
-                name,
-                text: d.text,
-              });
-              if (!r) throw Error("複製失敗");
-              if (r.documentId) openDocument(r.documentId);
-            },
-          }),
+        run: () => void duplicateDocument(d).catch((e) => notify(String(e))),
       },
       null,
       {
@@ -1073,32 +1165,17 @@ export default function Workbench({
         : []),
       null,
       {
-        label: d.path ? "從專案移除" : "移到垃圾桶",
+        label: "移到垃圾桶",
+        icon: <Trash2 size={15} />,
         danger: true,
         run: () =>
           void perform({
             type: "removeDocument",
             projectId: project.id,
             documentId: d.id,
-            deleteDisk: false,
+            deleteDisk: true,
           }),
       },
-      ...(d.path
-        ? [
-            {
-              label: "移到垃圾桶",
-              icon: <Trash2 size={15} />,
-              danger: true,
-              run: () =>
-                void perform({
-                  type: "removeDocument",
-                  projectId: project.id,
-                  documentId: d.id,
-                  deleteDisk: true,
-                }),
-            },
-          ]
-        : []),
     ];
   }
   function sceneMenu(node: YarnNode): MenuAction[] {
@@ -1119,106 +1196,127 @@ export default function Workbench({
         run: () => renameSceneInline(node),
       },
       {
-        label: "複製場景…",
+        label: "複製場景",
+        icon: <Copy size={15} />,
         run: () =>
-          ask({
-            title: "複製場景",
-            label: "新場景名稱",
-            value: uniqueSceneName(project, node.name + "Copy"),
-            run: async (name) => {
-              if (
-                !validSceneName(name) ||
-                analysis.nodes.some((n) => n.name === name)
-              )
-                throw Error("名稱無效或重複");
-              const range = sceneRange(d.text, node),
-                copy = d.text
-                  .slice(range.from, range.to)
-                  .replace(/^(\s*title\s*:\s*)\S+/, `$1${name}`),
-                nl = d.text.includes("\r\n") ? "\r\n" : "\n";
-              await perform({
-                type: "transaction",
-                projectId: project.id,
-                label: "複製場景",
-                documents: [
-                  {
-                    id: d.id,
-                    version: d.version,
-                    edits: [
-                      { from: range.to, to: range.to, insert: nl + copy },
-                    ],
-                  },
-                ],
-              });
-            },
-          }),
+          void (async () => {
+            await client.flush();
+            const latest = client
+              .getSnapshot()
+              .projects.find((p) => p.id === project.id)!;
+            const source = latest.documents.find((item) => item.id === d.id)!;
+            const current = parse(latest.documents, latest.commands).nodes.find(
+              (n) => n.file === source.name && n.name === node.name,
+            );
+            if (!current) return;
+            const name = uniqueSceneName(latest, node.name + "Copy"),
+              range = sceneRange(source.text, current),
+              nl = source.text.includes("\r\n") ? "\r\n" : "\n";
+            const copy = source.text
+              .slice(range.from, range.to)
+              .replace(/^(\s*title\s*:\s*)\S+/, (_m, prefix) => prefix + name);
+            const r = await perform({
+              type: "transaction",
+              projectId: project.id,
+              label: "複製場景",
+              documents: [
+                {
+                  id: source.id,
+                  version: source.version,
+                  edits: [{ from: range.to, to: range.to, insert: nl + copy }],
+                },
+              ],
+            });
+            if (r) {
+              const p = r.snapshot.projects.find((p) => p.id === project.id)!;
+              const created = parse(p.documents, p.commands).nodes.find(
+                (n) => n.file === source.name && n.name === name,
+              );
+              if (created) renameSceneInline(created);
+            }
+          })(),
       },
       {
-        label: "移至另一份劇本…",
-        run: () =>
-          ask({
-            title: "移動場景",
-            description: "輸入專案內另一份劇本的相對路徑。",
-            label: "目的劇本",
-            run: async (name) => {
-              const target = project.documents.find((d) => d.name === name);
-              if (!target || target.id === d.id)
-                throw Error("請輸入另一份已存在的劇本");
-              const range = sceneRange(d.text, node),
-                nl = target.text.includes("\r\n") ? "\r\n" : "\n";
-              if (
-                !(await perform({
-                  type: "transaction",
-                  projectId: project.id,
-                  label: "移動場景",
-                  documents: [
-                    {
-                      id: d.id,
-                      version: d.version,
-                      edits: [{ ...range, insert: "" }],
-                    },
-                    {
-                      id: target.id,
-                      version: target.version,
-                      edits: [
-                        {
-                          from: target.text.length,
-                          to: target.text.length,
-                          insert: nl + d.text.slice(range.from, range.to),
-                        },
-                      ],
-                    },
-                  ],
-                }))
-              )
-                throw Error("移動失敗");
-            },
-          }),
+        label: "移至另一份劇本",
+        icon: <Folder size={15} />,
+        run: () => {
+          const origin = menu;
+          requestAnimationFrame(() =>
+            setMenu({
+              x: origin?.x || 240,
+              y: origin?.y || 200,
+              actions: project.documents
+                .filter((item) => item.id !== d.id)
+                .map((target) => ({
+                  label: target.name,
+                  icon: <FileText size={15} />,
+                  run: () =>
+                    void (async () => {
+                      await client.flush();
+                      const latest = client
+                        .getSnapshot()
+                        .projects.find((p) => p.id === project.id)!;
+                      const source = latest.documents.find(
+                          (item) => item.id === d.id,
+                        ),
+                        destination = latest.documents.find(
+                          (item) => item.id === target.id,
+                        );
+                      const current =
+                        source &&
+                        parse(latest.documents, latest.commands).nodes.find(
+                          (n) => n.file === source.name && n.name === node.name,
+                        );
+                      if (!source || !destination || !current) return;
+                      const range = sceneRange(source.text, current),
+                        nl = destination.text.includes("\r\n") ? "\r\n" : "\n";
+                      await perform({
+                        type: "transaction",
+                        projectId: project.id,
+                        label: "移動場景",
+                        documents: [
+                          {
+                            id: source.id,
+                            version: source.version,
+                            edits: [{ ...range, insert: "" }],
+                          },
+                          {
+                            id: destination.id,
+                            version: destination.version,
+                            edits: [
+                              {
+                                from: destination.text.length,
+                                to: destination.text.length,
+                                insert:
+                                  nl + source.text.slice(range.from, range.to),
+                              },
+                            ],
+                          },
+                        ],
+                      });
+                    })(),
+                })),
+            }),
+          );
+        },
       },
       null,
       {
-        label: "刪除場景…",
+        label: "刪除場景",
+        icon: <Trash2 size={15} />,
         danger: true,
         run: () =>
-          ask({
-            title: "刪除 " + node.name + "？",
-            description: "引用保留並顯示缺失提醒；可使用撤銷復原。",
-            submitLabel: "刪除",
-            danger: true,
-            run: async () => {
-              await perform({
-                type: "transaction",
-                projectId: project.id,
-                label: "刪除場景",
-                documents: [
-                  {
-                    id: d.id,
-                    version: d.version,
-                    edits: [{ ...sceneRange(d.text, node), insert: "" }],
-                  },
-                ],
-              });
-            },
+          void perform({
+            type: "transaction",
+            projectId: project.id,
+            label: "刪除場景",
+            documents: [
+              {
+                id: d.id,
+                version: d.version,
+                edits: [{ ...sceneRange(d.text, node), insert: "" }],
+              },
+            ],
           }),
       },
     ];
@@ -1269,6 +1367,7 @@ export default function Workbench({
           })),
           data.commands,
         );
+        if (Array.isArray(data.folders)) p.folders = data.folders;
         if (data.commandDraft) p.commandDraft = data.commandDraft;
         await adopt(await perform({ type: "import", project: p }));
       } else {
@@ -1497,192 +1596,6 @@ export default function Workbench({
       fileSortByProject: { ...s.fileSortByProject, [project.id]: value },
     }));
   }
-  const folders = [
-    ...new Set(
-      displayedDocuments.flatMap((d) => {
-        const parts = d.name.split("/");
-        return parts
-          .slice(0, -1)
-          .map((_, i) => parts.slice(0, i + 1).join("/"));
-      }),
-    ),
-  ];
-  const renderFiles = (folder = "") => (
-    <>
-      {folders
-        .filter(
-          (f) =>
-            (f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : "") === folder,
-        )
-        .map((f) => (
-          <div key={f}>
-            <button
-              className={
-                "folder-row " +
-                (fileDrop === "folder:" + f ? "folder-drop-target" : "")
-              }
-              style={{ paddingLeft: 15 + f.split("/").length * 10 }}
-              onClick={() => {
-                setActiveFolder(f);
-                setCollapsed((previous) => {
-                  const next = new Set(previous);
-                  if (next.has(f)) next.delete(f);
-                  else next.add(f);
-                  return next;
-                });
-              }}
-              onDragOver={(e) => {
-                if (e.dataTransfer.types.includes("application/x-yarn-file")) {
-                  e.preventDefault();
-                  setFileDrop("folder:" + f);
-                }
-              }}
-              onDragLeave={() => setFileDrop("")}
-              onDrop={(e) => {
-                e.preventDefault();
-                setFileDrop("");
-                const id = e.dataTransfer.getData("application/x-yarn-file"),
-                  d = project.documents.find((d) => d.id === id);
-                if (d)
-                  void perform({
-                    type: "renameDocument",
-                    projectId: project.id,
-                    documentId: id,
-                    name: f + "/" + d.name.split("/").at(-1),
-                  });
-              }}
-            >
-              <ChevronDown
-                size={12}
-                style={{
-                  transform: collapsed.has(f) ? "rotate(-90deg)" : undefined,
-                }}
-              />
-              <Folder size={14} />
-              {f.split("/").at(-1)}
-            </button>
-            {!collapsed.has(f) && renderFiles(f)}
-          </div>
-        ))}
-      {inlineDraft?.kind === "new-document" &&
-        inlineDraft.folder === folder &&
-        inlineName()}
-      {displayedDocuments
-        .filter(
-          (d) =>
-            (d.name.includes("/")
-              ? d.name.slice(0, d.name.lastIndexOf("/"))
-              : "") === folder,
-        )
-        .map((d) => (
-          <div
-            key={d.id}
-            className={
-              "file-entry " +
-              (doc?.id === d.id ? "active " : "") +
-              (fileDrop === d.id ? "file-drop-before" : "")
-            }
-            style={{
-              marginLeft: 10 + folder.split("/").filter(Boolean).length * 10,
-            }}
-            draggable={!inlineDraft}
-            onDragStart={(e) => {
-              documentDrag.current = d.id;
-              e.dataTransfer.setData("application/x-yarn-file", d.id);
-            }}
-            onDragEnd={() => {
-              documentDrag.current = "";
-              setFileDrop("");
-            }}
-            onDragOver={(e) => {
-              const from = project.documents.find(
-                (item) => item.id === documentDrag.current,
-              );
-              if (
-                e.dataTransfer.types.includes("application/x-yarn-file") &&
-                from &&
-                folderOf(from.name) === folderOf(d.name)
-              ) {
-                e.preventDefault();
-                setFileDrop(d.id);
-              }
-            }}
-            onDragLeave={() => setFileDrop("")}
-            onDrop={(e) => {
-              if (!e.dataTransfer.types.includes("application/x-yarn-file"))
-                return;
-              e.preventDefault();
-              setFileDrop("");
-              const from = e.dataTransfer.getData("application/x-yarn-file");
-              const source = project.documents.find((item) => item.id === from);
-              if (
-                !source ||
-                folderOf(source.name) !== folderOf(d.name) ||
-                from === d.id
-              )
-                return;
-              const order = reorderWithinFolder(displayedDocuments, from, d.id);
-              void perform({
-                type: "sortDocuments",
-                projectId: project.id,
-                documentIds: order,
-              }).then((result) => {
-                if (result) setFileSort("manual");
-              });
-            }}
-            onContextMenu={(e) => showMenu(e, fileMenu(d))}
-            onKeyDown={(e) => {
-              if (e.key === "F2") {
-                e.preventDefault();
-                renameDocumentInline(d);
-              } else menuKeys(e, fileMenu(d));
-            }}
-          >
-            {inlineDraft?.kind === "rename-document" &&
-            inlineDraft.documentId === d.id ? (
-              inlineName()
-            ) : (
-              <>
-                <button
-                  className="file-row"
-                  title={d.path || d.name}
-                  onClick={(e) => {
-                    if (e.detail > 1) return;
-                    setActiveFolder(folderOf(d.name));
-                    openDocument(d.id, e.ctrlKey || e.metaKey);
-                  }}
-                  onDoubleClick={(e) => {
-                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                      e.preventDefault();
-                      renameDocumentInline(d);
-                    }
-                  }}
-                  onAuxClick={(e) => {
-                    if (e.button === 1) {
-                      e.preventDefault();
-                      openDocument(d.id, true);
-                    }
-                  }}
-                >
-                  <FileText size={14} />
-                  <span>{d.name.split("/").at(-1)}</span>
-                  {["conflict", "error", "missing"].includes(d.status) && (
-                    <AlertTriangle size={13} />
-                  )}
-                </button>
-                <button
-                  className="file-options"
-                  aria-label={"劇本選項 " + d.name}
-                  onClick={(e) => showMenu(e, fileMenu(d))}
-                >
-                  <MoreHorizontal size={15} />
-                </button>
-              </>
-            )}
-          </div>
-        ))}
-    </>
-  );
   if (!project) return <div className="empty-editor">正在開啟工作區…</div>;
   return (
     <main
@@ -1740,7 +1653,7 @@ export default function Workbench({
               <strong>{project.name}</strong>
               <ChevronDown size={13} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="desktop-menu">
+            <DropdownMenuContent className="desktop-menu project-menu">
               <DropdownMenuItem
                 onSelect={() =>
                   ask({
@@ -1987,7 +1900,10 @@ export default function Workbench({
                   <SegmentedControl
                     label="編輯模式"
                     value={mode}
-                    onChange={(value) => modeChange(value as TabView["mode"])}
+                    onChange={(value) => {
+                      tabPatch({ dialogueOnly: false });
+                      modeChange(value as TabView["mode"]);
+                    }}
                     options={[
                       {
                         value: "source",
@@ -2008,12 +1924,24 @@ export default function Workbench({
                   />
                   <div className="document-icon-tools">
                     <ChromeButton
+                      title="純閱讀：只顯示對話與選項"
+                      aria-label="純閱讀"
+                      aria-pressed={!!active.dialogueOnly}
+                      onClick={() => {
+                        capture();
+                        tabPatch({ dialogueOnly: !active.dialogueOnly });
+                      }}
+                    >
+                      <BookText size={16} />
+                    </ChromeButton>
+                    <ChromeButton
                       title="版本歷史"
                       aria-pressed={historyOpen}
                       onClick={() => {
                         capture();
                         setSideFocus("right");
                         setHistorySelection(null);
+                        setStatisticsOpen(false);
                         setHistoryOpen(!historyOpen);
                       }}
                     >
@@ -2024,6 +1952,7 @@ export default function Workbench({
                       aria-pressed={showOutline}
                       onClick={() => {
                         setHistoryOpen(false);
+                        setStatisticsOpen(false);
                         setSideFocus("right");
                         setHistorySelection(null);
                         setSession((s) => ({
@@ -2035,51 +1964,44 @@ export default function Workbench({
                       <ListTree size={16} />
                     </ChromeButton>
                     <ChromeButton
-                      title={"結構檢查 · " + analysis.issues.length + " 個問題"}
+                      title={
+                        "結構檢查 · " +
+                        errorCount +
+                        " 錯誤 · " +
+                        warningCount +
+                        " 警告"
+                      }
                       aria-label="結構檢查"
                       aria-pressed={problems}
                       className="check-button"
                       onClick={() => setProblems((v) => !v)}
                     >
-                      <AlertTriangle size={16} />
-                      {analysis.issues.length > 0 && (
-                        <b>{analysis.issues.length}</b>
+                      {errorCount > 0 && (
+                        <span className="diagnostic-count error">
+                          <CircleAlert size={16} />
+                          <b>{errorCount}</b>
+                        </span>
+                      )}
+                      {warningCount > 0 && (
+                        <span className="diagnostic-count warning">
+                          <AlertTriangle size={16} />
+                          <b>{warningCount}</b>
+                        </span>
+                      )}
+                      {!errorCount && !warningCount && (
+                        <CircleAlert size={16} />
                       )}
                     </ChromeButton>
                     <ChromeButton
-                      title={
-                        stats.scenes +
-                        " 場景 · " +
-                        stats.options +
-                        " 選項 · " +
-                        stats.characters +
-                        " 台詞字元 · " +
-                        stats.words +
-                        " 英文詞"
-                      }
+                      title="作者統計"
                       aria-label="作者統計"
-                      onClick={(e) =>
-                        showMenu(e, [
-                          {
-                            label:
-                              stats.scenes +
-                              " 場景 · " +
-                              stats.options +
-                              " 選項",
-                            disabled: true,
-                            run: () => {},
-                          },
-                          {
-                            label:
-                              stats.characters +
-                              " 台詞字元 · " +
-                              stats.words +
-                              " 英文詞",
-                            disabled: true,
-                            run: () => {},
-                          },
-                        ])
-                      }
+                      aria-pressed={statisticsOpen}
+                      onClick={() => {
+                        setStatisticsOpen(!statisticsOpen);
+                        setHistoryOpen(false);
+                        setHistorySelection(null);
+                        setSideFocus("right");
+                      }}
                     >
                       <BarChart3 size={16} />
                     </ChromeButton>
@@ -2118,7 +2040,9 @@ export default function Workbench({
           "workspace-body " +
           (sideFocus === "left" ? "left-priority " : "") +
           (utility ? "utility-surface" : "") +
-          ((showOutline || historyOpen) && !utility ? " has-document-side" : "")
+          ((showOutline || historyOpen || statisticsOpen) && !utility
+            ? " has-document-side"
+            : "")
         }
       >
         {session.left &&
@@ -2185,6 +2109,9 @@ export default function Workbench({
                       <ListOrdered size={15} />
                     )}
                   </ChromeButton>
+                  <ChromeButton title="新增資料夾" onClick={() => newFolder()}>
+                    <FolderPlus size={15} />
+                  </ChromeButton>
                   <ChromeButton
                     title="新增劇本"
                     aria-label="新增劇本"
@@ -2195,7 +2122,37 @@ export default function Workbench({
                 </div>
               </div>
               <div className="workspace-files">
-                {renderFiles()}
+                <FileTree
+                  key={project.id}
+                  project={project}
+                  sort={fileSort}
+                  documentId={doc?.id}
+                  folder={activeFolder}
+                  onFolder={setActiveFolder}
+                  draft={inlineDraft}
+                  inline={inlineName}
+                  onOpen={(d, newTab) => {
+                    setActiveFolder(folderOf(d.name));
+                    openDocument(d.id, newTab);
+                  }}
+                  onRenameFile={renameDocumentInline}
+                  onRenameFolder={renameFolderInline}
+                  onFileMenu={(e, d) => showMenu(e, fileMenu(d))}
+                  onFolderMenu={(e, path) => showMenu(e, folderMenu(path))}
+                  onMove={async (entry, parent, before) => {
+                    const r = await perform({
+                      type: "moveEntry",
+                      projectId: project.id,
+                      entry,
+                      parent,
+                      before,
+                    });
+                    if (r) {
+                      setFileSort("manual");
+                      setActiveFolder(parent);
+                    }
+                  }}
+                />
                 {!project.documents.length && (
                   <p className="empty-small">
                     尚無劇本。
@@ -2293,7 +2250,18 @@ export default function Workbench({
               style={historySelection ? { display: "none" } : undefined}
               inert={!!historySelection}
             >
-              {mode === "source" && (
+              {active.dialogueOnly && (
+                <DialogueReader
+                  text={doc.text}
+                  name={doc.name}
+                  line={active.line}
+                  goTo={goto}
+                  fontSize={session.readingSize}
+                  lineHeight={session.readingLineHeight}
+                  width={session.readingWidth}
+                />
+              )}
+              {!active.dialogueOnly && mode === "source" && (
                 <div
                   className="editor-surface"
                   onCompositionStart={() =>
@@ -2364,8 +2332,9 @@ export default function Workbench({
                   />
                 </div>
               )}
-              {mode === "rendered" && (
+              {!active.dialogueOnly && mode === "rendered" && (
                 <ReadingEditor
+                  goTo={goto}
                   scenes={analysis.nodes}
                   canNavigate={(name) =>
                     analysis.nodes.filter((node) => node.name === name)
@@ -2424,7 +2393,7 @@ export default function Workbench({
                   actionsRef={readingActions}
                 />
               )}
-              {mode === "graph" && (
+              {!active.dialogueOnly && mode === "graph" && (
                 <Graph
                   key={active.id}
                   file={doc.name}
@@ -2669,7 +2638,8 @@ export default function Workbench({
                       }}
                       onClick={() => {
                         setSelected(n.id);
-                        if (mode === "graph") setFocus((f) => f + 1);
+                        if (mode === "graph" && !active.dialogueOnly)
+                          setFocus((f) => f + 1);
                         else if (doc)
                           openDocument(doc.id, false, n.body, 1, true, mode);
                       }}
@@ -2691,6 +2661,25 @@ export default function Workbench({
                 inlineName()}
             </div>
           </aside>
+        )}
+        {doc && statisticsOpen && !utility && (
+          <StatisticsPanel
+            doc={doc}
+            width={session.rightPanelWidth ?? 260}
+            onWidth={(rightPanelWidth) =>
+              setSession((s) => ({ ...s, rightPanelWidth }))
+            }
+            onNavigate={(line) => {
+              openDocument(doc.id, false, line, 1, true, mode);
+              if (mode === "graph" && !active.dialogueOnly) {
+                const node = nodes.find((n) => n.start === line);
+                setSelected(node?.id || "");
+                setFocus((f) => f + 1);
+              }
+              setStatisticsOpen(true);
+              setSideFocus("right");
+            }}
+          />
         )}
         {doc && historyOpen && !utility && (
           <HistoryList

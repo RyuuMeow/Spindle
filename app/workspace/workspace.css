@@ -864,3 +864,25 @@
 .document-icon-tools > .check-button { width:auto; min-width:32px; flex:0 0 auto; padding:0 7px; gap:6px; }
 .document-icon-tools > .check-button svg, .document-icon-tools > .check-button b { flex-shrink:0; }
 .document-icon-tools > .check-button b { line-height:20px; font-variant-numeric:tabular-nums; }
+
+/* Document tools expand as a unit; the native caption is never a tooltip surface. */
+.document-icon-tools .diagnostic-count { display:inline-flex; align-items:center; gap:5px; }
+.document-icon-tools .diagnostic-count b { background:none; padding:0; min-width:0; font-size:12px; }
+.diagnostic-count.error { color:#e28c83; }
+.diagnostic-count.warning { color:#d5b56b; }
+.project-menu [data-slot="dropdown-menu-item"] { position:relative; padding-left:34px; min-height:30px; }
+.project-menu [data-slot="dropdown-menu-item"] > svg:first-child { position:absolute; left:10px; width:15px; height:15px; }
+.statistics-panel { position:relative; }
+.statistics-panel .section-heading strong { display:flex; align-items:center; gap:8px; }
+.statistics-scroll { overflow:auto; padding:0 16px 24px; }
+.statistics-file { font-size:12px; color:#999; overflow-wrap:anywhere; }
+.statistics-metrics { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:24px 0; }
+.statistics-metrics dt { font-size:12px; color:#999; }
+.statistics-metrics dd { margin:4px 0 0; font-size:22px; font-variant-numeric:tabular-nums; }
+.statistics-panel h3 { font-size:13px; margin:24px 0 12px; }
+.statistics-panel h3 small { font-weight:400; color:#999; margin-left:6px; }
+.statistics-bar { position:relative; display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:8px 0 12px; margin:6px 0; font-size:12px; text-align:left; }
+.statistics-bar span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.statistics-bar b { font-weight:400; color:#aaa; }
+.statistics-bar i { position:absolute; bottom:1px; left:0; height:3px; background:#6f8091; border-radius:2px; }
+button.statistics-bar:hover { color:#fff; background:#ffffff05; }

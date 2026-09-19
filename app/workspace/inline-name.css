@@ -4,5 +4,3 @@
 .inline-name-row input { width:100%; min-width:0; height:28px; padding:2px 6px; border:1px solid #7894ae; border-radius:4px; background:#24272a; color:#e0e0e0; font:inherit; font-size:13px; outline:none; }
 .inline-name-row input:focus-visible { outline:2px solid #a7c4de; outline-offset:1px; }
 .inline-name-editor p { margin:4px 0 4px 21px; color:#e9aaa0; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
-.file-entry.file-drop-before { box-shadow:inset 0 2px #a7c4de; }
-.folder-row.folder-drop-target { background:#344656; outline:1px solid #7d98ad; }

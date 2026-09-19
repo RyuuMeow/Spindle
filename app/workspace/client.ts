@@ -1,3 +1,4 @@
+import { addFolder, applyTreeMove, planTreeMove, projectFolders, withinFolder } from "./file-tree";
 import { appendedScene, renamedSceneByName } from "./authoring";
 import { EditorState, ChangeSet, Text } from "@codemirror/state";
 import {
@@ -92,6 +93,14 @@ class BrowserService {
         documentId = a.documentId;
       } else if (a.type === "createDocument")
         documentId = this.engine.create(p.id, a.name, a.text, a.firstInOrder).id;
+      else if (a.type === "createFolder") addFolder(p, a.name);
+      else if (a.type === "moveEntry") applyTreeMove(p, planTreeMove(p,a.entry,a.parent,a.name,a.before));
+      else if (a.type === "trashFolder") {
+        const children=p.documents.filter(d=>withinFolder(d.name,a.name));
+        for (const d of children) this.engine.checkpoint(p.id,d.id,"刪除資料夾",true);
+        p.documents=p.documents.filter(d=>!children.includes(d));
+        p.folders=projectFolders(p).filter(f=>f!==a.name&&!withinFolder(f,a.name));
+      }
       else if (a.type === "renameProject") p.name = a.name;
       else if (a.type === "renameDocument") {
         const d = this.engine.document(p.id, a.documentId);
@@ -121,7 +130,7 @@ class BrowserService {
       } else if (a.type === "composition")
         this.engine.document(p.id, a.documentId).composing = a.active;
       else if (a.type === "removeDocument") {
-        this.engine.checkpoint(p.id, a.documentId, "從專案移除", true);
+        this.engine.checkpoint(p.id, a.documentId, "移到垃圾桶", true);
         p.documents = p.documents.filter((d) => d.id !== a.documentId);
       } else if (a.type === "recover") {
         const e = p.recovery.find((e) => e.id === a.recoveryId);
@@ -176,6 +185,7 @@ class BrowserService {
                     text: d.text,
                   })),
                   commands: p.commands,
+                  folders: p.folders,
                 },
                 null,
                 2,

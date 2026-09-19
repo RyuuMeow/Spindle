@@ -153,6 +153,8 @@ export function validateProject(value: unknown): Project {
   )
     throw Error("專案資料格式錯誤");
   validateCommands(p.commands);
+  p.folders=Array.isArray(p.folders)?p.folders.filter(n=>typeof n==="string"&&validDocumentName(n+"/folder.yarn")):[];
+  p.treeOrder=Array.isArray(p.treeOrder)?p.treeOrder.filter(n=>typeof n==="string"):[];
   const ids = new Set<string>(),
     names = new Set<string>();
   for (const d of p.documents) {
@@ -184,6 +186,8 @@ export function restoreProjects(input: unknown) {
       id: typeof p.id === "string" ? p.id : uuid(),
       name: typeof p.name === "string" ? p.name : `復原專案 ${index + 1}`,
       commands: [],
+      folders: Array.isArray(p.folders) ? p.folders.filter(n=>typeof n==="string" && validDocumentName(n+"/folder.yarn")) : [],
+      treeOrder: Array.isArray(p.treeOrder) ? p.treeOrder.filter(n=>typeof n==="string") : [],
       excluded: Array.isArray(p.excluded)
         ? p.excluded.filter((n) => typeof n === "string")
         : [],
@@ -394,6 +398,7 @@ export class DocumentEngine {
       const first = ordered.findIndex(item => folder(item.name) === folder(name));
       ordered.splice(first < 0 ? ordered.length : first, 0, d);
       p.documents = ordered;
+      if (p.treeOrder) p.treeOrder = ["file:" + d.id, ...p.treeOrder];
     } else p.documents.push(d);
     this.logs.set(d.id, []);
     return d;

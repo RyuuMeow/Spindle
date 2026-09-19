@@ -1,0 +1,15 @@
+.file-tree { min-height:100%; display:flex; flex-direction:column; }
+.tree-group { position:relative; }
+.tree-entry.file-entry { margin:2px 8px 2px calc(8px + var(--tree-indent)); position:relative; }
+.tree-entry .folder-disclosure { width:20px; height:30px; flex:none; display:grid; place-items:center; color:#999; }
+.tree-entry .folder-disclosure:hover { color:#eee; }
+.tree-entry .file-row { min-width:0; }
+.tree-entry:has(.folder-disclosure) .file-row { padding-left:0; }
+.tree-group.tree-drop-before::before,.tree-group.tree-drop-after::after,.tree-end.tree-drop-before::before { content:""; position:absolute; z-index:3; height:2px; background:#eee; left:calc(8px + var(--tree-indent,0px)); right:8px; border-radius:0; pointer-events:none; }
+.tree-group.tree-drop-before::before { top:0; }
+.tree-group.tree-drop-after::after { bottom:0; }
+.tree-group.tree-drop-inside > .tree-entry { background:#ffffff12; outline:1px solid #777; }
+.tree-end { min-height:8px; position:relative; }
+.file-tree > .tree-end { flex:1; min-height:32px; }
+.is-dragging .tree-end { min-height:20px; }
+.tree-end span { display:block; padding:12px 16px; color:#888; font-size:12px; pointer-events:none; }
