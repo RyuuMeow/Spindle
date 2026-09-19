@@ -561,3 +561,124 @@
     bottom: 64px;
   }
 }
+/* Inline scene editing is a single expanded node, with the surrounding graph kept in place. */
+.flow-card.is-editing {
+  width: 480px;
+  padding: 0;
+  gap: 0;
+  background: #242424;
+  border-color: #80929e;
+  box-shadow: 0 10px 32px #0007;
+}
+.flow-scene-editor {
+  width: 100%;
+  user-select: text;
+}
+.flow-scene-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ffffff0b;
+}
+.flow-scene-title {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 4px !important;
+  border: 0 !important;
+  background: transparent !important;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+  justify-content: flex-start;
+}
+.flow-scene-close {
+  flex: 0 0 28px;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  padding: 5px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+.flow-scene-editor-header form {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.flow-scene-editor-header input {
+  width: 0;
+  flex: 1;
+  min-width: 0;
+  background: #1d1d1d;
+  border: 1px solid #718898;
+  padding: 4px 6px;
+  font: inherit;
+  border-radius: 4px;
+}
+.flow-scene-editor-header form button {
+  min-width: 28px !important;
+  min-height: 28px !important;
+  padding: 5px !important;
+}
+.flow-scene-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px 0;
+  color: #989898;
+  font-size: 11px;
+}
+.flow-scene-location > span:first-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flow-scene-save {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.flow-scene-save:is(.is-error, .is-conflict, .is-missing) {
+  color: #d8ad9d;
+}
+.graph-scene-editor.reading-editor {
+  height: auto;
+  min-height: 150px;
+  max-height: 370px;
+  --reading-size: 16px;
+  --reading-height: 29px;
+  --reading-width: 100%;
+}
+.graph-scene-editor.reading-editor .cm-scroller {
+  min-height: 150px;
+  max-height: 370px;
+  padding: 14px 12px 24px;
+}
+.graph-scene-editor.reading-editor .cm-content {
+  max-width: none;
+}
+.graph-scene-editor .cm-tooltip {
+  z-index: 150;
+}
+.flow-scene-problem {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: #e0b39d;
+  border-top: 1px solid #754e3866;
+  margin: 0;
+}
+.flow-scene-problem > span {
+  flex: 1;
+  min-width: 250px;
+}
+.flow-scene-problem button {
+  min-height: 26px !important;
+  padding: 3px 6px !important;
+  font-size: 12px;
+}

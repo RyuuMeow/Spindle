@@ -8,8 +8,12 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import ActionMenu from "./workspace/ActionMenu";
+import SceneEditor, { type SceneEditorBindings } from "./graph/SceneEditor";
+import type { SceneScope } from "./graph/scene-scope";
+import { lineOffset } from "./workspace/authoring";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -86,6 +90,7 @@ type ConnectionGroup = {
   label: boolean;
 };
 type CardData = SceneRecord & {
+  editor?: ReactNode;
   warning: boolean;
   compact: boolean;
   zoom: number;
@@ -119,6 +124,13 @@ export type GraphProps = {
     node: Node,
     event: React.MouseEvent | React.KeyboardEvent,
   ) => void;
+} & Partial<SceneEditorBindings>;
+const EDIT_WIDTH = 480;
+type EditSession = {
+  documentId: string;
+  record: SceneRecord;
+  records: SceneRecord[];
+  groups: ConnectionGroup[];
 };
 const kindLabel: Record<RecordKind, string> = {
   scene: "場景",
@@ -144,21 +156,22 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
           : GitBranch;
   const action =
     data.kind === "scene"
-      ? "編輯原文"
+      ? "在節點內編輯"
       : data.kind === "external"
-        ? "前往劇本"
+        ? "在節點內編輯"
         : "查看引用";
   const overviewStyle = {
     "--overview-title-size": `${Math.max(14, 11 / Math.max(data.zoom, 0.35))}px`,
   } as CSSProperties;
   return (
     <div
-      className={`flow-card flow-card--${data.kind}${selected ? " is-selected" : ""}${data.compact ? " is-overview" : ""}${data.zoom < 0.35 ? " is-distant" : ""}`}
+      className={`flow-card flow-card--${data.kind}${selected ? " is-selected" : ""}${data.editor ? " is-editing" : data.compact ? " is-overview" : ""}${!data.editor && data.zoom < 0.35 ? " is-distant" : ""}`}
       style={overviewStyle}
-      tabIndex={0}
-      role="button"
+      tabIndex={data.editor ? -1 : 0}
+      role={data.editor ? undefined : "button"}
       aria-label={`${data.name}，${kindLabel[data.kind]}。按 Enter ${action}`}
       onKeyDown={(event) => {
+        if (data.editor) return;
         if (
           event.key === "ContextMenu" ||
           (event.shiftKey && event.key === "F10")
@@ -174,7 +187,7 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
       }}
       onDoubleClick={(event) => {
         event.stopPropagation();
-        data.open();
+        if (!data.editor) data.open();
       }}
     >
       {Object.entries(sidePosition).map(([side, position]) => (
@@ -193,52 +206,56 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
           />
         </Fragment>
       ))}
-      <div className="flow-card-heading">
-        {data.kind !== "scene" && (
-          <Icon size={15} aria-label={kindLabel[data.kind]} />
-        )}
-        <strong className="flow-card-title" title={data.name}>
-          {data.name}
-        </strong>
-        {data.warning && data.kind !== "missing" && (
-          <AlertTriangle
-            size={14}
-            className="flow-warning"
-            aria-label="有檢查問題"
-          />
-        )}
-      </div>
-      {data.kind === "external" ? (
-        <span className="flow-card-file" title={data.node?.file}>
-          {data.node?.file}
-        </span>
-      ) : data.node?.summary || data.kind !== "scene" ? (
-        <p
-          className="flow-card-summary"
-          title={data.node?.summary || undefined}
-        >
-          {data.node?.summary ||
-            (data.kind === "missing"
-              ? "找不到目標，請查看引用。"
-              : "動態目標，執行時決定。")}
-        </p>
-      ) : null}
-      <button
-        type="button"
-        className="flow-card-action nodrag nopan"
-        aria-label={action}
-        title={action}
-        onClick={(event) => {
-          event.stopPropagation();
-          data.open();
-        }}
-      >
-        {data.kind === "scene" ? (
-          <PenLine size={13} />
-        ) : (
-          <ArrowUpRight size={13} />
-        )}
-      </button>
+      {data.editor || (
+        <>
+          <div className="flow-card-heading">
+            {data.kind !== "scene" && (
+              <Icon size={15} aria-label={kindLabel[data.kind]} />
+            )}
+            <strong className="flow-card-title" title={data.name}>
+              {data.name}
+            </strong>
+            {data.warning && data.kind !== "missing" && (
+              <AlertTriangle
+                size={14}
+                className="flow-warning"
+                aria-label="有檢查問題"
+              />
+            )}
+          </div>
+          {data.kind === "external" ? (
+            <span className="flow-card-file" title={data.node?.file}>
+              {data.node?.file}
+            </span>
+          ) : data.node?.summary || data.kind !== "scene" ? (
+            <p
+              className="flow-card-summary"
+              title={data.node?.summary || undefined}
+            >
+              {data.node?.summary ||
+                (data.kind === "missing"
+                  ? "找不到目標，請查看引用。"
+                  : "動態目標，執行時決定。")}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            className="flow-card-action nodrag nopan"
+            aria-label={action}
+            title={action}
+            onClick={(event) => {
+              event.stopPropagation();
+              data.open();
+            }}
+          >
+            {data.kind === "scene" ? (
+              <PenLine size={13} />
+            ) : (
+              <ArrowUpRight size={13} />
+            )}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -382,8 +399,16 @@ function Canvas({
   graphState,
   onGraphState,
   onNodeMenu,
+  documents,
+  commands,
+  onDocumentEdit,
+  onDocumentUndo,
+  onDocumentSave,
+  onDocumentComposition,
+  onRenameScene,
 }: GraphProps) {
   const flow = useReactFlow<SceneFlowNode, RouteEdge>();
+  const [editing, setEditing] = useState<EditSession | null>(null);
   const canvasElement = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<Record<string, Point>>(
     () => graphState?.positions || {},
@@ -434,7 +459,7 @@ function Canvas({
     () => links.filter((link) => own.some((node) => node.id === link.source)),
     [links, own],
   );
-  const { records, groups } = useMemo(() => {
+  const currentGraph = useMemo(() => {
     const records: SceneRecord[] = own.map((node) => ({
       id: node.id,
       node,
@@ -477,6 +502,7 @@ function Canvas({
     }
     return { records, groups };
   }, [own, out, allNodes]);
+  const { records, groups } = editing || currentGraph;
   const cardHeights = useMemo(
     () =>
       Object.fromEntries(
@@ -515,10 +541,133 @@ function Canvas({
   );
   const openRecord = useCallback(
     (record: SceneRecord) => {
-      if (record.node) onOpen(record.node);
+      if (
+        record.node &&
+        documents &&
+        onDocumentEdit &&
+        onDocumentUndo &&
+        onDocumentComposition
+      ) {
+        if (editing) return;
+        const doc = documents.find((doc) => doc.name === record.node!.file);
+        if (!doc) return;
+        const nextPositions = Object.fromEntries(
+          records.map((item) => [
+            item.id,
+            positions[item.id] || automatic[item.id],
+          ]),
+        );
+        setPositions(nextPositions);
+        setEditing({ documentId: doc.id, record, records, groups });
+        const position = nextPositions[record.id],
+          surface = canvasElement.current;
+        const viewport = flow.getViewport(),
+          nextZoom = Math.max(0.9, Math.min(1.15, viewport.zoom));
+        const width = surface?.clientWidth || 800,
+          height = surface?.clientHeight || 600;
+        void flow.setViewport(
+          {
+            x: width / 2 - (position.x + EDIT_WIDTH / 2) * nextZoom,
+            y:
+              Math.max(64, (height - 470 * nextZoom) / 2) -
+              position.y * nextZoom,
+            zoom: nextZoom,
+          },
+          { duration: 160 },
+        );
+      } else if (record.node) onOpen(record.node);
       else if (record.reference) goToLink(record.reference);
     },
-    [onOpen, goToLink],
+    [
+      onOpen,
+      goToLink,
+      documents,
+      onDocumentEdit,
+      onDocumentUndo,
+      onDocumentComposition,
+      editing,
+      records,
+      groups,
+      positions,
+      automatic,
+      flow,
+    ],
+  );
+  const finishEdit = useCallback(
+    (scope: SceneScope) => {
+      if (!editing) return;
+      const doc = documents?.find((doc) => doc.id === editing.documentId);
+      const nextRecord =
+        doc &&
+        currentGraph.records.find(
+          (record) =>
+            record.node?.file === doc.name &&
+            lineOffset(doc.text, record.node.start) === scope.sceneFrom,
+        );
+      const nextPositions = { ...positions };
+      if (nextRecord && nextRecord.id !== editing.record.id)
+        nextPositions[nextRecord.id] = positions[editing.record.id];
+      setPositions(nextPositions);
+      onGraphState({
+        positions: nextPositions,
+        viewport: flow.getViewport(),
+        undo: undoStack.current.slice(-50),
+        redo: redoStack.current.slice(-50),
+        detailsOpen: showDetails,
+      });
+      if (nextRecord?.node) onSelect(nextRecord.node);
+      setEditing(null);
+      requestAnimationFrame(() =>
+        canvasElement.current
+          ?.querySelector<HTMLElement>(".flow-card.is-selected")
+          ?.focus(),
+      );
+    },
+    [
+      editing,
+      documents,
+      currentGraph,
+      onSelect,
+      positions,
+      onGraphState,
+      flow,
+      showDetails,
+    ],
+  );
+  const editorDocument =
+    editing && documents?.find((doc) => doc.id === editing.documentId);
+  const nodeEditor = useMemo(
+    () =>
+      editing &&
+      editorDocument &&
+      editing.record.node &&
+      onDocumentEdit &&
+      onDocumentUndo &&
+      onDocumentComposition ? (
+        <SceneEditor
+          key={editing.documentId + editing.record.id}
+          doc={editorDocument}
+          node={editing.record.node}
+          commands={commands || []}
+          onDocumentEdit={onDocumentEdit}
+          onDocumentSave={onDocumentSave}
+          onDocumentUndo={onDocumentUndo}
+          onDocumentComposition={onDocumentComposition}
+          onRenameScene={onRenameScene}
+          onClose={finishEdit}
+        />
+      ) : undefined,
+    [
+      editing,
+      editorDocument,
+      onDocumentEdit,
+      onDocumentUndo,
+      onDocumentComposition,
+      commands,
+      onRenameScene,
+      onDocumentSave,
+      finishEdit,
+    ],
   );
   const nodes: SceneFlowNode[] = useMemo(
     () =>
@@ -526,13 +675,19 @@ function Canvas({
         id: record.id,
         type: "scene",
         position: positions[record.id] || automatic[record.id],
-        width: CARD_WIDTH,
+        width: editing?.record.id === record.id ? EDIT_WIDTH : CARD_WIDTH,
+        zIndex: editing?.record.id === record.id ? 100 : 0,
+        draggable: !editing || editing.record.id !== record.id,
         measured: heights[record.id]
-          ? { width: CARD_WIDTH, height: heights[record.id] }
+          ? {
+              width: editing?.record.id === record.id ? EDIT_WIDTH : CARD_WIDTH,
+              height: heights[record.id],
+            }
           : undefined,
         selected: record.id === selectedId,
         data: {
           ...record,
+          editor: editing?.record.id === record.id ? nodeEditor : undefined,
           compact: zoom < 0.7,
           zoom,
           open: () => openRecord(record),
@@ -559,6 +714,8 @@ function Canvas({
       issues,
       onNodeMenu,
       heights,
+      editing,
+      nodeEditor,
     ],
   );
   const geometry = useMemo(
@@ -566,10 +723,10 @@ function Canvas({
       records.map((record) => ({
         id: record.id,
         ...(positions[record.id] || automatic[record.id]),
-        width: CARD_WIDTH,
+        width: editing?.record.id === record.id ? EDIT_WIDTH : CARD_WIDTH,
         height: cardHeights[record.id],
       })),
-    [records, positions, automatic, cardHeights],
+    [records, positions, automatic, cardHeights, editing],
   );
   const routes = useMemo(
     () => routeConnections(geometry, groups),
@@ -745,6 +902,7 @@ function Canvas({
       ?.focus();
   }
   function arrange() {
+    if (editing) return;
     undoStack.current.push({
       positions: Object.fromEntries(nodes.map((n) => [n.id, n.position])),
       viewport: flow.getViewport(),
@@ -762,6 +920,7 @@ function Canvas({
     save(automatic);
   }
   function undoLayout() {
+    if (editing) return;
     const previous = undoStack.current.pop();
     if (!previous?.positions) return;
     redoStack.current.push({
@@ -775,6 +934,7 @@ function Canvas({
     setPreviousLayout(undoStack.current.at(-1) || null);
   }
   function redoLayout() {
+    if (editing) return;
     const next = redoStack.current.pop();
     setCanRedo(redoStack.current.length > 0);
     if (!next?.positions) return;
@@ -935,6 +1095,8 @@ function Canvas({
           zoomOnDoubleClick={false}
           minZoom={0.2}
           maxZoom={2}
+          zoomOnScroll={!editing}
+          zoomOnPinch={!editing}
           colorMode="dark"
           onNodesChange={(changes) => {
             const moved: Record<string, Point> = {};
@@ -1266,9 +1428,9 @@ function Canvas({
           </ChromeButton>
           <span />
           <ChromeButton
-            title="自動整理"
+            title={editing ? "結束節點編輯後可整理" : "自動整理"}
             aria-label="自動整理"
-            disabled={!nodes.length}
+            disabled={!!editing || !nodes.length}
             onClick={arrange}
           >
             <LayoutGrid size={16} />
@@ -1276,7 +1438,7 @@ function Canvas({
           <ChromeButton
             title="復原布局"
             aria-label="復原布局"
-            disabled={!previousLayout}
+            disabled={!!editing || !previousLayout}
             onClick={undoLayout}
           >
             <Undo2 size={16} />
@@ -1284,7 +1446,7 @@ function Canvas({
           <ChromeButton
             title="重做布局"
             aria-label="重做布局"
-            disabled={!canRedo}
+            disabled={!!editing || !canRedo}
             onClick={redoLayout}
           >
             <Redo2 size={16} />
