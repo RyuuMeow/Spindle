@@ -25,7 +25,11 @@ protocol.registerSchemesAsPrivileged([
     privileges: { standard: true, secure: true, supportFetchAPI: true },
   },
 ]);
-app.setName("Yarn Workbench");
+// Preserve the established profile and installation identity during rebranding.
+// Explicit test/portable --user-data-dir always takes precedence.
+if (!app.commandLine.hasSwitch("user-data-dir"))
+  app.setPath("userData", path.join(app.getPath("appData"), "Yarn Workbench"));
+app.setName("Spindle");
 const origin = "workbench://app";
 const windows = new Map();
 let service,
@@ -62,7 +66,8 @@ function createWindow(id = randomUUID(), initial) {
   const width = Math.min(Math.max(bounds?.width || 1440, 800), display.width),
     height = Math.min(Math.max(bounds?.height || 960, 600), display.height);
   const window = new BrowserWindow({
-    title: "Yarn Workbench",
+    title: "Spindle",
+    icon: path.join(__dirname, "icon.png"),
     width,
     height,
     x: Math.max(
@@ -247,7 +252,7 @@ function createWindow(id = randomUUID(), initial) {
     });
   window.on("closed", () => clearTimeout(geometryTimer));
   window.loadURL(origin + "/").catch((error) => {
-    dialog.showErrorBox("Yarn Workbench 無法啟動", error.message);
+    dialog.showErrorBox("Spindle 無法啟動", error.message);
     window.destroy();
   });
   return window;

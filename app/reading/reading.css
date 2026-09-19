@@ -300,3 +300,97 @@
   font: 12px/1.65 var(--font-sans, sans-serif);
   color: #d7d7db;
 }
+
+.spindle-source-link {
+  color: #8fc7ff !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer !important;
+}
+.reading-command-tooltip {
+  min-width: 240px;
+  max-width: min(440px, 85vw);
+  max-height: 360px;
+  overflow: auto;
+  padding: 14px 16px;
+  white-space: normal;
+}
+.command-tip-heading,
+.command-tip-label {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.command-tip-heading {
+  align-items: center;
+  font-size: 13px;
+}
+.command-tip-heading svg {
+  width: 15px;
+  height: 15px;
+  color: #9aa5af;
+}
+.command-tip-id,
+.command-tip-index,
+.command-tip-caption {
+  color: #929297;
+  font-size: 11px;
+}
+.command-tip-description {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #b6b6bd;
+}
+.command-tip-parameters {
+  margin-top: 12px;
+  border-top: 1px solid #ffffff12;
+}
+.command-tip-parameters:empty {
+  display: none;
+}
+.command-tip-parameter {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  padding-top: 10px;
+}
+.command-tip-type,
+.command-tip-optional {
+  font-size: 10px;
+  color: #a5a5ad;
+  background: #ffffff08;
+  border-radius: 3px;
+  padding: 0 5px;
+}
+.command-tip-default {
+  color: #939399;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.command-tip-caption {
+  margin-top: 14px;
+}
+.command-tip-example {
+  display: block;
+  margin-top: 5px;
+  padding: 6px 8px;
+  background: #0002;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cm-tooltip:has(> .reading-command-tooltip) {
+  background: #282828;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0004;
+}
+.monaco-editor .monaco-hover th,
+.monaco-editor .monaco-hover td {
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+}

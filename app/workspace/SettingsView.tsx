@@ -370,7 +370,10 @@ export default function SettingsView({
             {section === "about" && (
               <>
                 <section className="settings-group settings-about">
-                  <h3>Yarn Workbench</h3>
+                  {/* Bundled SVG: desktop renders without an image optimization server. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/spindle.svg" alt="" width={56} height={56} />
+                  <h3>Spindle</h3>
                   <p className="settings-version">{version || "Web"}</p>
                   <p>本機 Yarn 劇本編輯器</p>
                   <p className="setting-help">
@@ -386,7 +389,8 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.5.1：安靜自動保存、穩定分頁寬度與關閉保存保護；指令支援顯示名稱、參數提示與懸浮說明。
+                    0.6.0：Spindle 品牌與 App 圖示；Ctrl
+                    懸浮跳轉連結及分層指令提示。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

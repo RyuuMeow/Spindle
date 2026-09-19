@@ -1,8 +1,12 @@
 {
   "appId": "com.yarnworkbench.desktop",
-  "productName": "Yarn Workbench",
+  "productName": "Spindle",
   "fileAssociations": [
-    { "ext": "yarn", "name": "Yarn 劇本", "role": "Editor" }
+    {
+      "ext": "yarn",
+      "name": "Yarn 劇本",
+      "role": "Editor"
+    }
   ],
   "directories": {
     "app": "dist-desktop/app",
@@ -14,11 +18,15 @@
     "desktop/workspace-service.cjs",
     "dist-desktop/renderer/**/*",
     "package.json",
-    "!node_modules/**/*"
+    "!node_modules/**/*",
+    "desktop/icon.png"
   ],
   "asar": true,
   "win": {
-    "target": ["nsis", "portable"],
+    "target": [
+      "nsis",
+      "portable"
+    ],
     "icon": "desktop/icon.ico"
   },
   "nsis": {
@@ -27,13 +35,13 @@
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
-    "artifactName": "Yarn-Workbench-${version}-Setup-${arch}.${ext}"
+    "artifactName": "Spindle-${version}-Setup-${arch}.${ext}"
   },
   "portable": {
     "unpackDirName": true,
     "useZip": true,
     "splashImage": "desktop/portable-splash.bmp",
-    "artifactName": "Yarn-Workbench-${version}-Portable-${arch}.${ext}"
+    "artifactName": "Spindle-${version}-Portable-${arch}.${ext}"
   },
   "npmRebuild": false
 }

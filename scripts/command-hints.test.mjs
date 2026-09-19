@@ -91,3 +91,50 @@ test("legacy definitions keep machine names as display fallback", () => {
     "duration",
   );
 });
+
+test("structured help carries metadata and escapes project Markdown", () => {
+  const { commandMarkdown } = createRequire(import.meta.url)(output);
+  const hover = commandHover('<<play_sound "wind" 0.8>>', 5, commands);
+  assert.equal(hover.command.displayName, "播放音效");
+  assert.equal(hover.parameterIndex, -1);
+  const markup = commandMarkdown({
+    ...commands[0],
+    description: "[unsafe](command:run) <script>",
+  });
+  assert(markup.includes("| # | 參數 |"));
+  assert(markup.includes("`play_sound`"));
+  assert(!markup.includes("[unsafe](command:run)"));
+  assert(!markup.includes("<script>"));
+  const argument = commandHover('<<play_sound "wind" 0.8>>', 20, commands);
+  assert.equal(argument.parameterIndex, 1);
+});
+
+const linkOutput = path.resolve("outputs/tests/scene-link.cjs");
+buildSync({
+  entryPoints: ["app/scene-link.ts"],
+  outfile: linkOutput,
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+});
+const { sceneLink } = createRequire(import.meta.url)(linkOutput);
+test("static transfer links preserve exact target source ranges", () => {
+  for (const text of [
+    "    <<jump _Start>>",
+    "<<detour Village>> // jump Other",
+  ]) {
+    const link = sceneLink(text);
+    assert(link);
+    assert.equal(text.slice(link.from, link.to), link.name);
+  }
+});
+test("dynamic, incomplete and commented targets never become scene links", () => {
+  for (const text of [
+    "// <<jump Village>>",
+    "Narrator: <<jump Village>>",
+    "<<jump {$target}>>",
+    "<<jump Village",
+    "<<jump Village extra>>",
+  ])
+    assert.equal(sceneLink(text), null);
+});

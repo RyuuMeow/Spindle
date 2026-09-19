@@ -1,4 +1,5 @@
 "use client";
+import { sceneLinks } from "../reading/scene-links";
 import { commandTooltips } from "../reading/command-tooltips";
 
 import { useEffect, useRef, useState } from "react";
@@ -66,6 +67,8 @@ type Props = Omit<SceneEditorBindings, "documents"> & {
   node: Node;
   onClose: (scope: SceneScope) => void;
   closeRequest?: number;
+  canNavigate?: (name: string) => boolean;
+  onNavigate?: (name: string) => void;
 };
 function bodyStructure(text: string) {
   return readingStructure("---\n" + text + "\n===")
@@ -197,6 +200,14 @@ export default function SceneEditor(props: Props) {
         doc: recovered?.text ?? sceneText(source.current, scope.current),
         extensions: [
           commandTooltips(() => latest.current.commands),
+          sceneLinks(
+            (name) =>
+              !composing.current &&
+              !closeGuard.current &&
+              !blockedRef.current &&
+              !!latest.current.canNavigate?.(name),
+            (name) => latest.current.onNavigate?.(name),
+          ),
           decorations,
           editable.of([
             EditorView.editable.of(!recovered),

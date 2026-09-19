@@ -12,7 +12,7 @@ const playwright = require(
 );
 const version = require("../package.json").version;
 const executablePath = path.resolve(
-  `release/Yarn-Workbench-${version}-Portable-x64.exe`,
+  `release/Spindle-${version}-Portable-x64.exe`,
 );
 const out = path.resolve(
   process.env.DESKTOP_TEST_OUTPUT || "outputs/portable-startup-regression",

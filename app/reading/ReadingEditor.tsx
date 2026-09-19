@@ -1,4 +1,5 @@
 "use client";
+import { sceneLinks } from "./scene-links";
 import { commandTooltips } from "./command-tooltips";
 
 import { useEffect, useRef } from "react";
@@ -71,6 +72,7 @@ type Props = {
   selection?: { anchor: number; head: number };
   onSelection?: (selection: { anchor: number; head: number }) => void;
   onNavigate?: (target: string) => void;
+  canNavigate?: (target: string) => boolean;
   fontSize: number;
   lineHeight: number;
   readingWidth?: "standard" | "wide";
@@ -112,7 +114,7 @@ export default function ReadingEditor(props: Props) {
         entry = readingStructure(view.state.doc.toString())[line.number - 1];
       if (
         ["jump", "detour"].includes(entry.command || "") &&
-        /^[A-Za-z]\w*$/.test(entry.argument || "")
+        /^[A-Za-z_]\w*$/.test(entry.argument || "")
       ) {
         latest.current.onNavigate?.(entry.argument!);
         return true;
@@ -152,6 +154,10 @@ export default function ReadingEditor(props: Props) {
       doc: normalized(config.doc.text),
       extensions: [
         commandTooltips(() => latest.current.commands),
+        sceneLinks(
+          (name) => !!latest.current.canNavigate?.(name),
+          (name) => latest.current.onNavigate?.(name),
+        ),
         structure,
         decorations,
         readOnlyConfig.current.of([
@@ -331,18 +337,6 @@ export default function ReadingEditor(props: Props) {
           }
         }),
         EditorView.domEventHandlers({
-          mousedown: (event, view) => {
-            if (!(event.ctrlKey || event.metaKey)) return false;
-            const pos = view.posAtCoords({
-              x: event.clientX,
-              y: event.clientY,
-            });
-            if (pos !== null && follow(view, pos)) {
-              event.preventDefault();
-              return true;
-            }
-            return false;
-          },
           compositionstart: () => {
             composing = true;
             latest.current.onComposition(true);

@@ -657,6 +657,13 @@ function Canvas({
           onRenameScene={onRenameScene}
           onClose={finishEdit}
           closeRequest={closeRequest}
+          canNavigate={(name) =>
+            allNodes.filter((n) => n.name === name).length === 1
+          }
+          onNavigate={(name) => {
+            const target = allNodes.find((n) => n.name === name);
+            if (target) onGoTo?.(target.file, target.body);
+          }}
         />
       ) : undefined,
     [
@@ -670,6 +677,8 @@ function Canvas({
       onDocumentSave,
       finishEdit,
       closeRequest,
+      allNodes,
+      onGoTo,
     ],
   );
   const nodes: SceneFlowNode[] = useMemo(

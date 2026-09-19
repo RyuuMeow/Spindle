@@ -98,9 +98,13 @@ export function commandHover(
       from: call.args![index].from,
       to: call.args![index].to,
       text: parameterHelp(call.command.params[index], index),
+      command: call.command,
+      parameterIndex: index,
     };
   if (column > call.nameTo) return null;
   return {
+    command: call.command,
+    parameterIndex: -1,
     from: text.indexOf("<<"),
     to: call.nameTo,
     text: [
@@ -108,4 +112,53 @@ export function commandHover(
       ...call.command.params.map(parameterHelp),
     ].join("\n"),
   };
+}
+
+const markdownText = (text: string) =>
+  text.replace(/[\\`*_{}\[\]<>()#+.!|~-]/g, "\\$&").replace(/\r?\n/g, " ");
+/** Untrusted project descriptions are escaped; no HTML or command links. */
+export function commandMarkdown(command: Command, parameterIndex = -1) {
+  const esc = markdownText;
+  const title =
+    "**" +
+    esc(commandLabel(command)) +
+    "**" +
+    (command.displayName?.trim()
+      ? " · \x60" + command.name.replace(/`/g, "") + "\x60"
+      : "");
+  const rows = command.params.flatMap((p, index) =>
+    parameterIndex >= 0 && parameterIndex !== index
+      ? []
+      : [
+          "| " +
+            (index + 1) +
+            " | **" +
+            esc(parameterLabel(p)) +
+            "**" +
+            (p.displayName?.trim() ? " (" + esc(p.name) + ")" : "") +
+            " | " +
+            esc(p.type) +
+            " | " +
+            (p.required ? "必填" : "選填") +
+            " | " +
+            esc(p.description || "—") +
+            " |",
+        ],
+  );
+  return [
+    title,
+    command.description ? esc(command.description) : "",
+    rows.length
+      ? [
+          "| # | 參數 | 型別 | 需求 | 說明 |",
+          "| --- | --- | --- | --- | --- |",
+          ...rows,
+        ].join("\n")
+      : "",
+    command.example && parameterIndex < 0
+      ? "範例\n\n" + esc(command.example)
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }

@@ -1,6 +1,8 @@
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { build } from "esbuild";
 
+await import("./prepare-brand-assets.mjs");
+
 const root = new URL("../", import.meta.url);
 const destination = new URL("dist-desktop/app/", root);
 const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
@@ -12,6 +14,10 @@ await cp(
 await cp(
   new URL("desktop/preload.cjs", root),
   new URL("desktop/preload.cjs", destination),
+);
+await cp(
+  new URL("desktop/icon.png", root),
+  new URL("desktop/icon.png", destination),
 );
 await build({
   entryPoints: [
@@ -38,11 +44,11 @@ await writeFile(
   new URL("package.json", destination),
   JSON.stringify(
     {
-      name: "yarn-workbench",
+      name: "spindle",
       version: pkg.version,
       private: true,
       description: "Local-first Yarn Spinner dialogue editor",
-      author: "Yarn Workbench",
+      author: "Spindle",
       main: "desktop/main.cjs",
     },
     null,

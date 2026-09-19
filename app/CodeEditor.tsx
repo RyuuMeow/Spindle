@@ -1,10 +1,12 @@
 "use client";
+import { sceneLink } from "./scene-link";
 import { useEffect, useRef, useState } from "react";
 import Editor, { loader } from "@monaco-editor/react";
 import type { Command, Doc, Issue, Node } from "./parser";
 import { builtins } from "./parser";
 import {
   commandCall,
+  commandMarkdown,
   commandHover,
   commandLabel,
   parameterLabel,
@@ -304,9 +306,10 @@ export default function CodeEditor({
                     ),
                     contents: [
                       {
-                        value: hint.text
-                          .replace(/[\\\x60*_{}\[\]<>()#+.!|-]/g, "\\$&")
-                          .replace(/\n/g, "  \n"),
+                        value: commandMarkdown(
+                          hint.command,
+                          hint.parameterIndex,
+                        ),
                       },
                     ],
                   }
@@ -342,7 +345,7 @@ export default function CodeEditor({
                     label: parameterLabel(parameter) + ":",
                     kind: m.languages.InlayHintKind.Parameter,
                     paddingRight: true,
-                    tooltip: parameterHelp(parameter, index),
+                    tooltip: { value: commandMarkdown(call.command, index) },
                   });
                 });
               }
@@ -422,15 +425,32 @@ export default function CodeEditor({
         };
         editor.onDidChangeCursorSelection(preserveView);
         editor.onDidScrollChange(preserveView);
+        const linkAt = (position: import("monaco-editor").Position | null) => {
+          const model = editor.getModel();
+          if (!position || !model) return null;
+          const link = sceneLink(model.getLineContent(position.lineNumber));
+          if (
+            !link ||
+            position.column - 1 < link.from ||
+            position.column - 1 >= link.to
+          )
+            return null;
+          const matches = latest.current.nodes.filter(
+            (n) => n.name === link.name,
+          );
+          return matches.length === 1
+            ? { ...link, node: matches[0], line: position.lineNumber }
+            : null;
+        };
         const navigate = () => {
           const position = editor.getPosition(),
             model = editor.getModel();
           if (!position || !model) return;
-          const match = model
-              .getLineContent(position.lineNumber)
-              .match(/<<\s*(?:jump|detour)\s+([A-Za-z]\w*)\s*>>/),
-            target = latest.current.nodes.find((n) => n.name === match?.[1]);
-          if (target) navigationCallback.current?.(target.file, target.body);
+          const link = sceneLink(model.getLineContent(position.lineNumber));
+          const target =
+            link && linkAt(new m.Position(position.lineNumber, link.from + 1));
+          if (target)
+            navigationCallback.current?.(target.node.file, target.node.body);
         };
         editor.addAction({
           id: "yarn.goToScene",
@@ -439,8 +459,61 @@ export default function CodeEditor({
           contextMenuGroupId: "navigation",
           run: navigate,
         });
+        const links = editor.createDecorationsCollection();
+        let point: { x: number; y: number } | null = null;
+        const showLink = (modifier: boolean) => {
+          const position =
+            point && editor.getTargetAtClientPoint(point.x, point.y)?.position;
+          const link = modifier && linkAt(position || null);
+          links.set(
+            link
+              ? [
+                  {
+                    range: new m.Range(
+                      link.line,
+                      link.from + 1,
+                      link.line,
+                      link.to + 1,
+                    ),
+                    options: { inlineClassName: "spindle-source-link" },
+                  },
+                ]
+              : [],
+          );
+        };
+        const key = (event: KeyboardEvent) =>
+          showLink(event.ctrlKey || event.metaKey);
+        const blur = () => {
+          point = null;
+          links.clear();
+        };
+        window.addEventListener("keydown", key, true);
+        window.addEventListener("keyup", key, true);
+        window.addEventListener("blur", blur);
+        editor.onMouseMove((event) => {
+          point = { x: event.event.posx, y: event.event.posy };
+          showLink(event.event.ctrlKey || event.event.metaKey);
+        });
+        editor.onMouseLeave(blur);
+        editor.onDidChangeModel(blur);
+        editor.onDidChangeModelContent(blur);
+        editor.onDidScrollChange(blur);
         editor.onMouseDown((event) => {
-          if (event.event.ctrlKey || event.event.metaKey) navigate();
+          if (
+            !event.event.leftButton ||
+            !(event.event.ctrlKey || event.event.metaKey)
+          )
+            return;
+          const link = linkAt(event.target.position);
+          if (!link) return;
+          event.event.preventDefault();
+          links.clear();
+          navigationCallback.current?.(link.node.file, link.node.body);
+        });
+        editor.onDidDispose(() => {
+          window.removeEventListener("keydown", key, true);
+          window.removeEventListener("keyup", key, true);
+          window.removeEventListener("blur", blur);
         });
         editor.onDidCompositionStart(() => compositionCallback.current?.(true));
         editor.onDidCompositionEnd(() => compositionCallback.current?.(false));

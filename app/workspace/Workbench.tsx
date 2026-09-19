@@ -380,7 +380,7 @@ export default function Workbench({
     persistStructure();
   }, [structureKey]);
   useEffect(() => {
-    document.title = `${doc?.name || project?.name || "Yarn Workbench"} — ${project?.name || ""} · Yarn Workbench`;
+    document.title = `${doc?.name || project?.name || "Spindle"} — ${project?.name || ""} · Spindle`;
   }, [doc?.name, project?.name]);
   async function perform(action: WorkspaceAction) {
     try {
@@ -2366,6 +2366,10 @@ export default function Workbench({
               )}
               {mode === "rendered" && (
                 <ReadingEditor
+                  canNavigate={(name) =>
+                    analysis.nodes.filter((node) => node.name === name)
+                      .length === 1
+                  }
                   onNavigate={(name) => {
                     const node = analysis.nodes.find((n) => n.name === name);
                     if (node) {

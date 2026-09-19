@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Yarn Workbench",
+  title: "Spindle",
   description: "Local-first Yarn Spinner dialogue editor.",
   other: {
     "codex-preview": "development",
