@@ -30,7 +30,9 @@ Monaco 保留純文字呈現。CodeMirror 使用來源範圍裝飾，不以 DOM 
 
 ## 工作區與歷史介面
 
-Workbench組合專用SettingsView、SearchPanel、HistoryView及RecoveryView。設定／指令／復原使用utility tab，文件大綱按模式保存展開偏好；全文查找保留本視窗的查詢及結果狀態。
+Workbench 組合 SettingsView、SearchOverlay、CommandOverlay、HistoryView 及 RecoveryView。設定／復原使用 utility tab；指令使用獨立 modal，搜尋使用失焦關閉的 popup。文件大綱只由工具列切換，按模式保存偏好。navigation.ts 管理每 tab 的前進／後退與按 DocumentId 區分的視圖快取；一般定位保留目前 TabId。
+
+節點 SceneEditor 以固定來源範圍連續編輯，共用文件歷史與保存。跨檔節點依 DocumentId 提交，文字期待版本不符時不覆蓋新來源；未提交內容另存 Electron profile 所屬 localStorage 的 graph-pending key，重新開該場景可複製或明確捨棄，不自動覆蓋正式劇本。外部修改跨越場景邊界時停止提交。編輯期间固定圖表位置，退出才重建語義連線。
 
 歷史預覽使用獨立唯讀Monaco model，不接文件交易或自動保存；返回保留原編輯器。比較關閉先解除editor/model關係再釋放，避免尚在解析的diff worker讀到已釋放model。recover可帶expectedVersion／expectedText，由服務序列化檢查後才還原；過期比較不能覆蓋跨窗新內容。
 

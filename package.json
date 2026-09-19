@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -16,12 +16,13 @@
     "desktop:start": "pnpm desktop:build && node scripts/prepare-desktop.mjs && node node_modules/electron/cli.js dist-desktop/app/desktop/main.cjs",
     "desktop:pack": "pnpm desktop:build && node scripts/prepare-desktop.mjs && node scripts/package-desktop.mjs",
     "test:desktop-ui": "node scripts/test-desktop-ui.cjs",
-    "test:graph": "node --test scripts/graph-layout.test.mjs",
-    "test:workspace": "node --test scripts/workspace.test.mjs",
+    "test:graph": "node --test scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs",
+    "test:workspace": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs",
     "test:workspace-ui": "node scripts/test-workspace-ui.cjs",
     "test:portable-launch": "node scripts/test-portable-launch.cjs",
     "test:reading": "node --test scripts/reading.test.mjs",
-    "test:ui-redesign": "node scripts/test-ui-redesign.cjs"
+    "test:ui-redesign": "node scripts/test-ui-redesign.cjs",
+    "test:desktop-refinement": "node scripts/test-desktop-refinement.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

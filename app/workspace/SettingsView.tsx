@@ -374,7 +374,7 @@ export default function SettingsView({
                   <p className="settings-version">{version || "Web"}</p>
                   <p>本機 Yarn 劇本編輯器</p>
                   <p className="setting-help">
-                    純文字、閱讀編輯與流程圖共用同一份劇本。流程圖呈現場景關係；拖動節點只調整版面。
+                    純文字、閱讀編輯與流程圖共用同一份劇本。雙擊流程圖節點可直接編輯；拖動節點只調整版面。
                   </p>
                   {onOpenData && (
                     <Button variant="outline" size="sm" onClick={onOpenData}>
@@ -386,7 +386,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    整合桌面工作區、磁碟自動保存、閱讀編輯、跨視窗分頁與版本歷史。
+                    0.4.0：輕量搜尋浮層、獨立自訂指令面板、行內新增、分頁內導航、閱讀間距與節點直接編輯。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。
