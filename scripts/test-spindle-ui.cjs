@@ -103,6 +103,9 @@ async function shot(name) {
     page = await app.firstWindow();
     page.setDefaultTimeout(15000);
     page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
     const win = await app.browserWindow(page);
     await win.evaluate((w) => {
       w.setContentSize(1440, 960);
@@ -119,6 +122,10 @@ async function shot(name) {
     assert.equal(brand.name, "Spindle");
     assert.equal(path.resolve(brand.profile), path.resolve(profile));
     results.brandAndProfile = true;
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator(".monaco-editor").click();
+    await page.keyboard.press("Control+Home");
+    await new Promise((resolve) => setTimeout(resolve, 350));
     const hintPoint = await page
       .locator(".view-line")
       .filter({ hasText: "fade_in" })

@@ -16,6 +16,7 @@ export function sceneLinks(
       decorations: DecorationSet = Decoration.none;
       point: { x: number; y: number } | null = null;
       modifier = false;
+      destroyed = false;
       active: { from: number; to: number } | null = null;
       constructor(readonly view: EditorView) {
         window.addEventListener("keydown", this.key, true);
@@ -59,14 +60,12 @@ export function sceneLinks(
           this.view.requestMeasure({
             key: this,
             read: () => (this.modifier ? this.hit() : null),
-            write: (next) => {
-              if (
-                next?.from === this.active?.from &&
-                next?.to === this.active?.to
-              )
-                return;
-              this.active = next;
-              this.view.dispatch({});
+            write: () => {
+              // CodeMirror runs measure writes inside its update. Dispatch only
+              // after that phase, and hit-test again against the final layout.
+              queueMicrotask(() => {
+                if (!this.destroyed) this.refresh();
+              });
             },
           });
         }
@@ -81,6 +80,7 @@ export function sceneLinks(
           : Decoration.none;
       }
       destroy() {
+        this.destroyed = true;
         window.removeEventListener("keydown", this.key, true);
         window.removeEventListener("keyup", this.key, true);
         window.removeEventListener("blur", this.blur);
