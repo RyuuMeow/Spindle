@@ -49,3 +49,7 @@ Workbench 組合 SettingsView、SearchOverlay、CommandManager、HistoryView 及
 所有啟動測試都使用隔離 profile。預設 profile 仍在 `%APPDATA%/Yarn Workbench`；這次修正不改變劇本、草稿或工作階段的保存位置。
 
 指令的 `name` 仍是原始識別字，新增可選 `displayName`；參數新增可選 `displayName`／`description`。舊設定不需重寫，空顯示名回退識別字。純文字、閱讀與節點共用來源位置 tokenizer；虛擬提示不提交內容交易，未知／未完成或無法安全分辨的參數不猜測標籤。
+
+### 關閉握手（0.5.1）
+
+主程序攔截 close，以每次隨機 token 向該 renderer 請求 prepare-close。renderer 暫停操作，檢查組字並 flush 未同步交易、保存 session 後回覆。主程序核對 sender 與 token，再 flush 磁碟；重複 close 合併，15 秒未回覆保留視窗，錯誤可返回編輯。正常關閉不需要使用者確認；保存失敗沿用問題文件提示與草稿保護。

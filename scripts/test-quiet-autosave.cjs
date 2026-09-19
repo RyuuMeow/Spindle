@@ -180,6 +180,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     console.error(e);
     process.exitCode = 1;
   } finally {
-    if (app) await app.close().catch(() => {});
+    await app?.evaluate(({ app }) => app.exit(0)).catch(() => {});
   }
 })();

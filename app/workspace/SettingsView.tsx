@@ -386,7 +386,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.5.0：指令工具分頁、顯示名稱、參數提示與懸浮說明；點流程圖空白處可結束節點編輯。
+                    0.5.1：安靜自動保存、穩定分頁寬度與關閉保存保護；指令支援顯示名稱、參數提示與懸浮說明。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。
