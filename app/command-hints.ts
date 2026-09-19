@@ -220,6 +220,63 @@ export function commandInput(
   };
 }
 
+/** Automatic help is only for an empty slot, using both sides of the caret.
+ * Incomplete/ambiguous values count as occupied; help must not validate syntax.
+ */
+export function emptyParameterHint(
+  text: string,
+  column: number,
+  commands: Command[],
+) {
+  const input = commandInput(text.slice(0, column));
+  if (input?.kind !== "argument") return null;
+  const command = findCommand(input.name, commands);
+  if (!command?.params[input.index]) return null;
+  const prefix = /^\s*<<\s*[A-Za-z_]\w*[ \t]+/.exec(text)!;
+  const start = prefix[0].length;
+  let end = text.length,
+    quote = "",
+    escaped = false;
+  const stack: string[] = [];
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (c === "\\") escaped = true;
+      else if (c === quote) quote = "";
+    } else if (c === '"' || c === "'") quote = c;
+    else if ("([{".includes(c)) stack.push(c);
+    else if (")]}".includes(c)) stack.pop();
+    else if (!stack.length && text.slice(i, i + 2) === ">>") {
+      end = i;
+      break;
+    }
+  }
+  const body = text.slice(start, end);
+  if (command.builtin) {
+    let value = body;
+    if (command.name === "set" || command.name === "declare") {
+      if (input.index === 1) {
+        const assignment = /^\s*\$[A-Za-z_]\w*\s*(?:[+*/%\-]?=|to\b)\s*/.exec(
+          body,
+        );
+        if (!assignment) return null;
+        value = body.slice(assignment[0].length);
+      }
+    } else if (command.name === "once") {
+      // An omitted optional condition is not an unfinished argument.
+      const condition = /^\s*if[ \t]+/.exec(body);
+      if (!condition || column < start + condition[0].length) return null;
+      value = body.slice(condition[0].length);
+    }
+    if (value.trim()) return null;
+  } else {
+    const args = argumentSpans(body);
+    if (!args || args[input.index]) return null;
+  }
+  return { command, index: input.index };
+}
+
 /** Is the caret at an existing closing delimiter, outside quoted arguments? */
 export function atCommandCloser(line: string, column: number) {
   if (!/^\s*<</.test(line)) return false;

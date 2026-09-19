@@ -147,17 +147,8 @@ async function shot(name) {
     await page.keyboard.press("Home");
     await page.keyboard.press("Shift+End");
     await page.keyboard.type('<<play_sound "wind ', { delay: 50 });
-    await page
-      .locator(".source-command-popup:not([hidden]) .command-parameter-popup")
-      .waitFor();
-    assert.match(
-      await page
-        .locator(
-          ".source-command-popup:not([hidden]) .command-tip-slot.is-active",
-        )
-        .innerText(),
-      /clip/,
-    );
+    await page.waitForTimeout(200);
+    assert.equal(await page.locator(".command-parameter-popup:visible").count(), 0, "incomplete string counts as an occupied argument");
     await page.keyboard.type('sea" ', { delay: 50 });
     await page.waitForTimeout(200);
     assert.match(

@@ -2,7 +2,11 @@ import type { editor, IDisposable } from "monaco-editor";
 import type { Command } from "./parser";
 import { findCommand } from "./command-catalog";
 import type { YarnVariable } from "./variable-completion";
-import { commandHover, commandInput, atCommandCloser } from "./command-hints";
+import {
+  commandHover,
+  emptyParameterHint,
+  atCommandCloser,
+} from "./command-hints";
 import { commandPopup, completionDescription } from "./command-popup";
 import "./editor-assistance.css";
 
@@ -80,7 +84,13 @@ export function sourceCommandAssistance(
     if (!disposed) editor.layoutContentWidget(widget);
   };
   const parameter = () => {
-    if (disposed || composing || suggesting || !editor.hasTextFocus()) {
+    if (
+      disposed ||
+      composing ||
+      suggesting ||
+      !editor.hasTextFocus() ||
+      editor.getRawOptions().readOnly
+    ) {
       hide();
       return;
     }
@@ -91,17 +101,22 @@ export function sourceCommandAssistance(
       hide();
       return;
     }
-    const input = commandInput(
-      model.getLineContent(pos.lineNumber).slice(0, pos.column - 1),
+    const hint = emptyParameterHint(
+      model.getLineContent(pos.lineNumber),
+      pos.column - 1,
+      commands(),
     );
-    const c = input?.kind === "argument" && findCommand(input.name, commands());
-    if (!c || input?.kind !== "argument" || !c.params[input.index]) {
+    if (!hint || editor.getSelections()?.length !== 1) {
       hide();
       return;
     }
     clearTimeout(hoverTimer);
     signature = true;
-    show(pos.lineNumber, pos.column, commandPopup(c, input.index, true));
+    show(
+      pos.lineNumber,
+      pos.column,
+      commandPopup(hint.command, hint.index, true),
+    );
   };
   const clear = () => {
     hide();
@@ -142,7 +157,7 @@ export function sourceCommandAssistance(
     characterData: true,
   });
   const bindings: IDisposable[] = [
-    editor.onDidChangeCursorPosition(parameter),
+    editor.onDidChangeCursorSelection(parameter),
     editor.onDidChangeModelContent(parameter),
     editor.onDidBlurEditorText(clear),
     editor.onDidChangeModel(clear),
@@ -204,7 +219,7 @@ export function sourceCommandAssistance(
         clearTimeout(hoverTimer);
         return;
       }
-      if (signature || composing) return;
+      if (signature || composing || suggesting) return;
       clearTimeout(hoverTimer);
       const p = e.target.position,
         model = editor.getModel();
@@ -222,7 +237,14 @@ export function sourceCommandAssistance(
         return;
       }
       hoverTimer = setTimeout(() => {
-        if (disposed || editor.getModel() !== model) return;
+        if (
+          disposed ||
+          signature ||
+          composing ||
+          suggesting ||
+          editor.getModel() !== model
+        )
+          return;
         show(
           p.lineNumber,
           hint.from + 1,

@@ -233,10 +233,8 @@ async function shot(name) {
       await page.keyboard.press("Escape");
       await newLine();
       await page.keyboard.type("<<if $gold >= 5 and ", { delay: 80 });
-      await page
-        .locator(".command-tip-slot.is-active")
-        .filter({ hasText: /^條件$/ })
-        .waitFor();
+      await page.waitForTimeout(150);
+      assert.equal(await page.locator(".command-parameter-popup:visible").count(), 0, "filled expression stays quiet");
       await page.keyboard.type("true>>", { delay: 40 });
       await page.keyboard.press("Escape");
       results[name] = true;

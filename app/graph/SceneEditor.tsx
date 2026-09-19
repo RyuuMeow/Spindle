@@ -2,7 +2,6 @@
 import { collectVariables } from "../variable-completion";
 import { commandEditing } from "../reading/command-input";
 import { sceneLinks } from "../reading/scene-links";
-import { commandTooltips } from "../reading/command-tooltips";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -197,7 +196,6 @@ export default function SceneEditor(props: Props) {
       state: EditorState.create({
         doc: recovered?.text ?? sceneText(source.current, scope.current),
         extensions: [
-          commandTooltips(() => latest.current.commands),
           sceneLinks(
             (name) =>
               !composing.current &&

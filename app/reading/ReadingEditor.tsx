@@ -2,7 +2,6 @@
 import type { YarnVariable } from "../variable-completion";
 import { commandEditing } from "./command-input";
 import { sceneLinks } from "./scene-links";
-import { commandTooltips } from "./command-tooltips";
 
 import { useEffect, useRef } from "react";
 import {
@@ -161,7 +160,6 @@ export default function ReadingEditor(props: Props) {
     const state = EditorState.create({
       doc: normalized(config.doc.text),
       extensions: [
-        commandTooltips(() => latest.current.commands),
         sceneLinks(
           (name) => !!latest.current.canNavigate?.(name),
           (name) => latest.current.onNavigate?.(name),

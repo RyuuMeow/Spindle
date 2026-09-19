@@ -269,10 +269,8 @@ async function shot(name) {
     }
     // Two-argument hints ignore quoted spaces; Escape dismisses until next edit.
     await page.keyboard.type('<<play_sound "wind ', { delay: 55 });
-    assert.match(
-      await page.locator(".command-tip-slot.is-active").innerText(),
-      /clip/,
-    );
+    await page.waitForTimeout(150);
+    assert.equal(await page.locator(".command-parameter-popup:visible").count(), 0, "occupied string stays quiet");
     await page.keyboard.type('sea" ', { delay: 55 });
     assert.match(
       await page.locator(".command-tip-slot.is-active").innerText(),

@@ -15,6 +15,7 @@ buildSync({
 });
 const {
   commandInput,
+  emptyParameterHint,
   atCommandCloser,
   argumentSpans,
   commandCall,
@@ -272,4 +273,57 @@ test("variable completion only activates in real expression/assignment contexts"
     '<<play_sound "text // $g',
   ])
     assert.equal(variableCompletionContext(prefix), null, prefix);
+});
+
+test("automatic parameter prompts only describe genuinely empty slots", () => {
+  const cases = [
+    ["<<play_sound |>>", 0],
+    ['<<play_sound "wind" |>>', 1],
+    ['<<play_sound "wind >> sea" |', 1],
+    ["<<wait |>>", 0],
+    ["<<set |>>", 0],
+    ["<<set $gold = |>>", 1],
+    ["<<set $gold += |>>", 1],
+    ["<<declare $gold to |", 1],
+    ["<<if |>>", 0],
+    ["<<once if |>>", 0],
+  ];
+  for (const [marked, index] of cases) {
+    const at = marked.indexOf("|"),
+      text = marked.replace("|", "");
+    assert.equal(emptyParameterHint(text, at, commands)?.index, index, marked);
+  }
+});
+
+test("filled values on either side of caret never cause automatic prompts", () => {
+  for (const marked of [
+    '<<play_sound |"wind" 0.5>>',
+    '<<play_sound "wind"| 0.5>>',
+    '<<play_sound "wind" |0.5>>',
+    '<<play_sound "wind" 0.|5>>',
+    '<<play_sound "wind" 0.5|>>',
+    '<<play_sound "wind" 0.5 |>>',
+    '<<play_sound "unfinished |',
+    '<<play_sound ""|>>',
+    "<<play_sound {1 + |2}>>",
+    "<<wait |0>>",
+    "<<jump Village|>>",
+    "<<set $gold|>>",
+    "<<set $gold |>>",
+    "<<set $gold | = 5>>",
+    "<<set $gold = |5>>",
+    "<<set $gold = $gold + |>>",
+    "<<if $gold > 5 |>>",
+    "<<once |>>",
+    "<<once if |$gold>>",
+    "<<return |>>",
+    "<<unknown |>>",
+    "// <<wait |>>",
+    "Narrator: <<wait |>>",
+    "<<wait >>|",
+  ]) {
+    const at = marked.indexOf("|"),
+      text = marked.replace("|", "");
+    assert.equal(emptyParameterHint(text, at, commands), null, marked);
+  }
 });

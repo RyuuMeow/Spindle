@@ -4,6 +4,8 @@ import {
   keymap,
   showTooltip,
   tooltips,
+  closeHoverTooltips,
+  hasHoverTooltips,
   type Tooltip,
 } from "@codemirror/view";
 import {
@@ -18,17 +20,19 @@ import {
 } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
 import type { Command } from "../parser";
-import { commandCatalog, findCommand } from "../command-catalog";
+import { commandCatalog } from "../command-catalog";
 import {
   variableCompletionContext,
   type YarnVariable,
 } from "../variable-completion";
 import {
   commandInput,
+  emptyParameterHint,
   parameterLabel,
   atCommandCloser,
 } from "../command-hints";
 import { commandPopup, completionDescription } from "../command-popup";
+import { commandTooltips } from "./command-tooltips";
 import { readingIcon } from "./icons";
 import "../editor-assistance.css";
 
@@ -41,46 +45,68 @@ export function commandEditing(
 ) {
   const dismiss = StateEffect.define<boolean>();
   const focusChanged = StateEffect.define<boolean>();
+  const compositionChanged = StateEffect.define<boolean>();
+  const composing = StateField.define({
+    create: () => false,
+    update: (value, tr) =>
+      tr.effects.find((e) => e.is(compositionChanged))?.value ?? value,
+  });
   const focused = StateField.define({
     create: () => false,
     update: (value, tr) =>
       tr.effects.find((e) => e.is(focusChanged))?.value ?? value,
+  });
+  const dismissed = StateField.define({
+    create: () => false,
+    update(value, tr) {
+      if (tr.effects.some((e) => e.is(dismiss))) return true;
+      if (
+        tr.docChanged ||
+        (tr.selection && !tr.newSelection.eq(tr.startState.selection)) ||
+        (tr.effects.some((e) => e.is(focusChanged) && e.value) &&
+          !tr.startState.field(focused))
+      )
+        return false;
+      return value;
+    },
   });
   const hints = StateField.define<Tooltip | null>({
     create: () => null,
     update(value, tr) {
       if (
         !tr.state.field(focused) ||
-        completionStatus(tr.state) === "active" ||
-        tr.effects.some((e) => e.is(dismiss))
+        completionStatus(tr.state) !== null ||
+        tr.state.field(composing) ||
+        tr.state.field(dismissed)
       )
         return null;
       if (
         !tr.docChanged &&
         !tr.selection &&
         completionStatus(tr.startState) === completionStatus(tr.state) &&
-        !tr.effects.some((e) => e.is(focusChanged))
+        !tr.effects.some((e) => e.is(focusChanged) || e.is(compositionChanged))
       )
         return value;
       const selection = tr.state.selection.main;
       if (
         !selection.empty ||
+        tr.state.selection.ranges.length !== 1 ||
         tr.state.readOnly ||
         tr.isUserEvent("input.type.compose")
       )
         return null;
       const line = tr.state.doc.lineAt(selection.head);
-      const input = commandInput(
-        line.text.slice(0, selection.head - line.from),
+      const hint = emptyParameterHint(
+        line.text,
+        selection.head - line.from,
+        commands(),
       );
-      if (input?.kind !== "argument") return null;
-      const command = findCommand(input.name, commands());
-      if (!command?.params[input.index]) return null;
+      if (!hint) return null;
       return {
         pos: selection.head,
         above: true,
         strictSide: false,
-        create: () => ({ dom: commandPopup(command, input.index, true) }),
+        create: () => ({ dom: commandPopup(hint.command, hint.index, true) }),
       };
     },
     provide: (field) => showTooltip.from(field),
@@ -150,17 +176,33 @@ export function commandEditing(
     // Keep overlays out of scaled/clipped graph nodes.
     tooltips({ parent: document.body }),
     focused,
+    composing,
+    dismissed,
     hints,
+    commandTooltips(
+      commands,
+      (state) =>
+        !!state.field(hints) ||
+        state.field(composing) ||
+        completionStatus(state) !== null,
+    ),
     EditorView.domEventHandlers({
       focus: (_event, view) => {
         view.dispatch({ effects: focusChanged.of(true) });
       },
       blur: (_event, view) => {
-        view.dispatch({ effects: focusChanged.of(false) });
+        view.dispatch({
+          effects: [focusChanged.of(false), closeHoverTooltips],
+        });
       },
       compositionstart: (_event, view) => {
-        view.dispatch({ effects: dismiss.of(true) });
+        view.dispatch({
+          effects: [compositionChanged.of(true), closeHoverTooltips],
+        });
         closeCompletion(view);
+      },
+      compositionend: (_event, view) => {
+        view.dispatch({ effects: compositionChanged.of(false) });
       },
     }),
     Prec.highest(
@@ -208,9 +250,11 @@ export function commandEditing(
           run: (view) => {
             if (view.composing) return false;
             const consumed =
-              !!completionStatus(view.state) || !!view.state.field(hints);
+              !!completionStatus(view.state) ||
+              !!view.state.field(hints) ||
+              hasHoverTooltips(view.state);
             closeCompletion(view);
-            view.dispatch({ effects: dismiss.of(true) });
+            view.dispatch({ effects: [dismiss.of(true), closeHoverTooltips] });
             return consumed;
           },
         },
