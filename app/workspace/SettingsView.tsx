@@ -386,7 +386,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.4.0：輕量搜尋浮層、獨立自訂指令面板、行內新增、分頁內導航、閱讀間距與節點直接編輯。
+                    0.5.0：指令工具分頁、顯示名稱、參數提示與懸浮說明；點流程圖空白處可結束節點編輯。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。
