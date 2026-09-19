@@ -64,8 +64,13 @@ Ctrl 連結由共用 sceneLink 解析來源範圍，解析後先確認唯一存�
 
 ### 內建指令與變數補全（0.6.4）
 
-`command-catalog.ts` 提供純顯示 metadata，不寫入自訂指令設定。三個編輯入口共用內建／自訂候選、懸浮說明與參數提示；`set`／`declare` 的名稱與值分開，條件與右側運算式不依空格拆成位置參數。內建語法不增加重複的 inline 參數標籤。補全清單開啟時暫停參數提示，關閉後再定位當前參數。
+`command-catalog.ts` 提供純顯示 metadata，不寫入自訂指令設定。三個編輯入口共用內建／自訂候選、懸浮說明與參數提示；`set`／`declare` 的名稱與值分開，條件與右側運算式不依空格拆成位置參數。內建語法不增加重複的 inline 參數標籤。補全清單開啟時暫停參數提示，關閉後依空參數規則重新判斷，不提示已填值。
 
 `variable-completion.ts` 索引整個專案的完整 declare／set 定義，宣告優先、同名去重，保留型別、文件、行數及緊鄰的 /// 說明。`set` 左側不提供唯讀 smart variable；條件、運算式及插值中的 `$` 提供定義候選，排除註解、字串與普通台詞。這是編輯輔助，不代替官方編譯器的型別分析。
 
 語義來源：[變數、declare、set 與型別](https://yarnspinner.dev/docs/yarn/02-fundamentals/05-logic-and-variables/)、[detour／return 與 v3 語法](https://docs.yarnspinner.dev/2.5/coming-in-v3)、[once](https://docs.yarnspinner.dev/write-yarn-scripts/scripting-fundamentals/once)、[函式與 call](https://docs.yarnspinner.dev/api/csharp/yarn.unity/yarn.unity.dialoguerunner/yarn.unity.dialoguerunner.addfunction)、[wait／stop](https://docs.yarnspinner.dev/2.3/getting-started/writing-in-yarn/commands?fallback=true)。
+
+
+### 指令提示互斥（0.6.5）
+
+emptyParameterHint 同時讀取游標兩側，內建語義位置與自訂位置參數共用空值規則。CodeMirror 的 commandEditing 統一安裝游標與 hover extension，hover 的建立與保留均受參數提示、補全狀態及組字狀態約束；選取／內容變動撤掉舊 hover。Monaco 的同一個來源定位 widget 顯示參數或 hover，延遲回呼也再次核對優先順序，避免過期 hover 搶回顯示。Esc、失焦與組字關閉提示；來源內容與交易不參與提示狀態。

@@ -1,6 +1,12 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.6.4**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
+版本：Windows x64 **0.6.5**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
+
+## 0.6.5 指令提示規則
+
+- 自動參數提示只描述空位置；完整行判斷可避免游標位於既有值前方時誤彈窗。字串、未完成內容與完整運算式都算已有內容。
+- 三種編輯入口共用補全 → 空參數 → hover 優先順序；已有 hover 被較高優先提示接替，不並排堆疊。Esc、失焦、組字與模式切換清除浮窗。
+- [提示互動](../outputs/hint-priority-ui/results.json)及[編輯輔助回歸](../outputs/hint-priority-assistance/results.json)涵蓋三模式、已有值前／中／後、取代 hover、補全互斥、空白行、窄窗與 App 縮放；[參數與摺疊](../outputs/hint-priority-context/results.json)亦通過。
 
 ## 0.6.4 修正
 
@@ -35,8 +41,9 @@
 
 ## 驗證證據
 
-- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。本輪改動範圍 lint 仍只有 `app/CodeEditor.tsx` 的既有 **13 errors／2 warnings**，見 [lint 報告](../outputs/sync-language-lint.json)；未冒稱全專案 lint 清零。
-- 單元與服務回歸 **95／95**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- TypeScript、修改範圍 lint、網頁及桌面 production build 通過；本輪 6 個提示／編輯入口檔案 lint 為 0 errors／0 warnings，見 [lint 報告](../outputs/hint-priority-lint.json)。全專案既有 lint 基線未清零。
+- 單元與服務回歸 **97／97**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- [0.6.5 Portable 提示互動](../outputs/hint-priority-portable-0.6.5/results.json)：空值判斷、hover 取代、候選互斥、Esc 與失焦，三種模式全數通過；安裝精靈及真正 IME／混合 DPI 未實測。
 - [0.6.4 Portable 互動](../outputs/sync-language-portable-0.6.4/results.json)：純文字／閱讀／圖表即時同步與共享 Undo、跨檔變數補全、內建指令參數說明、靜默更名、無確認刪除、Windows 資源回收筒與 App 復原，全數通過且無頁面錯誤。
 - [0.6.3 Portable 互動](../outputs/refinement-portable-0.6.3/results.json)：三個編輯入口、相同 29px 補全列高與參數文字寬度、空白行與 BOM／CRLF 保留、頂部新增與雙擊改名、800px 窄窗及 100／125／150% App 縮放提示定位，全數通過且無頁面錯誤。
 - [0.6.2 portable 基線互動](../outputs/assistance-portable-0.6.2/results.json)：三種編輯入口、補全／參數／Esc／貼上／Undo、失焦、模式切換、診斷數量與窄窗浮窗。
@@ -62,4 +69,4 @@
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/quiet-actions-and-editor-sync` 修正垃圾桶、靜默操作、來源同步與語言輔助；前版基線為 `v0.6.3`，本輪交付標記為 `v0.6.4`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/command-hint-priority` 統一指令提示顯示規則；前版基線為 `v0.6.4`，交付標記為 `v0.6.5`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
