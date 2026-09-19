@@ -1,4 +1,5 @@
 "use client";
+import { collectVariables } from "../variable-completion";
 import { commandEditing } from "../reading/command-input";
 import { sceneLinks } from "../reading/scene-links";
 import { commandTooltips } from "../reading/command-tooltips";
@@ -285,6 +286,7 @@ export default function SceneEditor(props: Props) {
                   ),
               ),
             ],
+            () => collectVariables(latest.current.documents),
           ),
           EditorView.updateListener.of((update) => {
             if (

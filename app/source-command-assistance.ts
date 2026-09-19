@@ -1,5 +1,7 @@
 import type { editor, IDisposable } from "monaco-editor";
 import type { Command } from "./parser";
+import { findCommand } from "./command-catalog";
+import type { YarnVariable } from "./variable-completion";
 import { commandHover, commandInput, atCommandCloser } from "./command-hints";
 import { commandPopup, completionDescription } from "./command-popup";
 import "./editor-assistance.css";
@@ -36,6 +38,7 @@ export function sourceCommandAssistance(
   editor: editor.IStandaloneCodeEditor,
   commands: () => Command[],
   placement: typeof import("monaco-editor").editor.ContentWidgetPositionPreference,
+  variables: () => YarnVariable[] = () => [],
 ): IDisposable {
   const host = editor.getDomNode()!;
   host.dataset.spindleAssisted = "";
@@ -47,6 +50,7 @@ export function sourceCommandAssistance(
   document.body.appendChild(info);
   let composing = false,
     signature = false,
+    suggesting = false,
     hoverTimer: ReturnType<typeof setTimeout> | undefined,
     frame = 0,
     disposed = false;
@@ -76,7 +80,7 @@ export function sourceCommandAssistance(
     if (!disposed) editor.layoutContentWidget(widget);
   };
   const parameter = () => {
-    if (disposed || composing || !editor.hasTextFocus()) {
+    if (disposed || composing || suggesting || !editor.hasTextFocus()) {
       hide();
       return;
     }
@@ -90,9 +94,7 @@ export function sourceCommandAssistance(
     const input = commandInput(
       model.getLineContent(pos.lineNumber).slice(0, pos.column - 1),
     );
-    const c =
-      input?.kind === "argument" &&
-      commands().find((c) => c.name === input.name);
+    const c = input?.kind === "argument" && findCommand(input.name, commands());
     if (!c || input?.kind !== "argument" || !c.params[input.index]) {
       hide();
       return;
@@ -111,16 +113,22 @@ export function sourceCommandAssistance(
     frame = 0;
     if (disposed) return;
     const list = host.querySelector<HTMLElement>(".suggest-widget.visible");
+    if (!!list !== suggesting) {
+      suggesting = !!list;
+      parameter();
+    }
     const name = list?.querySelector(
       ".monaco-list-row.focused .label-name",
     )?.textContent;
-    const c = commands().find((c) => c.name === name);
-    if (!list || !c?.description || composing) {
+    const c = findCommand(name || "", commands());
+    const description =
+      c?.description || variables().find((v) => v.name === name)?.description;
+    if (!list || !description || composing) {
       info.hidden = true;
       return;
     }
-    if (info.textContent !== c.description)
-      info.replaceChildren(completionDescription(c.description));
+    if (info.textContent !== description)
+      info.replaceChildren(completionDescription(description));
     place(info, list.getBoundingClientRect(), true);
   };
   const observer = new MutationObserver(() => {

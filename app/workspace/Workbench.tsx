@@ -63,6 +63,7 @@ import {
 import { ChromeButton } from "@/components/ChromeButton";
 import WorkspaceTabs from "../WorkspaceTabs";
 import CodeEditor from "../CodeEditor";
+import { collectVariables } from "../variable-completion";
 import Graph from "../Graph";
 import { type CommandActions } from "../CommandManager";
 import CommandManager from "../CommandManager";
@@ -215,6 +216,10 @@ export default function Workbench({
         ? parse(project.documents, project.commands)
         : { nodes: [], issues: [], links: [] },
     [project],
+  );
+  const variables = useMemo(
+    () => collectVariables(project?.documents || []),
+    [project?.documents],
   );
   const utility = !!utilityNames[active?.documentId || ""];
   const recoveredCommand = project?.commandDraft as
@@ -774,7 +779,7 @@ export default function Workbench({
             : {
                 type: "createDocument",
                 projectId: project.id,
-                firstInOrder: displayedDocuments.map(d => d.id),
+                firstInOrder: displayedDocuments.map((d) => d.id),
                 name: relative,
                 text: "title: " + uniqueSceneName(latest) + "\n---\n\n===\n",
               },
@@ -2315,6 +2320,7 @@ export default function Workbench({
                     key={project.id}
                     doc={doc}
                     commands={project.commands}
+                    variables={variables}
                     nodes={analysis.nodes}
                     issues={analysis.issues}
                     onChange={(value, event) => {
@@ -2385,6 +2391,7 @@ export default function Workbench({
                   key={active.id + doc.id}
                   doc={doc}
                   commands={project.commands}
+                  variables={variables}
                   line={active.line}
                   column={active.column}
                   scrollTop={active.scrollTop}

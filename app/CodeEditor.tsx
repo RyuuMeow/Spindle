@@ -1,10 +1,14 @@
 "use client";
 import { sourceCommandAssistance } from "./source-command-assistance";
 import { sceneLink } from "./scene-link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Editor, { loader } from "@monaco-editor/react";
 import type { Command, Doc, Issue, Node } from "./parser";
-import { builtins } from "./parser";
+import { commandCatalog } from "./command-catalog";
+import {
+  variableCompletionContext,
+  type YarnVariable,
+} from "./variable-completion";
 import { commandCall, parameterLabel, commandInput } from "./command-hints";
 import { yarnEditorTheme } from "./editor-theme";
 import { loadEditorLocale } from "./editor-locale";
@@ -12,6 +16,7 @@ loader.config({ paths: { vs: "/monaco/vs" } });
 export default function CodeEditor({
   doc,
   commands,
+  variables = [],
   nodes,
   issues,
   onChange,
@@ -35,6 +40,7 @@ export default function CodeEditor({
   viewStates: any;
   doc: Doc;
   commands: Command[];
+  variables?: YarnVariable[];
   nodes: Node[];
   issues: Issue[];
   onChange: (
@@ -51,6 +57,11 @@ export default function CodeEditor({
   onView?: (view: import("monaco-editor").editor.ICodeEditorViewState) => void;
   onNavigate?: (file: string, line: number) => void;
 }) {
+  const currentDoc = useRef(doc),
+    syncingModel = useRef(false);
+  useLayoutEffect(() => {
+    currentDoc.current = doc;
+  }, [doc]);
   const viewCallback = useRef(onView),
     navigationCallback = useRef(onNavigate),
     restoredView = useRef(persistedView);
@@ -77,8 +88,8 @@ export default function CodeEditor({
   compositionCallback.current = onComposition;
   const api = useRef<any>(null),
     providers = useRef<any[]>([]),
-    latest = useRef({ commands, nodes });
-  latest.current = { commands, nodes };
+    latest = useRef({ commands, nodes, variables });
+  latest.current = { commands, nodes, variables };
   const hintChanges = useRef<import("monaco-editor").Emitter<void> | null>(
     null,
   );
@@ -159,6 +170,7 @@ export default function CodeEditor({
       saveViewState
       keepCurrentModel
       onChange={(s, event) =>
+        !syncingModel.current &&
         onChange(
           (doc.text.startsWith("\ufeff") && !s?.startsWith("\ufeff")
             ? "\ufeff"
@@ -246,6 +258,25 @@ export default function CodeEditor({
                   startColumn: word.startColumn,
                   endColumn: pos.column,
                 };
+              const variable = variableCompletionContext(prefix);
+              if (variable)
+                return {
+                  suggestions: latest.current.variables
+                    .filter((v) => !variable.assignment || !v.readOnly)
+                    .map((v) => ({
+                      label: v.name,
+                      kind: m.languages.CompletionItemKind.Variable,
+                      insertText: v.name,
+                      detail:
+                        v.type + (v.readOnly ? " · 唯讀" : "") + " · " + v.file,
+                      range: {
+                        ...range,
+                        startColumn: variable.from + 1,
+                        endColumn:
+                          model.getWordAtPosition(pos)?.endColumn || pos.column,
+                      },
+                    })),
+                };
               if (/^\s*<<\s*(jump|detour)\s+\w*$/.test(prefix))
                 return {
                   suggestions: latest.current.nodes.map((n) => ({
@@ -260,9 +291,9 @@ export default function CodeEditor({
                 return { suggestions: [] };
               return {
                 suggestions: [
-                  ...latest.current.commands.map((c) => ({
+                  ...commandCatalog(latest.current.commands).map((c) => ({
                     label: c.name,
-                    kind: 1,
+                    kind: c.builtin ? 14 : 1,
                     insertText: c.name,
                     detail: c.params
                       .map(
@@ -270,13 +301,6 @@ export default function CodeEditor({
                           `${parameterLabel(p)}${p.required ? "" : "?"}: ${p.type}`,
                       )
                       .join(", "),
-                    range,
-                  })),
-                  ...builtins.map((name) => ({
-                    label: name,
-                    kind: 14,
-                    insertText: name,
-                    detail: "Yarn 內建語法",
                     range,
                   })),
                 ],
@@ -302,6 +326,7 @@ export default function CodeEditor({
                 );
                 if (
                   !call?.args ||
+                  call.command.builtin ||
                   call.args.length > call.command.params.length
                 )
                   continue;
@@ -321,10 +346,29 @@ export default function CodeEditor({
         ];
       }}
       onMount={(editor, m) => {
+        // Monaco React reuses retained models without applying value on mount.
+        // Refresh before restoring the cursor or accepting the first keystroke.
+        const syncModel = () => {
+          const model = editor.getModel();
+          if (
+            !model ||
+            model.getValue(undefined, true) === currentDoc.current.text
+          )
+            return;
+          syncingModel.current = true;
+          try {
+            model.setValue(currentDoc.current.text);
+          } finally {
+            syncingModel.current = false;
+          }
+        };
+        syncModel();
+        editor.onDidChangeModel(syncModel);
         const assistance = sourceCommandAssistance(
           editor,
           () => latest.current.commands,
           m.editor.ContentWidgetPositionPreference,
+          () => latest.current.variables,
         );
         editor.onDidDispose(() => assistance.dispose());
         editorRef.current = editor;

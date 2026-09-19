@@ -1,9 +1,9 @@
-import type { Command } from "./parser";
+import type { CommandInfo } from "./command-catalog";
 import { commandLabel, parameterLabel } from "./command-hints";
 import { readingIcon } from "./reading/icons";
 /** Text-only DOM construction: project descriptions never become HTML. */
 export function commandPopup(
-  command: Command,
+  command: CommandInfo,
   parameterIndex = -1,
   signature = false,
 ) {
@@ -28,6 +28,7 @@ export function commandPopup(
     add(heading, "code", "command-tip-id", command.name);
   if (command.description && !signature)
     add(dom, "p", "command-tip-description", command.description);
+  if (command.syntax) add(dom, "code", "command-tip-example", command.syntax);
   if (signature) {
     const strip = add(dom, "div", "command-tip-signature", "");
     command.params.forEach((p, index) => {
@@ -60,7 +61,7 @@ export function commandPopup(
         "預設值：" + String(p.defaultValue),
       );
   });
-  if (command.example && parameterIndex < 0) {
+  if (command.example && command.example !== command.syntax && parameterIndex < 0) {
     add(dom, "div", "command-tip-caption", "範例");
     add(dom, "code", "command-tip-example", command.example);
   }

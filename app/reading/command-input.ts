@@ -17,7 +17,12 @@ import {
   type CompletionSource,
 } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
-import { builtins, type Command } from "../parser";
+import type { Command } from "../parser";
+import { commandCatalog, findCommand } from "../command-catalog";
+import {
+  variableCompletionContext,
+  type YarnVariable,
+} from "../variable-completion";
 import {
   commandInput,
   parameterLabel,
@@ -32,6 +37,7 @@ export function commandEditing(
   commands: () => Command[],
   scenes: () => { name: string; file?: string }[] = () => [],
   characters: () => string[] = () => [],
+  variables: () => YarnVariable[] = () => [],
 ) {
   const dismiss = StateEffect.define<boolean>();
   const focusChanged = StateEffect.define<boolean>();
@@ -43,11 +49,16 @@ export function commandEditing(
   const hints = StateField.define<Tooltip | null>({
     create: () => null,
     update(value, tr) {
-      if (!tr.state.field(focused) || tr.effects.some((e) => e.is(dismiss)))
+      if (
+        !tr.state.field(focused) ||
+        completionStatus(tr.state) === "active" ||
+        tr.effects.some((e) => e.is(dismiss))
+      )
         return null;
       if (
         !tr.docChanged &&
         !tr.selection &&
+        completionStatus(tr.startState) === completionStatus(tr.state) &&
         !tr.effects.some((e) => e.is(focusChanged))
       )
         return value;
@@ -63,7 +74,7 @@ export function commandEditing(
         line.text.slice(0, selection.head - line.from),
       );
       if (input?.kind !== "argument") return null;
-      const command = commands().find((c) => c.name === input.name);
+      const command = findCommand(input.name, commands());
       if (!command?.params[input.index]) return null;
       return {
         pos: selection.head,
@@ -78,6 +89,25 @@ export function commandEditing(
     if (context.view?.composing || context.state.readOnly) return null;
     const line = context.state.doc.lineAt(context.pos);
     const prefix = line.text.slice(0, context.pos - line.from);
+    const variable = variableCompletionContext(prefix);
+    if (variable)
+      return {
+        from: line.from + variable.from,
+        to:
+          context.pos +
+          (/^\w*/.exec(line.text.slice(context.pos - line.from))?.[0].length ||
+            0),
+        options: variables()
+          .filter((v) => !variable.assignment || !v.readOnly)
+          .map((v) => ({
+            label: v.name,
+            type: "variable",
+            detail: v.type + (v.readOnly ? " · 唯讀" : "") + " · " + v.file,
+            info: v.description
+              ? () => completionDescription(v.description)
+              : undefined,
+          })),
+      };
     const input = commandInput(prefix);
     const word = context.matchBefore(/[\w$]*/)!;
     if (/^\s*<<\s*(jump|detour)\s+\w*$/.test(prefix))
@@ -93,9 +123,9 @@ export function commandEditing(
       return {
         from: word.from,
         options: [
-          ...commands().map((c) => ({
+          ...commandCatalog(commands()).map((c) => ({
             label: c.name,
-            type: "function",
+            type: c.builtin ? "keyword" : "function",
             detail: c.params
               .map(
                 (p) =>
@@ -105,11 +135,6 @@ export function commandEditing(
             info: c.description
               ? () => completionDescription(c.description!)
               : undefined,
-          })),
-          ...builtins.map((label) => ({
-            label,
-            type: "keyword",
-            detail: "Yarn 內建語法",
           })),
         ],
       };

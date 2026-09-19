@@ -285,6 +285,7 @@ export function readingDecorations(
       const call = commandCall(line.text, definitions);
       if (
         call?.args &&
+        !call.command.builtin &&
         call.args.length <= call.command.params.length &&
         !active
       ) {

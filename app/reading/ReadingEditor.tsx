@@ -1,4 +1,5 @@
 "use client";
+import type { YarnVariable } from "../variable-completion";
 import { commandEditing } from "./command-input";
 import { sceneLinks } from "./scene-links";
 import { commandTooltips } from "./command-tooltips";
@@ -67,6 +68,7 @@ export type ReadingActions = {
 type Props = {
   doc: DocumentRecord;
   commands: Command[];
+  variables?: YarnVariable[];
   scenes?: { name: string; file: string }[];
   onEdit: (edits: TextEdit[]) => void;
   onUndo: (redo?: boolean) => void;
@@ -316,6 +318,8 @@ export default function ReadingEditor(props: Props) {
         commandEditing(
           () => latest.current.commands,
           () => latest.current.scenes || [],
+          () => [],
+          () => latest.current.variables || [],
         ),
         EditorView.updateListener.of((update) => {
           reportFolded(update.state);

@@ -1,4 +1,12 @@
-import type { Command, Param } from "./parser";
+import type { Command } from "./parser";
+import {
+  findCommand,
+  builtinCommands,
+  builtinArgumentSpans,
+  builtinParameterIndex,
+  type CommandInfo,
+  type HelpParameter,
+} from "./command-catalog";
 export type ArgumentSpan = { from: number; to: number };
 /** Conservative positional tokenizer. Never guess around an unfinished quote/group. */
 export function argumentSpans(text: string, offset = 0): ArgumentSpan[] | null {
@@ -43,7 +51,7 @@ export function argumentSpans(text: string, offset = 0): ArgumentSpan[] | null {
 export function commandCall(text: string, commands: Command[]) {
   const prefix = /^\s*<<\s*([A-Za-z_]\w*)\b\s*/.exec(text);
   if (!prefix) return null;
-  const command = commands.find((c) => c.name === prefix[1]);
+  const command = findCommand(prefix[1], commands);
   if (!command) return null;
   let quote = "",
     escaped = false,
@@ -61,10 +69,13 @@ export function commandCall(text: string, commands: Command[]) {
     }
   }
   if (end < 0) return null;
-  const args = argumentSpans(
-    text.slice(prefix[0].length, end),
-    prefix[0].length,
-  );
+  const args = command.builtin
+    ? builtinArgumentSpans(
+        command.name,
+        text.slice(prefix[0].length, end),
+        prefix[0].length,
+      )
+    : argumentSpans(text.slice(prefix[0].length, end), prefix[0].length);
   const nameFrom = text.indexOf(command.name, text.indexOf("<<") + 2);
   return {
     command,
@@ -74,14 +85,14 @@ export function commandCall(text: string, commands: Command[]) {
     end: end + 2,
   };
 }
-export const commandLabel = (command: Command) =>
+export const commandLabel = (command: CommandInfo) =>
   command.displayName?.trim() || command.name;
-export const parameterLabel = (parameter: Param) =>
+export const parameterLabel = (parameter: HelpParameter) =>
   parameter.displayName?.trim() || parameter.name;
-export function parameterHelp(parameter: Param, index: number) {
+export function parameterHelp(parameter: HelpParameter, index: number) {
   return `${parameterLabel(parameter)} · ${parameter.type} · 第 ${index + 1} 個參數${parameter.required ? "" : " · 選填"}${parameter.description ? "\n" + parameter.description : ""}`;
 }
-export function commandHelp(command: Command) {
+export function commandHelp(command: CommandInfo) {
   return `${commandLabel(command)}${command.displayName?.trim() ? " · " + command.name : ""}${command.description ? "\n" + command.description : ""}`;
 }
 export function commandHover(
@@ -117,7 +128,7 @@ export function commandHover(
 const markdownText = (text: string) =>
   text.replace(/[\\`*_{}\[\]<>()#+.!|~-]/g, "\\$&").replace(/\r?\n/g, " ");
 /** Untrusted project descriptions are escaped; no HTML or command links. */
-export function commandMarkdown(command: Command, parameterIndex = -1) {
+export function commandMarkdown(command: CommandInfo, parameterIndex = -1) {
   const esc = markdownText;
   const title =
     "**" +
@@ -200,7 +211,13 @@ export function commandInput(
       }
     } else token = true;
   }
-  return { kind: "argument", name: match[1], index };
+  return {
+    kind: "argument",
+    name: match[1],
+    index: builtinCommands.some((c) => c.name === match[1])
+      ? builtinParameterIndex(match[1], text)
+      : index,
+  };
 }
 
 /** Is the caret at an existing closing delimiter, outside quoted arguments? */

@@ -175,3 +175,101 @@ test("closing pair skipping only recognizes delimiters outside strings", () => {
   assert.equal(atCommandCloser("// <<fade_in 2>>", 14), false);
   assert.equal(atCommandCloser('<<play_sound "unfinished >>', 24), false);
 });
+
+const catalogOutput = path.resolve("outputs/tests/command-catalog.cjs");
+buildSync({
+  entryPoints: ["app/command-catalog.ts"],
+  outfile: catalogOutput,
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+});
+const { builtinCommands } = createRequire(import.meta.url)(catalogOutput);
+test("all supported builtins carry readable syntax and parameter descriptions", () => {
+  assert.equal(builtinCommands.length, 14);
+  for (const c of builtinCommands) {
+    assert(c.description && c.syntax && c.example, c.name);
+    for (const p of c.params) assert(p.description && p.type, c.name);
+  }
+  assert.equal(commandHover("<<wait 0.5>>", 3, []).command.builtin, true);
+  assert.match(commandHover("<<wait 0.5>>", 8, []).text, /秒數/);
+});
+test("built-in expressions stay one semantic argument regardless of spaces", () => {
+  for (const prefix of [
+    "<<if $gold >= 5 and ",
+    "<<elseif $x == true ",
+    "<<once if $x && ",
+    "<<call max(1, 2) ",
+  ])
+    assert.equal(commandInput(prefix).index, 0, prefix);
+  for (const prefix of [
+    "<<set $gold = ",
+    "<<set $gold to $gold + ",
+    "<<set $gold += 2 ",
+    '<<declare $name = "a b" as string',
+  ])
+    assert.equal(commandInput(prefix).index, 1, prefix);
+  const line = "<<set $gold = $gold + 2>>";
+  const call = commandCall(line, []);
+  assert.deepEqual(
+    call.args.map((a) => line.slice(a.from, a.to)),
+    ["$gold", "$gold + 2"],
+  );
+  assert.equal(commandHover(line, line.indexOf("+"), []).parameterIndex, 1);
+});
+const variableOutput = path.resolve("outputs/tests/variable-completion.cjs");
+buildSync({
+  entryPoints: ["app/variable-completion.ts"],
+  outfile: variableOutput,
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+});
+const { collectVariables, variableCompletionContext } = createRequire(
+  import.meta.url,
+)(variableOutput);
+test("project variable index prefers declarations, deduplicates and excludes prose/comments", () => {
+  const values = collectVariables([
+    {
+      name: "a.yarn",
+      text: '<<set $gold = 2>>\n// <<declare $fake = 1>>\nNarrator: $literal\n<<play_sound "$quoted">>\n<<set $implicit to false>>',
+    },
+    {
+      name: "folder/b.yarn",
+      text: '\ufeff/// 金幣數量\r\n<<declare $gold = 12>>\r\n<<declare $rich = $gold > 10>>\r\n<<declare $name = "Hero" as string>>\r\n<<declare $unfinished = ',
+    },
+  ]);
+  assert.deepEqual(
+    values.map((v) => v.name),
+    ["$gold", "$implicit", "$name", "$rich"],
+  );
+  assert.equal(values[0].file, "folder/b.yarn");
+  assert.equal(values[0].description, "金幣數量");
+  assert.equal(values[0].type, "number");
+  assert.equal(values.find((v) => v.name === "$rich").readOnly, true);
+  assert.equal(values.find((v) => v.name === "$name").readOnly, false);
+});
+test("variable completion only activates in real expression/assignment contexts", () => {
+  for (const prefix of ["<<set ", "<<set $g", "<<set go"])
+    assert.equal(variableCompletionContext(prefix).assignment, true, prefix);
+  for (const prefix of [
+    "<<if $g",
+    "<<set $g = $o",
+    "<<declare $g = $o",
+    "Narrator: {$g",
+    "-> 選项 <<if $g",
+    "<<play_sound {$v",
+  ])
+    assert(variableCompletionContext(prefix), prefix);
+  for (const prefix of [
+    "// <<set $g",
+    "Narrator: $g",
+    '<<play_sound "$g',
+    "<<declare $g",
+    "tags: $g",
+    "<<set $g = 1>> $g",
+    "Narrator: \\{$g",
+    '<<play_sound "text // $g',
+  ])
+    assert.equal(variableCompletionContext(prefix), null, prefix);
+});
