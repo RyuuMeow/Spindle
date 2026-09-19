@@ -389,7 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.6.5：統一提示優先順序；已有值不自動顯示參數浮窗，游標提示優先於懸浮說明。
+                    0.7.0：資料夾與行內操作、純閱讀與分析側欄、閱讀定位，以及更清楚的流程佈線與診斷狀態。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

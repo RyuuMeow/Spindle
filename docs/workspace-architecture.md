@@ -74,3 +74,9 @@ Ctrl 連結由共用 sceneLink 解析來源範圍，解析後先確認唯一存�
 ### 指令提示互斥（0.6.5）
 
 emptyParameterHint 同時讀取游標兩側，內建語義位置與自訂位置參數共用空值規則。CodeMirror 的 commandEditing 統一安裝游標與 hover extension，hover 的建立與保留均受參數提示、補全狀態及組字狀態約束；選取／內容變動撤掉舊 hover。Monaco 的同一個來源定位 widget 顯示參數或 hover，延遲回呼也再次核對優先順序，避免過期 hover 搶回顯示。Esc、失焦與組字關閉提示；來源內容與交易不參與提示狀態。
+
+### 工作區樹與輔助閱讀（0.7.0）
+
+FileTree 負責選取、折疊、命名入口和拖移命中；file-tree.ts 共用資料夾合法性、移動規劃、混合順序。Project.folders 保存空資料夾，treeOrder 保存文件 ID／資料夾路徑鍵的排列；舊資料缺欄位仍可還原。建立與移動透過具名 IPC，renderer 不取得任意 filesystem。單次資料夾移動先驗證來源／目的在 root 內、排除 symlink 和同名，完成磁碟 rename 後才映射全部子文件路徑及 metadata，文字、版本與 DocumentId 保持不變。資料夾移到系統垃圾桶前保留各 Yarn 文件快照；App 可逐檔復原，完整目錄及其他檔案可從系統垃圾桶復原。
+
+ReadingEditor 接受 goTo nonce 以區分外部定位與游標回報，解除覆蓋目標的折疊再捲動。DialogueReader 是唯讀、來源行對應的 React 畫面，不生成或回寫 Yarn；書本狀態屬於 tab。StatisticsPanel 僅聚合目前文件，沿用 document-side 寬度與窄窗規則。desktop:stage 更新 renderer、主程序服務與版本資訊後才供 UI 測試／打包使用；只清理驗證位於 dist-desktop/app 下的生成 renderer，避免過期 hash bundle 混入發行。

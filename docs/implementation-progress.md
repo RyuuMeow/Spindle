@@ -1,6 +1,13 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.6.5**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
+版本：Windows x64 **0.7.0**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
+
+## 0.7.0 工作區、閱讀與流程修訂
+
+- 最新回饋 14 項均已實作：閱讀大綱定位、白色拖移線、caption 提示避讓、單一垃圾桶入口、直接複製改名、純閱讀、資料夾與跨層操作、統計側欄、診斷數字、選單對齊、流程佈線與只選取連線。
+- [桌面互動](../outputs/workspace-navigation-ui/results.json)通過已收合場景定位、空資料夾／跨層拖移、直接複製與刪除、工具提示幾何、7 個流程標籤、800px 窄窗。
+- 磁碟服務測試確認新 profile 重開後空資料夾、順序與文件 ID 保留；同名／循環／路徑拒絕、垃圾桶失敗不移走原件，BOM／CRLF 不變。
+- Windows 混合 DPI、Snap、原生滑鼠拖移及安裝精靈未實測。拖移 UI 使用合成 DataTransfer；垃圾桶 UI 用隔離目錄替身，磁碟服務另驗證失敗保護。
 
 ## 0.6.5 指令提示規則
 
@@ -41,8 +48,11 @@
 
 ## 驗證證據
 
-- TypeScript、修改範圍 lint、網頁及桌面 production build 通過；本輪 6 個提示／編輯入口檔案 lint 為 0 errors／0 warnings，見 [lint 報告](../outputs/hint-priority-lint.json)。全專案既有 lint 基線未清零。
-- 單元與服務回歸 **97／97**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- [0.7.0 Portable 工作區互動](../outputs/workspace-navigation-portable-0.7.0/results.json)全部通過，核對 App 版本為 0.7.0 且沒有頁面錯誤；[提示優先順序回歸](../outputs/workspace-navigation-hint-regression/results.json)涵蓋純文字、閱讀與節點編輯。
+
+- [0.7.0 Portable 原生啟動](../outputs/workspace-navigation-startup-0.7.0/results.json)通過自行顯示視窗、兩個隔離執行個體、解壓資源存活與重複啟動喚回；本機 225% DPI，沒有用強制 show 取代啟動驗證。
+- TypeScript、修改範圍 lint、網頁及桌面 production build 通過；本輪改動範圍見 [lint 報告](../outputs/workspace-navigation-lint.json)。全專案既有 lint 基線未清零。
+- 單元與服務回歸 **100／100**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
 - [0.6.5 Portable 提示互動](../outputs/hint-priority-portable-0.6.5/results.json)：空值判斷、hover 取代、候選互斥、Esc 與失焦，三種模式全數通過；安裝精靈及真正 IME／混合 DPI 未實測。
 - [0.6.4 Portable 互動](../outputs/sync-language-portable-0.6.4/results.json)：純文字／閱讀／圖表即時同步與共享 Undo、跨檔變數補全、內建指令參數說明、靜默更名、無確認刪除、Windows 資源回收筒與 App 復原，全數通過且無頁面錯誤。
 - [0.6.3 Portable 互動](../outputs/refinement-portable-0.6.3/results.json)：三個編輯入口、相同 29px 補全列高與參數文字寬度、空白行與 BOM／CRLF 保留、頂部新增與雙擊改名、800px 窄窗及 100／125／150% App 縮放提示定位，全數通過且無頁面錯誤。
@@ -65,8 +75,8 @@
 
 仍未實測：真正中文輸入法期間的跨窗輸入、原生 tab 拖出／拖回、Snap、拔除副螢幕、混合 DPI、安裝精靈／Explorer 關聯與讀屏。服務層 composition、合成事件及 Electron 內容截圖不代表上述驗收完成。
 
-完整 Yarn runtime／官方編譯器、Unity、雲端協作、外掛、圖上拉線改寫、角色別台詞量與完整分支折疊仍屬後續範圍。更新來源未配置，僅提供版本與記錄資訊。
+完整 Yarn runtime／官方編譯器、Unity、雲端協作、外掛、圖上拉線改寫與完整分支折疊仍屬後續範圍。更新來源未配置，僅提供版本與記錄資訊。
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/command-hint-priority` 統一指令提示顯示規則；前版基線為 `v0.6.4`，交付標記為 `v0.6.5`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `feat/workspace-reading-navigation` 整理工作區樹、閱讀與流程；前版基線為 `v0.6.5`，交付標記為 `v0.7.0`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
