@@ -622,6 +622,7 @@ test("native disk saves preserve BOM, detect conflict, keep deletion, and restor
     chooseFolder: async () => chosen,
     chooseFiles: async () => [],
     saveDialog: async () => null,
+    trash: async (file) => fs.renameSync(file, path.join(base, "trashed.yarn")),
     reveal: () => {},
     changed: () => {},
   });
@@ -713,17 +714,87 @@ test("command presentation metadata remains optional and survives restore", () =
   );
 });
 
-
 test("top insertion keeps visible order, folder scope and concurrently added files", () => {
-  const p = project(), engine = new DocumentEngine([p]);
+  const p = project(),
+    engine = new DocumentEngine([p]);
   p.documents[0].name = "folder/A.yarn";
   p.documents[1].name = "folder/B.yarn";
   const outside = engine.create(p.id, "other/C.yarn", "outside");
   const peer = engine.create(p.id, "folder/Peer.yarn", "peer");
-  const created = engine.create(p.id, "folder/New.yarn", "new", [outside.id, "b", "a"]);
-  assert.deepEqual(p.documents.map(d => d.id), [outside.id, created.id, "b", "a", peer.id]);
-  assert.equal(p.documents.find(d => d.id === peer.id).text, "peer");
-  const ids = p.documents.map(d => d.id);
+  const created = engine.create(p.id, "folder/New.yarn", "new", [
+    outside.id,
+    "b",
+    "a",
+  ]);
+  assert.deepEqual(
+    p.documents.map((d) => d.id),
+    [outside.id, created.id, "b", "a", peer.id],
+  );
+  assert.equal(p.documents.find((d) => d.id === peer.id).text, "peer");
+  const ids = p.documents.map((d) => d.id);
   assert.throws(() => engine.create(p.id, "folder/New.yarn", "bad", ids));
-  assert.deepEqual(p.documents.map(d => d.id), ids);
+  assert.deepEqual(
+    p.documents.map((d) => d.id),
+    ids,
+  );
+});
+
+test("trash failure keeps the file and latest recoverable source; retry moves it without unlink", async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "yarn-workbench-test-")),
+    root = path.join(base, "project");
+  fs.mkdirSync(root);
+  const file = path.join(root, "a.yarn");
+  fs.writeFileSync(file, "title: A\n---\noriginal\n===");
+  let reject = true;
+  const service = new WorkspaceService(path.join(base, "profile"), {
+    chooseFolder: async () => root,
+    chooseFiles: async () => [],
+    saveDialog: async () => null,
+    reveal: () => {},
+    changed: () => {},
+    trash: async (target) => {
+      if (reject) throw Error("trash unavailable");
+      fs.renameSync(target, path.join(base, "trash.yarn"));
+    },
+  });
+  try {
+    const p = (await service.request({ type: "openFolder" })).snapshot
+        .projects[0],
+      d = p.documents[0];
+    service.engine.replace(p.id, d.id, "latest local text", "test");
+    const action = {
+      type: "removeDocument",
+      projectId: p.id,
+      documentId: d.id,
+      deleteDisk: true,
+    };
+    await assert.rejects(service.request(action), /trash unavailable/);
+    assert(fs.existsSync(file));
+    assert.equal(service.snapshot().projects[0].documents.length, 1);
+    assert.equal(
+      service.snapshot().projects[0].recovery.at(-1).text,
+      "latest local text",
+    );
+    reject = false;
+    await service.request(action);
+    assert(!fs.existsSync(file));
+    assert(fs.existsSync(path.join(base, "trash.yarn")));
+    const entry = service.snapshot().projects[0].recovery.at(-1);
+    await service.request({
+      type: "recover",
+      projectId: p.id,
+      recoveryId: entry.id,
+    });
+    assert.equal(fs.readFileSync(file, "utf8"), "latest local text");
+  } finally {
+    service.dispose();
+    assert(
+      path
+        .resolve(base)
+        .startsWith(
+          path.resolve(os.tmpdir()) + path.sep + "yarn-workbench-test-",
+        ),
+    );
+    fs.rmSync(base, { recursive: true, force: true });
+  }
 });

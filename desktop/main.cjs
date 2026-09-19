@@ -484,6 +484,7 @@ else {
           });
           return r.canceled ? null : r.filePath;
         },
+        trash: (file) => shell.trashItem(file),
         reveal: (file) =>
           fs.statSync(file).isDirectory()
             ? shell.openPath(file)

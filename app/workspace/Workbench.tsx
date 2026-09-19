@@ -1068,44 +1068,28 @@ export default function Workbench({
         : []),
       null,
       {
-        label: "從專案移除…",
+        label: d.path ? "從專案移除" : "移到垃圾桶",
         danger: true,
         run: () =>
-          ask({
-            title: "從專案移除 " + d.name + "？",
-            description: "保留磁碟原檔，可從最近刪除恢復。",
-            submitLabel: "移除",
-            danger: true,
-            run: async () => {
-              await perform({
-                type: "removeDocument",
-                projectId: project.id,
-                documentId: d.id,
-                deleteDisk: false,
-              });
-            },
+          void perform({
+            type: "removeDocument",
+            projectId: project.id,
+            documentId: d.id,
+            deleteDisk: false,
           }),
       },
       ...(d.path
         ? [
             {
-              label: "刪除磁碟檔案…",
+              label: "移到垃圾桶",
               icon: <Trash2 size={15} />,
               danger: true,
               run: () =>
-                ask({
-                  title: "刪除 " + d.name + "？",
-                  description: "先建立復原副本，再移除磁碟檔案。",
-                  danger: true,
-                  submitLabel: "刪除",
-                  run: async () => {
-                    await perform({
-                      type: "removeDocument",
-                      projectId: project.id,
-                      documentId: d.id,
-                      deleteDisk: true,
-                    });
-                  },
+                void perform({
+                  type: "removeDocument",
+                  projectId: project.id,
+                  documentId: d.id,
+                  deleteDisk: true,
                 }),
             },
           ]

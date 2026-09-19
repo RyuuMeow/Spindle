@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { FileText, LoaderCircle } from "lucide-react";
+import { FileText } from "lucide-react";
 import "./inline-name.css";
 export type InlineDraft = {
   kind: "new-document" | "rename-document" | "new-scene" | "rename-scene";
@@ -56,7 +56,8 @@ export function InlineNameEditor({
         <input
           ref={input}
           value={draft.value}
-          disabled={draft.busy}
+          readOnly={draft.busy}
+          aria-busy={!!draft.busy}
           aria-label={draft.kind.includes("scene") ? "場景名稱" : "劇本名稱"}
           aria-invalid={!!draft.error}
           aria-describedby={draft.error ? "inline-name-error" : undefined}
@@ -90,7 +91,6 @@ export function InlineNameEditor({
               onSubmit();
           }}
         />
-        {draft.busy && <LoaderCircle className="save-spinner" size={13} />}
       </div>
       {draft.error && (
         <p id="inline-name-error" role="alert">

@@ -71,6 +71,7 @@ type Services = {
   chooseFiles: () => Promise<string[]>;
   saveDialog: (name: string) => Promise<string | null>;
   reveal: (file: string) => void;
+  trash?: (file: string) => Promise<void>;
   changed: () => void;
 };
 
@@ -774,7 +775,13 @@ export class WorkspaceService {
         clearTimeout(this.timers.get(d.id));
         if (a.deleteDisk && d.path) {
           if (p.root) withinRoot(p.root, d.name);
-          fs.unlinkSync(d.path);
+          try {
+            if (!this.services.trash) throw Error("目前無法使用垃圾桶，檔案已保留");
+            await this.services.trash(d.path);
+          } catch (error) {
+            this.schedule(p, d);
+            throw error;
+          }
         } else if (d.path) p.excluded.push(d.name);
         p.documents = p.documents.filter((x) => x.id !== d.id);
         this.metadata(p);

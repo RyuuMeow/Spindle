@@ -405,22 +405,10 @@
     padding: 12px 20px;
   }
 }
-.command-saving-icon {
-  animation: command-saving-spin 1s linear infinite;
-}
-@keyframes command-saving-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .command-workspace input,
   .command-workspace textarea,
   .command-workspace select {
     transition: none;
-  }
-  .command-saving-icon {
-    animation: none;
   }
 }

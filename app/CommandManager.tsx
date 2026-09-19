@@ -22,7 +22,6 @@ import {
   Redo2,
   Search,
   MoreHorizontal,
-  LoaderCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CompactSelect } from "@/components/CompactSelect";
@@ -535,11 +534,7 @@ export default function CommandManager({
               disabled={!dirty || saving}
               {...fieldProps("save")}
             >
-              {saving ? (
-                <LoaderCircle size={14} className="command-saving-icon" />
-              ) : (
-                <Check size={14} />
-              )}
+              <Check size={14} />
               套用定義
             </Button>
           </div>
