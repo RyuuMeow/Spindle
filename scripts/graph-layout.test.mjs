@@ -180,7 +180,9 @@ test("content heights affect layout and every route uses actual card bounds", ()
     ...rect(id, positions[id].x, positions[id].y),
     height: heights[id],
   }));
-  assert.ok(positions.b.y > positions.a.y + heights.a);
+  assert.ok(positions.b.x > positions.a.x, "cycle forward edge retains reading direction");
+  assert.ok(positions.c.y >= positions.b.y + heights.b, "same-column cards respect measured height");
+  for(let i=0;i<cards.length;i++) for(let j=i+1;j<cards.length;j++) assert.equal(rectsOverlap(cards[i],cards[j]),false);
   assertNoCardIntersections(routeConnections(cards, edges), cards);
 });
 

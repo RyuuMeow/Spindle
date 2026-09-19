@@ -6,6 +6,7 @@ export type GraphConnection = {
   source: string;
   target: string;
   label?: boolean;
+  labelWidth?: number;
 };
 export type Side = "left" | "right" | "top" | "bottom";
 export const CARD_WIDTH = 232;
@@ -13,87 +14,95 @@ export const CARD_HEIGHT = 108;
 export const LABEL_WIDTH = 164;
 export const LABEL_HEIGHT = 36;
 
-/** Collapse cycles first so a feedback link cannot make ranks grow forever. */
+/** Remove only DFS feedback edges for ranking; cycles still read from left to right. */
 export function layoutGraph(
   ids: string[],
   edges: GraphConnection[],
   heights: Record<string, number> = {},
 ): Record<string, Point> {
   const adjacency = new Map(ids.map((id) => [id, [] as string[]]));
-  for (const edge of edges)
-    if (adjacency.has(edge.target))
-      adjacency.get(edge.source)?.push(edge.target);
-  let next = 0;
-  const indexes = new Map<string, number>(),
-    low = new Map<string, number>();
-  const stack: string[] = [],
-    active = new Set<string>(),
-    groups: string[][] = [];
+  for (const e of edges)
+    if (adjacency.has(e.target) && e.source !== e.target)
+      adjacency.get(e.source)?.push(e.target);
+  const active = new Set<string>(),
+    seen = new Set<string>(),
+    forward = new Map(ids.map((id) => [id, [] as string[]]));
   function visit(id: string) {
-    indexes.set(id, next);
-    low.set(id, next++);
-    stack.push(id);
+    seen.add(id);
     active.add(id);
     for (const target of adjacency.get(id) || []) {
-      if (!indexes.has(target)) {
-        visit(target);
-        low.set(id, Math.min(low.get(id)!, low.get(target)!));
-      } else if (active.has(target))
-        low.set(id, Math.min(low.get(id)!, indexes.get(target)!));
+      if (active.has(target)) continue;
+      forward.get(id)!.push(target);
+      if (!seen.has(target)) visit(target);
     }
-    if (low.get(id) === indexes.get(id)) {
-      const group: string[] = [];
-      let item: string;
-      do {
-        item = stack.pop()!;
-        active.delete(item);
-        group.push(item);
-      } while (item !== id);
-      groups.push(group.sort((a, b) => ids.indexOf(a) - ids.indexOf(b)));
-    }
+    active.delete(id);
   }
   ids.forEach((id) => {
-    if (!indexes.has(id)) visit(id);
+    if (!seen.has(id)) visit(id);
   });
-  const groupOf = new Map(
-    groups.flatMap((group, index) => group.map((id) => [id, index] as const)),
-  );
-  const successors = groups.map(() => new Set<number>()),
-    indegree = groups.map(() => 0),
-    ranks = groups.map(() => 0);
-  for (const edge of edges) {
-    const a = groupOf.get(edge.source),
-      b = groupOf.get(edge.target);
-    if (
-      a !== undefined &&
-      b !== undefined &&
-      a !== b &&
-      !successors[a].has(b)
-    ) {
-      successors[a].add(b);
-      indegree[b]++;
-    }
-  }
-  const queue = indegree.flatMap((value, index) => (value ? [] : [index]));
+  const indegree = new Map(ids.map((id) => [id, 0])),
+    ranks = new Map(ids.map((id) => [id, 0]));
+  for (const targets of forward.values())
+    for (const target of targets)
+      indegree.set(target, indegree.get(target)! + 1);
+  const queue = ids.filter((id) => !indegree.get(id));
   for (let i = 0; i < queue.length; i++)
-    for (const target of successors[queue[i]]) {
-      ranks[target] = Math.max(ranks[target], ranks[queue[i]] + 1);
-      if (--indegree[target] === 0) queue.push(target);
+    for (const target of forward.get(queue[i])!) {
+      ranks.set(target, Math.max(ranks.get(target)!, ranks.get(queue[i])! + 1));
+      indegree.set(target, indegree.get(target)! - 1);
+      if (!indegree.get(target)) queue.push(target);
     }
   const columns = new Map<number, string[]>();
-  groups
-    .sort((a, b) => ids.indexOf(a[0]) - ids.indexOf(b[0]))
-    .forEach((group) => {
-      const rank = ranks[groupOf.get(group[0])!];
-      columns.set(rank, [...(columns.get(rank) || []), ...group]);
-    });
+  ids.forEach((id) => {
+    const rank = ranks.get(id)!;
+    columns.set(rank, [...(columns.get(rank) || []), id]);
+  });
+  // Barycentric ordering keeps converging branches next to their neighbours.
+  const order = new Map(ids.map((id, i) => [id, i]));
+  for (let sweep = 0; sweep < 4; sweep++) {
+    const ranksInOrder = [...columns.keys()].sort((a, b) =>
+      sweep % 2 ? b - a : a - b,
+    );
+    for (const rank of ranksInOrder) {
+      const members = columns.get(rank)!;
+      const center = (id: string) => {
+        const neighbours = edges.flatMap((e) =>
+          sweep % 2
+            ? e.source === id && ranks.get(e.target)! > rank
+              ? [e.target]
+              : []
+            : e.target === id && ranks.get(e.source)! < rank
+              ? [e.source]
+              : [],
+        );
+        return neighbours.length
+          ? neighbours.reduce((sum, n) => sum + (order.get(n) || 0), 0) /
+              neighbours.length
+          : order.get(id)!;
+      };
+      members.sort(
+        (a, b) => center(a) - center(b) || ids.indexOf(a) - ids.indexOf(b),
+      );
+      members.forEach((id, i) => order.set(id, i));
+    }
+  }
   const result: Record<string, Point> = {};
+  const largest = Math.max(
+    ...[...columns.values()].map((m) =>
+      m.reduce((h, id) => h + (heights[id] || CARD_HEIGHT) + 100, 0),
+    ),
+    0,
+  );
   for (const [rank, members] of columns) {
-    let y = 64;
-    members.forEach((id) => {
-      result[id] = { x: 56 + rank * (CARD_WIDTH + 236), y };
+    const size = members.reduce(
+      (h, id) => h + (heights[id] || CARD_HEIGHT) + 100,
+      0,
+    );
+    let y = 64 + (largest - size) / 2;
+    for (const id of members) {
+      result[id] = { x: 56 + rank * (CARD_WIDTH + 200), y };
       y += (heights[id] || CARD_HEIGHT) + 100;
-    });
+    }
   }
   return result;
 }
@@ -248,7 +257,7 @@ function findPath(
         costs.get(current.id)! +
         Math.abs(a.x - b.x) +
         Math.abs(a.y - b.y) +
-        (d && d !== nd ? 24 : 0) +
+        (d && d !== nd ? 80 : 0) +
         crossingCost;
       if (cost >= (costs.get(id) ?? Infinity)) continue;
       costs.set(id, cost);
@@ -294,13 +303,26 @@ export function routeConnections(
   const byId = new Map(rects.map((rect) => [rect.id, rect]));
   const labels: GraphRect[] = [],
     routed: RoutedConnection[] = [];
-  for (const connection of connections) {
+  let feedbackLane = 0;
+  for (const connection of [...connections].sort((a, b) => {
+    const backward = (e: GraphConnection) =>
+      (byId.get(e.target)?.x ?? 0) <= (byId.get(e.source)?.x ?? 0) ? 1 : 0;
+    return backward(a) - backward(b);
+  })) {
+    const labelWidth = Math.max(
+      80,
+      Math.min(220, connection.labelWidth || LABEL_WIDTH),
+    );
     const source = byId.get(connection.source),
       target = byId.get(connection.target);
     if (!source || !target) continue;
+    const feedback = target.x < source.x - CARD_WIDTH / 2;
     let sourceSide: Side, targetSide: Side;
     if (source.id === target.id) {
       sourceSide = "right";
+      targetSide = "top";
+    } else if (feedback) {
+      sourceSide = "top";
       targetSide = "top";
     } else if (Math.abs(target.x - source.x) > CARD_WIDTH / 2) {
       sourceSide = target.x > source.x ? "right" : "left";
@@ -309,34 +331,24 @@ export function routeConnections(
       sourceSide = target.y > source.y ? "right" : "left";
       targetSide = sourceSide;
     }
-    const reverse = connections.some(
-      (edge) =>
-        edge.source === connection.target && edge.target === connection.source,
-    );
-    const siblings = connections.filter(
-      (edge) =>
-        edge.source === connection.source && edge.target !== connection.source,
-    );
-    const incoming = connections.filter(
-      (edge) =>
-        edge.target === connection.target && edge.source !== connection.target,
-    );
-    const sourceFraction = reverse
-      ? sourceSide === "right"
-        ? 0.35
-        : 0.65
-      : 0.25 +
-        0.5 *
-          ((siblings.findIndex((e) => e.id === connection.id) + 1) /
-            (siblings.length + 1));
-    const targetFraction = reverse
-      ? targetSide === "left"
-        ? 0.35
-        : 0.65
-      : 0.25 +
-        0.5 *
-          ((incoming.findIndex((e) => e.id === connection.id) + 1) /
-            (incoming.length + 1));
+    const siblings = connections
+      .filter((e) => e.source === connection.source)
+      .sort(
+        (a, b) => (byId.get(a.target)?.y || 0) - (byId.get(b.target)?.y || 0),
+      );
+    const incoming = connections
+      .filter((e) => e.target === connection.target)
+      .sort(
+        (a, b) => (byId.get(a.source)?.y || 0) - (byId.get(b.source)?.y || 0),
+      );
+    const fraction = (items: GraphConnection[]) =>
+      items.length < 2
+        ? 0.5
+        : 0.08 +
+          (0.84 * items.findIndex((e) => e.id === connection.id)) /
+            (items.length - 1);
+    const sourceFraction = fraction(siblings);
+    const targetFraction = fraction(incoming);
     const obstacles = [
       ...rects.map((rect) => ({
         ...rect,
@@ -347,29 +359,43 @@ export function routeConnections(
       })),
       ...labels,
     ];
-    const points = simplify([
-      port(source, sourceSide, 0, sourceFraction),
-      ...findPath(
-        port(source, sourceSide, 22, sourceFraction),
-        port(target, targetSide, 22, targetFraction),
-        obstacles,
-        routed,
+    const start = port(source, sourceSide, 22, sourceFraction),
+      end = port(target, targetSide, 22, targetFraction);
+    const lane =
+      Math.min(...rects.map((r) => r.y)) -
+      60 -
+      (feedback ? feedbackLane++ * 64 : 0);
+    const middle = feedback
+      ? [
+          ...findPath(start, { x: start.x, y: lane }, obstacles, routed),
+          { x: end.x, y: lane },
+          ...findPath({ x: end.x, y: lane }, end, obstacles, routed),
+        ]
+      : findPath(start, end, obstacles, routed);
+    const points = simplify(
+      [
+        port(source, sourceSide, 0, sourceFraction),
+        ...middle,
+        port(target, targetSide, 0, targetFraction),
+      ].filter(
+        (p, i, all) => !i || p.x !== all[i - 1].x || p.y !== all[i - 1].y,
       ),
-      port(target, targetSide, 0, targetFraction),
-    ]);
-    const segments = points
-      .slice(1)
-      .map((b, i) => ({
-        a: points[i],
-        b,
-        length: Math.abs(points[i].x - b.x) + Math.abs(points[i].y - b.y),
-      }));
+    );
+    const segments = points.slice(1).map((b, i) => ({
+      a: points[i],
+      b,
+      length: Math.abs(points[i].x - b.x) + Math.abs(points[i].y - b.y),
+    }));
     let label: Point | undefined, labelRect: GraphRect | undefined;
-    for (const segment of segments) {
+    for (const segment of [...segments].sort(
+      (a, b) =>
+        (b.a.y === b.b.y ? 1 : 0) - (a.a.y === a.b.y ? 1 : 0) ||
+        b.length - a.length,
+    )) {
       if (connection.label === false) break;
       if (
         segment.length <
-        (segment.a.y === segment.b.y ? LABEL_WIDTH + 16 : LABEL_HEIGHT + 16)
+        (segment.a.y === segment.b.y ? labelWidth + 16 : LABEL_HEIGHT + 16)
       )
         continue;
       for (const fraction of [0.5, 0.3, 0.7]) {
@@ -379,9 +405,9 @@ export function routeConnections(
         };
         const candidate = {
           id: `label:${connection.id}`,
-          x: middle.x - LABEL_WIDTH / 2,
+          x: middle.x - labelWidth / 2,
           y: middle.y - LABEL_HEIGHT / 2,
-          width: LABEL_WIDTH,
+          width: labelWidth,
           height: LABEL_HEIGHT,
         };
         if ([...rects, ...labels].some((rect) => rectsOverlap(candidate, rect)))

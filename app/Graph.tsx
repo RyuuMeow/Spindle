@@ -320,7 +320,7 @@ function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
         tabIndex={0}
         role="button"
         className="flow-edge-focus"
-        aria-label={`${group.items[0].kind === "detour" ? "呼叫後返回" : "轉場"}，${label}。按 Enter 查看完整前提與來源`}
+        aria-label={`${group.items[0].kind === "detour" ? "呼叫後返回" : "轉場"}，${label}。按 Enter 選取連線；詳情由圖表詳情按鈕開啟`}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
@@ -351,6 +351,7 @@ function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
             type="button"
             className={`flow-edge-label nodrag nopan${active ? " is-active" : ""}${muted ? " is-muted" : ""}`}
             style={{
+              width: route.labelRect.width,
               transform: `translate(-50%, -50%) translate(${route.labelPoint.x}px, ${route.labelPoint.y}px)`,
             }}
             title={group.items
@@ -702,7 +703,7 @@ function Canvas({
         data: {
           ...record,
           editor: editing?.record.id === record.id ? nodeEditor : undefined,
-          compact: zoom < 0.7,
+          compact: zoom < 0.6,
           zoom,
           open: () => openRecord(record),
           menu: record.node
@@ -743,7 +744,24 @@ function Canvas({
     [records, positions, automatic, cardHeights, editing],
   );
   const routes = useMemo(
-    () => routeConnections(geometry, groups),
+    () =>
+      routeConnections(
+        geometry,
+        groups.map((group) => {
+          const label =
+            group.items.length > 1
+              ? group.items.length + " 個分支"
+              : linkSummary(group.items[0]);
+          const textWidth = [...label].reduce(
+            (sum, c) => sum + (c.charCodeAt(0) > 255 ? 12 : 7),
+            0,
+          );
+          return {
+            ...group,
+            labelWidth: Math.max(96, Math.min(200, textWidth + 34)),
+          };
+        }),
+      ),
     [geometry, groups],
   );
   const edges: RouteEdge[] = routes.map((route) => {
@@ -775,7 +793,6 @@ function Canvas({
           onSelect(null);
           setTargetSelection("");
           setEdgeSelection(group.id);
-          updateDetails(true);
         },
       },
     };
@@ -1181,7 +1198,6 @@ function Canvas({
             onSelect(null);
             setTargetSelection("");
             setEdgeSelection(edge.id);
-            updateDetails(true);
           }}
           onNodeDragStop={(_, moved) => {
             if (dragOrigin.current) {
