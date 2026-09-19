@@ -1,13 +1,14 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.6.2**，2026-09-19。依據 M0–M6、第二輪 R01–R08 及 Spindle 品牌／跳轉提示回饋。安裝版與 portable 已打包，portable 啟動與本輪互動驗證通過；完整工作流另以隔離 Electron 驗證。
+版本：Windows x64 **0.6.3**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
 
-## 0.6.2 修正
+## 0.6.3 修正
 
-- 診斷按鈕依內容撐寬，完整容納圖示與數量；一至三位數問題、800／1440px 已量測。
-- 三個編輯入口統一指令輔助：輸入配對、即時候選、選取說明、Enter／Tab 接受、位置參數提示、既有結尾跳過與空配對刪除。
-- 閱讀與節點活動行完整揭露來源，使用純文字字體與語法配色；離開恢復渲染，不更改文件。指令及參數浮窗使用同一套 DOM 排版。
-- 本輪互動證據：[編輯輔助](../outputs/assistance-ui/results.json)、[導航與懸浮回歸](../outputs/assistance-navigation/results.json)、[摺疊回歸](../outputs/assistance-folds/results.json)。Portable 驗證記錄另見下節。
+- 閱讀空白逐行保留，活動／非活動高度一致，已有空白取代外部段落留白；條件與選項保留邊界內距。BOM／CRLF 原文字節不變。
+- 新增劇本在目前資料夾文件頂部完成，保留當下可見順序並同步切回手動排序；雙擊原位改名，反白主檔名，不新增或跳其他 tab。
+- 三個編輯入口的補全使用相同字型與 29px 列高；純文字取消重複的說明箭頭及 hover 截斷。
+- 純文字提示使用 Monaco 原生來源定位；100／125／150% App 縮放均量測提示與游標相鄰。
+- 本輪開發版證據：[編輯互動與幾何](../outputs/refinement-regression/results.json)、[導航／懸浮](../outputs/refinement-navigation/results.json)、[摺疊](../outputs/refinement-folds/results.json)。
 
 ## 累積完成
 
@@ -17,7 +18,7 @@
 | 指令提示 | 標題、識別字、描述、位置參數列與範例分區；虛擬參數提示使用相同資料。 |
 | 指令與搜尋 | 自訂指令使用與設定一致的工具 tab；保留非法草稿，支援一般分頁切換／關閉。顯示名稱與參數說明可選填，灰色小標籤及單一搜尋焦點框減少雜訊。搜尋／Ctrl+P 共用中央偏上的輕量即時結果浮層；方向鍵選取，Enter 定位，Ctrl+Enter／中鍵新分頁，整體失焦關閉。 |
 | 導航與新增 | 普通導航保持目前 TabId，不跳另一個同稿視圖；每 tab 有獨立歷史及文件視圖快取。劇本／場景新增與更名採行內反白輸入，Esc 取消，錯誤就地保留。排序 SVG 隨方向改變，不破壞手排。 |
-| 閱讀 | 正文優先，附屬資訊降低彩度；命令與正文維持相同行框。場景分隔前後 24px，分支首尾 16px，圖示與文字起點一致。保留連續編輯、來源揭露、跨區塊選取與 Undo；Monaco 原有字體與配色保留，另加虛擬參數提示。 |
+| 閱讀 | 正文優先，附屬資訊降低彩度；命令與正文維持相同行框。無來源空白時場景分隔前後 24px、分支首尾 16px；空白行保留且減少重複外部留白，圖示與文字起點一致。保留連續編輯、來源揭露、跨區塊選取與 Undo；Monaco 原有字體與配色保留，另加虛擬參數提示。 |
 | 圖表 | 雙擊或 Enter 原位展開節點連續編輯器，修改台詞／角色／命令，共用來源與歷史；跨檔節點不切 tab。點空白處可退出編輯，組字／改名／未處理草稿除外；編輯期間不重新布局；外部修改跨越邊界時停寫並保留未提交草稿。 |
 | 面板 | 左右與底部調整手柄支援鍵盤、拖動及 Esc 回復；6px 溝槽與表面色階。大綱只保留工具列 toggle，按模式記憶。診斷使用對齊的分段篩選／窄版選單，空狀態縮小；指令參數選單共用風格。 |
 | 保存體驗 | 日常自動保存不顯示圓點、轉圈或成功文字，同稿 tab 移除撰寫序號；關閉等待 renderer 交易與 session，再寫入磁碟，待保存時顯示中央小型進度面板，組字／失敗／逾時保留視窗。 |
@@ -26,9 +27,10 @@
 
 ## 驗證證據
 
-- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。本輪改動範圍 lint 仍只有 `app/CodeEditor.tsx` 的既有 **13 errors／2 warnings**，見 [lint 報告](../outputs/assistance-lint.json)。移除重複 provider 後少 4 項既有 any；未冒稱全專案 lint 清零。
-- 單元與服務回歸 **88／88**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
-- [0.6.2 portable 本輪互動](../outputs/assistance-portable-0.6.2/results.json)：三種編輯入口、補全／參數／Esc／貼上／Undo、失焦、模式切換、診斷數量與窄窗浮窗。
+- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。本輪改動範圍 lint 仍只有 `app/CodeEditor.tsx` 的既有 **13 errors／2 warnings**，見 [lint 報告](../outputs/refinement-lint.json) 與 [修正後複查](../outputs/refinement-lint-followup.json)；未冒稱全專案 lint 清零。
+- 單元與服務回歸 **90／90**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- [0.6.3 Portable 互動](../outputs/refinement-portable-0.6.3/results.json)：三個編輯入口、相同 29px 補全列高與參數文字寬度、空白行與 BOM／CRLF 保留、頂部新增與雙擊改名、800px 窄窗及 100／125／150% App 縮放提示定位，全數通過且無頁面錯誤。
+- [0.6.2 portable 基線互動](../outputs/assistance-portable-0.6.2/results.json)：三種編輯入口、補全／參數／Esc／貼上／Undo、失焦、模式切換、診斷數量與窄窗浮窗。
 - [0.6.0 品牌／導航／提示基線](../outputs/spindle-portable-0.6.0/results.json)：名稱、隔離 profile、Monaco／閱讀／節點 Ctrl 懸浮與釋放、分層提示、跨檔不增 tab。
 - [保存與關閉基線（0.5.1）](../outputs/quiet-autosave-portable-0.5.1/results.json)：持續輸入 tab 寬度穩定、無日常圓點／轉圈、關閉保存面板、磁碟衝突保留視窗、立即關閉寫入最後編輯。
 - [0.5.0 桌面互動基線](../outputs/command-display-portable-0.5.0/results.json)：目前分頁導航、行內新增／取消、排序、大綱、搜尋浮層、指令 tab／草稿／虛擬提示與懸浮說明、面板及實際節點共享來源。
@@ -51,4 +53,4 @@
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/editor-assistance-parity` 提交診斷按鈕與三種編輯入口的一致性修正。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/editor-overlay-and-sidebar` 修正來源留白、文件操作與編輯浮窗；前版基線為 `v0.6.2`，本輪交付標記為 `v0.6.3`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。

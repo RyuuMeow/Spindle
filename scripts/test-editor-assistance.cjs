@@ -332,6 +332,9 @@ async function shot(name) {
     await page.locator(".spindle-completions").waitFor();
     await page.keyboard.type("fade", { delay: 65 });
     await page.locator(".cm-completionInfo").waitFor();
+    // CodeMirror guards newly opened completion lists for 75 ms.
+    // Visibility alone is not proof that the list accepts keyboard input yet.
+    await page.waitForTimeout(100);
     await page.keyboard.press("Tab");
     await page.keyboard.type(" ");
     await page.locator(".command-parameter-popup").waitFor();

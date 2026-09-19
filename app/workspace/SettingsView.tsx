@@ -389,7 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.6.2：統一指令補全與提示、閱讀活動行原文編輯，修正診斷數量按鈕。
+                    0.6.3：保留閱讀空白行、頂部新增與雙擊改名，修正補全清單及提示定位。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。
