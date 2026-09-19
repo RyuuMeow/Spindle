@@ -1,18 +1,11 @@
 "use client";
+import { sourceCommandAssistance } from "./source-command-assistance";
 import { sceneLink } from "./scene-link";
 import { useEffect, useRef, useState } from "react";
 import Editor, { loader } from "@monaco-editor/react";
 import type { Command, Doc, Issue, Node } from "./parser";
 import { builtins } from "./parser";
-import {
-  commandCall,
-  commandMarkdown,
-  commandHover,
-  commandLabel,
-  parameterLabel,
-  parameterHelp,
-  commandInput,
-} from "./command-hints";
+import { commandCall, parameterLabel, commandInput } from "./command-hints";
 import { yarnEditorTheme } from "./editor-theme";
 import { loadEditorLocale } from "./editor-locale";
 loader.config({ paths: { vs: "/monaco/vs" } });
@@ -273,10 +266,10 @@ export default function CodeEditor({
                     insertText: c.name,
                     detail: c.params
                       .map(
-                        (p) => `${p.name}${p.required ? "" : "?"}: ${p.type}`,
+                        (p) =>
+                          `${parameterLabel(p)}${p.required ? "" : "?"}: ${p.type}`,
                       )
                       .join(", "),
-                    documentation: c.description,
                     range,
                   })),
                   ...builtins.map((name) => ({
@@ -288,33 +281,6 @@ export default function CodeEditor({
                   })),
                 ],
               };
-            },
-          }),
-          m.languages.registerHoverProvider("yarn", {
-            provideHover(model: any, pos: any) {
-              const hint = commandHover(
-                model.getLineContent(pos.lineNumber),
-                pos.column - 1,
-                latest.current.commands,
-              );
-              return hint
-                ? {
-                    range: new m.Range(
-                      pos.lineNumber,
-                      hint.from + 1,
-                      pos.lineNumber,
-                      hint.to + 1,
-                    ),
-                    contents: [
-                      {
-                        value: commandMarkdown(
-                          hint.command,
-                          hint.parameterIndex,
-                        ),
-                      },
-                    ],
-                  }
-                : null;
             },
           }),
           m.languages.registerInlayHintsProvider("yarn", {
@@ -346,63 +312,20 @@ export default function CodeEditor({
                     label: parameterLabel(parameter) + ":",
                     kind: m.languages.InlayHintKind.Parameter,
                     paddingRight: true,
-                    tooltip: { value: commandMarkdown(call.command, index) },
                   });
                 });
               }
               return { hints, dispose() {} };
             },
           }),
-          m.languages.registerSignatureHelpProvider("yarn", {
-            signatureHelpTriggerCharacters: [" "],
-            signatureHelpRetriggerCharacters: [" "],
-            provideSignatureHelp(model: any, pos: any) {
-              const line = model
-                .getLineContent(pos.lineNumber)
-                .slice(0, pos.column - 1);
-              const input = commandInput(line);
-              if (input?.kind !== "argument") return null;
-              const c = latest.current.commands.find(
-                (c) => c.name === input.name,
-              );
-              if (!c || !c.params[input.index]) return null;
-              return {
-                value: {
-                  signatures: [
-                    {
-                      label:
-                        commandLabel(c) +
-                        " " +
-                        c.params
-                          .map(
-                            (p) =>
-                              parameterLabel(p) +
-                              ": " +
-                              p.type +
-                              (p.required ? "" : "?"),
-                          )
-                          .join(" "),
-                      documentation: c.description,
-                      parameters: c.params.map((p, index) => ({
-                        label:
-                          parameterLabel(p) +
-                          ": " +
-                          p.type +
-                          (p.required ? "" : "?"),
-                        documentation: parameterHelp(p, index),
-                      })),
-                    },
-                  ],
-                  activeSignature: 0,
-                  activeParameter: input.index,
-                },
-                dispose() {},
-              };
-            },
-          }),
         ];
       }}
       onMount={(editor, m) => {
+        const assistance = sourceCommandAssistance(
+          editor,
+          () => latest.current.commands,
+        );
+        editor.onDidDispose(() => assistance.dispose());
         editorRef.current = editor;
         api.current = m;
         for (const model of m.editor.getModels()) {

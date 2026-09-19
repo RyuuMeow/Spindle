@@ -2366,6 +2366,7 @@ export default function Workbench({
               )}
               {mode === "rendered" && (
                 <ReadingEditor
+                  scenes={analysis.nodes}
                   canNavigate={(name) =>
                     analysis.nodes.filter((node) => node.name === name)
                       .length === 1

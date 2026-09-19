@@ -145,7 +145,9 @@ async function shot(name) {
         throw Error("command source range missing");
       });
     await page.mouse.move(hintPoint.x, hintPoint.y);
-    await page.locator(".monaco-hover table").waitFor();
+    await page
+      .locator(".source-command-popup:not([hidden]) .command-tip-parameters")
+      .waitFor();
     await shot("00-source-tooltip");
     results.sourceStructuredTooltip = true;
     const sourcePoint = await page

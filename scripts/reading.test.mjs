@@ -102,17 +102,19 @@ test("set left and right operands share the same variable decoration", () => {
   );
 });
 
-test("cursor reveals the touched token without dismantling the rest of the line", () => {
+test("cursor reveals the whole active line without changing source", () => {
   const text = source("<<set $score = $base + 1>>");
   const result = decorations(text, text.indexOf("$score") + 2);
   assert.deepEqual(
     result.widgets
       .filter((r) => r.spec.widget.className === "reading-variable")
       .map((r) => r.spec.widget.label),
-    ["base"],
+    [],
   );
   assert.ok(
-    result.ranges.some((r) => r.spec.class === "reading-variable-source"),
+    result.ranges.some((r) =>
+      r.spec.class?.includes("reading-variable-source"),
+    ),
   );
 });
 

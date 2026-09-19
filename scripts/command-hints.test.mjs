@@ -15,6 +15,7 @@ buildSync({
 });
 const {
   commandInput,
+  atCommandCloser,
   argumentSpans,
   commandCall,
   commandHover,
@@ -164,4 +165,13 @@ test("completion stops at the name and tracks incomplete positional arguments", 
     "<<fade_in>> ",
   ])
     assert.equal(commandInput(text), null);
+});
+
+test("closing pair skipping only recognizes delimiters outside strings", () => {
+  const text = '  <<play_sound "literal >>" 0.6>>';
+  assert.equal(atCommandCloser(text, text.indexOf(">>")), false);
+  assert.equal(atCommandCloser(text, text.lastIndexOf(">>")), true);
+  assert.equal(atCommandCloser(text, text.lastIndexOf(">>") + 1), true);
+  assert.equal(atCommandCloser("// <<fade_in 2>>", 14), false);
+  assert.equal(atCommandCloser('<<play_sound "unfinished >>', 24), false);
 });

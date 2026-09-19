@@ -1,0 +1,182 @@
+.reading-command-tooltip {
+  min-width: 240px;
+  max-width: min(440px, 85vw);
+  max-height: 360px;
+  overflow: auto;
+  padding: 14px 16px;
+  white-space: normal;
+}
+.command-tip-heading,
+.command-tip-label {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.command-tip-heading {
+  align-items: center;
+  font-size: 13px;
+}
+.command-tip-heading svg {
+  width: 15px;
+  height: 15px;
+  color: #9aa5af;
+}
+.command-tip-id,
+.command-tip-index,
+.command-tip-caption {
+  color: #929297;
+  font-size: 11px;
+}
+.command-tip-description {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #b6b6bd;
+}
+.command-tip-parameters {
+  margin-top: 12px;
+  border-top: 1px solid #ffffff12;
+}
+.command-tip-parameters:empty {
+  display: none;
+}
+.command-tip-parameter {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  padding-top: 10px;
+}
+.command-tip-type,
+.command-tip-optional {
+  font-size: 10px;
+  color: #a5a5ad;
+  background: #ffffff08;
+  border-radius: 3px;
+  padding: 0 5px;
+}
+.command-tip-default {
+  color: #939399;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.command-tip-caption {
+  margin-top: 14px;
+}
+.command-tip-example {
+  display: block;
+  margin-top: 5px;
+  padding: 6px 8px;
+  background: #0002;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cm-tooltip:has(> .reading-command-tooltip) {
+  background: #282828;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0004;
+}
+
+.reading-command-tooltip {
+  font: 12px/1.65 var(--font-sans, "Segoe UI", sans-serif);
+  color: #d7d7db;
+}
+.spindle-command-popup,
+.cm-tooltip:has(> .command-tip-heading),
+.cm-tooltip:has(> .command-tip-signature) {
+  background: #282828;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0004;
+}
+.spindle-command-popup {
+  position: fixed;
+  z-index: 1000;
+  max-width: calc(100vw - 16px);
+}
+.spindle-command-popup[hidden] {
+  display: none;
+}
+.command-tip-signature {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 8px;
+  color: #85858d;
+}
+.command-tip-slot.is-active {
+  color: #e0d4ed;
+  font-weight: 600;
+  border-bottom: 1px solid #b8a1ca;
+}
+.command-completion-description {
+  padding: 10px 12px;
+  font: 12px/1.65 var(--font-sans, "Segoe UI", sans-serif);
+  color: #b6b6bd;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: min(360px, 85vw);
+  max-height: 220px;
+  overflow: auto;
+}
+.cm-tooltip.spindle-completions {
+  background: #252525;
+  color: #d0d0d0;
+  border: 1px solid #454545;
+  box-shadow: 0 8px 24px #0004;
+  font:
+    16px/1.5 "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+}
+.cm-tooltip.spindle-completions > ul {
+  font: inherit;
+  max-width: min(620px, 90vw);
+  min-width: 260px;
+}
+.cm-tooltip.spindle-completions > ul > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.cm-tooltip.spindle-completions > ul > li[aria-selected] {
+  background: #393939;
+  color: #f0f0f0;
+}
+.spindle-completions .cm-completionMatchedText {
+  color: #eedcaa;
+  font-weight: 600;
+  text-decoration: none;
+}
+.spindle-completions .cm-completionDetail {
+  margin-left: 16px;
+  font-style: normal;
+  font-size: 12px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.command-completion-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: #c5c5ca;
+}
+.cm-tooltip.cm-completionInfo {
+  background: #282828;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  padding: 0;
+  box-shadow: 0 8px 24px #0004;
+}
+.cm-tooltip.reading-command-tooltip {
+  background: #282828;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0004;
+}

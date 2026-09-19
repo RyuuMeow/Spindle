@@ -1,5 +1,5 @@
 "use client";
-import { commandInput } from "../command-hints";
+import { commandEditing } from "./command-input";
 import { sceneLinks } from "./scene-links";
 import { commandTooltips } from "./command-tooltips";
 
@@ -36,11 +36,11 @@ import {
   foldedRanges,
   codeFolding,
 } from "@codemirror/language";
-import { autocompletion } from "@codemirror/autocomplete";
+
 import { difference, normalized, sourceOffset } from "../workspace/engine";
 import type { TextEdit, DocumentRecord } from "../workspace/types";
 import type { Command } from "../parser";
-import { builtins } from "../parser";
+
 import {
   readingStructure,
   readableText,
@@ -67,6 +67,7 @@ export type ReadingActions = {
 type Props = {
   doc: DocumentRecord;
   commands: Command[];
+  scenes?: { name: string; file: string }[];
   onEdit: (edits: TextEdit[]) => void;
   onUndo: (redo?: boolean) => void;
   onCursor: (line: number, column: number, scrollTop: number) => void;
@@ -312,32 +313,10 @@ export default function ReadingEditor(props: Props) {
           });
           return effects.length ? { effects } : null;
         }),
-        autocompletion({
-          override: [
-            (context) => {
-              const line = context.state.doc.lineAt(context.pos);
-              if (
-                commandInput(line.text.slice(0, context.pos - line.from))
-                  ?.kind !== "name"
-              )
-                return null;
-              const word = context.matchBefore(/[\w$]*/);
-              if (!word || (!context.explicit && word.from === word.to))
-                return null;
-              return {
-                from: word.from,
-                options: [
-                  ...latest.current.commands.map((c) => ({
-                    label: c.name,
-                    type: "function",
-                    info: c.description,
-                  })),
-                  ...builtins.map((label) => ({ label, type: "keyword" })),
-                ],
-              };
-            },
-          ],
-        }),
+        commandEditing(
+          () => latest.current.commands,
+          () => latest.current.scenes || [],
+        ),
         EditorView.updateListener.of((update) => {
           reportFolded(update.state);
           if (

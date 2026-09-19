@@ -202,3 +202,21 @@ export function commandInput(
   }
   return { kind: "argument", name: match[1], index };
 }
+
+/** Is the caret at an existing closing delimiter, outside quoted arguments? */
+export function atCommandCloser(line: string, column: number) {
+  if (!/^\s*<</.test(line)) return false;
+  let quote = "",
+    escaped = false;
+  for (let i = line.indexOf("<<") + 2; i < line.length - 1; i++) {
+    const char = line[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quote) quote = "";
+    } else if (char === '"' || char === "'") quote = char;
+    else if (line.slice(i, i + 2) === ">>")
+      return column === i || column === i + 1;
+  }
+  return false;
+}

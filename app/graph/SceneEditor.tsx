@@ -1,5 +1,5 @@
 "use client";
-import { commandInput } from "../command-hints";
+import { commandEditing } from "../reading/command-input";
 import { sceneLinks } from "../reading/scene-links";
 import { commandTooltips } from "../reading/command-tooltips";
 
@@ -18,13 +18,9 @@ import {
   placeholder,
 } from "@codemirror/view";
 import { defaultKeymap, indentWithTab } from "@codemirror/commands";
-import {
-  autocompletion,
-  completionStatus,
-  closeCompletion,
-} from "@codemirror/autocomplete";
+import { completionStatus, closeCompletion } from "@codemirror/autocomplete";
 import { Check, Copy, FileText, Minimize2, AlertTriangle } from "lucide-react";
-import { builtins, type Command, type Node } from "../parser";
+import { type Command, type Node } from "../parser";
 import type { DocumentRecord, TextEdit } from "../workspace/types";
 import { difference } from "../workspace/engine";
 import { readingStructure } from "../reading/structure";
@@ -63,7 +59,7 @@ export type SceneEditorBindings = {
     expectedText: string,
   ) => Promise<boolean>;
 };
-type Props = Omit<SceneEditorBindings, "documents"> & {
+type Props = SceneEditorBindings & {
   doc: DocumentRecord;
   node: Node;
   onClose: (scope: SceneScope) => void;
@@ -269,53 +265,27 @@ export default function SceneEditor(props: Props) {
             ...defaultKeymap,
             indentWithTab,
           ]),
-          autocompletion({
-            override: [
-              (context) => {
-                const inputLine = context.state.doc.lineAt(context.pos);
-                const inputPrefix = inputLine.text.slice(
-                  0,
-                  context.pos - inputLine.from,
-                );
-                const commandName = commandInput(inputPrefix)?.kind === "name";
-                if (inputPrefix.includes("<<") && !commandName) return null;
-                const word = context.matchBefore(/[\w$]*/);
-                if (!word || (!context.explicit && word.from === word.to))
-                  return null;
-                const characters = [
-                  ...new Set(
-                    latest.current.doc.text
-                      .split(/\r?\n/)
-                      .map((line) => line.match(/^\s*([^<>:\n]+):\s/)?.[1])
-                      .filter(
-                        (value): value is string =>
-                          !!value && !["title", "tags"].includes(value),
-                      ),
+          commandEditing(
+            () => latest.current.commands,
+            () =>
+              latest.current.documents.flatMap((d) =>
+                [...d.text.matchAll(/^title:\s*(\w+)/gm)].map((m) => ({
+                  name: m[1],
+                  file: d.name,
+                })),
+              ),
+            () => [
+              ...new Set(
+                latest.current.doc.text
+                  .split(/\r?\n/)
+                  .map((line) => line.match(/^\s*([^<>:\n]+):\s/)?.[1])
+                  .filter(
+                    (value): value is string =>
+                      !!value && !["title", "tags"].includes(value),
                   ),
-                ];
-                return {
-                  from: word.from,
-                  options: [
-                    ...(commandName ? latest.current.commands : []).map(
-                      (c) => ({
-                        label: c.name,
-                        type: "function",
-                        info: c.description,
-                      }),
-                    ),
-                    ...(commandName ? builtins : []).map((label) => ({
-                      label,
-                      type: "keyword",
-                    })),
-                    ...(commandName ? [] : characters).map((label) => ({
-                      label,
-                      type: "variable",
-                    })),
-                  ],
-                };
-              },
+              ),
             ],
-          }),
+          ),
           EditorView.updateListener.of((update) => {
             if (
               !update.docChanged ||

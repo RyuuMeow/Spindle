@@ -1,5 +1,7 @@
 /** Small SVGs used by CodeMirror widgets, without a separate React root. */
 const paths = {
+  cube: ["m12 3 9 5v8l-9 5-9-5V8z", "m3 8 9 5 9-5", "M12 13v8"],
+  document: ["M6 3h12v18H6z", "M9 7h6", "M9 11h6", "M9 15h4"],
   command: ["m4 5 5 7-5 7", "M12 19h8"],
   branch: [
     "M6 3v12a4 4 0 0 0 4 4h8",

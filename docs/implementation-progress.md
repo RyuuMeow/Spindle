@@ -1,12 +1,13 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.6.1**，2026-09-19。依據 M0–M6、第二輪 R01–R08 及 Spindle 品牌／跳轉提示回饋。安裝版與 portable 已打包，portable 啟動與本輪互動驗證通過；完整工作流另以隔離 Electron 驗證。
+版本：Windows x64 **0.6.2**，2026-09-19。依據 M0–M6、第二輪 R01–R08 及 Spindle 品牌／跳轉提示回饋。安裝版與 portable 已打包，portable 啟動與本輪互動驗證通過；完整工作流另以隔離 Electron 驗證。
 
-## 0.6.1 修正
+## 0.6.2 修正
 
-指令名稱補全與參數簽名分流，帶空格字串／群組保持正確位置；閱讀與節點補全限制在指令名稱範圍。摺疊 gutter 排除標題前語義留白，展開及收合對齊。
-
-[本輪 portable 互動](../outputs/context-portable-0.6.1/results.json)：真實鍵盤輸入、當前參數高亮與可見摺疊箭頭幾何。
+- 診斷按鈕依內容撐寬，完整容納圖示與數量；一至三位數問題、800／1440px 已量測。
+- 三個編輯入口統一指令輔助：輸入配對、即時候選、選取說明、Enter／Tab 接受、位置參數提示、既有結尾跳過與空配對刪除。
+- 閱讀與節點活動行完整揭露來源，使用純文字字體與語法配色；離開恢復渲染，不更改文件。指令及參數浮窗使用同一套 DOM 排版。
+- 本輪互動證據：[編輯輔助](../outputs/assistance-ui/results.json)、[導航與懸浮回歸](../outputs/assistance-navigation/results.json)、[摺疊回歸](../outputs/assistance-folds/results.json)。Portable 驗證記錄另見下節。
 
 ## 累積完成
 
@@ -25,8 +26,9 @@
 
 ## 驗證證據
 
-- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。本輪改動範圍 lint 仍只有 `app/CodeEditor.tsx` 的既有 **17 errors／2 warnings**，見 [lint 報告](../outputs/context-lint.json)。未為清理基線改動純文字編輯器。
-- 單元與服務回歸 **87／87**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- TypeScript、改動範圍 lint、網頁及桌面 production build 已檢查。本輪改動範圍 lint 仍只有 `app/CodeEditor.tsx` 的既有 **13 errors／2 warnings**，見 [lint 報告](../outputs/assistance-lint.json)。移除重複 provider 後少 4 項既有 any；未冒稱全專案 lint 清零。
+- 單元與服務回歸 **88／88**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- [0.6.2 portable 本輪互動](../outputs/assistance-portable-0.6.2/results.json)：三種編輯入口、補全／參數／Esc／貼上／Undo、失焦、模式切換、診斷數量與窄窗浮窗。
 - [0.6.0 品牌／導航／提示基線](../outputs/spindle-portable-0.6.0/results.json)：名稱、隔離 profile、Monaco／閱讀／節點 Ctrl 懸浮與釋放、分層提示、跨檔不增 tab。
 - [保存與關閉基線（0.5.1）](../outputs/quiet-autosave-portable-0.5.1/results.json)：持續輸入 tab 寬度穩定、無日常圓點／轉圈、關閉保存面板、磁碟衝突保留視窗、立即關閉寫入最後編輯。
 - [0.5.0 桌面互動基線](../outputs/command-display-portable-0.5.0/results.json)：目前分頁導航、行內新增／取消、排序、大綱、搜尋浮層、指令 tab／草稿／虛擬提示與懸浮說明、面板及實際節點共享來源。
@@ -49,4 +51,4 @@
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `feat/spindle-navigation` 提交 Spindle 品牌、精確 Ctrl 跳轉及結構化提示。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/editor-assistance-parity` 提交診斷按鈕與三種編輯入口的一致性修正。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。

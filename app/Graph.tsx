@@ -646,6 +646,7 @@ function Canvas({
       onDocumentUndo &&
       onDocumentComposition ? (
         <SceneEditor
+          documents={documents || []}
           key={editing.documentId + editing.record.id}
           doc={editorDocument}
           node={editing.record.node}
@@ -669,6 +670,7 @@ function Canvas({
     [
       editing,
       editorDocument,
+      documents,
       onDocumentEdit,
       onDocumentUndo,
       onDocumentComposition,

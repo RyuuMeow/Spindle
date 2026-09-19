@@ -132,9 +132,13 @@ async function shot(name) {
     await page.keyboard.type("<<fade_in", { delay: 65 });
     await page.keyboard.press("Escape");
     await page.keyboard.type(" ");
-    await page.locator(".parameter-hints-widget.visible").waitFor();
+    await page
+      .locator(".source-command-popup:not([hidden]) .command-parameter-popup")
+      .waitFor();
     assert.match(
-      await page.locator(".parameter-hints-widget.visible").innerText(),
+      await page
+        .locator(".source-command-popup:not([hidden]) .command-parameter-popup")
+        .innerText(),
       /秒數/,
     );
     assert.equal(await page.locator(".suggest-widget.visible").count(), 0);
@@ -143,10 +147,14 @@ async function shot(name) {
     await page.keyboard.press("Home");
     await page.keyboard.press("Shift+End");
     await page.keyboard.type('<<play_sound "wind ', { delay: 50 });
-    await page.locator(".parameter-hints-widget.visible").waitFor();
+    await page
+      .locator(".source-command-popup:not([hidden]) .command-parameter-popup")
+      .waitFor();
     assert.match(
       await page
-        .locator(".parameter-hints-widget.visible .parameter.active")
+        .locator(
+          ".source-command-popup:not([hidden]) .command-tip-slot.is-active",
+        )
         .innerText(),
       /clip/,
     );
@@ -154,7 +162,9 @@ async function shot(name) {
     await page.waitForTimeout(200);
     assert.match(
       await page
-        .locator(".parameter-hints-widget.visible .parameter.active")
+        .locator(
+          ".source-command-popup:not([hidden]) .command-tip-slot.is-active",
+        )
         .innerText(),
       /volume/,
     );

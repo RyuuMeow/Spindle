@@ -389,8 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.6.1：修正指令參數提示與場景摺疊對齊；Ctrl
-                    懸浮跳轉連結及分層指令提示。
+                    0.6.2：統一指令補全與提示、閱讀活動行原文編輯，修正診斷數量按鈕。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

@@ -1,3 +1,4 @@
+import { sourceTokens } from "./source-tokens";
 import { EditorState, RangeSetBuilder, type Range } from "@codemirror/state";
 import { Decoration, WidgetType } from "@codemirror/view";
 import {
@@ -118,6 +119,23 @@ export function readingDecorations(
         names.includes(line.command),
       rhythm = layout[index],
       classes = ["reading-line", ...rhythm.classes];
+    if (active) {
+      ranges.push(
+        Decoration.line({
+          attributes: {
+            class:
+              "reading-line reading-source" +
+              (structural ? " reading-editing-syntax" : "") +
+              (line.depth > 0 ? " reading-region" : "") +
+              (line.kind === "blank" ? " reading-blank-active" : ""),
+            style: `--reading-gap-before:${rhythm.before}px;--reading-gap-after:${rhythm.after}px`,
+          },
+        }).range(line.from),
+      );
+      for (const token of sourceTokens(line.text))
+        mark(line.from + token.from, line.from + token.to, token.className);
+      continue;
+    }
     if (
       !line.valid ||
       (line.kind === "command" && !known) ||
