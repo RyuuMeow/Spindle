@@ -15,8 +15,7 @@ export function navigateSession(session: WindowSession, documentId: string, opti
   const base = same ? viewOf(current) : cached;
   const destination: NavigationLocation = {
     documentId,
-    mode: options.mode || current?.mode || "source",
-    line: 1, column: 1,
+    ...viewOf({ mode: options.mode || current?.mode || "source", line: 1, column: 1 }),
     ...base,
     ...(options.mode ? { mode: options.mode } : {}),
     ...(options.line !== undefined ? { line: options.line, column: options.column ?? 1, selection: undefined, scrollTop: undefined, sourceView: undefined } : {}),

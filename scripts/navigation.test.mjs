@@ -31,7 +31,7 @@ test('each tab has independent back/forward and per-document reading/graph posit
  const a=tab('one','a',{line:10,scrollTop:120,folded:[{from:2,to:8}],graph:{positions:{a:{x:2,y:3}}}});
  let s=session([a,tab('two','b',{line:90})]);
  s=navigateSession(s,'b',{line:8},'unused');
- assert.deepEqual(s.tabs[0].views.a.folded,a.folded);
+ assert.deepEqual(s.tabs[0].views.a.folded,a.folded);assert.equal(s.tabs[0].folded,undefined);assert.equal(s.tabs[0].graph,undefined);assert.equal(s.tabs[0].scrollTop,undefined);
  s={...s,activeId:'two'};assert.equal(navigateHistory(s,true,new Set(['a','b'])),s);
  s=navigateSession(s,'c',{line:33},'unused');
  s={...s,activeId:'one'};s=navigateHistory(s,true,new Set(['a','b','c']));
@@ -78,4 +78,119 @@ test('failed exclusive disk create leaves no phantom draft or overwritten file',
 test('manual project order survives opening from a separate fresh profile',async()=>{
  const {base,service,services}=fixture();let second;try{const p=(await service.request({type:'openFolder'})).snapshot.projects[0];await service.request({type:'sortDocuments',projectId:p.id,documentIds:[...p.documents].reverse().map(d=>d.id)});second=new WorkspaceService(path.join(base,'profile2'),services);const loaded=(await second.request({type:'openFolder'})).snapshot.projects[0];assert.deepEqual(loaded.documents.map(d=>d.name),['B.yarn','A.yarn']);}
  finally{service.dispose();second?.dispose();fs.rmSync(base,{recursive:true,force:true});}
+});
+test('queued scene creation from two views rejects stale source and cross-file name collision without extra Undo', async () => {
+  const { base, service } = fixture();
+  try {
+    const p = (await service.request({ type: 'openFolder' })).snapshot.projects[0];
+    const a = p.documents.find(d => d.name === 'A.yarn'), b = p.documents.find(d => d.name === 'B.yarn');
+    const beforeA = a.text, beforeB = b.text;
+    const results = await Promise.allSettled([
+      service.request({ type: 'createScene', projectId: p.id, documentId: a.id, version: a.version, name: 'SharedName' }),
+      service.request({ type: 'createScene', projectId: p.id, documentId: a.id, version: a.version, name: 'StaleAppend' }),
+      service.request({ type: 'createScene', projectId: p.id, documentId: b.id, version: b.version, name: 'SharedName' }),
+    ]);
+    assert.deepEqual(results.map(r => r.status), ['fulfilled', 'rejected', 'rejected']);
+    assert.match(String(results[1].reason), /變更/);
+    assert.match(String(results[2].reason), /同名/);
+    assert.equal(service.engine.document(p.id, b.id).text, beforeB);
+    assert.doesNotMatch(service.engine.document(p.id, a.id).text, /StaleAppend/);
+    await service.request({ type: 'undo', projectId: p.id, documentId: a.id });
+    assert.equal(service.engine.document(p.id, a.id).text, beforeA);
+    await service.request({ type: 'redo', projectId: p.id, documentId: a.id });
+    assert.equal(parse(service.engine.project(p.id).documents, []).nodes.filter(n => n.name === 'SharedName').length, 1);
+  } finally { service.dispose(); fs.rmSync(base, { recursive: true, force: true }); }
+});
+
+test('scene rename uses latest peer references and shared Undo/Redo is atomic from either document', async () => {
+  const { base, service } = fixture();
+  try {
+    const p = (await service.request({ type: 'openFolder' })).snapshot.projects[0];
+    const a = p.documents.find(d => d.name === 'A.yarn'), b = p.documents.find(d => d.name === 'B.yarn');
+    const beforeA = a.text, peerPrefix = '// peer draft before rename\n';
+    await service.request({ type: 'transaction', projectId: p.id, label: 'peer edit', documents: [{ id: b.id, version: b.version, edits: [{ from: 0, to: 0, insert: peerPrefix }] }] });
+    const beforeB = service.engine.document(p.id, b.id).text;
+    await service.request({ type: 'renameScene', projectId: p.id, documentId: a.id, version: a.version, fromName: 'Start', name: 'Opening' });
+    const renamedA = service.engine.document(p.id, a.id).text, renamedB = service.engine.document(p.id, b.id).text;
+    assert.equal(renamedB.startsWith(peerPrefix), true); assert.match(renamedB, /jump Opening/);
+    await assert.rejects(service.request({ type: 'renameScene', projectId: p.id, documentId: a.id, version: a.version, fromName: 'Start', name: 'Wrong' }), /變更/);
+    assert.equal(service.engine.document(p.id, a.id).text, renamedA); assert.equal(service.engine.document(p.id, b.id).text, renamedB);
+    await service.request({ type: 'undo', projectId: p.id, documentId: b.id });
+    assert.equal(service.engine.document(p.id, a.id).text, beforeA); assert.equal(service.engine.document(p.id, b.id).text, beforeB);
+    await service.request({ type: 'redo', projectId: p.id, documentId: a.id });
+    assert.equal(service.engine.document(p.id, a.id).text, renamedA); assert.equal(service.engine.document(p.id, b.id).text, renamedB);
+    const currentB = service.engine.document(p.id, b.id);
+    await service.request({ type: 'transaction', projectId: p.id, label: 'later peer edit', documents: [{ id: b.id, version: currentB.version, edits: [{ from: 0, to: 0, insert: '// later\n' }] }] });
+    const laterB = service.engine.document(p.id, b.id).text;
+    await assert.rejects(service.request({ type: 'undo', projectId: p.id, documentId: a.id }), /後續修改/);
+    assert.equal(service.engine.document(p.id, a.id).text, renamedA); assert.equal(service.engine.document(p.id, b.id).text, laterB);
+    await service.request({ type: 'undo', projectId: p.id, documentId: b.id });
+    await service.request({ type: 'undo', projectId: p.id, documentId: a.id });
+    assert.equal(service.engine.document(p.id, a.id).text, beforeA); assert.equal(service.engine.document(p.id, b.id).text, beforeB);
+  } finally { service.dispose(); fs.rmSync(base, { recursive: true, force: true }); }
+});
+
+test('disk-full midway through exclusive creation leaves no partial file and allows same-name retry', async () => {
+  const { base, root, service } = fixture();
+  const originalWrite = fs.writeFileSync, originalOpen = fs.openSync, target = path.join(root, 'Retry.yarn');
+  let targetFd;
+  try {
+    const p = (await service.request({ type: 'openFolder' })).snapshot.projects[0];
+    const source = 'title: Retry\n---\nFull source\n===\n';
+    fs.openSync = function(file, flags, mode) {
+      const fd = originalOpen.call(this, file, flags, mode);
+      if (typeof file === 'string' && path.resolve(file) === target) targetFd = fd;
+      return fd;
+    };
+    fs.writeFileSync = function(file, data, options) {
+      if ((typeof file === 'string' && path.resolve(file) === target) || (typeof file === 'number' && file === targetFd)) {
+        originalWrite.call(this, file, 'titl', options);
+        throw Object.assign(new Error('simulated partial ENOSPC'), { code: 'ENOSPC' });
+      }
+      return originalWrite.call(this, file, data, options);
+    };
+    await assert.rejects(service.request({ type: 'createDocument', projectId: p.id, name: 'Retry.yarn', text: source }), /ENOSPC/);
+    fs.writeFileSync = originalWrite; fs.openSync = originalOpen;
+    assert.equal(service.engine.project(p.id).documents.some(d => d.name === 'Retry.yarn'), false);
+    assert.equal(fs.existsSync(target), false, 'failed creation must remove its own partial file, otherwise retry collides with it');
+    const result = await service.request({ type: 'createDocument', projectId: p.id, name: 'Retry.yarn', text: source });
+    assert.equal(result.snapshot.projects.find(x => x.id === p.id).documents.filter(d => d.name === 'Retry.yarn').length, 1);
+    assert.equal(fs.readFileSync(target, 'utf8'), source);
+  } finally { fs.writeFileSync = originalWrite; fs.openSync = originalOpen; service.dispose(); fs.rmSync(base, { recursive: true, force: true }); }
+});
+test('failed create cleanup preserves a different file that replaced its path before rollback', async () => {
+  const { base, root, service } = fixture();
+  const originalOpen = fs.openSync, originalWrite = fs.writeFileSync, originalClose = fs.closeSync;
+  const target = path.join(root, 'Replaced.yarn'), movedPartial = path.join(root, 'own-partial.tmp');
+  let createdFd, replaceOnClose = false;
+  try {
+    const p = (await service.request({ type: 'openFolder' })).snapshot.projects[0];
+    fs.openSync = function(file, flags, mode) {
+      const fd = originalOpen.call(this, file, flags, mode);
+      if (typeof file === 'string' && path.resolve(file) === target && flags === 'wx') createdFd = fd;
+      return fd;
+    };
+    fs.writeFileSync = function(file, data, options) {
+      if (typeof file === 'number' && file === createdFd) {
+        originalWrite.call(this, file, 'titl', options); replaceOnClose = true;
+        throw Object.assign(new Error('simulated ENOSPC before replacement'), { code: 'ENOSPC' });
+      }
+      return originalWrite.call(this, file, data, options);
+    };
+    fs.closeSync = function(fd) {
+      originalClose.call(this, fd);
+      if (fd === createdFd && replaceOnClose) {
+        replaceOnClose = false;
+        fs.renameSync(target, movedPartial);
+        originalWrite.call(fs, target, 'external replacement', { encoding: 'utf8', flag: 'wx' });
+      }
+    };
+    await assert.rejects(service.request({ type: 'createDocument', projectId: p.id, name: 'Replaced.yarn', text: 'title: Own\n---\n===\n' }), /ENOSPC/);
+    assert.equal(fs.readFileSync(target, 'utf8'), 'external replacement');
+    assert.equal(fs.readFileSync(movedPartial, 'utf8'), 'titl');
+    assert.equal(service.engine.project(p.id).documents.some(d => d.name === 'Replaced.yarn'), false);
+  } finally {
+    fs.openSync = originalOpen; fs.writeFileSync = originalWrite; fs.closeSync = originalClose;
+    service.dispose(); fs.rmSync(base, { recursive: true, force: true });
+  }
 });

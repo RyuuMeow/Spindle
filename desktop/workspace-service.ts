@@ -643,18 +643,40 @@ export class WorkspaceService {
         const d = this.engine.create(p.id, a.name, a.text);
         documentId = d.id;
         if (p.root) {
+          let createdFile: string | undefined;
+          let createdIdentity: fs.Stats | undefined;
           try {
             const file = withinRoot(p.root, d.name);
             fs.mkdirSync(path.dirname(file), { recursive: true });
-            fs.writeFileSync(file, d.text, { encoding: "utf8", flag: "wx" });
+            const fd = fs.openSync(file, "wx");
+            createdFile = file;
+            try {
+              createdIdentity = fs.fstatSync(fd);
+              fs.writeFileSync(fd, d.text, { encoding: "utf8" });
+              fs.fsyncSync(fd);
+            } finally {
+              fs.closeSync(fd);
+            }
             d.path = file;
             d.diskHash = hash(d.text);
             d.status = "saved";
             this.metadata(p);
           } catch (error) {
             if (!d.path) {
-              // Failed exclusive create must not leave a phantom document that blocks retry.
+              // Only remove the file created by this request. EEXIST or a replacement
+              // from another process must never cause deletion of somebody else's file.
+              let cleanupFailure: unknown;
+              if (createdFile && createdIdentity) {
+                try {
+                  const current = fs.lstatSync(createdFile);
+                  if (!current.isSymbolicLink() && current.dev === createdIdentity.dev && current.ino === createdIdentity.ino)
+                    fs.unlinkSync(createdFile);
+                } catch (cleanupError) {
+                  if ((cleanupError as NodeJS.ErrnoException).code !== "ENOENT") cleanupFailure = cleanupError;
+                }
+              }
               p.documents = p.documents.filter(document => document.id !== d.id);
+              if (cleanupFailure) throw Error(String(error) + "；未完成檔案無法清理，請檢查磁碟權限後重試：" + String(cleanupFailure));
               throw error;
             }
             d.status = "error";

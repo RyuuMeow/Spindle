@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+import {createServer} from 'vite';
+import react from '@vitejs/plugin-react';
+import {transformSync} from 'esbuild';
+const require=createRequire(import.meta.url), root=fileURLToPath(new URL('..',import.meta.url)),out=path.join(root,'outputs/inline-name-ui');fs.mkdirSync(out,{recursive:true});
+let playwright;try{playwright=require('playwright');}catch{playwright=require(path.join(process.env.USERPROFILE,'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'));}
+const fixture=`import React,{useState} from 'react';import {createRoot} from 'react-dom/client';import {InlineNameEditor} from '@/app/workspace/InlineNameEditor';import '@/app/globals.css';
+function App(){const [draft,setDraft]=useState(null),[status,setStatus]=useState('');return <div style={{width:300,padding:20}}><button onClick={()=>{setDraft({kind:'new-document',value:'Untitled.yarn'});setStatus('');}}>New</button><button>Outside</button>{draft&&<InlineNameEditor draft={draft} onChange={value=>setDraft(d=>({...d,value,error:undefined}))} onCancel={()=>{setDraft(null);setStatus('cancelled');}} onSubmit={()=>{if(draft.value==='collision'){setDraft(d=>({...d,busy:true}));setTimeout(()=>setDraft(d=>({...d,busy:false,error:'檔名已存在'})),20);}else{setStatus('submitted:'+draft.value);setDraft(null);}}}/>}<output>{status}</output></div>};createRoot(document.getElementById('root')).render(<App/>);`;
+const server=await createServer({configFile:false,root:path.join(root,'desktop'),optimizeDeps:{entries:[],include:['react','react-dom/client','lucide-react']},resolve:{alias:{'@':root}},plugins:[react(),{name:'inline-fixture',resolveId:id=>id==='/inline-fixture.tsx'?'\0inline-fixture.tsx':null,load:id=>id==='\0inline-fixture.tsx'?transformSync(fixture,{loader:'tsx',jsx:'automatic'}).code:null,configureServer(s){s.middlewares.use(async(req,res,next)=>{if(req.url?.split('?')[0]!=='/')return next();try{res.setHeader('Content-Type','text/html');res.end(await s.transformIndexHtml('/','<html class="dark"><body><div id="root"></div><script type="module" src="/inline-fixture.tsx"></script></body></html>'));}catch(e){next(e);}});}}],server:{host:'127.0.0.1',port:0}});
+let browser;const results={},errors=[];
+try{await server.listen();browser=await playwright.chromium.launch({headless:true,channel:'msedge'});const page=await browser.newPage({viewport:{width:800,height:600}});page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await page.goto(server.resolvedUrls.local[0]);
+const input=page.getByRole('textbox',{name:'劇本名稱'}),start=()=>page.getByRole('button',{name:'New',exact:true}).click();
+await start();assert.deepEqual(await input.evaluate(e=>[document.activeElement===e,e.selectionStart,e.selectionEnd]),[true,0,13]);results.defaultSelected=true;
+await input.press('Escape');assert.equal(await input.count(),0);assert.equal(await page.locator('output').innerText(),'cancelled');results.escapeNoSubmit=true;
+await start();await input.fill('Scene.yarn');await input.dispatchEvent('compositionstart',{data:''});await input.press('Enter');assert.equal(await input.count(),1);assert.equal(await page.locator('output').innerText(),'');await input.dispatchEvent('compositionend',{data:'Scene'});await input.press('Enter');assert.equal(await page.locator('output').innerText(),'submitted:Scene.yarn');results.syntheticCompositionEnterGuard=true;
+await start();await input.fill('collision');await input.press('Enter');await page.getByRole('alert').waitFor();assert.equal(await input.inputValue(),'collision');assert.equal(await input.evaluate(e=>document.activeElement===e),true);await input.fill('Recovered.yarn');await page.getByRole('button',{name:'Outside',exact:true}).click();assert.equal(await page.locator('output').innerText(),'submitted:Recovered.yarn');results.errorPreservesInputAndBlurRetry=true;
+assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({results,errors,limits:['Synthetic composition guard only; native Windows IME remains untested.']},null,2));console.log(JSON.stringify({results,errors},null,2));
+}catch(error){fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({results,errors,failure:String(error)},null,2));throw error;}finally{await browser?.close();await server.close();}
