@@ -104,6 +104,9 @@ async function shot(name) {
     page = await app.firstWindow();
     page.setDefaultTimeout(15000);
     page.on("pageerror", (e) => errors.push(e.message));
+    page.on("requestfailed", (request) =>
+      errors.push(request.url() + ": " + request.failure()?.errorText),
+    );
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
     });
@@ -145,6 +148,7 @@ async function shot(name) {
       await page.keyboard.press("Control+End");
       await page.keyboard.press("Enter");
     }
+    results.completionMetrics = {};
     for (const [name, editor, list, info] of [
       [
         "純文字",
@@ -168,6 +172,41 @@ async function shot(name) {
       await page.keyboard.type("fade", { delay: 80 });
       await page.locator(info).waitFor();
       assert.match(await page.locator(info).innerText(), /指定秒數/);
+      const row = page.locator(
+        name === "純文字"
+          ? ".suggest-widget.visible .monaco-list-row.focused"
+          : ".spindle-completions li[aria-selected]",
+      );
+      const metrics = () =>
+        row.evaluate((el) => {
+          const label = el.querySelector(".label-name,.cm-completionLabel"),
+            detail = el.querySelector(".details-label,.cm-completionDetail"),
+            r = detail.getBoundingClientRect();
+          return {
+            font: getComputedStyle(label).fontFamily,
+            lineHeight: getComputedStyle(label).lineHeight,
+            rowHeight: el.getBoundingClientRect().height,
+            detailX: r.x,
+            detailWidth: r.width,
+            clipped: detail.scrollWidth > detail.clientWidth + 1,
+          };
+        });
+      await page.mouse.move(1420, 100);
+      const beforeHover = await metrics();
+      await row.hover();
+      const afterHover = await metrics();
+      assert.match(afterHover.font, /Consolas/);
+      assert(
+        Math.abs(afterHover.rowHeight - 29) < 1,
+        JSON.stringify(afterHover),
+      );
+      assert(
+        Math.abs(afterHover.detailWidth - beforeHover.detailWidth) < 1,
+        "hover must not shorten parameter text: " +
+          JSON.stringify({ beforeHover, afterHover }),
+      );
+      assert(!afterHover.clipped, "short parameter summary must fit");
+      results.completionMetrics[name] = afterHover;
       await shot(
         name === "純文字" ? "01-source-completion" : "03-reading-completion",
       );
@@ -179,6 +218,26 @@ async function shot(name) {
         /秒數/,
       );
       assert.equal(await page.locator(list).count(), 0);
+      if (name === "純文字") {
+        const geometry = await page.evaluate(() => {
+          const cursor = document
+            .querySelector(".monaco-editor .cursor")
+            .getBoundingClientRect();
+          const tip = document
+            .querySelector(".source-command-popup")
+            .getBoundingClientRect();
+          return {
+            gap: Math.min(
+              Math.abs(cursor.top - tip.bottom),
+              Math.abs(tip.top - cursor.bottom),
+            ),
+            aligned:
+              cursor.left >= tip.left - 2 && cursor.left <= tip.right + 2,
+          };
+        });
+        assert(geometry.aligned && geometry.gap < 12, JSON.stringify(geometry));
+        results.sourceAnchor = geometry;
+      }
       await shot(
         name === "純文字" ? "02-source-parameter" : "04-reading-parameter",
       );
@@ -382,6 +441,141 @@ async function shot(name) {
       })),
     );
     await shot("07-narrow-reading-completion");
+    // Source blanks retain their exact rows and bytes, including whitespace-only lines.
+    await page.keyboard.press("Escape");
+    await win.evaluate((w) => w.setContentSize(1440, 960));
+    const blankSource =
+      "\ufefftitle: Blanks\r\n---\r\nMira: before\r\n\r\n \t\r\nMira: after\r\n===\r\n";
+    const prior = (await snapshot()).projects[0].documents[0];
+    await page.evaluate(
+      ({ prior, value }) =>
+        window.yarnDesktop.request({
+          type: "transaction",
+          projectId: "design-test",
+          label: "blank rows",
+          documents: [
+            {
+              id: prior.id,
+              version: prior.version,
+              edits: [{ from: 0, to: prior.text.length, insert: value }],
+            },
+          ],
+        }),
+      { prior, value: blankSource },
+    );
+    await page.waitForTimeout(160);
+    await page.locator(".reading-editor .cm-content").click();
+    await page.keyboard.press("Control+Home");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await page
+      .locator(".reading-editor")
+      .evaluate((el) => el.style.setProperty("--reading-height", "37px"));
+    const blankHeights = () =>
+      page
+        .locator(".reading-blank,.reading-blank-active")
+        .evaluateAll((els) =>
+          els.map((el) => el.getBoundingClientRect().height),
+        );
+    const resting = await blankHeights();
+    assert(
+      resting.length >= 2 &&
+        resting.every((height) => Math.abs(height - 37) < 1),
+      JSON.stringify(resting),
+    );
+    await page.keyboard.press("ArrowDown");
+    const editing = await blankHeights();
+    assert(
+      editing.every((height) => Math.abs(height - 37) < 1),
+      JSON.stringify(editing),
+    );
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await text(), blankSource);
+    await page
+      .locator(".reading-editor")
+      .evaluate((el) => el.style.removeProperty("--reading-height"));
+    results.blankRows = { resting, editing, bytesPreserved: true };
+
+    // Creating from a sorted list keeps the item at its input location, then uses manual order.
+    await page
+      .getByRole("button", { name: "切換劇本側欄", exact: true })
+      .click();
+    await page.getByRole("button", { name: "手動排序", exact: true }).click();
+    const beforeFiles = await page.locator(".file-row").allTextContents();
+    const tabsBefore = await page.locator("[role=tab]").count();
+    await page.getByRole("button", { name: "新增劇本", exact: true }).click();
+    const filename = page.getByRole("textbox", {
+      name: "劇本名稱",
+      exact: true,
+    });
+    await filename.fill("ZebraNew");
+    const inputY = (await filename.boundingBox()).y;
+    await filename.press("Enter");
+    const file = page.getByRole("button", {
+      name: "ZebraNew.yarn",
+      exact: true,
+    });
+    await file.waitFor();
+    const afterFiles = await page.locator(".file-row").allTextContents();
+    assert.deepEqual(afterFiles, ["ZebraNew.yarn", ...beforeFiles]);
+    assert(Math.abs((await file.boundingBox()).y - inputY) < 12);
+    assert(
+      await page
+        .getByRole("button", { name: "手動排序", exact: true })
+        .isVisible(),
+    );
+    await file.dblclick();
+    await filename.waitFor();
+    assert(
+      await filename.evaluate(
+        (el) =>
+          el.selectionStart === 0 && el.selectionEnd === el.value.length - 5,
+      ),
+    );
+    await filename.fill("Renamed");
+    await filename.press("Enter");
+    await page
+      .getByRole("button", { name: "Renamed.yarn", exact: true })
+      .waitFor();
+    assert.equal(await page.locator("[role=tab]").count(), tabsBefore);
+    results.sidebarCreateRename = true;
+
+    // Repeated layouts and app zoom must still anchor the current parameter to the caret.
+    await mode("純文字");
+    results.layoutAnchors = [];
+    for (const zoom of [1, 1.25, 1.5]) {
+      await page.evaluate((zoom) => window.yarnDesktop.zoom(zoom), zoom);
+      await page.waitForTimeout(160);
+      await page.locator(".monaco-editor").click();
+      await newLine();
+      await page.keyboard.type("<<fade_in ", { delay: 20 });
+      await page.locator(".source-command-popup:not([hidden])").waitFor();
+      const geometry = await page.evaluate(() => {
+        const c = document
+            .querySelector(".monaco-editor .cursor")
+            .getBoundingClientRect(),
+          t = document
+            .querySelector(".source-command-popup")
+            .getBoundingClientRect();
+        return {
+          gap: Math.min(Math.abs(c.top - t.bottom), Math.abs(t.top - c.bottom)),
+          x: c.x,
+          tipX: t.x,
+          tipRight: t.right,
+        };
+      });
+      assert(
+        geometry.gap < 12 &&
+          geometry.x >= geometry.tipX - 2 &&
+          geometry.x <= geometry.tipRight + 2,
+        JSON.stringify({ zoom, ...geometry }),
+      );
+      results.layoutAnchors.push({ zoom, ...geometry });
+      await page.keyboard.type("1>>");
+      await page.keyboard.press("Escape");
+    }
+    await page.evaluate(() => window.yarnDesktop.zoom(1));
     results.passed = true;
     assert.equal(errors.length, 0, errors.join("\n"));
   } catch (e) {

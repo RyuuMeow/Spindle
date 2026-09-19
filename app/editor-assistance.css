@@ -133,17 +133,6 @@
     "Liberation Mono",
     monospace;
 }
-.cm-tooltip.spindle-completions > ul {
-  font: inherit;
-  max-width: min(620px, 90vw);
-  min-width: 260px;
-}
-.cm-tooltip.spindle-completions > ul > li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-}
 .cm-tooltip.spindle-completions > ul > li[aria-selected] {
   background: #393939;
   color: #f0f0f0;
@@ -153,14 +142,7 @@
   font-weight: 600;
   text-decoration: none;
 }
-.spindle-completions .cm-completionDetail {
-  margin-left: 16px;
-  font-style: normal;
-  font-size: 12px;
-  opacity: 0.75;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+
 .command-completion-icon {
   width: 16px;
   height: 16px;
@@ -179,4 +161,62 @@
   border: 1px solid #ffffff12;
   border-radius: 6px;
   box-shadow: 0 8px 24px #0004;
+}
+
+/* Editor-owned popups must explicitly defeat CodeMirror's generated base theme. */
+.cm-tooltip.cm-tooltip-autocomplete.spindle-completions > ul {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 16px;
+  line-height: 29px;
+  min-width: min(430px, calc(100vw - 16px));
+  max-width: min(620px, calc(100vw - 16px));
+  padding: 0;
+}
+.cm-tooltip.cm-tooltip-autocomplete.spindle-completions > ul > li {
+  display: flex;
+  align-items: center;
+  min-height: 29px;
+  line-height: 29px;
+  padding: 0 6px;
+  gap: 0;
+}
+.spindle-completions .command-completion-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+}
+.spindle-completions .cm-completionLabel {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spindle-completions .cm-completionDetail {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: 1.1em;
+  font-size: 85%;
+  line-height: inherit;
+  opacity: 1;
+}
+/* Shared side descriptions replace Monaco's second, hover-only details action. */
+.monaco-editor[data-spindle-assisted]
+  .suggest-widget
+  .monaco-list
+  .monaco-list-row
+  > .contents
+  > .main
+  > .right
+  > .readMore {
+  display: none !important;
+}
+.monaco-editor[data-spindle-assisted]
+  .suggest-widget:not(.docs-side)
+  .monaco-list
+  .monaco-list-row.focused:hover
+  > .contents
+  > .main
+  > .right.can-expand-details
+  > .details-label {
+  width: auto;
 }

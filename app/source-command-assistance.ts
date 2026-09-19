@@ -10,6 +10,8 @@ function place(
   beside = false,
 ) {
   dom.hidden = false;
+  dom.style.left = "8px";
+  dom.style.top = "8px";
   const width = dom.offsetWidth,
     height = dom.offsetHeight,
     gap = 6;
@@ -33,35 +35,45 @@ function place(
 export function sourceCommandAssistance(
   editor: editor.IStandaloneCodeEditor,
   commands: () => Command[],
+  placement: typeof import("monaco-editor").editor.ContentWidgetPositionPreference,
 ): IDisposable {
   const host = editor.getDomNode()!;
+  host.dataset.spindleAssisted = "";
   const popup = document.createElement("div"),
     info = document.createElement("div");
   popup.className = "spindle-command-popup source-command-popup";
   info.className = "spindle-command-popup source-completion-info";
   popup.hidden = info.hidden = true;
-  document.body.appendChild(popup);
   document.body.appendChild(info);
   let composing = false,
     signature = false,
     hoverTimer: ReturnType<typeof setTimeout> | undefined,
     frame = 0,
     disposed = false;
+  let position: editor.IContentWidgetPosition | null = null;
+  const widget: editor.IContentWidget = {
+    getId: () => "spindle.command-assistance",
+    getDomNode: () => popup,
+    getPosition: () => position,
+    allowEditorOverflow: true,
+    suppressMouseDown: true,
+  };
+  editor.addContentWidget(widget);
+  const show = (lineNumber: number, column: number, content: HTMLElement) => {
+    popup.replaceChildren(content);
+    popup.hidden = false;
+    position = {
+      position: { lineNumber, column },
+      preference: [placement.ABOVE, placement.BELOW],
+    };
+    editor.layoutContentWidget(widget);
+  };
   const hide = () => {
     clearTimeout(hoverTimer);
     popup.hidden = true;
     signature = false;
-  };
-  const anchor = (lineNumber: number, column: number) => {
-    const p = editor.getScrolledVisiblePosition({ lineNumber, column });
-    if (!p) return null;
-    const r = host.getBoundingClientRect();
-    return {
-      left: r.left + p.left,
-      right: r.left + p.left,
-      top: r.top + p.top,
-      bottom: r.top + p.top + p.height,
-    };
+    position = null;
+    if (!disposed) editor.layoutContentWidget(widget);
   };
   const parameter = () => {
     if (disposed || composing || !editor.hasTextFocus()) {
@@ -85,12 +97,9 @@ export function sourceCommandAssistance(
       hide();
       return;
     }
-    const rect = anchor(pos.lineNumber, pos.column);
-    if (!rect) return;
     clearTimeout(hoverTimer);
     signature = true;
-    popup.replaceChildren(commandPopup(c, input.index, true));
-    place(popup, rect);
+    show(pos.lineNumber, pos.column, commandPopup(c, input.index, true));
   };
   const clear = () => {
     hide();
@@ -130,6 +139,10 @@ export function sourceCommandAssistance(
     editor.onDidBlurEditorText(clear),
     editor.onDidChangeModel(clear),
     editor.onDidScrollChange(clear),
+    editor.onDidLayoutChange(() => {
+      if (position) editor.layoutContentWidget(widget);
+      completion();
+    }),
     editor.onDidCompositionStart(() => {
       composing = true;
       clear();
@@ -179,6 +192,10 @@ export function sourceCommandAssistance(
       }
     }),
     editor.onMouseMove((e) => {
+      if (e.target.element && popup.contains(e.target.element)) {
+        clearTimeout(hoverTimer);
+        return;
+      }
       if (signature || composing) return;
       clearTimeout(hoverTimer);
       const p = e.target.position,
@@ -197,10 +214,12 @@ export function sourceCommandAssistance(
         return;
       }
       hoverTimer = setTimeout(() => {
-        const rect = anchor(p.lineNumber, hint.from + 1);
-        if (!rect || disposed) return;
-        popup.replaceChildren(commandPopup(hint.command, hint.parameterIndex));
-        place(popup, rect);
+        if (disposed || editor.getModel() !== model) return;
+        show(
+          p.lineNumber,
+          hint.from + 1,
+          commandPopup(hint.command, hint.parameterIndex),
+        );
       }, 350);
     }),
     editor.onMouseLeave(() => {
@@ -227,6 +246,8 @@ export function sourceCommandAssistance(
       bindings.forEach((b) => b.dispose());
       window.removeEventListener("blur", clear);
       window.removeEventListener("resize", clear);
+      delete host.dataset.spindleAssisted;
+      editor.removeContentWidget(widget);
       popup.remove();
       info.remove();
     },

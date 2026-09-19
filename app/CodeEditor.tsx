@@ -324,6 +324,7 @@ export default function CodeEditor({
         const assistance = sourceCommandAssistance(
           editor,
           () => latest.current.commands,
+          m.editor.ContentWidgetPositionPreference,
         );
         editor.onDidDispose(() => assistance.dispose());
         editorRef.current = editor;
