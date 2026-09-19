@@ -640,7 +640,7 @@ export class WorkspaceService {
         }
       } else if (a.type === "commandDraft") p.commandDraft = a.draft;
       else if (a.type === "createDocument") {
-        const d = this.engine.create(p.id, a.name, a.text);
+        const d = this.engine.create(p.id, a.name, a.text, a.firstInOrder);
         documentId = d.id;
         if (p.root) {
           let createdFile: string | undefined;

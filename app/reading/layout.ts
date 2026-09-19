@@ -3,7 +3,6 @@ import type { ReadingLine } from "./structure";
 export type ReadingLayout = {
   before: number;
   after: number;
-  collapseBlank: boolean;
   classes: string[];
 };
 
@@ -12,7 +11,6 @@ export function readingLayout(lines: readonly ReadingLine[]): ReadingLayout[] {
   const layout = lines.map(() => ({
     before: 0,
     after: 0,
-    collapseBlank: false,
     classes: [] as string[],
   }));
   const content = lines
@@ -39,25 +37,16 @@ export function readingLayout(lines: readonly ReadingLine[]): ReadingLayout[] {
       prior?.kind === "condition" &&
       ["endif", "endonce"].includes(prior.command || "");
 
-    // Blank source lines are represented by a single semantic gap. Selecting one
-    // still reveals its original line so editing never loses a source position.
-    if (
-      previous &&
-      prior?.valid &&
-      prior.kind !== "raw" &&
-      line.kind !== "raw"
-    ) {
-      for (let blank = previous.index + 1; blank < index; blank++)
-        layout[blank].collapseBlank = true;
-    }
     if (line.kind === "title") {
       if (prior && prior.kind !== "end") current.before = 24;
     } else if (line.kind === "tags") {
       current.before = 6;
     } else if (line.kind === "start") {
       current.classes.push("reading-header-end");
+      current.after = 24;
     } else if (line.kind === "end") {
       current.classes.push("reading-scene-boundary");
+      current.before = current.after = 24;
     } else if (startsBranch) {
       current.before = 16;
       if (prior && prior.kind !== "start" && !priorBranchHeader) {
@@ -104,6 +93,12 @@ export function readingLayout(lines: readonly ReadingLine[]): ReadingLayout[] {
       prior.kind !== "tags"
     ) {
       if (separated || line.kind !== prior.kind) current.before = 12;
+    }
+    // Blanks supply the outer gap, while borders retain their inner content inset.
+    if (separated) {
+      if (!startsBranch && !line.optionGroupStart && !line.optionEnd)
+        current.before = 0;
+      layout[previous.index].after = 0;
     }
     if (
       next?.line.kind === "condition" &&

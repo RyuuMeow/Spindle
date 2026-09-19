@@ -377,7 +377,7 @@ export class DocumentEngine {
       { id, version: d.version, edits: difference(d.text, value) },
     ]);
   }
-  create(projectId: string, name: string, value: string) {
+  create(projectId: string, name: string, value: string, firstInOrder?: string[]) {
     const p = this.project(projectId);
     name = name.replace(/\\/g, "/");
     if (
@@ -386,7 +386,15 @@ export class DocumentEngine {
     )
       throw Error("檔名無效或已存在");
     const d = makeDocument(name, value);
-    p.documents.push(d);
+    if (firstInOrder) {
+      const rank = new Map(firstInOrder.map((id, index) => [id, index]));
+      const ordered = [...p.documents].sort((a, b) =>
+        (rank.get(a.id) ?? firstInOrder.length) - (rank.get(b.id) ?? firstInOrder.length));
+      const folder = (value: string) => value.slice(0, value.lastIndexOf("/") + 1);
+      const first = ordered.findIndex(item => folder(item.name) === folder(name));
+      ordered.splice(first < 0 ? ordered.length : first, 0, d);
+      p.documents = ordered;
+    } else p.documents.push(d);
     this.logs.set(d.id, []);
     return d;
   }

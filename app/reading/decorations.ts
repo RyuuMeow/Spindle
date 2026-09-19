@@ -159,8 +159,6 @@ export function readingDecorations(
     if (line.kind === "comment") classes.push("reading-comment");
     if (line.kind === "blank") {
       classes.push(active ? "reading-blank-active" : "reading-blank");
-      if (!active && rhythm.collapseBlank)
-        classes.push("reading-blank-collapsed");
     }
     if (line.kind === "option") {
       classes.push("reading-option");

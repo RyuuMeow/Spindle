@@ -774,6 +774,7 @@ export default function Workbench({
             : {
                 type: "createDocument",
                 projectId: project.id,
+                firstInOrder: displayedDocuments.map(d => d.id),
                 name: relative,
                 text: "title: " + uniqueSceneName(latest) + "\n---\n\n===\n",
               },
@@ -792,8 +793,10 @@ export default function Workbench({
         }
         if (!created) throw Error("找不到建立結果");
         setInlineDraft(null);
-        if (draft.kind === "new-document")
+        if (draft.kind === "new-document") {
+          setFileSort("manual");
           openDocument(created.id, !!draft.newTab);
+        }
       } else {
         const target = latest.documents.find((d) => d.id === draft.documentId);
         if (!target) throw Error("劇本已移除");
@@ -1655,8 +1658,15 @@ export default function Workbench({
                   className="file-row"
                   title={d.path || d.name}
                   onClick={(e) => {
+                    if (e.detail > 1) return;
                     setActiveFolder(folderOf(d.name));
                     openDocument(d.id, e.ctrlKey || e.metaKey);
+                  }}
+                  onDoubleClick={(e) => {
+                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                      e.preventDefault();
+                      renameDocumentInline(d);
+                    }
                   }}
                   onAuxClick={(e) => {
                     if (e.button === 1) {

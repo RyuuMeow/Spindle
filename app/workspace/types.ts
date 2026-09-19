@@ -93,7 +93,7 @@ export type WorkspaceAction =
   | { type: "undo" | "redo"; projectId: string; documentId: string }
   | { type: "createProject"; name: string; root?: string }
   | { type: "renameProject"; projectId: string; name: string }
-  | { type: "createDocument"; projectId: string; name: string; text: string }
+  | { type: "createDocument"; projectId: string; name: string; text: string; firstInOrder?: string[] }
   | { type: "createScene"; projectId: string; documentId: string; version: number; name: string }
   | { type: "renameScene"; projectId: string; documentId: string; version: number; fromName: string; name: string }
   | {

@@ -246,7 +246,7 @@ test("semantic groups add breathing room even when the source has no blank lines
           ],
     );
   }
-  assert.deepEqual(groupGaps(compact), groupGaps(spaced));
+  assert.equal(groupGaps(spaced).find(line => line.text.startsWith("<<play_sound")).before, 0);
   const gaps = groupGaps(compact);
   assert.equal(
     gaps.find((line) => line.text.startsWith("<<play_sound")).before,
@@ -274,7 +274,7 @@ test("every branch has balanced leading and trailing content spacing", () => {
   assert.ok(item("Mira: together").classes.includes("reading-after-region"));
 });
 
-test("scene separators own their spacing rather than source blank lines", () => {
+test("source blank lines remain visible around scene separators", () => {
   for (const blanks of ["", "\n", "\n\n\n"]) {
     const text =
       source("Mira: first") +
@@ -290,11 +290,11 @@ test("scene separators own their spacing rather than source blank lines", () => 
       ),
     );
     for (let index = nextTitle - 1; lines[index]?.kind === "blank"; index--)
-      assert.equal(layout[index].collapseBlank, true);
+      assert.equal(layout[index].before + layout[index].after, 0);
   }
 });
 
-test("visual blank collapsing keeps selected source lines accessible", () => {
+test("blank source lines remain accessible before and during editing", () => {
   const text = source("Mira: first\n\n\nMira: second");
   const position = text.indexOf("\n\n\n") + 1;
   const resting = decorations(text, text.length, true);
@@ -302,7 +302,7 @@ test("visual blank collapsing keeps selected source lines accessible", () => {
     resting.ranges.some(
       (range) =>
         range.from === position &&
-        range.spec.attributes?.class.includes("reading-blank-collapsed"),
+        range.spec.attributes?.class.includes("reading-blank"),
     ),
   );
   const selected = decorations(text, position);
@@ -416,4 +416,16 @@ test("display command metadata adds virtual labels without changing Yarn or sele
     },
   );
   assert.equal(activeHints.length, 0);
+});
+
+
+test("blank spacing keeps condition and option border padding", () => {
+  const lines = readingStructure(source("Mira: before\n\n<<if $key>>\n\nMira: branch\n\n<<endif>>\n\n-> Pick\n    <<jump Next>>"));
+  const layout = readingLayout(lines);
+  const item = value => layout[lines.findIndex(line => line.text === value)];
+  assert.equal(item("<<if $key>>").before, 16);
+  assert.equal(item("Mira: before").after, 0);
+  assert.equal(item("Mira: branch").before, 0);
+  assert.equal(item("Mira: branch").after, 0);
+  assert(item("-> Pick").before >= 16);
 });

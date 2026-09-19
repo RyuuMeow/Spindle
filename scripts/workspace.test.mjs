@@ -712,3 +712,18 @@ test("command presentation metadata remains optional and survives restore", () =
     ]),
   );
 });
+
+
+test("top insertion keeps visible order, folder scope and concurrently added files", () => {
+  const p = project(), engine = new DocumentEngine([p]);
+  p.documents[0].name = "folder/A.yarn";
+  p.documents[1].name = "folder/B.yarn";
+  const outside = engine.create(p.id, "other/C.yarn", "outside");
+  const peer = engine.create(p.id, "folder/Peer.yarn", "peer");
+  const created = engine.create(p.id, "folder/New.yarn", "new", [outside.id, "b", "a"]);
+  assert.deepEqual(p.documents.map(d => d.id), [outside.id, created.id, "b", "a", peer.id]);
+  assert.equal(p.documents.find(d => d.id === peer.id).text, "peer");
+  const ids = p.documents.map(d => d.id);
+  assert.throws(() => engine.create(p.id, "folder/New.yarn", "bad", ids));
+  assert.deepEqual(p.documents.map(d => d.id), ids);
+});

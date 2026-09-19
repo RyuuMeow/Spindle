@@ -165,7 +165,7 @@ async function shot(name) {
     await name.waitFor();
     assert(
       await name.evaluate(
-        (el) => el.selectionStart === 0 && el.selectionEnd === el.value.length,
+        (el) => el.selectionStart === 0 && el.selectionEnd === el.value.replace(/\.yarn$/, "").length,
       ),
     );
     assert.equal(await page.getByRole("dialog").count(), 0);

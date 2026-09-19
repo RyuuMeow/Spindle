@@ -91,7 +91,7 @@ class BrowserService {
         this.engine.transaction(p.id, a.type === "createScene" ? "新增場景" : "更名場景", documents);
         documentId = a.documentId;
       } else if (a.type === "createDocument")
-        documentId = this.engine.create(p.id, a.name, a.text).id;
+        documentId = this.engine.create(p.id, a.name, a.text, a.firstInOrder).id;
       else if (a.type === "renameProject") p.name = a.name;
       else if (a.type === "renameDocument") {
         const d = this.engine.document(p.id, a.documentId);

@@ -198,19 +198,18 @@
   width: 14px;
   height: 14px;
 }
-/* A scene boundary has its own balanced rhythm; no dependence on the number
-   of source blank lines, or on a heading's font metrics. */
+/* Boundary spacing yields to the author's source blank lines. */
 .reading-editor .reading-scene-end {
   position: relative;
   min-height: 0;
   line-height: 0;
-  padding-top: 24px;
-  padding-bottom: 24px;
+  padding-top: var(--reading-gap-before, 24px);
+  padding-bottom: var(--reading-gap-after, 24px);
 }
 .reading-editor .reading-scene-end::before {
   content: "";
   position: absolute;
-  top: 24px;
+  top: var(--reading-gap-before, 24px);
   left: 0;
   right: 0;
   border-top: 1px solid #303030;
@@ -219,16 +218,12 @@
 .reading-editor .reading-scene-start {
   min-height: 0;
   line-height: 0;
-  padding-bottom: 24px;
+  padding-bottom: var(--reading-gap-after, 24px);
 }
-.reading-editor .reading-blank {
-  min-height: 12px;
-  line-height: 12px;
-}
-.reading-editor .reading-blank-collapsed {
-  min-height: 0;
-  line-height: 0;
-  height: 0;
+.reading-editor .cm-line.reading-blank,
+.reading-editor .cm-line.reading-source.reading-blank-active {
+  min-height: var(--reading-height);
+  line-height: var(--reading-height);
   padding-top: 0;
   padding-bottom: 0;
 }
