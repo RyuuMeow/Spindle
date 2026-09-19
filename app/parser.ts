@@ -1,10 +1,13 @@
 export type Param = {
+  displayName?: string;
+  description?: string;
   name: string;
   type: "string" | "number" | "boolean";
   required: boolean;
   defaultValue: string;
 };
 export type Command = {
+  displayName?: string;
   name: string;
   description: string;
   params: Param[];

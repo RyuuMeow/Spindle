@@ -1,4 +1,6 @@
 "use client";
+import { commandTooltips } from "../reading/command-tooltips";
+
 import { useEffect, useRef, useState } from "react";
 import {
   Annotation,
@@ -63,6 +65,7 @@ type Props = Omit<SceneEditorBindings, "documents"> & {
   doc: DocumentRecord;
   node: Node;
   onClose: (scope: SceneScope) => void;
+  closeRequest?: number;
 };
 function bodyStructure(text: string) {
   return readingStructure("---\n" + text + "\n===")
@@ -122,8 +125,22 @@ export default function SceneEditor(props: Props) {
       ]),
     });
   };
+  const closeGuard = useRef(false);
+  closeGuard.current = title !== null || renaming || titleComposing.current;
+  const lastCloseRequest = useRef(props.closeRequest);
+  useEffect(() => {
+    if (props.closeRequest === lastCloseRequest.current) return;
+    lastCloseRequest.current = props.closeRequest;
+    close();
+  }, [props.closeRequest]);
   function close() {
-    if (composing.current || blockedRef.current) return;
+    if (
+      composing.current ||
+      titleComposing.current ||
+      closeGuard.current ||
+      blockedRef.current
+    )
+      return;
     latest.current.onClose(scope.current);
   }
   function reconcile() {
@@ -157,7 +174,7 @@ export default function SceneEditor(props: Props) {
       create: (state) =>
         readingDecorations(
           state,
-          latest.current.commands.map((c) => c.name),
+          latest.current.commands,
           bodyStructure(state.doc.toString()),
         ),
       update: (value, tr) =>
@@ -168,7 +185,7 @@ export default function SceneEditor(props: Props) {
               tr.effects.some((e) => e.is(refresh))
             ? readingDecorations(
                 tr.state,
-                latest.current.commands.map((c) => c.name),
+                latest.current.commands,
                 bodyStructure(tr.state.doc.toString()),
               )
             : value,
@@ -179,6 +196,7 @@ export default function SceneEditor(props: Props) {
       state: EditorState.create({
         doc: recovered?.text ?? sceneText(source.current, scope.current),
         extensions: [
+          commandTooltips(() => latest.current.commands),
           decorations,
           editable.of([
             EditorView.editable.of(!recovered),

@@ -1,5 +1,13 @@
 import { EditorState, RangeSetBuilder, type Range } from "@codemirror/state";
 import { Decoration, WidgetType } from "@codemirror/view";
+import {
+  commandCall,
+  commandLabel,
+  commandHelp,
+  parameterHelp,
+  parameterLabel,
+} from "../command-hints";
+import type { Command } from "../parser";
 import { builtins } from "../parser";
 import { readingStructure, type ReadingLine } from "./structure";
 import { commandEnd, readingVariables } from "./tokens";
@@ -28,7 +36,13 @@ class Token extends WidgetType {
   toDOM() {
     const span = document.createElement("span");
     span.className = this.className;
-    if (this.title) span.title = this.title;
+    if (
+      this.title &&
+      !["reading-parameter-hint", "reading-function reading-leading"].includes(
+        this.className,
+      )
+    )
+      span.title = this.title;
     if (this.icon) span.appendChild(readingIcon(this.icon));
     if (this.context.length) {
       const context = document.createElement("span");
@@ -48,10 +62,14 @@ class Token extends WidgetType {
 /** Decorations only; the source and its offsets never depend on rendered DOM. */
 export function readingDecorations(
   state: EditorState,
-  commands: string[],
+  commands: (string | Command)[],
   lines: ReadingLine[] = readingStructure(state.doc.toString()),
   readOnly = false,
 ) {
+  const definitions = commands.filter(
+    (c): c is Command => typeof c !== "string",
+  );
+  const names = commands.map((c) => (typeof c === "string" ? c : c.name));
   const ranges: Range<Decoration>[] = [];
   const layout = readingLayout(lines);
   const touched = (from: number, to: number) =>
@@ -97,7 +115,7 @@ export function readingDecorations(
       known =
         !line.command ||
         builtins.includes(line.command) ||
-        commands.includes(line.command),
+        names.includes(line.command),
       rhythm = layout[index],
       classes = ["reading-line", ...rhythm.classes];
     if (
@@ -248,6 +266,28 @@ export function readingDecorations(
         add(from, from + end + 2, "", "reading-rule");
         continue;
       }
+      const call = commandCall(line.text, definitions);
+      if (
+        call?.args &&
+        call.args.length <= call.command.params.length &&
+        !active
+      ) {
+        call.args.forEach((argument, i) => {
+          const parameter = call.command.params[i];
+          ranges.push(
+            Decoration.widget({
+              widget: new Token(
+                parameterLabel(parameter) + ":",
+                "reading-parameter-hint",
+                undefined,
+                [],
+                parameterHelp(parameter, i),
+              ),
+              side: -1,
+            }).range(line.from + argument.from),
+          );
+        });
+      }
       const presentation: Record<
         string,
         { label: string; icon: ReadingIcon; title?: string }
@@ -282,7 +322,8 @@ export function readingDecorations(
         );
       } else {
         const display = presentation[line.command] || {
-          label: line.command + " ",
+          label: (call ? commandLabel(call.command) : line.command) + " ",
+          title: call ? commandHelp(call.command) : undefined,
           icon: "command" as const,
         };
         add(

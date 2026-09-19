@@ -365,3 +365,53 @@ test("unknown commands retain their source while keeping branch containment and 
     ),
   );
 });
+test("display command metadata adds virtual labels without changing Yarn or selected source", () => {
+  const text = source('<<play_sound "wind" {$volume}>>');
+  const definition = {
+    name: "play_sound",
+    displayName: "播放音效",
+    description: "播放資源",
+    params: [
+      { name: "asset", displayName: "音效", type: "string", required: true },
+      { name: "volume", displayName: "音量", type: "number", required: true },
+    ],
+  };
+  const state = EditorState.create({
+    doc: text,
+    selection: { anchor: text.length },
+  });
+  const widgets = [];
+  readingDecorations(state, [definition]).between(
+    0,
+    text.length,
+    (from, to, value) => {
+      if (value.spec.widget)
+        widgets.push({ from, to, widget: value.spec.widget });
+    },
+  );
+  assert.equal(state.doc.toString(), text);
+  assert.ok(widgets.some((w) => w.widget.label === "播放音效 "));
+  const labels = widgets.filter(
+    (w) => w.widget.className === "reading-parameter-hint",
+  );
+  assert.deepEqual(
+    labels.map((w) => w.widget.label),
+    ["音效:", "音量:"],
+  );
+  assert.ok(labels.every((w) => w.from === w.to));
+  assert.equal(labels[0].from, text.indexOf('"wind"'));
+  const active = EditorState.create({
+    doc: text,
+    selection: { anchor: text.indexOf("wind") },
+  });
+  const activeHints = [];
+  readingDecorations(active, [definition]).between(
+    0,
+    text.length,
+    (_from, _to, value) => {
+      if (value.spec.widget?.className === "reading-parameter-hint")
+        activeHints.push(value);
+    },
+  );
+  assert.equal(activeHints.length, 0);
+});

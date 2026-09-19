@@ -29,15 +29,6 @@
   font-size: 13px;
   font-weight: 600;
 }
-.command-project-name {
-  margin: 0 4px 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted-foreground);
-  font-size: 12px;
-}
-
 .command-workspace .section-heading button {
   width: auto;
   min-width: 32px;
@@ -54,7 +45,7 @@
   gap: 9px;
   width: 100%;
   margin: 2px 0;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: 5px;
   color: var(--muted-foreground);
@@ -67,7 +58,7 @@
 .command-workspace .command-row.active {
   background: #343434;
   color: #eee;
-  border-color: #454545;
+  border-color: transparent;
 }
 .command-workspace .command-row.active:hover {
   background: #393939;
@@ -111,7 +102,7 @@
   gap: 12px;
   min-height: 66px;
   width: 100%;
-  max-width: 776px;
+  max-width: 824px;
   padding: 12px 28px;
   background: var(--background);
   border-bottom: 1px solid var(--border);
@@ -144,7 +135,7 @@
   flex-direction: column;
   gap: 20px;
   width: 100%;
-  max-width: 776px;
+  max-width: 824px;
   padding: 24px 28px 40px;
 }
 .command-workspace .command-field {
@@ -157,7 +148,11 @@
   font-size: 13px;
 }
 .command-optional {
+  display: inline-block;
   margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #ffffff09;
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 400;
@@ -227,7 +222,7 @@
 }
 .command-workspace .param {
   display: grid;
-  grid-template-columns: minmax(100px, 1.3fr) 112px 58px minmax(100px, 1fr) 32px;
+  grid-template-columns: minmax(100px, 1fr) minmax(100px, 1fr) 112px 32px;
   align-items: end;
   gap: 12px;
   min-width: 0;
@@ -242,7 +237,7 @@
   display: contents;
 }
 .command-workspace .param-order {
-  grid-column: 5;
+  grid-column: 4;
   grid-row: 1;
   display: flex;
   align-items: end;
@@ -252,12 +247,12 @@
   display: contents;
 }
 .command-workspace .param-bottom > .check {
-  grid-column: 3;
-  grid-row: 1;
+  grid-column: 1;
+  grid-row: 2;
 }
 .command-workspace .param-bottom > .command-default {
-  grid-column: 4;
-  grid-row: 1;
+  grid-column: 2 / 4;
+  grid-row: 2;
 }
 .command-workspace .check {
   display: inline-flex;
@@ -322,21 +317,79 @@
   outline-offset: 2px;
 }
 
+/* Search has a single focus surface; the inner input must not draw another ring. */
+.command-workspace .node-search {
+  margin: 0 4px 12px;
+  height: 34px;
+}
+.command-workspace .node-search > input {
+  min-height: 0;
+  padding: 5px 4px;
+  border: 0;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  font-size: 12px;
+}
+.command-workspace .node-search > svg {
+  flex-shrink: 0;
+}
+.command-identity {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.param-description {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.param-description > summary {
+  width: fit-content;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.param-description[open] > summary {
+  margin-bottom: 6px;
+}
+.param-description-present {
+  margin-left: 8px;
+  font-size: 11px;
+}
 @container command-editor (max-width: 610px) {
+  .command-identity {
+    grid-template-columns: 1fr;
+  }
   .command-workspace .param {
     grid-template-columns: minmax(0, 1fr) 112px 32px;
     gap: 10px;
+  }
+  .command-workspace .param-top > .command-field:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .command-workspace .param-top > .command-field:nth-child(2) {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+  .command-workspace .param-top > .command-field:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
   }
   .command-workspace .param-order {
     grid-column: 3;
   }
   .command-workspace .param-bottom > .check {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 3;
   }
   .command-workspace .param-bottom > .command-default {
     grid-column: 2 / -1;
-    grid-row: 2;
+    grid-row: 3;
+  }
+  .command-detail-heading {
+    flex-wrap: wrap;
   }
 }
 

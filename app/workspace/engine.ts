@@ -118,6 +118,7 @@ export function validateCommands(commands: Command[]) {
     if (
       !c ||
       typeof c.name !== "string" ||
+      (c.displayName !== undefined && typeof c.displayName !== "string") ||
       typeof c.description !== "string" ||
       typeof c.example !== "string" ||
       !Array.isArray(c.params) ||
@@ -125,6 +126,8 @@ export function validateCommands(commands: Command[]) {
         (p) =>
           !p ||
           typeof p.name !== "string" ||
+          (p.displayName !== undefined && typeof p.displayName !== "string") ||
+          (p.description !== undefined && typeof p.description !== "string") ||
           !["string", "number", "boolean"].includes(p.type) ||
           typeof p.required !== "boolean" ||
           typeof p.defaultValue !== "string",

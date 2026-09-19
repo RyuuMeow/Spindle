@@ -21,6 +21,7 @@ function load(entry) {
 }
 const {
   DocumentEngine,
+  validateCommands,
   sourceEdits,
   difference,
   restoreProjects,
@@ -673,4 +674,41 @@ test("native disk saves preserve BOM, detect conflict, keep deletion, and restor
     );
     fs.rmSync(base, { recursive: true, force: true });
   }
+});
+
+test("command presentation metadata remains optional and survives restore", () => {
+  const legacy = {
+    name: "fade_in",
+    description: "Fade",
+    params: [
+      { name: "duration", type: "number", required: true, defaultValue: "" },
+    ],
+    example: "<<fade_in 1>>",
+  };
+  assert.doesNotThrow(() => validateCommands([legacy]));
+  const command = {
+    ...legacy,
+    displayName: "淡入",
+    params: [
+      { ...legacy.params[0], displayName: "秒數", description: "淡入耗時" },
+    ],
+  };
+  assert.doesNotThrow(() => validateCommands([command]));
+  const result = restoreProjects([
+    {
+      id: "p",
+      name: "P",
+      documents: [],
+      commands: [command],
+      excluded: [],
+      recovery: [],
+    },
+  ]);
+  assert.deepEqual(result.projects[0].commands, [command]);
+  assert.throws(() => validateCommands([{ ...command, displayName: 42 }]));
+  assert.throws(() =>
+    validateCommands([
+      { ...command, params: [{ ...command.params[0], description: {} }] },
+    ]),
+  );
 });

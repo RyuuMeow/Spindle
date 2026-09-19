@@ -1,4 +1,6 @@
 "use client";
+import { commandTooltips } from "./command-tooltips";
+
 import { useEffect, useRef } from "react";
 import {
   Annotation,
@@ -126,7 +128,7 @@ export default function ReadingEditor(props: Props) {
       create: (state) =>
         readingDecorations(
           state,
-          config.commands.map((c) => c.name),
+          config.commands,
           state.field(structure),
           state.readOnly,
         ),
@@ -139,7 +141,7 @@ export default function ReadingEditor(props: Props) {
               tr.effects.some((e) => e.is(refreshDecorations))
             ? readingDecorations(
                 tr.state,
-                latest.current.commands.map((c) => c.name),
+                latest.current.commands,
                 tr.state.field(structure),
                 tr.state.readOnly,
               )
@@ -149,6 +151,7 @@ export default function ReadingEditor(props: Props) {
     const state = EditorState.create({
       doc: normalized(config.doc.text),
       extensions: [
+        commandTooltips(() => latest.current.commands),
         structure,
         decorations,
         readOnlyConfig.current.of([

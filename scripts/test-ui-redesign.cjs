@@ -146,13 +146,16 @@ async function shot(name) {
     assert.equal(await page.locator(".tab-shell .dirty-dot").count(), 0);
     results.shellAndDraftState = true;
     await shot("01-reading");
-    await page.locator('.reading-fold-marker[title="收合場景"]').first().click();
-    await page.locator('.reading-folded').first().waitFor();
+    await page
+      .locator('.reading-fold-marker[title="收合場景"]')
+      .first()
+      .click();
+    await page.locator(".reading-folded").first().waitFor();
     await mode("純文字");
     await mode("閱讀編輯");
-    await page.locator('.reading-folded').first().waitFor();
-    await page.locator('.reading-folded').first().click();
-    assert(await page.locator('.reading-editor svg').count() > 0);
+    await page.locator(".reading-folded").first().waitFor();
+    await page.locator(".reading-folded").first().click();
+    assert((await page.locator(".reading-editor svg").count()) > 0);
     results.foldPersistenceAndSvg = true;
     await page.locator(".cm-content").click();
     await page.keyboard.press("Control+End");
@@ -190,12 +193,12 @@ async function shot(name) {
         .getAttribute("aria-checked"),
       "true",
     );
-    await search.waitFor({state:"detached"});
+    await search.waitFor({ state: "detached" });
     await page.keyboard.press("Control+Shift+F");
     assert.equal(await search.inputValue(), "Mira");
     await shot("02-search");
-    await page.locator('.search-overlay-results [role=option]').first().click();
-    await search.waitFor({state:"detached"});
+    await page.locator(".search-overlay-results [role=option]").first().click();
+    await search.waitFor({ state: "detached" });
     results.searchPaletteAndModes = true;
     const beforeHistory = await current();
     await page.getByRole("button", { name: "版本歷史", exact: true }).click();
@@ -296,8 +299,13 @@ async function shot(name) {
           await page.locator(".workspace-sidebar").isVisible(),
           false,
         );
-      const outlineBounds = await page.getByRole("complementary", {name:"場景大綱"}).boundingBox();
-      assert(outlineBounds.y + outlineBounds.height <= 795, "outline respects the bottom application gutter");
+      const outlineBounds = await page
+        .getByRole("complementary", { name: "場景大綱" })
+        .boundingBox();
+      assert(
+        outlineBounds.y + outlineBounds.height <= 795,
+        "outline respects the bottom application gutter",
+      );
       await shot("outline-" + width);
     }
     await page.getByRole("button", { name: "場景大綱", exact: true }).click();
@@ -319,11 +327,11 @@ async function shot(name) {
     results.graphSimplification = true;
     await menu("自訂指令");
     await page
-      .getByRole("textbox", { name: "指令名稱", exact: true })
+      .getByRole("textbox", { name: "變數名稱", exact: true })
       .waitFor();
-    assert(await page.locator(".command-overlay").isVisible());
+    assert(await page.locator(".command-workspace").isVisible());
     await shot("07-commands");
-    await page.getByRole("button", {name:"關閉自訂指令",exact:true}).click();
+    await page.keyboard.press("Control+w");
     await menu("最近刪除與指令復原");
     await page.getByRole("button", { name: /Deleted.yarn/ }).click();
     await page.getByRole("region", { name: "唯讀版本預覽" }).waitFor();

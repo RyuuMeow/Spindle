@@ -106,7 +106,6 @@ export default function CommandManager({
   initialDraft,
   onDraftChange,
   referenceCount,
-  projectName,
 }: {
   commands: Command[];
   onChange: (commands: Command[]) => boolean | Promise<boolean>;
@@ -126,6 +125,8 @@ export default function CommandManager({
       value.index >= -1 &&
       value.draft &&
       typeof value.draft.name === "string" &&
+      (value.draft.displayName === undefined ||
+        typeof value.draft.displayName === "string") &&
       typeof value.draft.description === "string" &&
       typeof value.draft.example === "string" &&
       Array.isArray(value.draft.params) &&
@@ -133,6 +134,8 @@ export default function CommandManager({
         (p) =>
           p &&
           typeof p.name === "string" &&
+          (p.displayName === undefined || typeof p.displayName === "string") &&
+          (p.description === undefined || typeof p.description === "string") &&
           typeof p.defaultValue === "string" &&
           typeof p.required === "boolean" &&
           ["string", "number", "boolean"].includes(p.type),
@@ -147,6 +150,10 @@ export default function CommandManager({
     structuredClone(recovered?.draft || commands[0] || emptyCommand()),
   );
   const [query, setQuery] = useState("");
+  const matchesQuery = (command: Command) =>
+    `${command.name} ${command.displayName || ""}`
+      .toLocaleLowerCase()
+      .includes(query.trim().toLocaleLowerCase());
   const [history, setHistory] = useState<{
     past: Command[];
     future: Command[];
@@ -358,11 +365,6 @@ export default function CommandManager({
   return (
     <div className="command-workspace">
       <aside className="command-list" aria-label="自訂指令">
-        {projectName && (
-          <p className="command-project-name" title={projectName}>
-            {projectName}
-          </p>
-        )}
         <div className="section-heading">
           <span>自訂指令</span>
           <ControlTooltip label="新增指令">
@@ -389,7 +391,7 @@ export default function CommandManager({
         {commands.map((command, i) => (
           <button
             type="button"
-            hidden={!command.name.toLowerCase().includes(query.toLowerCase())}
+            hidden={!matchesQuery(command)}
             className={`command-row ${i === index ? "active" : ""}`}
             aria-current={i === index ? "true" : undefined}
             key={command.name}
@@ -403,8 +405,8 @@ export default function CommandManager({
           >
             <Terminal size={15} />
             <span className="command-row-label">
-              {command.name}
-              <small>{command.params.length} 個參數</small>
+              {command.displayName || command.name}
+              {command.displayName && <small>{command.name}</small>}
             </span>
           </button>
         ))}
@@ -413,10 +415,9 @@ export default function CommandManager({
             尚未定義自訂指令。填寫右側表單後套用。
           </p>
         )}
-        {!!commands.length &&
-          !commands.some((command) =>
-            command.name.toLowerCase().includes(query.toLowerCase()),
-          ) && <p className="command-empty">找不到符合的指令。</p>}
+        {!!commands.length && !commands.some(matchesQuery) && (
+          <p className="command-empty">找不到符合的指令。</p>
+        )}
       </aside>
 
       <form
@@ -433,7 +434,11 @@ export default function CommandManager({
         <div className="command-detail-heading">
           <div className="command-heading-label">
             <h2>
-              {index < 0 ? "新增指令" : commands[index]?.name || "指令定義"}
+              {index < 0
+                ? "新增指令"
+                : commands[index]?.displayName ||
+                  commands[index]?.name ||
+                  "指令定義"}
             </h2>
             <span
               className={
@@ -541,36 +546,44 @@ export default function CommandManager({
         </div>
         <div className="command-form-body">
           {issue?.field === "save" && renderError()}
-          <label className="command-field" htmlFor={`${formId}-name`}>
-            <span>指令名稱</span>
-            <input
-              id={`${formId}-name`}
-              {...fieldProps("name")}
-              aria-label="指令名稱"
-              aria-describedby={
-                issue?.field === "name"
-                  ? `${formId}-name-hint ${errorId}`
-                  : `${formId}-name-hint`
-              }
-              value={draft.name}
-              placeholder="例如 play_animation"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) =>
-                updateDraft({ ...draft, name: event.target.value })
-              }
-            />
-            <span className="command-field-hint" id={`${formId}-name-hint`}>
-              使用英文字母、數字或底線；不能以數字起始。
-            </span>
-            {issue?.field === "name" && renderError()}
-            {index >= 0 && draft.name !== commands[index]?.name && (
-              <span className="command-field-hint">
-                更名影響：{referenceCount?.(commands[index].name) || 0}{" "}
-                個現有呼叫仍使用舊名稱，保存後會提示未註冊；腳本不會被盲目取代。
+          <div className="command-identity">
+            <label className="command-field" htmlFor={`${formId}-name`}>
+              <span>變數名稱</span>
+              <input
+                id={`${formId}-name`}
+                {...fieldProps("name")}
+                aria-label="變數名稱"
+                value={draft.name}
+                placeholder="例如 play_animation"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(event) =>
+                  updateDraft({ ...draft, name: event.target.value })
+                }
+              />
+              {issue?.field === "name" && renderError()}
+              {index >= 0 && draft.name !== commands[index]?.name && (
+                <span className="command-field-hint">
+                  更名影響：{referenceCount?.(commands[index].name) || 0}{" "}
+                  處呼叫仍使用舊名稱，需同步修改劇本。
+                </span>
+              )}
+            </label>
+            <label className="command-field" htmlFor={`${formId}-display-name`}>
+              <span>
+                指令名稱（顯示） <span className="command-optional">選填</span>
               </span>
-            )}
-          </label>
+              <input
+                id={`${formId}-display-name`}
+                aria-label="指令名稱（顯示）"
+                value={draft.displayName || ""}
+                placeholder={draft.name || "例如 播放動畫"}
+                onChange={(event) =>
+                  updateDraft({ ...draft, displayName: event.target.value })
+                }
+              />
+            </label>
+          </div>
           <label className="command-field" htmlFor={`${formId}-description`}>
             <span>
               說明 <span className="command-optional">選填</span>
@@ -621,17 +634,34 @@ export default function CommandManager({
                     className="command-field"
                     htmlFor={`${formId}-param-${i}-name`}
                   >
-                    <span>名稱</span>
+                    <span>變數名稱</span>
                     <input
                       id={`${formId}-param-${i}-name`}
                       {...fieldProps(`param-${i}-name`)}
-                      aria-label={`參數 ${i + 1} 名稱`}
+                      aria-label={`參數 ${i + 1} 變數名稱`}
                       placeholder="例如 animation"
                       value={param.name}
                       spellCheck={false}
                       autoComplete="off"
                       onChange={(event) =>
                         updateParam(i, { name: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label
+                    className="command-field"
+                    htmlFor={`${formId}-param-${i}-display-name`}
+                  >
+                    <span>
+                      顯示名稱 <span className="command-optional">選填</span>
+                    </span>
+                    <input
+                      id={`${formId}-param-${i}-display-name`}
+                      aria-label={`參數 ${i + 1} 顯示名稱`}
+                      value={param.displayName || ""}
+                      placeholder={param.name || "例如 動畫"}
+                      onChange={(event) =>
+                        updateParam(i, { displayName: event.target.value })
                       }
                     />
                   </label>
@@ -741,6 +771,32 @@ export default function CommandManager({
                     />
                   </label>
                 </div>
+                <details
+                  className="param-description"
+                  key={`description-${index}-${i}`}
+                >
+                  <summary>
+                    參數說明 <span className="command-optional">選填</span>
+                    {param.description && (
+                      <span className="param-description-present">已填寫</span>
+                    )}
+                  </summary>
+                  <label
+                    className="command-field"
+                    htmlFor={`${formId}-param-${i}-description`}
+                  >
+                    <span className="sr-only">參數 {i + 1} 說明</span>
+                    <textarea
+                      id={`${formId}-param-${i}-description`}
+                      rows={2}
+                      aria-label={`參數 ${i + 1} 說明`}
+                      value={param.description || ""}
+                      onChange={(event) =>
+                        updateParam(i, { description: event.target.value })
+                      }
+                    />
+                  </label>
+                </details>
                 {issue?.field.startsWith(`param-${i}-`) && renderError()}
               </fieldset>
             ))}

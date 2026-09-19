@@ -286,3 +286,17 @@
     width: 24px;
   }
 }
+.reading-parameter-hint {
+  color: var(--muted-foreground, #8b8b90);
+  opacity: 0.78;
+  font: 0.78em/1.4 var(--font-sans, sans-serif);
+  margin-right: 0.45em;
+  user-select: none;
+}
+.reading-command-tooltip {
+  padding: 10px 12px;
+  max-width: 360px;
+  white-space: pre-wrap;
+  font: 12px/1.65 var(--font-sans, sans-serif);
+  color: #d7d7db;
+}

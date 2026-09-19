@@ -3,6 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import Editor, { loader } from "@monaco-editor/react";
 import type { Command, Doc, Issue, Node } from "./parser";
 import { builtins } from "./parser";
+import {
+  commandCall,
+  commandHover,
+  commandLabel,
+  parameterLabel,
+  parameterHelp,
+  argumentSpans,
+} from "./command-hints";
 import { yarnEditorTheme } from "./editor-theme";
 import { loadEditorLocale } from "./editor-locale";
 loader.config({ paths: { vs: "/monaco/vs" } });
@@ -76,7 +84,20 @@ export default function CodeEditor({
     providers = useRef<any[]>([]),
     latest = useRef({ commands, nodes });
   latest.current = { commands, nodes };
-  useEffect(() => () => providers.current.forEach((p) => p.dispose()), []);
+  const hintChanges = useRef<import("monaco-editor").Emitter<void> | null>(
+    null,
+  );
+  useEffect(() => {
+    hintChanges.current?.fire();
+  }, [commands]);
+  useEffect(
+    () => () => {
+      providers.current.forEach((p) => p.dispose());
+      hintChanges.current?.dispose();
+      hintChanges.current = null;
+    },
+    [],
+  );
   const markers = () => {
     if (!api.current) return;
     for (const m of api.current.editor.getModels()) {
@@ -268,30 +289,64 @@ export default function CodeEditor({
           }),
           m.languages.registerHoverProvider("yarn", {
             provideHover(model: any, pos: any) {
-              const w = model.getWordAtPosition(pos);
-              const c = latest.current.commands.find((c) => c.name === w?.word);
-              return c
+              const hint = commandHover(
+                model.getLineContent(pos.lineNumber),
+                pos.column - 1,
+                latest.current.commands,
+              );
+              return hint
                 ? {
+                    range: new m.Range(
+                      pos.lineNumber,
+                      hint.from + 1,
+                      pos.lineNumber,
+                      hint.to + 1,
+                    ),
                     contents: [
-                      { value: "**" + c.name + "** — " + c.description },
                       {
-                        value:
-                          "`" +
-                          c.params
-                            .map(
-                              (p) =>
-                                p.name +
-                                ": " +
-                                p.type +
-                                (p.required ? "" : " = " + p.defaultValue),
-                            )
-                            .join(", ") +
-                          "`",
+                        value: hint.text
+                          .replace(/[\\\x60*_{}\[\]<>()#+.!|-]/g, "\\$&")
+                          .replace(/\n/g, "  \n"),
                       },
-                      { value: "```yarn\n" + c.example + "\n```" },
                     ],
                   }
                 : null;
+            },
+          }),
+          m.languages.registerInlayHintsProvider("yarn", {
+            onDidChangeInlayHints: (hintChanges.current ||= new m.Emitter())
+              .event,
+            provideInlayHints(
+              model: import("monaco-editor").editor.ITextModel,
+              range: import("monaco-editor").Range,
+            ) {
+              const hints: import("monaco-editor").languages.InlayHint[] = [];
+              for (
+                let line = range.startLineNumber;
+                line <= range.endLineNumber;
+                line++
+              ) {
+                const call = commandCall(
+                  model.getLineContent(line),
+                  latest.current.commands,
+                );
+                if (
+                  !call?.args ||
+                  call.args.length > call.command.params.length
+                )
+                  continue;
+                call.args.forEach((arg, index) => {
+                  const parameter = call.command.params[index];
+                  hints.push({
+                    position: { lineNumber: line, column: arg.from + 1 },
+                    label: parameterLabel(parameter) + ":",
+                    kind: m.languages.InlayHintKind.Parameter,
+                    paddingRight: true,
+                    tooltip: parameterHelp(parameter, index),
+                  });
+                });
+              }
+              return { hints, dispose() {} };
             },
           }),
           m.languages.registerSignatureHelpProvider("yarn", {
@@ -301,38 +356,45 @@ export default function CodeEditor({
               const line = model
                 .getLineContent(pos.lineNumber)
                 .slice(0, pos.column - 1);
-              const match = line.match(/<<\s*(\w+)\s+([^>]*)$/);
+              const match = line.match(/^\s*<<\s*(\w+)\s+(.*)$/);
               const c = latest.current.commands.find(
                 (c) => c.name === match?.[1],
               );
-              if (!c || !match) return null;
+              if (!c || !match || commandCall(line, latest.current.commands))
+                return null;
+              const argumentsSoFar = argumentSpans(match[2]);
+              if (!argumentsSoFar) return null;
               return {
                 value: {
                   signatures: [
                     {
                       label:
-                        c.name +
+                        commandLabel(c) +
                         " " +
                         c.params
                           .map(
                             (p) =>
-                              p.name + ": " + p.type + (p.required ? "" : "?"),
+                              parameterLabel(p) +
+                              ": " +
+                              p.type +
+                              (p.required ? "" : "?"),
                           )
                           .join(" "),
                       documentation: c.description,
-                      parameters: c.params.map((p) => ({
-                        label: p.name + ": " + p.type + (p.required ? "" : "?"),
-                        documentation: p.required
-                          ? "必填"
-                          : "選填；預設 " + p.defaultValue,
+                      parameters: c.params.map((p, index) => ({
+                        label:
+                          parameterLabel(p) +
+                          ": " +
+                          p.type +
+                          (p.required ? "" : "?"),
+                        documentation: parameterHelp(p, index),
                       })),
                     },
                   ],
                   activeSignature: 0,
                   activeParameter: Math.max(
                     0,
-                    (match[2].match(/"[^"]*"|\S+/g) || []).length -
-                      (/\s$/.test(match[2]) ? 0 : 1),
+                    argumentsSoFar.length - (/\s$/.test(match[2]) ? 0 : 1),
                   ),
                 },
                 dispose() {},

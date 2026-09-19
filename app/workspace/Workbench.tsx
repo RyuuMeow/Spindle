@@ -66,7 +66,7 @@ import WorkspaceTabs from "../WorkspaceTabs";
 import CodeEditor from "../CodeEditor";
 import Graph from "../Graph";
 import { type CommandActions } from "../CommandManager";
-import { CommandOverlay } from "./CommandOverlay";
+import CommandManager from "../CommandManager";
 import { SearchOverlay } from "./SearchOverlay";
 import { type SearchHit, type SearchScope } from "./search";
 import { ProblemsPanel } from "./ProblemsPanel";
@@ -116,6 +116,7 @@ type Prompt = {
 const modes = { source: "純文字", rendered: "閱讀編輯", graph: "流程圖" };
 const utilityNames: Record<string, string> = {
   "@settings": "設定",
+  "@commands": "自訂指令",
   "@recovery": "專案復原",
 };
 const pendingWrite = (doc: DocumentRecord) =>
@@ -130,20 +131,6 @@ const saveLabels = {
   error: "寫入失敗",
 };
 
-function withoutCommandTabs(session: WindowSession): WindowSession {
-  const tabs = session.tabs.filter((tab) => tab.documentId !== "@commands");
-  return {
-    ...session,
-    tabs,
-    closedTabs: session.closedTabs.filter(
-      (tab) => tab.documentId !== "@commands",
-    ),
-    activeId: tabs.some((tab) => tab.id === session.activeId)
-      ? session.activeId
-      : tabs[0]?.id || "",
-  };
-}
-
 export default function Workbench({
   client,
   initialSession,
@@ -156,11 +143,10 @@ export default function Workbench({
     client.getSnapshot,
     client.getSnapshot,
   );
-  const [session, setSession] = useState<WindowSession>(() =>
-    withoutCommandTabs(
+  const [session, setSession] = useState<WindowSession>(
+    () =>
       initialSession ||
-        defaultSession(client.windowId, snapshot.currentProjectId),
-    ),
+      defaultSession(client.windowId, snapshot.currentProjectId),
   );
   const [menu, setMenu] = useState<MenuState | null>(null),
     [prompt, setPrompt] = useState<Prompt | null>(null),
@@ -177,11 +163,6 @@ export default function Workbench({
     [searchQuery, setSearchQuery] = useState(""),
     [searchScope, setSearchScope] = useState<SearchScope>("content"),
     [quickNewTab, setQuickNewTab] = useState(false),
-    [commandOpen, setCommandOpen] = useState(
-      () =>
-        initialSession?.tabs.find((tab) => tab.id === initialSession.activeId)
-          ?.documentId === "@commands",
-    ),
     [sceneQuery, setSceneQuery] = useState(""),
     [problems, setProblems] = useState(false),
     [issueScope, setIssueScope] = useState("all"),
@@ -284,25 +265,10 @@ export default function Workbench({
     setSearchQuery("");
     setSearchOpen(true);
   }
-  function restoreEditorFocus() {
-    requestAnimationFrame(() => {
-      if (mode === "source" && doc) editorRef.current?.focus();
-      else
-        document
-          .querySelector<HTMLElement>(
-            mode === "rendered"
-              ? ".workspace-center .cm-content"
-              : mode === "graph"
-                ? ".story-canvas"
-                : ".project-switch",
-          )
-          ?.focus();
-    });
-  }
   function openCommands() {
     capture();
     setSearchOpen(false);
-    setCommandOpen(true);
+    openDocument("@commands");
   }
   function openSettings(section: typeof settingsSection = "reading") {
     setSettingsSection(section);
@@ -627,7 +593,7 @@ export default function Workbench({
     );
     setSession(
       previous
-        ? withoutCommandTabs({ ...previous, id: client.windowId })
+        ? { ...previous, id: client.windowId }
         : defaultSession(client.windowId, id),
     );
   }
@@ -1307,11 +1273,11 @@ export default function Workbench({
       e.target.closest(
         '[data-workspace-overlay], [role="dialog"], [role="alertdialog"]',
       );
-    if (overlay || commandOpen) {
+    if (overlay) {
       if (
         mod &&
         key === "s" &&
-        commandOpen &&
+        active?.documentId === "@commands" &&
         !(
           e.target instanceof Element &&
           e.target.closest('[role="alertdialog"]')
@@ -1337,6 +1303,12 @@ export default function Workbench({
     }
     if (mod && key === "s") {
       e.preventDefault();
+      if (active?.documentId === "@commands") {
+        void commandActions.current?.save().then((ok) => {
+          if (!ok) commandActions.current?.focusError();
+        });
+        return;
+      }
       void perform({
         type: "save",
         projectId: project.id,
@@ -2237,7 +2209,37 @@ export default function Workbench({
               <button onClick={() => setConflict(doc)}>處理</button>
             </div>
           )}
-          {active?.documentId === "@settings" ? (
+          {active?.documentId === "@commands" ? (
+            <CommandManager
+              key={project.id}
+              commands={project.commands}
+              notify={notify}
+              onDirtyChange={setCommandDirty}
+              actionsRef={commandActions}
+              initialDraft={project.commandDraft}
+              onDraftChange={(draft) => {
+                void perform({
+                  type: "commandDraft",
+                  projectId: project.id,
+                  draft,
+                });
+              }}
+              referenceCount={(name) =>
+                analysis.nodes.reduce(
+                  (sum, n) =>
+                    sum + n.calls.filter((c) => c.name === name).length,
+                  0,
+                )
+              }
+              onChange={async (commands) =>
+                !!(await perform({
+                  type: "commands",
+                  projectId: project.id,
+                  commands,
+                }))
+              }
+            />
+          ) : active?.documentId === "@settings" ? (
             <SettingsView
               key={settingsSection}
               initialSection={settingsSection}
@@ -2692,39 +2694,6 @@ export default function Workbench({
           />
         )}
       </div>
-      <CommandOverlay
-        open={commandOpen}
-        onClose={() => setCommandOpen(false)}
-        restoreFocus={restoreEditorFocus}
-        key={project.id}
-        projectName={project.name}
-        commands={project.commands}
-        notify={notify}
-        onDirtyChange={setCommandDirty}
-        actionsRef={commandActions}
-        initialDraft={project.commandDraft}
-        onDraftChange={(draft) => {
-          void perform({
-            type: "commandDraft",
-            projectId: project.id,
-            draft,
-          });
-        }}
-        referenceCount={(name) =>
-          analysis.nodes.reduce(
-            (sum, n) => sum + n.calls.filter((c) => c.name === name).length,
-            0,
-          )
-        }
-        onChange={async (commands) =>
-          !!(await perform({
-            type: "commands",
-            projectId: project.id,
-            commands,
-          }))
-        }
-      />
-
       <ActionMenu menu={menu} onClose={() => setMenu(null)} />
       <Dialog
         open={!!prompt}

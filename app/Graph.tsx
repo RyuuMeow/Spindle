@@ -413,6 +413,7 @@ function Canvas({
   const [positions, setPositions] = useState<Record<string, Point>>(
     () => graphState?.positions || {},
   );
+  const [closeRequest, setCloseRequest] = useState(0);
   const [zoom, setZoom] = useState(graphState?.viewport?.zoom || 1);
   const [heights, setHeights] = useState<Record<string, number>>({});
   const measurementFrame = useRef<number | null>(null);
@@ -655,6 +656,7 @@ function Canvas({
           onDocumentComposition={onDocumentComposition}
           onRenameScene={onRenameScene}
           onClose={finishEdit}
+          closeRequest={closeRequest}
         />
       ) : undefined,
     [
@@ -667,6 +669,7 @@ function Canvas({
       onRenameScene,
       onDocumentSave,
       finishEdit,
+      closeRequest,
     ],
   );
   const nodes: SceneFlowNode[] = useMemo(
@@ -1154,6 +1157,10 @@ function Canvas({
             };
           }}
           onPaneClick={() => {
+            if (editing) {
+              setCloseRequest((request) => request + 1);
+              return;
+            }
             onSelect(null);
             setTargetSelection("");
             setEdgeSelection("");

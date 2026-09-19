@@ -354,7 +354,7 @@ async function chooseMode(page, name) {
       .getByRole("menuitem", { name: "自訂指令", exact: true })
       .click();
     await second
-      .getByRole("textbox", { name: "指令名稱", exact: true })
+      .getByRole("textbox", { name: "變數名稱", exact: true })
       .fill("bad name");
     await until(
       async () =>
@@ -364,8 +364,8 @@ async function chooseMode(page, name) {
     results.invalidDraftRecoverySaved = true;
     await until(async () => {
       const s = await second.evaluate(() => window.yarnDesktop.session.load());
-      return !s.tabs.some((t) => t.documentId === "@commands");
-    }, "command modal must not become a tab");
+      return s.tabs.some((t) => t.documentId === "@commands");
+    }, "command tool tab must persist");
     await app.evaluate(({ app }) => app.exit(0));
     const restored = await launch();
     await until(
@@ -375,9 +375,18 @@ async function chooseMode(page, name) {
         ),
       "restart lost document",
     );
-    await restored.getByRole("button", {name:projectName,exact:true}).click();
-    await restored.getByRole("menuitem", {name:"自訂指令 · 有草稿",exact:true}).click();
-    assert.equal(await restored.getByRole("textbox", {name:"指令名稱",exact:true}).inputValue(), "bad name");
+    await restored
+      .getByRole("button", { name: projectName, exact: true })
+      .click();
+    await restored
+      .getByRole("menuitem", { name: "自訂指令 · 有草稿", exact: true })
+      .click();
+    assert.equal(
+      await restored
+        .getByRole("textbox", { name: "變數名稱", exact: true })
+        .inputValue(),
+      "bad name",
+    );
     results.restartRecovery = true;
     await app.evaluate(({ app }) => app.exit(0));
     fs.writeFileSync(
