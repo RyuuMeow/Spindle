@@ -132,8 +132,7 @@ async function shot(name) {
     assert(
       await page.getByRole("complementary", { name: "場景大綱" }).isVisible(),
     );
-    await page.getByRole("button", { name: "固定大綱", exact: true }).click();
-    await page.getByRole("button", { name: "關閉大綱", exact: true }).click();
+    await page.getByRole("button", { name: "場景大綱", exact: true }).click();
     assert.equal(await page.locator(".writing-footer").count(), 0);
     assert.equal(
       await page.getByRole("button", { name: "儲存", exact: true }).count(),
@@ -178,7 +177,7 @@ async function shot(name) {
     );
     results.draftPersistence = true;
     await page.keyboard.press("Control+Shift+F");
-    const search = page.getByRole("textbox", {
+    const search = page.getByRole("combobox", {
       name: "搜尋全專案文字",
       exact: true,
     });
@@ -191,20 +190,13 @@ async function shot(name) {
         .getAttribute("aria-checked"),
       "true",
     );
-    assert(await search.isVisible());
-    await page.locator(".search-hit > button:first-child").first().click();
-    assert.equal(
-      await page
-        .getByRole("radio", { name: "閱讀編輯", exact: true })
-        .getAttribute("aria-checked"),
-      "true",
-    );
-    await shot("02-search");
-    await page.getByRole("button", { name: "關閉搜尋", exact: true }).click();
+    await search.waitFor({state:"detached"});
     await page.keyboard.press("Control+Shift+F");
     assert.equal(await search.inputValue(), "Mira");
-    await page.getByRole("button", { name: "關閉搜尋", exact: true }).click();
-    results.persistentSearchAndModes = true;
+    await shot("02-search");
+    await page.locator('.search-overlay-results [role=option]').first().click();
+    await search.waitFor({state:"detached"});
+    results.searchPaletteAndModes = true;
     const beforeHistory = await current();
     await page.getByRole("button", { name: "版本歷史", exact: true }).click();
     await page.locator(".history-entries > button").first().click();
@@ -306,7 +298,7 @@ async function shot(name) {
         );
       await shot("outline-" + width);
     }
-    await page.getByRole("button", { name: "關閉大綱", exact: true }).click();
+    await page.getByRole("button", { name: "場景大綱", exact: true }).click();
     await win.evaluate((w) => w.setContentSize(1440, 900));
     await mode("流程圖");
     await page.locator(".flow-card").first().waitFor();
@@ -327,8 +319,9 @@ async function shot(name) {
     await page
       .getByRole("textbox", { name: "指令名稱", exact: true })
       .waitFor();
-    assert.equal(await page.locator(".workspace-sidebar:visible").count(), 0);
+    assert(await page.locator(".command-overlay").isVisible());
     await shot("07-commands");
+    await page.getByRole("button", {name:"關閉自訂指令",exact:true}).click();
     await menu("最近刪除與指令復原");
     await page.getByRole("button", { name: /Deleted.yarn/ }).click();
     await page.getByRole("region", { name: "唯讀版本預覽" }).waitFor();

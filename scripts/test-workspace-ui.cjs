@@ -247,12 +247,11 @@ async function chooseMode(page, name) {
     results.tabShortcuts = true;
     await page.keyboard.press("Control+Shift+f");
     await page
-      .getByRole("textbox", { name: "搜尋全專案文字", exact: true })
+      .getByRole("combobox", { name: "搜尋全專案文字", exact: true })
       .fill("鑰匙");
-    await page.locator(".search-hit > button:first-child").first().click();
+    await page.locator(".search-overlay-results [role=option]").first().click();
     await page.locator(".monaco-editor .view-lines").waitFor();
     results.projectSearch = true;
-    await page.getByRole("button", { name: "關閉搜尋", exact: true }).click();
     await page.locator(".tab-shell.active").click({ button: "right" });
     const secondPromise = app.waitForEvent("window");
     await page
@@ -365,8 +364,8 @@ async function chooseMode(page, name) {
     results.invalidDraftRecoverySaved = true;
     await until(async () => {
       const s = await second.evaluate(() => window.yarnDesktop.session.load());
-      return s.tabs.some((t) => t.documentId === "@commands");
-    }, "command tab session was not persisted");
+      return !s.tabs.some((t) => t.documentId === "@commands");
+    }, "command modal must not become a tab");
     await app.evaluate(({ app }) => app.exit(0));
     const restored = await launch();
     await until(
@@ -376,32 +375,9 @@ async function chooseMode(page, name) {
         ),
       "restart lost document",
     );
-    await until(async () => {
-      for (const p of app.windows())
-        if (
-          await p
-            .getByRole("textbox", { name: "指令名稱", exact: true })
-            .count()
-        )
-          return true;
-      return false;
-    }, "command view was not restored");
-    const pages = app.windows();
-    let found = false;
-    for (const p of pages) {
-      if (
-        await p.getByRole("textbox", { name: "指令名稱", exact: true }).count()
-      ) {
-        assert.equal(
-          await p
-            .getByRole("textbox", { name: "指令名稱", exact: true })
-            .inputValue(),
-          "bad name",
-        );
-        found = true;
-      }
-    }
-    assert(found, "command view was not restored");
+    await restored.getByRole("button", {name:projectName,exact:true}).click();
+    await restored.getByRole("menuitem", {name:"自訂指令 · 有草稿",exact:true}).click();
+    assert.equal(await restored.getByRole("textbox", {name:"指令名稱",exact:true}).inputValue(), "bad name");
     results.restartRecovery = true;
     await app.evaluate(({ app }) => app.exit(0));
     fs.writeFileSync(

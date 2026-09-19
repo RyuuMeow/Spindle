@@ -65,18 +65,19 @@ import { ChromeButton } from "@/components/ChromeButton";
 import WorkspaceTabs from "../WorkspaceTabs";
 import CodeEditor from "../CodeEditor";
 import Graph from "../Graph";
-import CommandManager, { type CommandActions } from "../CommandManager";
+import { type CommandActions } from "../CommandManager";
+import { CommandOverlay } from "./CommandOverlay";
+import { SearchOverlay } from "./SearchOverlay";
+import { type SearchHit, type SearchScope } from "./search";
+import { ProblemsPanel } from "./ProblemsPanel";
+import { PanelResizeHandle } from "@/components/PanelResizeHandle";
 import ReadingEditor, { type ReadingActions } from "../reading/ReadingEditor";
 import { authorStatistics } from "../reading/structure";
 import { parse, type Node as YarnNode } from "../parser";
 import { WorkspaceClient } from "./client";
 import { restoreSession } from "./storage";
 import { difference, monacoSourceEdits, validateCommands } from "./engine";
-import {
-  uniqueSceneName,
-  validSceneName,
-  sceneRange,
-} from "./authoring";
+import { uniqueSceneName, validSceneName, sceneRange } from "./authoring";
 import {
   defaultSession,
   makeProject,
@@ -90,16 +91,16 @@ import {
 import ActionMenu, { type MenuAction, type MenuState } from "./ActionMenu";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import SettingsView from "./SettingsView";
-import {
-  SearchPanel,
-  type SearchHit,
-  type SearchViewState,
-} from "./SearchPanel";
 import { HistoryList, HistoryPreview } from "./HistoryView";
 import RecoveryView from "./RecoveryView";
 import type { RecoveryEntry } from "./types";
 import { navigateSession, navigateHistory } from "./navigation";
-import { orderedDocuments, uniqueDocumentName, folderOf, reorderWithinFolder } from "./file-order";
+import {
+  orderedDocuments,
+  uniqueDocumentName,
+  folderOf,
+  reorderWithinFolder,
+} from "./file-order";
 import { InlineNameEditor, type InlineDraft } from "./InlineNameEditor";
 import "./workspace.css";
 
@@ -114,7 +115,6 @@ type Prompt = {
 };
 const modes = { source: "純文字", rendered: "閱讀編輯", graph: "流程圖" };
 const utilityNames: Record<string, string> = {
-  "@commands": "自訂指令",
   "@settings": "設定",
   "@recovery": "專案復原",
 };
@@ -130,6 +130,20 @@ const saveLabels = {
   error: "寫入失敗",
 };
 
+function withoutCommandTabs(session: WindowSession): WindowSession {
+  const tabs = session.tabs.filter((tab) => tab.documentId !== "@commands");
+  return {
+    ...session,
+    tabs,
+    closedTabs: session.closedTabs.filter(
+      (tab) => tab.documentId !== "@commands",
+    ),
+    activeId: tabs.some((tab) => tab.id === session.activeId)
+      ? session.activeId
+      : tabs[0]?.id || "",
+  };
+}
+
 export default function Workbench({
   client,
   initialSession,
@@ -142,10 +156,11 @@ export default function Workbench({
     client.getSnapshot,
     client.getSnapshot,
   );
-  const [session, setSession] = useState<WindowSession>(
-    () =>
+  const [session, setSession] = useState<WindowSession>(() =>
+    withoutCommandTabs(
       initialSession ||
-      defaultSession(client.windowId, snapshot.currentProjectId),
+        defaultSession(client.windowId, snapshot.currentProjectId),
+    ),
   );
   const [menu, setMenu] = useState<MenuState | null>(null),
     [prompt, setPrompt] = useState<Prompt | null>(null),
@@ -153,21 +168,20 @@ export default function Workbench({
     [promptError, setPromptError] = useState(""),
     [busy, setBusy] = useState(false);
   const [inlineDraft, setInlineDraft] = useState<InlineDraft | null>(null);
-  const inlineSubmitting = useRef(false), inlineOrigin = useRef<HTMLElement | null>(null);
+  const inlineSubmitting = useRef(false),
+    inlineOrigin = useRef<HTMLElement | null>(null);
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [fileDrop, setFileDrop] = useState("");
   const [toast, setToast] = useState(""),
-    [quick, setQuick] = useState<"files" | null>(null),
     [searchOpen, setSearchOpen] = useState(false),
     [searchQuery, setSearchQuery] = useState(""),
-    [searchViewState, setSearchViewState] = useState<SearchViewState>({
-      selected: 0,
-      scrollTop: 0,
-      recent: [],
-    }),
-    [quickIndex, setQuickIndex] = useState(0),
+    [searchScope, setSearchScope] = useState<SearchScope>("content"),
     [quickNewTab, setQuickNewTab] = useState(false),
-    [query, setQuery] = useState(""),
+    [commandOpen, setCommandOpen] = useState(
+      () =>
+        initialSession?.tabs.find((tab) => tab.id === initialSession.activeId)
+          ?.documentId === "@commands",
+    ),
     [sceneQuery, setSceneQuery] = useState(""),
     [problems, setProblems] = useState(false),
     [issueScope, setIssueScope] = useState("all"),
@@ -209,7 +223,10 @@ export default function Workbench({
       project?.documents.some((d) => d.id === t.documentId),
   );
   const active = tabs.find((t) => t.id === session.activeId) || tabs[0];
-  const navigationAvailable = { back: !!active?.past?.length, forward: !!active?.future?.length };
+  const navigationAvailable = {
+    back: !!active?.past?.length,
+    forward: !!active?.future?.length,
+  };
   const doc = project?.documents.find((d) => d.id === active?.documentId),
     mode = active?.mode || "source";
   const analysis = useMemo(
@@ -239,7 +256,8 @@ export default function Workbench({
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1279px)");
     const update = () => setNarrowPanels(media.matches);
-    update(); media.addEventListener("change", update);
+    update();
+    media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
   const [historyToolbar, setHistoryToolbar] = useState<HTMLDivElement | null>(
@@ -247,27 +265,44 @@ export default function Workbench({
   );
   const [sideFocus, setSideFocus] = useState<"left" | "right">("left");
   const showOutline =
-    !!doc && outlineOpen && !historyOpen && (!narrowPanels || sideFocus === "right" || !session.left);
+    !!doc &&
+    outlineOpen &&
+    !historyOpen &&
+    (!narrowPanels || sideFocus === "right" || !session.left);
   function resetTransient() {
     setHistorySelection(null);
     setHistoryOpen(false);
   }
   function showSearch() {
-    setHistoryOpen(false);
-    setHistorySelection(null);
-    setSideFocus("left");
+    setQuickNewTab(false);
+    setSearchScope("content");
     setSearchOpen(true);
-    setSession((s) => ({ ...s, left: true }));
-    if (utility) {
-      const previous = tabs.find((t) => !utilityNames[t.documentId]);
-      if (previous) activate(previous.id);
-      else if (project.documents[0]) openDocument(project.documents[0].id);
-    }
-    requestAnimationFrame(() =>
-      document
-        .querySelector<HTMLInputElement>('[aria-label="搜尋全專案文字"]')
-        ?.focus(),
-    );
+  }
+  function showFiles(newTab = false) {
+    setQuickNewTab(newTab);
+    setSearchScope("files");
+    setSearchQuery("");
+    setSearchOpen(true);
+  }
+  function restoreEditorFocus() {
+    requestAnimationFrame(() => {
+      if (mode === "source" && doc) editorRef.current?.focus();
+      else
+        document
+          .querySelector<HTMLElement>(
+            mode === "rendered"
+              ? ".workspace-center .cm-content"
+              : mode === "graph"
+                ? ".story-canvas"
+                : ".project-switch",
+          )
+          ?.focus();
+    });
+  }
+  function openCommands() {
+    capture();
+    setSearchOpen(false);
+    setCommandOpen(true);
   }
   function openSettings(section: typeof settingsSection = "reading") {
     setSettingsSection(section);
@@ -388,7 +423,12 @@ export default function Workbench({
       const state = editorRef.current.saveViewState();
       if (state) {
         editorViews.current[active.id + ":" + active.documentId] = state;
-        setSession(s => ({ ...s, tabs: s.tabs.map(t => t.id === active.id ? { ...t, sourceView: state } : t) }));
+        setSession((s) => ({
+          ...s,
+          tabs: s.tabs.map((t) =>
+            t.id === active.id ? { ...t, sourceView: state } : t,
+          ),
+        }));
       }
     }
   }
@@ -401,27 +441,48 @@ export default function Workbench({
     setSelected("");
   }
   function openDocument(
-    id: string, newTab = false, line?: number, column?: number, record = true, forcedMode?: TabView["mode"],
+    id: string,
+    newTab = false,
+    line?: number,
+    column?: number,
+    record = true,
+    forcedMode?: TabView["mode"],
   ) {
     setInlineDraft(null);
     resetTransient();
     capture();
-    const document = project.documents.find(d => d.id === id);
-    setSession(current => {
+    const document = project.documents.find((d) => d.id === id);
+    setSession((current) => {
       // Utility pages are explicitly selected by their own menu, not discovered by file navigation.
       if (utilityNames[id] && !newTab) {
-        const existing = current.tabs.find(t => t.documentId === id);
+        const existing = current.tabs.find((t) => t.documentId === id);
         if (existing) return { ...current, activeId: existing.id };
-        return navigateSession(current, id, { newTab: true, line, column, mode: forcedMode, record }, uuid());
+        return navigateSession(
+          current,
+          id,
+          { newTab: true, line, column, mode: forcedMode, record },
+          uuid(),
+        );
       }
-      return navigateSession(current, id, { newTab, line, column, mode: forcedMode, record }, uuid());
+      return navigateSession(
+        current,
+        id,
+        { newTab, line, column, mode: forcedMode, record },
+        uuid(),
+      );
     });
     setSelected("");
-    if (document && line !== undefined) setGoto(previous => ({ file: document.name, line, column: column ?? 1, nonce: (previous?.nonce || 0) + 1 }));
+    if (document && line !== undefined)
+      setGoto((previous) => ({
+        file: document.name,
+        line,
+        column: column ?? 1,
+        nonce: (previous?.nonce || 0) + 1,
+      }));
     else setGoto(null);
   }
   function go(file: string, line: number, column = 1) {
-    const d = project.documents.find(d => d.name === file);
+    const d = project.documents.find((d) => d.name === file);
     if (d) openDocument(d.id, false, line, column, true, "source");
   }
   function history(back: boolean) {
@@ -430,14 +491,16 @@ export default function Workbench({
     resetTransient();
     setGoto(null);
     setSelected("");
-    const validIds = new Set(project.documents.map(d => d.id));
-    const target = [...(back ? active?.past || [] : active?.future || [])].reverse().find(location => validIds.has(location.documentId));
+    const validIds = new Set(project.documents.map((d) => d.id));
+    const target = [...(back ? active?.past || [] : active?.future || [])]
+      .reverse()
+      .find((location) => validIds.has(location.documentId));
     if (active && target) {
       const key = active.id + ":" + target.documentId;
       if (target.sourceView) editorViews.current[key] = target.sourceView;
       else delete editorViews.current[key];
     }
-    setSession(current => navigateHistory(current, back, validIds));
+    setSession((current) => navigateHistory(current, back, validIds));
   }
   function modeChange(next: TabView["mode"]) {
     capture();
@@ -521,7 +584,8 @@ export default function Workbench({
   }
   async function selectProject(id: string, force = false) {
     if (id === project.id) return;
-    setInlineDraft(null); setActiveFolder(null);
+    setInlineDraft(null);
+    setActiveFolder(null);
     resetTransient();
     const result = await perform({ type: "save", projectId: project.id });
     if (!result) return;
@@ -563,14 +627,15 @@ export default function Workbench({
     );
     setSession(
       previous
-        ? { ...previous, id: client.windowId }
+        ? withoutCommandTabs({ ...previous, id: client.windowId })
         : defaultSession(client.windowId, id),
     );
   }
   async function adopt(result: ActionResult | undefined, force = false) {
     if (!result || result.cancelled) return;
     const id = result.projectId;
-    setInlineDraft(null); setActiveFolder(null);
+    setInlineDraft(null);
+    setActiveFolder(null);
     if (id) {
       if (!force && project && project.id !== id) {
         const saved = await perform({ type: "save", projectId: project.id });
@@ -605,7 +670,9 @@ export default function Workbench({
   function cancelInline() {
     if (inlineSubmitting.current) return;
     setInlineDraft(null);
-    requestAnimationFrame(() => inlineOrigin.current?.isConnected && inlineOrigin.current.focus());
+    requestAnimationFrame(
+      () => inlineOrigin.current?.isConnected && inlineOrigin.current.focus(),
+    );
   }
   function beginInline(next: InlineDraft) {
     if (inlineSubmitting.current) return;
@@ -614,76 +681,190 @@ export default function Workbench({
   }
   function newDocument(inNewTab = false) {
     const candidate = activeFolder ?? folderOf(doc?.name || "");
-    const folder = candidate && !project.documents.some(d => d.name.startsWith(candidate + "/")) ? "" : candidate;
+    const folder =
+      candidate &&
+      !project.documents.some((d) => d.name.startsWith(candidate + "/"))
+        ? ""
+        : candidate;
     setSearchOpen(false);
     setSideFocus("left");
-    setSession(s => ({ ...s, left: true }));
-    setCollapsed(previous => { const next = new Set(previous); const parts = folder.split("/"); parts.forEach((_, index) => next.delete(parts.slice(0, index + 1).join("/"))); return next; });
-    beginInline({ kind: "new-document", folder, value: uniqueDocumentName(project.documents, folder), newTab: inNewTab });
+    setSession((s) => ({ ...s, left: true }));
+    setCollapsed((previous) => {
+      const next = new Set(previous);
+      const parts = folder.split("/");
+      parts.forEach((_, index) =>
+        next.delete(parts.slice(0, index + 1).join("/")),
+      );
+      return next;
+    });
+    beginInline({
+      kind: "new-document",
+      folder,
+      value: uniqueDocumentName(project.documents, folder),
+      newTab: inNewTab,
+    });
   }
   function renameDocumentInline(d: DocumentRecord) {
-    setSearchOpen(false); setSideFocus("left"); setSession(s => ({ ...s, left: true }));
-    beginInline({ kind: "rename-document", documentId: d.id, folder: folderOf(d.name), value: d.name.split("/").at(-1)! });
+    setSearchOpen(false);
+    setSideFocus("left");
+    setSession((s) => ({ ...s, left: true }));
+    beginInline({
+      kind: "rename-document",
+      documentId: d.id,
+      folder: folderOf(d.name),
+      value: d.name.split("/").at(-1)!,
+    });
   }
   function newScene() {
     if (!doc) return;
-    setHistoryOpen(false); setHistorySelection(null); setSideFocus("right"); setSceneQuery("");
-    setSession(s => ({ ...s, outline: { ...s.outline, [mode]: true } }));
-    beginInline({ kind: "new-scene", documentId: doc.id, version: doc.version, value: uniqueSceneName(project) });
+    setHistoryOpen(false);
+    setHistorySelection(null);
+    setSideFocus("right");
+    setSceneQuery("");
+    setSession((s) => ({ ...s, outline: { ...s.outline, [mode]: true } }));
+    beginInline({
+      kind: "new-scene",
+      documentId: doc.id,
+      version: doc.version,
+      value: uniqueSceneName(project),
+    });
   }
   function renameSceneInline(node: YarnNode) {
-    const target = project.documents.find(d => d.name === node.file);
+    const target = project.documents.find((d) => d.name === node.file);
     if (!target) return;
     if (target.id !== doc?.id) openDocument(target.id);
-    setHistoryOpen(false); setSideFocus("right"); setSceneQuery("");
-    setSession(s => ({ ...s, outline: { ...s.outline, [mode]: true } }));
-    beginInline({ kind: "rename-scene", documentId: target.id, version: target.version, sceneName: node.name, value: node.name });
+    setHistoryOpen(false);
+    setSideFocus("right");
+    setSceneQuery("");
+    setSession((s) => ({ ...s, outline: { ...s.outline, [mode]: true } }));
+    beginInline({
+      kind: "rename-scene",
+      documentId: target.id,
+      version: target.version,
+      sceneName: node.name,
+      value: node.name,
+    });
   }
   async function submitInline() {
     const draft = inlineDraft;
     if (!draft || inlineSubmitting.current) return;
     const name = draft.value.trim();
     inlineSubmitting.current = true;
-    setInlineDraft(previous => previous ? { ...previous, busy: true, error: undefined } : previous);
+    setInlineDraft((previous) =>
+      previous ? { ...previous, busy: true, error: undefined } : previous,
+    );
     try {
       await client.flush();
-      const latest = client.getSnapshot().projects.find(p => p.id === project.id);
+      const latest = client
+        .getSnapshot()
+        .projects.find((p) => p.id === project.id);
       if (!latest) throw Error("專案已關閉");
       if (draft.kind === "new-document" || draft.kind === "rename-document") {
-        if (!name || /[\\/]/.test(name)) throw Error("請輸入檔名；移動資料夾請使用移動操作");
+        if (!name || /[\\/]/.test(name))
+          throw Error("請輸入檔名；移動資料夾請使用移動操作");
         const filename = name.endsWith(".yarn") ? name : name + ".yarn";
         const relative = (draft.folder ? draft.folder + "/" : "") + filename;
-        const existing = latest.documents.find(d => d.id === (draft.documentId || draft.createdId));
-        const result = await client.action(existing ? { type: "renameDocument", projectId: project.id, documentId: existing.id, name: relative } : { type: "createDocument", projectId: project.id, name: relative, text: "title: " + uniqueSceneName(latest) + "\n---\n\n===\n" });
-        const created = result.snapshot.projects.find(p => p.id === project.id)?.documents.find(d => d.id === (result.documentId || existing?.id));
-        if (created && ["error", "missing", "conflict"].includes(created.status)) {
-          setInlineDraft(previous => previous ? { ...previous, createdId: created.id } : previous);
+        const existing = latest.documents.find(
+          (d) => d.id === (draft.documentId || draft.createdId),
+        );
+        const result = await client.action(
+          existing
+            ? {
+                type: "renameDocument",
+                projectId: project.id,
+                documentId: existing.id,
+                name: relative,
+              }
+            : {
+                type: "createDocument",
+                projectId: project.id,
+                name: relative,
+                text: "title: " + uniqueSceneName(latest) + "\n---\n\n===\n",
+              },
+        );
+        const created = result.snapshot.projects
+          .find((p) => p.id === project.id)
+          ?.documents.find((d) => d.id === (result.documentId || existing?.id));
+        if (
+          created &&
+          ["error", "missing", "conflict"].includes(created.status)
+        ) {
+          setInlineDraft((previous) =>
+            previous ? { ...previous, createdId: created.id } : previous,
+          );
           throw Error(created.error || "建立未完成，請重試");
         }
         if (!created) throw Error("找不到建立結果");
         setInlineDraft(null);
-        if (draft.kind === "new-document") openDocument(created.id, !!draft.newTab);
+        if (draft.kind === "new-document")
+          openDocument(created.id, !!draft.newTab);
       } else {
-        const target = latest.documents.find(d => d.id === draft.documentId);
+        const target = latest.documents.find((d) => d.id === draft.documentId);
         if (!target) throw Error("劇本已移除");
-        if (!validSceneName(name)) throw Error("名稱須以英文字母起始，僅含英文字母、數字與底線");
-        if (draft.kind === "rename-scene" && name === draft.sceneName) { setInlineDraft(null); return; }
-        const result = await client.action(draft.kind === "new-scene" ? { type: "createScene", projectId: project.id, documentId: target.id, version: target.version, name } : { type: "renameScene", projectId: project.id, documentId: target.id, version: target.version, fromName: draft.sceneName!, name });
-        const updated = result.snapshot.projects.find(p => p.id === project.id)!;
-        const node = parse(updated.documents, updated.commands).nodes.find(n => n.file === target.name && n.name === name);
+        if (!validSceneName(name))
+          throw Error("名稱須以英文字母起始，僅含英文字母、數字與底線");
+        if (draft.kind === "rename-scene" && name === draft.sceneName) {
+          setInlineDraft(null);
+          return;
+        }
+        const result = await client.action(
+          draft.kind === "new-scene"
+            ? {
+                type: "createScene",
+                projectId: project.id,
+                documentId: target.id,
+                version: target.version,
+                name,
+              }
+            : {
+                type: "renameScene",
+                projectId: project.id,
+                documentId: target.id,
+                version: target.version,
+                fromName: draft.sceneName!,
+                name,
+              },
+        );
+        const updated = result.snapshot.projects.find(
+          (p) => p.id === project.id,
+        )!;
+        const node = parse(updated.documents, updated.commands).nodes.find(
+          (n) => n.file === target.name && n.name === name,
+        );
         setInlineDraft(null);
         if (node) {
           openDocument(target.id, false, node.body, 1, true, mode);
           setSelected(node.id);
-          if (mode === "graph") setFocus(f => f + 1);
+          if (mode === "graph") setFocus((f) => f + 1);
         }
       }
     } catch (error) {
-      setInlineDraft(previous => previous ? { ...previous, busy: false, error: error instanceof Error ? error.message : String(error) } : previous);
-    } finally { inlineSubmitting.current = false; }
+      setInlineDraft((previous) =>
+        previous
+          ? {
+              ...previous,
+              busy: false,
+              error: error instanceof Error ? error.message : String(error),
+            }
+          : previous,
+      );
+    } finally {
+      inlineSubmitting.current = false;
+    }
   }
   function inlineName() {
-    return inlineDraft ? <InlineNameEditor draft={inlineDraft} onChange={value => setInlineDraft(previous => previous ? { ...previous, value, error: undefined } : previous)} onSubmit={() => void submitInline()} onCancel={cancelInline}/> : null;
+    return inlineDraft ? (
+      <InlineNameEditor
+        draft={inlineDraft}
+        onChange={(value) =>
+          setInlineDraft((previous) =>
+            previous ? { ...previous, value, error: undefined } : previous,
+          )
+        }
+        onSubmit={() => void submitInline()}
+        onCancel={cancelInline}
+      />
+    ) : null;
   }
   function showMenu(event: MouseEvent | KeyboardEvent, actions: MenuAction[]) {
     event.preventDefault();
@@ -1121,31 +1302,51 @@ export default function Workbench({
     const mod = e.ctrlKey || e.metaKey,
       key = e.key.toLowerCase();
     if (e.defaultPrevented) return;
+    const overlay =
+      e.target instanceof Element &&
+      e.target.closest(
+        '[data-workspace-overlay], [role="dialog"], [role="alertdialog"]',
+      );
+    if (overlay || commandOpen) {
+      if (
+        mod &&
+        key === "s" &&
+        commandOpen &&
+        !(
+          e.target instanceof Element &&
+          e.target.closest('[role="alertdialog"]')
+        )
+      ) {
+        e.preventDefault();
+        if (!e.isComposing) void commandActions.current?.save();
+      } else if (
+        (mod && ["w", "t", "p", "s", "tab"].includes(key)) ||
+        (e.altKey && ["ArrowLeft", "ArrowRight"].includes(e.key))
+      )
+        e.preventDefault();
+      return;
+    }
+    if (e.isComposing) return;
     if (e.key === "Escape") {
       if (historySelection) {
         setHistorySelection(null);
         return;
       }
-        dragCancelled.current = true;
+      dragCancelled.current = true;
       void window.yarnDesktop?.windows.cancelDrag();
     }
     if (mod && key === "s") {
       e.preventDefault();
-      if (active?.documentId === "@commands")
-        void commandActions.current?.save();
-      else
-        void perform({
-          type: "save",
-          projectId: project.id,
-          ...(!e.shiftKey && doc ? { documentId: doc.id } : {}),
-        });
+      void perform({
+        type: "save",
+        projectId: project.id,
+        ...(!e.shiftKey && doc ? { documentId: doc.id } : {}),
+      });
     } else if (mod && key === "t") {
       e.preventDefault();
       if (e.shiftKey) reopen();
       else {
-        setQuickNewTab(true);
-        setQuick("files");
-        setQuery("");
+        showFiles(true);
       }
     } else if (mod && key === "w") {
       e.preventDefault();
@@ -1160,10 +1361,7 @@ export default function Workbench({
     } else if (mod && (key === "p" || (key === "f" && e.shiftKey))) {
       e.preventDefault();
       if (key === "p") {
-        setQuickNewTab(false);
-        setQuick("files");
-        setQuery("");
-        setQuickIndex(0);
+        showFiles();
       } else showSearch();
     } else if (
       e.altKey &&
@@ -1292,13 +1490,6 @@ export default function Workbench({
     window.addEventListener("yarn-editor-menu", handler);
     return () => window.removeEventListener("yarn-editor-menu", handler);
   }, []);
-  const quickFiles = project.documents.filter((d) =>
-    d.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-  );
-  const quickSelected = Math.min(
-    quickIndex,
-    Math.max(0, quickFiles.length - 1),
-  );
   const currentIssues = analysis.issues.filter(
     (i) =>
       (issueScope === "all" || i.file === doc?.name) &&
@@ -1306,7 +1497,12 @@ export default function Workbench({
   );
   const fileSort = session.fileSortByProject?.[project.id] || "manual";
   const displayedDocuments = orderedDocuments(project.documents, fileSort);
-  function setFileSort(value: "manual" | "name-asc" | "name-desc") { setSession(s => ({ ...s, fileSortByProject: { ...s.fileSortByProject, [project.id]: value } })); }
+  function setFileSort(value: "manual" | "name-asc" | "name-desc") {
+    setSession((s) => ({
+      ...s,
+      fileSortByProject: { ...s.fileSortByProject, [project.id]: value },
+    }));
+  }
   const folders = [
     ...new Set(
       displayedDocuments.flatMap((d) => {
@@ -1327,7 +1523,10 @@ export default function Workbench({
         .map((f) => (
           <div key={f}>
             <button
-              className={"folder-row " + (fileDrop === "folder:" + f ? "folder-drop-target" : "")}
+              className={
+                "folder-row " +
+                (fileDrop === "folder:" + f ? "folder-drop-target" : "")
+              }
               style={{ paddingLeft: 15 + f.split("/").length * 10 }}
               onClick={() => {
                 setActiveFolder(f);
@@ -1339,11 +1538,15 @@ export default function Workbench({
                 });
               }}
               onDragOver={(e) => {
-                if (e.dataTransfer.types.includes("application/x-yarn-file")) { e.preventDefault(); setFileDrop("folder:" + f); }
+                if (e.dataTransfer.types.includes("application/x-yarn-file")) {
+                  e.preventDefault();
+                  setFileDrop("folder:" + f);
+                }
               }}
               onDragLeave={() => setFileDrop("")}
               onDrop={(e) => {
-                e.preventDefault(); setFileDrop("");
+                e.preventDefault();
+                setFileDrop("");
                 const id = e.dataTransfer.getData("application/x-yarn-file"),
                   d = project.documents.find((d) => d.id === id);
                 if (d)
@@ -1367,7 +1570,9 @@ export default function Workbench({
             {!collapsed.has(f) && renderFiles(f)}
           </div>
         ))}
-      {inlineDraft?.kind === "new-document" && inlineDraft.folder === folder && inlineName()}
+      {inlineDraft?.kind === "new-document" &&
+        inlineDraft.folder === folder &&
+        inlineName()}
       {displayedDocuments
         .filter(
           (d) =>
@@ -1378,7 +1583,11 @@ export default function Workbench({
         .map((d) => (
           <div
             key={d.id}
-            className={"file-entry " + (doc?.id === d.id ? "active " : "") + (fileDrop === d.id ? "file-drop-before" : "")}
+            className={
+              "file-entry " +
+              (doc?.id === d.id ? "active " : "") +
+              (fileDrop === d.id ? "file-drop-before" : "")
+            }
             style={{
               marginLeft: 10 + folder.split("/").filter(Boolean).length * 10,
             }}
@@ -1387,10 +1596,22 @@ export default function Workbench({
               documentDrag.current = d.id;
               e.dataTransfer.setData("application/x-yarn-file", d.id);
             }}
-            onDragEnd={() => { documentDrag.current = ""; setFileDrop(""); }}
+            onDragEnd={() => {
+              documentDrag.current = "";
+              setFileDrop("");
+            }}
             onDragOver={(e) => {
-              const from = project.documents.find(item => item.id === documentDrag.current);
-              if (e.dataTransfer.types.includes("application/x-yarn-file") && from && folderOf(from.name) === folderOf(d.name)) { e.preventDefault(); setFileDrop(d.id); }
+              const from = project.documents.find(
+                (item) => item.id === documentDrag.current,
+              );
+              if (
+                e.dataTransfer.types.includes("application/x-yarn-file") &&
+                from &&
+                folderOf(from.name) === folderOf(d.name)
+              ) {
+                e.preventDefault();
+                setFileDrop(d.id);
+              }
             }}
             onDragLeave={() => setFileDrop("")}
             onDrop={(e) => {
@@ -1399,47 +1620,71 @@ export default function Workbench({
               e.preventDefault();
               setFileDrop("");
               const from = e.dataTransfer.getData("application/x-yarn-file");
-              const source = project.documents.find(item => item.id === from);
-              if (!source || folderOf(source.name) !== folderOf(d.name) || from === d.id) return;
+              const source = project.documents.find((item) => item.id === from);
+              if (
+                !source ||
+                folderOf(source.name) !== folderOf(d.name) ||
+                from === d.id
+              )
+                return;
               const order = reorderWithinFolder(displayedDocuments, from, d.id);
-              void perform({ type: "sortDocuments", projectId: project.id, documentIds: order }).then(result => { if (result) setFileSort("manual"); });
+              void perform({
+                type: "sortDocuments",
+                projectId: project.id,
+                documentIds: order,
+              }).then((result) => {
+                if (result) setFileSort("manual");
+              });
             }}
             onContextMenu={(e) => showMenu(e, fileMenu(d))}
-            onKeyDown={(e) => { if (e.key === "F2") { e.preventDefault(); renameDocumentInline(d); } else menuKeys(e, fileMenu(d)); }}
+            onKeyDown={(e) => {
+              if (e.key === "F2") {
+                e.preventDefault();
+                renameDocumentInline(d);
+              } else menuKeys(e, fileMenu(d));
+            }}
           >
-            {inlineDraft?.kind === "rename-document" && inlineDraft.documentId === d.id ? inlineName() : <>
-            <button
-              className="file-row"
-              title={d.path || d.name}
-              onClick={(e) => { setActiveFolder(folderOf(d.name)); openDocument(d.id, e.ctrlKey || e.metaKey); }}
-              onAuxClick={(e) => {
-                if (e.button === 1) {
-                  e.preventDefault();
-                  openDocument(d.id, true);
-                }
-              }}
-            >
-              <FileText size={14} />
-              <span>{d.name.split("/").at(-1)}</span>
-              {pendingWrite(d) && (
-                <LoaderCircle
-                  className="save-spinner"
-                  size={12}
-                  aria-label="正在保存"
-                />
-              )}
-              {["conflict", "error", "missing"].includes(d.status) && (
-                <AlertTriangle size={13} />
-              )}
-            </button>
-            <button
-              className="file-options"
-              aria-label={"劇本選項 " + d.name}
-              onClick={(e) => showMenu(e, fileMenu(d))}
-            >
-              <MoreHorizontal size={15} />
-            </button>
-            </>}
+            {inlineDraft?.kind === "rename-document" &&
+            inlineDraft.documentId === d.id ? (
+              inlineName()
+            ) : (
+              <>
+                <button
+                  className="file-row"
+                  title={d.path || d.name}
+                  onClick={(e) => {
+                    setActiveFolder(folderOf(d.name));
+                    openDocument(d.id, e.ctrlKey || e.metaKey);
+                  }}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) {
+                      e.preventDefault();
+                      openDocument(d.id, true);
+                    }
+                  }}
+                >
+                  <FileText size={14} />
+                  <span>{d.name.split("/").at(-1)}</span>
+                  {pendingWrite(d) && (
+                    <LoaderCircle
+                      className="save-spinner"
+                      size={12}
+                      aria-label="正在保存"
+                    />
+                  )}
+                  {["conflict", "error", "missing"].includes(d.status) && (
+                    <AlertTriangle size={13} />
+                  )}
+                </button>
+                <button
+                  className="file-options"
+                  aria-label={"劇本選項 " + d.name}
+                  onClick={(e) => showMenu(e, fileMenu(d))}
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+              </>
+            )}
           </div>
         ))}
     </>
@@ -1599,7 +1844,11 @@ export default function Workbench({
               <DropdownMenuItem onSelect={() => openDocument("@recovery")}>
                 <ArchiveRestore size={15} /> 最近刪除與指令復原
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDocument("@commands")}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  requestAnimationFrame(openCommands);
+                }}
+              >
                 <Settings2 size={15} /> 自訂指令
                 {commandHasDraft ? " · 有草稿" : ""}
               </DropdownMenuItem>
@@ -1629,10 +1878,7 @@ export default function Workbench({
             return {
               id: t.id,
               file: d?.name || t.documentId,
-              dirty:
-                t.documentId === "@commands"
-                  ? commandHasDraft
-                  : !!d && pendingWrite(d),
+              dirty: !!d && pendingWrite(d),
               mode: t.mode === "graph" ? "graph" : "text",
               location: d ? `${modes[t.mode]} · 第 ${t.line} 行` : project.name,
               pinned: t.pinned,
@@ -1641,9 +1887,7 @@ export default function Workbench({
           onActivate={activate}
           onClose={(id) => void closeTabs([id])}
           onAdd={() => {
-            setQuickNewTab(true);
-            setQuick("files");
-            setQuery("");
+            showFiles(true);
           }}
           onMenu={(id, e) => {
             showMenu(e, tabMenu(id));
@@ -1794,7 +2038,10 @@ export default function Workbench({
                         setHistoryOpen(false);
                         setSideFocus("right");
                         setHistorySelection(null);
-                        setSession(s => ({ ...s, outline: { ...s.outline, [mode]: !showOutline } }));
+                        setSession((s) => ({
+                          ...s,
+                          outline: { ...s.outline, [mode]: !showOutline },
+                        }));
                       }}
                     >
                       <ListTree size={16} />
@@ -1869,7 +2116,7 @@ export default function Workbench({
               <ChromeButton
                 title="全專案搜尋 · Ctrl+Shift+F"
                 aria-label="全專案搜尋"
-                aria-pressed={searchOpen && !utility}
+                aria-pressed={searchOpen}
                 onClick={showSearch}
               >
                 <Search size={16} />
@@ -1886,95 +2133,102 @@ export default function Workbench({
           ((showOutline || historyOpen) && !utility ? " has-document-side" : "")
         }
       >
-        {session.left && (!utility || inlineDraft?.kind.endsWith("document")) && (
-          <aside
-            className="workspace-sidebar"
-            style={{ width: session.sidebarWidth }}
-          >
-            {searchOpen ? (
-              <SearchPanel
-                documents={project.documents}
-                query={searchQuery}
-                onQuery={setSearchQuery}
-                onClose={() => setSearchOpen(false)}
-                onNavigate={navigateHit}
-                viewState={searchViewState}
-                onViewState={setSearchViewState}
+        {session.left &&
+          (!utility || inlineDraft?.kind.endsWith("document")) && (
+            <aside
+              className="workspace-sidebar"
+              style={{ width: session.sidebarWidth }}
+            >
+              <div className="section-heading">
+                <span>劇本</span>
+                <div>
+                  <ChromeButton
+                    title={
+                      fileSort === "name-asc"
+                        ? "名稱升冪；點擊改為降冪"
+                        : fileSort === "name-desc"
+                          ? "名稱降冪；點擊改為升冪"
+                          : "手動排序；點擊依名稱升冪，右鍵選擇排序方式"
+                    }
+                    aria-label={
+                      fileSort === "name-asc"
+                        ? "名稱升冪"
+                        : fileSort === "name-desc"
+                          ? "名稱降冪"
+                          : "手動排序"
+                    }
+                    onClick={() =>
+                      setFileSort(
+                        fileSort === "name-asc" ? "name-desc" : "name-asc",
+                      )
+                    }
+                    onContextMenu={(e) =>
+                      showMenu(e, [
+                        { label: "手動排序", run: () => setFileSort("manual") },
+                        {
+                          label: "名稱升冪",
+                          run: () => setFileSort("name-asc"),
+                        },
+                        {
+                          label: "名稱降冪",
+                          run: () => setFileSort("name-desc"),
+                        },
+                      ])
+                    }
+                    onKeyDown={(e) =>
+                      menuKeys(e, [
+                        { label: "手動排序", run: () => setFileSort("manual") },
+                        {
+                          label: "名稱升冪",
+                          run: () => setFileSort("name-asc"),
+                        },
+                        {
+                          label: "名稱降冪",
+                          run: () => setFileSort("name-desc"),
+                        },
+                      ])
+                    }
+                  >
+                    {fileSort === "name-desc" ? (
+                      <ArrowUpZA size={15} />
+                    ) : fileSort === "name-asc" ? (
+                      <ArrowDownAZ size={15} />
+                    ) : (
+                      <ListOrdered size={15} />
+                    )}
+                  </ChromeButton>
+                  <ChromeButton
+                    title="新增劇本"
+                    aria-label="新增劇本"
+                    onClick={() => newDocument()}
+                  >
+                    <Plus size={15} />
+                  </ChromeButton>
+                </div>
+              </div>
+              <div className="workspace-files">
+                {renderFiles()}
+                {!project.documents.length && (
+                  <p className="empty-small">
+                    尚無劇本。
+                    <button onClick={() => newDocument()}>
+                      建立第一份劇本
+                    </button>
+                  </p>
+                )}
+              </div>
+              <PanelResizeHandle
+                side="left"
+                value={session.sidebarWidth}
+                min={180}
+                max={420}
+                label="調整侧欄寬度"
+                onResize={(sidebarWidth) =>
+                  setSession((s) => ({ ...s, sidebarWidth }))
+                }
               />
-            ) : (
-              <>
-                <div className="section-heading">
-                  <span>劇本</span>
-                  <div>
-                    <ChromeButton
-                      title={fileSort === "name-asc" ? "名稱升冪；點擊改為降冪" : fileSort === "name-desc" ? "名稱降冪；點擊改為升冪" : "手動排序；點擊依名稱升冪，右鍵選擇排序方式"}
-                      aria-label={fileSort === "name-asc" ? "名稱升冪" : fileSort === "name-desc" ? "名稱降冪" : "手動排序"}
-                      onClick={() => setFileSort(fileSort === "name-asc" ? "name-desc" : "name-asc")}
-                      onContextMenu={e => showMenu(e, [
-                        { label: "手動排序", run: () => setFileSort("manual") },
-                        { label: "名稱升冪", run: () => setFileSort("name-asc") },
-                        { label: "名稱降冪", run: () => setFileSort("name-desc") },
-                      ])}
-                      onKeyDown={e => menuKeys(e, [
-                        { label: "手動排序", run: () => setFileSort("manual") },
-                        { label: "名稱升冪", run: () => setFileSort("name-asc") },
-                        { label: "名稱降冪", run: () => setFileSort("name-desc") },
-                      ])}
-                    >
-                      {fileSort === "name-desc" ? <ArrowUpZA size={15}/> : fileSort === "name-asc" ? <ArrowDownAZ size={15}/> : <ListOrdered size={15}/>}
-                    </ChromeButton>
-                    <ChromeButton
-                      title="新增劇本"
-                      aria-label="新增劇本"
-                      onClick={() => newDocument()}
-                    >
-                      <Plus size={15} />
-                    </ChromeButton>
-                  </div>
-                </div>
-                <div className="workspace-files">
-                  {renderFiles()}
-                  {!project.documents.length && (
-                    <p className="empty-small">
-                      尚無劇本。
-                      <button onClick={() => newDocument()}>建立第一份劇本</button>
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-            <div
-              className="sidebar-resizer"
-              role="separator"
-              aria-label="調整側欄寬度"
-              aria-orientation="vertical"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (["ArrowLeft", "ArrowRight"].includes(e.key))
-                  setSession((s) => ({
-                    ...s,
-                    sidebarWidth: Math.max(
-                      180,
-                      Math.min(
-                        420,
-                        s.sidebarWidth + (e.key === "ArrowLeft" ? -10 : 10),
-                      ),
-                    ),
-                  }));
-              }}
-              onPointerDown={(e) => {
-                e.currentTarget.setPointerCapture(e.pointerId);
-              }}
-              onPointerMove={(e) => {
-                if (e.currentTarget.hasPointerCapture(e.pointerId))
-                  setSession((s) => ({
-                    ...s,
-                    sidebarWidth: Math.max(180, Math.min(420, e.clientX)),
-                  }));
-              }}
-            />
-          </aside>
-        )}
+            </aside>
+          )}
         <section className="workspace-center">
           {doc && ["conflict", "missing", "error"].includes(doc.status) && (
             <div className="workspace-notice" role="alert">
@@ -1994,6 +2248,8 @@ export default function Workbench({
                   ...s,
                   left: true,
                   sidebarWidth: 220,
+                  rightPanelWidth: 260,
+                  problemsHeight: 140,
                   outline: {},
                 }))
               }
@@ -2012,37 +2268,6 @@ export default function Workbench({
               key={project.id}
               project={project}
               onRestore={restoreEntry}
-            />
-          ) : active?.documentId === "@commands" ? (
-            <CommandManager
-              key={project.id}
-              projectName={project.name}
-              commands={project.commands}
-              notify={notify}
-              onDirtyChange={setCommandDirty}
-              actionsRef={commandActions}
-              initialDraft={project.commandDraft}
-              onDraftChange={(draft) => {
-                void perform({
-                  type: "commandDraft",
-                  projectId: project.id,
-                  draft,
-                });
-              }}
-              referenceCount={(name) =>
-                analysis.nodes.reduce(
-                  (sum, n) =>
-                    sum + n.calls.filter((c) => c.name === name).length,
-                  0,
-                )
-              }
-              onChange={async (commands) =>
-                !!(await perform({
-                  type: "commands",
-                  projectId: project.id,
-                  commands,
-                }))
-              }
             />
           ) : doc ? (
             <div
@@ -2178,6 +2403,57 @@ export default function Workbench({
                 <Graph
                   key={active.id}
                   file={doc.name}
+                  documents={project.documents}
+                  commands={project.commands}
+                  onDocumentEdit={(documentId, edits, expectedText) => {
+                    const current = client
+                      .getSnapshot()
+                      .projects.find((p) => p.id === project.id)
+                      ?.documents.find((d) => d.id === documentId);
+                    if (!current || current.text !== expectedText) return false;
+                    client.edit(project.id, documentId, edits, false);
+                    return true;
+                  }}
+                  onDocumentUndo={(documentId, redo) =>
+                    void perform({
+                      type: redo ? "redo" : "undo",
+                      projectId: project.id,
+                      documentId,
+                    })
+                  }
+                  onDocumentSave={(documentId) =>
+                    void perform({
+                      type: "save",
+                      projectId: project.id,
+                      documentId,
+                    })
+                  }
+                  onDocumentComposition={(documentId, active) =>
+                    void perform({
+                      type: "composition",
+                      projectId: project.id,
+                      documentId,
+                      active,
+                    })
+                  }
+                  onRenameScene={async (node, name, expectedText) => {
+                    const current = client
+                      .getSnapshot()
+                      .projects.find((p) => p.id === project.id)
+                      ?.documents.find((d) => d.name === node.file);
+                    if (!current || current.text !== expectedText) {
+                      notify("文件已變更，請重新確認場景名稱。");
+                      return false;
+                    }
+                    return !!(await perform({
+                      type: "renameScene",
+                      projectId: project.id,
+                      documentId: current.id,
+                      version: current.version,
+                      fromName: node.name,
+                      name,
+                    }));
+                  }}
                   allNodes={analysis.nodes}
                   links={analysis.links}
                   issues={analysis.issues}
@@ -2210,8 +2486,7 @@ export default function Workbench({
                 </button>
                 <button
                   onClick={() => {
-                    setQuick("files");
-                    setQuery("");
+                    showFiles();
                   }}
                 >
                   開啟劇本
@@ -2261,59 +2536,40 @@ export default function Workbench({
             />
           )}
           {problems && !utility && !historySelection && (
-            <aside className="workspace-problems">
-              <div className="panel-title">
-                <span>結構檢查 · {currentIssues.length} · 非官方編譯器</span>
-                <select
-                  aria-label="檢查範圍"
-                  value={issueScope}
-                  onChange={(e) => setIssueScope(e.target.value)}
-                >
-                  <option value="all">全專案</option>
-                  <option value="current">目前劇本</option>
-                </select>
-                <select
-                  aria-label="問題嚴重度"
-                  value={issueSeverity}
-                  onChange={(e) => setIssueSeverity(e.target.value)}
-                >
-                  <option value="all">全部</option>
-                  <option value="error">錯誤</option>
-                  <option value="warning">提醒</option>
-                </select>
-                <ChromeButton
-                  title="關閉檢查"
-                  onClick={() => setProblems(false)}
-                >
-                  <X size={14} />
-                </ChromeButton>
-              </div>
-              <div className="issues-scroll">
-                {currentIssues.map((issue, i) => (
-                  <button
-                    key={i}
-                    className="issue-row"
-                    onClick={() => go(issue.file, issue.line, issue.column)}
-                  >
-                    <AlertTriangle size={14} className={issue.severity} />
-                    <span>{issue.message}</span>
-                    <small title={issue.file}>
-                      {issue.file} : {issue.line}
-                    </small>
-                  </button>
-                ))}
-                {!currentIssues.length && (
-                  <p className="empty-small">此範圍未發現結構問題。</p>
-                )}
-              </div>
-            </aside>
+            <ProblemsPanel
+              issues={currentIssues}
+              scope={issueScope}
+              onScope={setIssueScope}
+              severity={issueSeverity}
+              onSeverity={setIssueSeverity}
+              height={session.problemsHeight ?? 140}
+              onHeight={(problemsHeight) =>
+                setSession((s) => ({ ...s, problemsHeight }))
+              }
+              onClose={() => setProblems(false)}
+              onNavigate={(issue) => go(issue.file, issue.line, issue.column)}
+            />
           )}
         </section>
         {showOutline && !utility && (
           <aside
             className="document-side workspace-scenes"
             aria-label="場景大綱"
+            style={{
+              width: session.rightPanelWidth ?? 260,
+              flexBasis: session.rightPanelWidth ?? 260,
+            }}
           >
+            <PanelResizeHandle
+              side="right"
+              value={session.rightPanelWidth ?? 260}
+              min={220}
+              max={420}
+              label="調整大綱寬度"
+              onResize={(rightPanelWidth) =>
+                setSession((s) => ({ ...s, rightPanelWidth }))
+              }
+            />
             <div className="section-heading">
               <strong>
                 場景 <small>{nodes.length}</small>
@@ -2356,50 +2612,67 @@ export default function Workbench({
                     .toLowerCase()
                     .includes(sceneQuery.toLowerCase()),
                 )
-                .map((n) => inlineDraft?.kind === "rename-scene" && inlineDraft.documentId === doc?.id && inlineDraft.sceneName === n.name ? <div key={n.id}>{inlineName()}</div> : (
-                  <button
-                    key={n.id}
-                    className={
-                      "node-row " + (selected === n.id ? "active" : "")
-                    }
-                    draggable
-                    onDragStart={(e) =>
-                      e.dataTransfer.setData("application/x-yarn-scene", n.id)
-                    }
-                    onDragOver={(e) => {
-                      if (
-                        e.dataTransfer.types.includes(
-                          "application/x-yarn-scene",
+                .map((n) =>
+                  inlineDraft?.kind === "rename-scene" &&
+                  inlineDraft.documentId === doc?.id &&
+                  inlineDraft.sceneName === n.name ? (
+                    <div key={n.id}>{inlineName()}</div>
+                  ) : (
+                    <button
+                      key={n.id}
+                      className={
+                        "node-row " + (selected === n.id ? "active" : "")
+                      }
+                      draggable
+                      onDragStart={(e) =>
+                        e.dataTransfer.setData("application/x-yarn-scene", n.id)
+                      }
+                      onDragOver={(e) => {
+                        if (
+                          e.dataTransfer.types.includes(
+                            "application/x-yarn-scene",
+                          )
                         )
-                      )
+                          e.preventDefault();
+                      }}
+                      onDrop={(e) => {
                         e.preventDefault();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      void moveScene(
-                        e.dataTransfer.getData("application/x-yarn-scene"),
-                        n,
-                      );
-                    }}
-                    onClick={() => {
-                      setSelected(n.id);
-                      if (mode === "graph") setFocus((f) => f + 1);
-                      else if (doc)
-                        openDocument(doc.id, false, n.body, 1, true, mode);
-                    }}
-                    onContextMenu={(e) => showMenu(e, sceneMenu(n))}
-                    onKeyDown={(e) => { if (e.key === "F2") { e.preventDefault(); renameSceneInline(n); } else menuKeys(e, sceneMenu(n)); }}
-                  >
-                    <FileText size={13} />
-                    <span>{n.name}</span>
-                  </button>
-                ))}
-              {inlineDraft?.kind === "new-scene" && inlineDraft.documentId === doc?.id && inlineName()}
+                        void moveScene(
+                          e.dataTransfer.getData("application/x-yarn-scene"),
+                          n,
+                        );
+                      }}
+                      onClick={() => {
+                        setSelected(n.id);
+                        if (mode === "graph") setFocus((f) => f + 1);
+                        else if (doc)
+                          openDocument(doc.id, false, n.body, 1, true, mode);
+                      }}
+                      onContextMenu={(e) => showMenu(e, sceneMenu(n))}
+                      onKeyDown={(e) => {
+                        if (e.key === "F2") {
+                          e.preventDefault();
+                          renameSceneInline(n);
+                        } else menuKeys(e, sceneMenu(n));
+                      }}
+                    >
+                      <FileText size={13} />
+                      <span>{n.name}</span>
+                    </button>
+                  ),
+                )}
+              {inlineDraft?.kind === "new-scene" &&
+                inlineDraft.documentId === doc?.id &&
+                inlineName()}
             </div>
           </aside>
         )}
         {doc && historyOpen && !utility && (
           <HistoryList
+            width={session.rightPanelWidth ?? 260}
+            onWidth={(rightPanelWidth) =>
+              setSession((s) => ({ ...s, rightPanelWidth }))
+            }
             entries={project.recovery.filter(
               (entry) => entry.documentId === doc.id && !entry.deleted,
             )}
@@ -2419,6 +2692,39 @@ export default function Workbench({
           />
         )}
       </div>
+      <CommandOverlay
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        restoreFocus={restoreEditorFocus}
+        key={project.id}
+        projectName={project.name}
+        commands={project.commands}
+        notify={notify}
+        onDirtyChange={setCommandDirty}
+        actionsRef={commandActions}
+        initialDraft={project.commandDraft}
+        onDraftChange={(draft) => {
+          void perform({
+            type: "commandDraft",
+            projectId: project.id,
+            draft,
+          });
+        }}
+        referenceCount={(name) =>
+          analysis.nodes.reduce(
+            (sum, n) => sum + n.calls.filter((c) => c.name === name).length,
+            0,
+          )
+        }
+        onChange={async (commands) =>
+          !!(await perform({
+            type: "commands",
+            projectId: project.id,
+            commands,
+          }))
+        }
+      />
+
       <ActionMenu menu={menu} onClose={() => setMenu(null)} />
       <Dialog
         open={!!prompt}
@@ -2482,94 +2788,19 @@ export default function Workbench({
           </form>
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={!!quick}
-        onOpenChange={(open) => {
-          if (!open) setQuick(null);
-        }}
-      >
-        <DialogContent className="quick-dialog">
-          <DialogTitle>快速開啟</DialogTitle>
-          <DialogDescription>
-            {quickNewTab
-              ? "選擇劇本，在新分頁開啟。"
-              : "Enter 開啟；Ctrl+Enter 在新分頁開啟。"}
-          </DialogDescription>
-          <div className="panel-search-input">
-            <Search size={16} />
-            <input
-              autoFocus
-              aria-label="搜尋劇本"
-              placeholder="檔名或路徑"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setQuickIndex(0);
-              }}
-              role="combobox"
-              aria-expanded="true"
-              aria-controls="quick-files"
-              aria-activedescendant={
-                quickFiles.length ? "quick-file-" + quickSelected : undefined
-              }
-              onKeyDown={(e) => {
-                if (["ArrowDown", "ArrowUp"].includes(e.key)) {
-                  e.preventDefault();
-                  setQuickIndex(
-                    (quickSelected +
-                      (e.key === "ArrowDown" ? 1 : -1) +
-                      quickFiles.length) %
-                      Math.max(1, quickFiles.length),
-                  );
-                }
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const target = quickFiles[quickSelected];
-                  if (target) {
-                    openDocument(
-                      target.id,
-                      quickNewTab || e.ctrlKey || e.metaKey,
-                    );
-                    setQuick(null);
-                  }
-                }
-              }}
-            />
-          </div>
-          <div className="quick-results" id="quick-files" role="listbox">
-            {quickFiles.map((d, index) => (
-              <button
-                id={"quick-file-" + index}
-                role="option"
-                aria-selected={index === quickSelected}
-                className={index === quickSelected ? "active" : ""}
-                key={d.id}
-                onClick={(e) => {
-                  openDocument(d.id, quickNewTab || e.ctrlKey || e.metaKey);
-                  setQuick(null);
-                }}
-              >
-                <FileText size={15} />
-                <span>{d.name}</span>
-              </button>
-            ))}
-            {!quickFiles.length && (
-              <p className="empty-small">找不到符合的劇本。</p>
-            )}
-          </div>
-          <button
-            className="secondary"
-            onClick={() => {
-              setQuick(null);
-              newDocument(quickNewTab);
-            }}
-          >
-            <Plus size={14} />
-            建立新劇本
-          </button>
-        </DialogContent>
-      </Dialog>
+      {searchOpen && (
+        <SearchOverlay
+          documents={project.documents}
+          query={searchQuery}
+          onQuery={setSearchQuery}
+          scope={searchScope}
+          onScope={setSearchScope}
+          newTab={quickNewTab}
+          onNavigate={navigateHit}
+          onClose={() => setSearchOpen(false)}
+          onCreate={() => newDocument(quickNewTab)}
+        />
+      )}
       <Dialog
         open={!!conflict}
         onOpenChange={(open) => {

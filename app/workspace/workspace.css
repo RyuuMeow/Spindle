@@ -823,3 +823,39 @@
     height: 160px;
   }
 }
+/* Panel surfaces share a narrow application gutter; floating surfaces alone cast shadows. */
+.workspace-body { gap: 6px; padding: 6px; background: #171717; }
+.workspace-sidebar { background: #242424; border: 1px solid #343434; border-radius: 6px; }
+.workspace-center { background: #1c1c1c; border: 1px solid #303030; border-radius: 6px; overflow: hidden; }
+.document-side { position: relative; background: #242424; border: 1px solid #343434; border-radius: 6px; }
+.document-toolbar { border-bottom-color: #303030; }
+.panel-resize-handle { position: absolute; z-index: 12; touch-action: none; outline-offset: -2px; }
+.panel-resize-handle:after { content: ""; position: absolute; border-radius: 2px; background: transparent; }
+.panel-resize-handle:hover:after, .panel-resize-handle:focus-visible:after { background: #83929e; }
+.resize-left, .resize-right { width: 7px; top: 0; bottom: 0; cursor: col-resize; }
+.resize-left { right: -7px; }
+.resize-right { left: -7px; }
+.resize-left:after, .resize-right:after { left: 2px; width: 2px; top: 8px; bottom: 8px; }
+.resize-bottom { top: -4px; left: 0; right: 0; height: 7px; cursor: row-resize; }
+.resize-bottom:after { height: 2px; top: 2px; left: 8px; right: 8px; }
+.workspace-problems { position: relative; container-type: inline-size; container-name: diagnostics; flex-shrink: 0; max-height: 42%; min-height: 86px; background: #242424; border-top: 1px solid #424242; }
+.problems-toolbar { display: flex; flex-shrink: 0; align-items: center; gap: 8px; min-height: 42px; padding: 6px 12px; border-bottom: 1px solid #343434; font-size: 12px; }
+.problems-heading { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.problems-heading > small { color: #999; font-size: 11px; }
+.problems-note { display: inline-flex; color: #888; }
+.problems-filters-wide, .problems-filters-compact { align-items: center; gap: 8px; margin-left: auto; }
+.problems-filters-wide { display: flex; }
+.problems-filters-compact { display: none; }
+.problems-toolbar .segmented-control { padding: 2px; border: 1px solid #424242; border-radius: 5px; }
+.problems-toolbar .segmented-control button { min-height: 24px; padding: 0 8px; font-size: 11px; }
+.problems-toolbar > .chrome-button { width: 28px; min-height: 28px; }
+.problems-filters-compact .compact-select { height: 28px; min-height: 28px; padding: 0 7px; font-size: 11px; }
+.problems-empty { display: flex; align-items: center; gap: 8px; margin: 0; padding: 13px 16px; color: #aaa; font-size: 12px; }
+@container diagnostics (max-width: 630px) { .problems-filters-wide { display: none; } .problems-filters-compact { display: flex; } .problems-note { display: none; } }
+@container diagnostics (max-width: 430px) { .problems-toolbar { gap: 5px; padding: 6px 8px; } .problems-filters-compact { gap: 5px; } .problems-heading { font-size: 11px; } }
+@media (max-width: 999px) {
+  .workspace-body > .workspace-sidebar { left: 6px; top: 6px; bottom: 6px; }
+  .workspace-body > .document-side { right: 6px; top: 6px; bottom: 6px; }
+}
+
+@media (max-width: 999px) { .workspace-body > .document-side { position: absolute; } }

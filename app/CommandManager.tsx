@@ -25,6 +25,7 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CompactSelect } from "@/components/CompactSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ControlTooltip } from "@/components/ui/tooltip";
 import {
@@ -639,20 +640,19 @@ export default function CommandManager({
                     htmlFor={`${formId}-param-${i}-type`}
                   >
                     <span>型別</span>
-                    <select
+                    <CompactSelect
                       id={`${formId}-param-${i}-type`}
-                      aria-label={`參數 ${i + 1} 型別`}
+                      label={`參數 ${i + 1} 型別`}
                       value={param.type}
-                      onChange={(event) =>
-                        updateParam(i, {
-                          type: event.target.value as Param["type"],
-                        })
+                      onChange={(value) =>
+                        updateParam(i, { type: value as Param["type"] })
                       }
-                    >
-                      <option value="string">文字</option>
-                      <option value="number">數字</option>
-                      <option value="boolean">布林</option>
-                    </select>
+                      options={[
+                        { value: "string", label: "文字" },
+                        { value: "number", label: "數字" },
+                        { value: "boolean", label: "布林" },
+                      ]}
+                    />
                   </label>
                   <div
                     className="param-order"

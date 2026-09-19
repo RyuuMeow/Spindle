@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { loader } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { ArrowLeft, Clock3, RotateCcw, X } from "lucide-react";
+import { PanelResizeHandle } from "@/components/PanelResizeHandle";
 import { ChromeButton } from "@/components/ChromeButton";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import type { RecoveryEntry } from "./types";
@@ -89,18 +90,34 @@ function HistorySource({
 }
 
 export function HistoryList({
+  width,
+  onWidth,
   entries,
   selected,
   onSelect,
   onClose,
 }: {
+  width: number;
+  onWidth: (value: number) => void;
   entries: RecoveryEntry[];
   selected?: string;
   onSelect: (entry: RecoveryEntry) => void;
   onClose: () => void;
 }) {
   return (
-    <aside className="document-side history-list" aria-label="版本歷史">
+    <aside
+      className="document-side history-list"
+      aria-label="版本歷史"
+      style={{ width, flexBasis: width }}
+    >
+      <PanelResizeHandle
+        side="right"
+        value={width}
+        min={220}
+        max={420}
+        onResize={onWidth}
+        label="調整版本歷史寬度"
+      />
       <div className="section-heading">
         <strong>
           <Clock3 size={15} />
@@ -118,24 +135,34 @@ export function HistoryList({
           .sort((a, b) => b.at - a.at)
           .map((entry, index, sorted) => (
             <Fragment key={entry.id}>
-            {(index === 0 || new Date(sorted[index-1].at).toDateString() !== new Date(entry.at).toDateString()) && <h3 className="history-day">{new Date(entry.at).toLocaleDateString("zh-TW",{year:"numeric",month:"long",day:"numeric"})}</h3>}
-            <button
-              className={selected === entry.id ? "active" : ""}
-              aria-pressed={selected === entry.id}
-              onClick={() => onSelect(entry)}
-            >
-              <Clock3 size={14} />
-              <span>
-                <strong>
-                  {new Date(entry.at).toLocaleString("zh-TW", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false,
+              {(index === 0 ||
+                new Date(sorted[index - 1].at).toDateString() !==
+                  new Date(entry.at).toDateString()) && (
+                <h3 className="history-day">
+                  {new Date(entry.at).toLocaleDateString("zh-TW", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
                   })}
-                </strong>
-                <small>{entry.reason}</small>
-              </span>
-            </button>
+                </h3>
+              )}
+              <button
+                className={selected === entry.id ? "active" : ""}
+                aria-pressed={selected === entry.id}
+                onClick={() => onSelect(entry)}
+              >
+                <Clock3 size={14} />
+                <span>
+                  <strong>
+                    {new Date(entry.at).toLocaleString("zh-TW", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    })}
+                  </strong>
+                  <small>{entry.reason}</small>
+                </span>
+              </button>
             </Fragment>
           ))}
       </div>
