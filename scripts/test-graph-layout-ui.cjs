@@ -44,6 +44,35 @@ fs.writeFileSync(
     notices: [],
   }),
 );
+function assertRouteGeometry(snapshot) {
+  for (const route of Object.values(snapshot.layout.routes)) {
+    assert.ok(!route.error, route.id + ": " + route.error);
+    if (route.card) {
+      const c = route.card;
+      assert.ok(
+        route.points.slice(1).some((b, i) => {
+          const a = route.points[i];
+          return (
+            a.y === b.y &&
+            Math.abs(c.y - a.y) < 0.01 &&
+            Math.min(a.x, b.x) <= c.x - c.width / 2 &&
+            Math.max(a.x, b.x) >= c.x + c.width / 2
+          );
+        }),
+        "card must stay on its own horizontal route",
+      );
+    }
+    for (let i = 2; i < route.points.length; i++) {
+      const a = route.points[i - 2],
+        b = route.points[i - 1],
+        c = route.points[i];
+      assert.ok(
+        (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y) >= -0.01,
+        route.id + " immediately retraces at " + JSON.stringify(b),
+      );
+    }
+  }
+}
 let app, page;
 const result = { errors: [], console: [], requests: [] };
 (async () => {
@@ -66,6 +95,8 @@ const result = { errors: [], console: [], requests: [] };
       timeout: 60000,
     });
     page = await app.firstWindow();
+    await page.context().setOffline(true);
+    result.version = await app.evaluate(({ app }) => app.getVersion());
     page.setDefaultTimeout(12000);
     page.on("pageerror", (e) => result.errors.push(e.message));
     page.on("console", (m) => {
@@ -247,6 +278,7 @@ const result = { errors: [], console: [], requests: [] };
     await page.waitForTimeout(700);
     const movedPin = (await state()).layout.routes[direct.id].pins[0];
     assert.ok(movedPin.x !== pin.x || movedPin.y !== pin.y);
+    assertRouteGeometry(await state());
     result.pin = true;
     // Escape rolls back an in-progress pin drag.
     const beforeCancel = await state(),
@@ -292,6 +324,7 @@ const result = { errors: [], console: [], requests: [] };
     await page.waitForTimeout(700);
     const afterTrunk = await state();
     assert.ok(afterTrunk.layout.trunks[trunk.id].manual);
+    assertRouteGeometry(afterTrunk);
     result.trunk = true;
     await label.click({ button: "right" });
     await settle();
@@ -379,6 +412,7 @@ const result = { errors: [], console: [], requests: [] };
       afterSwitch.layout.routes[direct.id].pins,
     );
     result.sourceMapping = true;
+    assertRouteGeometry(mapped);
     result.persisted = geometry(mapped);
     await app.close();
     app = null;
@@ -438,8 +472,19 @@ const result = { errors: [], console: [], requests: [] };
       groupIds = await page
         .locator(".react-flow__node.selected")
         .evaluateAll((es) => es.map((e) => e.dataset.id));
-    const groupBox = await byName("Start").boundingBox(),
-      frameStart = performance.now();
+    const groupBox = await byName("Start").boundingBox();
+    await page.evaluate(() => {
+      window.graphFrames = [];
+      window.graphSampling = true;
+      let previous = performance.now();
+      const sample = (now) => {
+        if (!window.graphSampling) return;
+        window.graphFrames.push(now - previous);
+        previous = now;
+        requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
     await page.mouse.move(groupBox.x + 20, groupBox.y + 15);
     await page.mouse.down();
     await page.mouse.move(groupBox.x + 45, groupBox.y + 45, { steps: 12 });
@@ -461,7 +506,15 @@ const result = { errors: [], console: [], requests: [] };
     );
     result.boxSelect = true;
     result.groupMove = true;
-    result.dragTestElapsedMs = Math.round(performance.now() - frameStart);
+    result.dragFrameGaps = await page.evaluate(() => {
+      window.graphSampling = false;
+      const a = window.graphFrames.sort((x, y) => x - y);
+      return {
+        samples: a.length,
+        p95Ms: Math.round(a[Math.floor(a.length * 0.95)] || 0),
+        maxMs: Math.round(a.at(-1) || 0),
+      };
+    });
     await page.getByRole("button", { name: "復原布局", exact: true }).click();
     await settle();
     assert.deepEqual(
@@ -512,6 +565,21 @@ const result = { errors: [], console: [], requests: [] };
     await settle();
     assert.deepEqual(geometry(await state()), geometry(segmentBefore));
     result.segmentUndo = true;
+    const beforeAll = await state();
+    await page.getByRole("button", { name: "自動整理", exact: true }).click();
+    await page.waitForTimeout(900);
+    assert.ok(
+      Object.values((await state()).layout.routes).every(
+        (r) =>
+          r.pins.length === 0 &&
+          r.fixedSegments.length === 0 &&
+          !r.card?.manual,
+      ),
+    );
+    await page.getByRole("button", { name: "復原布局", exact: true }).click();
+    await settle();
+    assert.deepEqual(geometry(await state()), geometry(beforeAll));
+    result.fullArrangeUndo = true;
     // Inline text editing keeps its separate document history.
     await byName("Start").locator(".flow-card-title").dblclick();
     const content = page.getByRole("textbox", {
@@ -539,6 +607,10 @@ const result = { errors: [], console: [], requests: [] };
     await page.locator(".react-flow__pane").click({ position: { x: 8, y: 8 } });
     await content.waitFor({ state: "detached" });
     result.inlineEditing = true;
+    await page.getByRole("button", { name: "適應全部", exact: true }).click();
+    await settle();
+    assert.ok(result.requests.some((url) => url.endsWith(".wasm")));
+    result.offlineEngines = true;
 
     await page.screenshot({ path: path.join(out, "edited.png") });
     await page.screenshot({

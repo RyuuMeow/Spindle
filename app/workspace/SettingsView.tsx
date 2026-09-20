@@ -389,7 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.7.1：穩定的圖表局部佈線、整列劇本拖移，以及更清楚的檢查狀態。
+                    0.8.0：一次性圖表整理、整組分支、手動 pin 與線路、完整布局撤銷及重啟恢復。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

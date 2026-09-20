@@ -9,13 +9,22 @@ async function unusedPort() {
   for (let attempt = 0; attempt < 30; attempt++) {
     const server = net.createServer();
     try {
-      await new Promise((resolve, reject) => { server.once('error', reject); server.listen(require('node:crypto').randomInt(16384, 65536), '127.0.0.1', resolve); });
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(
+          require("node:crypto").randomInt(16384, 65536),
+          "127.0.0.1",
+          resolve,
+        );
+      });
       const port = server.address().port;
-      await new Promise(resolve => server.close(resolve));
+      await new Promise((resolve) => server.close(resolve));
       return port;
-    } catch { if (server.listening) server.close(); }
+    } catch {
+      if (server.listening) server.close();
+    }
   }
-  throw Error('No local debugger port is available');
+  throw Error("No local debugger port is available");
 }
 exports.launch = async function (playwright, options) {
   const inspectorPort = await unusedPort(),
@@ -115,6 +124,18 @@ exports.launch = async function (playwright, options) {
     if (!browser) throw Error("Portable browser debugger did not start");
     const context = browser.contexts()[0];
     return {
+      close: async () => {
+        try {
+          await evaluateExpression(
+            "new Promise((resolve,reject)=>{const e=process.mainModule.require('electron');e.app.once('will-quit',resolve);for(const w of e.BrowserWindow.getAllWindows())w.close();setTimeout(()=>reject(Error('Portable close handshake timed out')),12000).unref();})",
+            true,
+          );
+        } finally {
+          socket.close();
+          await browser.close().catch(() => {});
+          child.unref();
+        }
+      },
       firstWindow: async () =>
         context.pages()[0] || context.waitForEvent("page"),
       windows: () => context.pages(),

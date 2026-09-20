@@ -1,6 +1,19 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.7.1**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
+版本：Windows x64 **0.8.0**，2026-09-20。圖表改造、網頁／桌面打包及實際 Portable 驗收完成。
+
+## 0.8.0 圖表排版與手動佈線
+
+- 一次性全圖／選取整理、中心接點、原文分支成組、局部避障、新節點不重排、手動 pin／線段／幹線／卡片與 50 筆完整布局 Undo／Redo 已實作。
+- [桌面互動](../outputs/graph-layout-ui/result.json)通過右鍵平移／單擊選單、框選／Shift 加選、整組搬移、局部整理、無關線路不變、pin 拖動／Delete／Esc、卡片及幹線移動、線段撤銷、模式切換、圖表關閉時的來源修改、重啟恢復與節點內文字 Undo。
+- 單元／磁碟服務測試 **125／125**，涵蓋獨立／巢狀／不完整分支、相同目的地、唯一身分匹配、CRLF／BOM、舊布局遷移、外部修改、無解 pin 保留、pin 不折返、卡片通道與來源節點搬移。[圖表測試及效能](../outputs/graph-all-unit.log)。
+- 直線流程基準（本機 Node）：10／50／120 節點，約 14／65／96ms，皆為零轉折。
+- 多分支基準（本機 Node，非拖動延遲）：12／36／72 節點，20／68／140 轉場，約 68／301／1364ms；嚴格內部交叉計數 9／33／69，轉折 104／368／764。這是壓力資料，不代表任意圖可無交叉或得到全局最優解。
+- TypeScript、[變更範圍 lint](../outputs/graph-changed-lint.json)、網頁及桌面 build 通過。根目錄既有異常目錄使一般 lint 掃描 ENOENT；改以 Git 追蹤來源掃描，共 177 檔、13 個既有錯誤及 4 個警告，未宣稱清零。
+- [0.8.0 Portable 圖表驗收](../outputs/graph-portable-0.8.0/result.json)通過離線 Worker／WASM、手動佈線、完整整理撤銷、來源映射與重啟恢復；最終封裝再次檢查 pin 不折返及卡片始終位於所屬水平通道。
+- [原生啟動](../outputs/graph-startup-0.8.0/results.json)在本機 225% DPI 自行顯示視窗，工作區 4.125 秒就緒；雙執行個體解壓資源及重複啟動喚回通過。另有[工作區回歸](../outputs/graph-workspace-0.8.0/results.json)，涵蓋大綱、資料夾、複製、閱讀、提示、選取與窄窗。
+- Portable 拖動測試在 1440×960、scale 1 的範例圖採樣 69 筆 requestAnimationFrame 間隔，P95 8ms、最大 9ms；此數據包含等待收尾，僅代表幀間隔，不宣稱是輸入至繪製延遲。
+- 安裝版與 Portable 均已產生；ASAR 內含兩個圖表 Worker、WASM 與授權檔。[封裝核對](../outputs/graph-archive-verification.json)及[發行大小／SHA256／驗證摘要](../outputs/release-verification.json)。安裝精靈、多螢幕及混合 DPI 仍未實測。
 
 ## 0.7.1 拖移與路由修正
 
@@ -79,7 +92,7 @@
 
 原始 Yarn 是唯一內容來源；純文字、閱讀、節點與跨窗視圖共用文件版本及撤銷。指令別名與虛擬參數名稱只影響顯示，不改原始 Yarn；舊定義回退識別字。懸浮說明顯示位置、型別及參數描述，未完成／歧義輸入不猜測標籤。原檔停止輸入 800ms 後自動保存，組字期間暫停；不合法 Yarn 仍可保存。非法指令保留草稿，只有「套用定義」才更新有效設定。外部衝突／缺檔不自動覆寫或重建。
 
-每文件保留最近 50 份快照，最近刪除保留 30 天。Undo／Redo 共用於本次 App 執行階段；重啟使用持久化草稿與快照。匯入備份新增專案，保留原專案。Portable 與安裝版預設沿用 `%APPDATA%/Yarn Workbench`，不是 exe 旁保存。
+每文件保留最近 50 份快照，最近刪除保留 30 天。文字 Undo／Redo 共用於本次 App 執行階段；重啟使用持久化草稿與快照。圖表布局另有按視圖持久化的 50 筆 Undo／Redo。匯入備份新增專案，保留原專案。Portable 與安裝版預設沿用 `%APPDATA%/Yarn Workbench`，不是 exe 旁保存。
 
 仍未實測：真正中文輸入法期間的跨窗輸入、原生 tab 拖出／拖回、Snap、拔除副螢幕、混合 DPI、安裝精靈／Explorer 關聯與讀屏。服務層 composition、合成事件及 Electron 內容截圖不代表上述驗收完成。
 
@@ -87,4 +100,4 @@
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/stable-routing-and-tree-drag` 修正拖移與路由；前版基線 `v0.7.0`，交付標記 `v0.7.1`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪分支 `feat/graph-layout-editing`，前版基線 `v0.7.1`；四階段提交語義保存、引擎、互動歷史與交付，發行標記為 `v0.8.0`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。

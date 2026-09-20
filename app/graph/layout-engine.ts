@@ -7,6 +7,7 @@ import {
   cloneLayout,
   simplify,
   pointOnRoute,
+  cardOnRoute,
   type GraphLayoutRequest,
   type GraphLayoutResult,
   type RouteGeometry,
@@ -461,6 +462,7 @@ export async function computeLayout(
     old?: RouteGeometry;
     route: RouteGeometry;
     fixed: Point[][];
+    matches: (points: Point[]) => boolean;
     legs: { id: string; from: Point; to: Point }[];
   }[] = [];
   for (const e of model.groups) {
@@ -488,15 +490,25 @@ export async function computeLayout(
         (b) => b.id !== e.id,
       ),
     ];
+    const trunk = e.groupId && state.trunks[e.groupId];
+    const constraintsMatch = (points: Point[]) =>
+      (!card || cardOnRoute(card, points)) &&
+      (!trunk || trunk.points.every((p) => pointOnRoute(p, points, 0.01)));
     if (
       old &&
       same(old.points[0], start) &&
       same(old.points.at(-1)!, end) &&
       clear(old.points, blockers) &&
       old.pins.every((p) => pointOnRoute(p, old.points)) &&
-      !old.error
-    )
+      constraintsMatch(old.points) &&
+      old.fixedSegments.every(
+        (s) => pointOnRoute(s.a, old.points) && pointOnRoute(s.b, old.points),
+      ) &&
+      (!old.error || old.error === "等待修整")
+    ) {
+      delete old.error;
       continue;
+    }
     const route: RouteGeometry = {
       id: e.id,
       source: e.source,
@@ -510,7 +522,6 @@ export async function computeLayout(
       card,
     };
     let fixed: Point[][] = [[start, outside(start, sourceSide)]];
-    const trunk = e.groupId && state.trunks[e.groupId];
     if (trunk && sourceSide === "right") {
       const split = trunk.points.at(-1)!;
       fixed[0] = [
@@ -551,7 +562,12 @@ export async function computeLayout(
       outside(end, targetSide),
       end,
     ]);
-    if (old && old.points.length > 2) {
+    if (
+      old &&
+      old.points.length > 2 &&
+      !old.error &&
+      constraintsMatch(old.points)
+    ) {
       const interior = old.points.slice(1, -1);
       const portions: Point[][] = [];
       const allBoxes = [
@@ -590,7 +606,7 @@ export async function computeLayout(
         to: part[0],
       }))
       .filter((l) => !same(l.from, l.to));
-    plans.push({ edge: e, old, route, fixed, legs });
+    plans.push({ edge: e, old, route, fixed, legs, matches: constraintsMatch });
   }
   if (plans.length) {
     // Cards are obstacles except for their explicitly reserved fixed corridor.
@@ -619,6 +635,7 @@ export async function computeLayout(
       const result = simplify(points, route.pins);
       if (
         !clear(result, blockers) ||
+        !plan.matches(result) ||
         !route.pins.every((p) => pointOnRoute(p, result)) ||
         !route.fixedSegments.every(
           (s) => pointOnRoute(s.a, result) && pointOnRoute(s.b, result),

@@ -4,6 +4,7 @@ import { rectsOverlap } from "../graph-layout";
 import {
   cloneLayout,
   moveSegment,
+  movePin,
   projectCard,
   type GraphLayoutSnapshot,
 } from "./layout-state";
@@ -67,24 +68,10 @@ export function useRouteGestures(
       } else if (action.kind === "pin") {
         const pin = route.pins.find((p) => p.id === action.id);
         if (!pin) return;
-        const previous = { x: pin.x, y: pin.y };
-        pin.x += delta.x;
-        pin.y += delta.y;
-        const index = route.points.findIndex(
-          (p) => p.x === previous.x && p.y === previous.y,
-        );
-        if (index > 0 && index < route.points.length - 1) {
-          const a = route.points[index - 1],
-            b = route.points[index + 1];
-          route.points.splice(
-            index,
-            1,
-            a.y === previous.y ? { x: pin.x, y: a.y } : { x: a.x, y: pin.y },
-            { x: pin.x, y: pin.y },
-            b.y === previous.y ? { x: pin.x, y: b.y } : { x: b.x, y: pin.y },
-          );
-        }
-        route.error = "等待修整";
+        next.routes[id] = movePin(route, action.id, {
+          x: pin.x + delta.x,
+          y: pin.y + delta.y,
+        });
       } else if (action.kind === "segment") {
         const a = route.points[action.index],
           b = route.points[action.index + 1];

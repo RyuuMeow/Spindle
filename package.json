@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -16,7 +16,7 @@
     "desktop:start": "pnpm desktop:stage && node node_modules/electron/cli.js dist-desktop/app/desktop/main.cjs",
     "desktop:pack": "pnpm desktop:stage && node scripts/package-desktop.mjs",
     "test:desktop-ui": "node scripts/test-desktop-ui.cjs",
-    "test:graph": "node --test scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs",
+    "test:graph": "node --test scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs",
     "test:workspace": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs",
     "test:workspace-ui": "node scripts/test-workspace-ui.cjs",
     "test:portable-launch": "node scripts/test-portable-launch.cjs",
@@ -30,11 +30,12 @@
     "test:command-context-ui": "node scripts/test-command-context-ui.cjs",
     "test:editor-assistance": "node scripts/test-editor-assistance.cjs",
     "test:sync-language": "node scripts/test-sync-and-language.cjs",
-    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs",
+    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs",
     "test:hint-priority": "node scripts/test-hint-priority.cjs",
     "desktop:stage": "pnpm desktop:build && node scripts/prepare-desktop.mjs",
     "test:workspace-navigation": "node scripts/test-workspace-navigation.cjs",
-    "test:tree-drag": "node scripts/test-tree-drag.cjs"
+    "test:tree-drag": "node scripts/test-tree-drag.cjs",
+    "test:graph-ui": "node scripts/test-graph-layout-ui.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

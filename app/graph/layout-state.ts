@@ -188,6 +188,55 @@ export function moveNodes(
   next.revision++;
   return next;
 }
+/** Keep the two neighboring bends around a dragged pin, without a spur that doubles back. */
+export function movePin(
+  route: RouteGeometry,
+  id: string,
+  point: Point,
+): RouteGeometry {
+  const next = structuredClone(route);
+  const pin = next.pins.find((p) => p.id === id);
+  if (!pin) return next;
+  const previous = { x: pin.x, y: pin.y };
+  const index = next.points.findIndex((p) => p.x === pin.x && p.y === pin.y);
+  Object.assign(pin, point);
+  if (index > 0 && index < next.points.length - 1) {
+    const a = next.points[index - 1],
+      b = next.points[index + 1];
+    const incomingHorizontal = a.y === previous.y,
+      outgoingHorizontal = b.y === previous.y;
+    const sameAxis = incomingHorizontal === outgoingHorizontal;
+    const entry = sameAxis
+      ? incomingHorizontal
+        ? { x: a.x, y: pin.y }
+        : { x: pin.x, y: a.y }
+      : incomingHorizontal
+        ? { x: pin.x, y: a.y }
+        : { x: a.x, y: pin.y };
+    const exit = sameAxis
+      ? outgoingHorizontal
+        ? { x: b.x, y: pin.y }
+        : { x: pin.x, y: b.y }
+      : outgoingHorizontal
+        ? { x: pin.x, y: b.y }
+        : { x: b.x, y: pin.y };
+    next.points.splice(index, 1, entry, { x: pin.x, y: pin.y }, exit);
+    next.points = simplify(next.points, next.pins);
+  }
+  next.error = "等待修整";
+  return next;
+}
+export function cardOnRoute(card: CardAnchor, points: Point[]): boolean {
+  return points.slice(1).some((b, i) => {
+    const a = points[i];
+    return (
+      a.y === b.y &&
+      Math.abs(a.y - card.y) < 0.01 &&
+      Math.min(a.x, b.x) <= card.x - card.width / 2 &&
+      Math.max(a.x, b.x) >= card.x + card.width / 2
+    );
+  });
+}
 export function moveSegment(
   route: RouteGeometry,
   index: number,

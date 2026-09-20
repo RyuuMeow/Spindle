@@ -81,6 +81,19 @@ FileTree 負責選取、折疊、命名入口和拖移命中；file-tree.ts 共�
 
 ReadingEditor 接受 goTo nonce 以區分外部定位與游標回報，解除覆蓋目標的折疊再捲動。DialogueReader 是唯讀、來源行對應的 React 畫面，不生成或回寫 Yarn；書本狀態屬於 tab。StatisticsPanel 僅聚合目前文件，沿用 document-side 寬度與窄窗規則。desktop:stage 更新 renderer、主程序服務與版本資訊後才供 UI 測試／打包使用；只清理驗證位於 dist-desktop/app 下的生成 renderer，避免過期 hash bundle 混入發行。
 
-### 穩定路由與指標拖移（0.7.1）
+### 穩定路由與指標拖移（0.7.1，圖表部分由 0.8.0 取代）
 
 createConnectionRouter 在每個 Canvas 內保留上一組路徑，核對端點尺寸、連線拓撲及新障礙；有效路徑直接沿用。routeConnections 的幾何與標籤分兩階段，標籤位置不作幾何障礙；短引線也檢查碰撞。快取不寫入劇本或跨窗共享歷史。useTreeDrag 使用 pointer capture 與來源鍵，依 elementFromPoint 命中現有樹列／層尾，放開再呼叫同一 moveEntry 驗證與磁碟服務；不產生 OS 檔案拖曳 payload。
+
+
+### 持久圖表布局（0.8.0）
+
+0.8.0 取代 Canvas 內的即時 createConnectionRouter。React Flow 負責畫布與量測；graph/model.ts 建立獨立場景、轉場、分支組。graph/layout-state.ts 的 schema 2 快照包含節點位置、中心接點面、線路、pin、固定線段、幹線與卡片錨點。舊 positions／viewport 原位遷移，不重新排列。
+
+graph/layout-engine.ts 接收全圖／所選／修線請求。ELK Layered 使用量測尺寸與具有原文順序的虛擬分支組；libavoid-js 只負責固定部分之間的避障候選，Spindle 管理幹線、卡片通道及手動限制。全圖整理清除限制並適應視窗；局部只重排選取的完整範圍，外部節點作固定障礙，外部 pin／卡片保留。repair 沿用有效線路，只修端部及新障礙；新節點尋找鄰近空位。
+
+use-graph-layout.ts 管理 Worker、文件／布局版本、50 筆完整布局 Undo／Redo 與保存。過期回應丟棄，失敗保留布局；30 秒逾時終止引擎，重試建立新 Worker。layout.worker.ts 使用獨立 ELK Worker 與離線 libavoid WASM；avoid.ts 封裝已驗證的 embind API 與原生物件生命週期，不假設 C++ 全部介面皆可用。public/legal/ 附 LGPL／EPL 與對應來源。
+
+map-sources.ts 訂閱 WorkspaceClient 每筆共享文件交易。即使圖表未掛載，也更新目前、快取、前後導航及已關閉 tab 的來源錨點；使用保留 CRLF／BOM 的原文座標。全物件替換／外部改寫只作唯一特徵匹配，歧義轉場不繼承舊幾何。文件以 DocumentId 識別，Graph 掛載 key 包含 TabId／DocumentId，避免同 tab 切稿套用別稿布局。
+
+RouteEditor／TrunkEditor／use-route-gestures.ts 管理線、pin、卡片及幹線手勢；文字仍使用 SceneEditor 文件交易。每次手勢一筆布局快照，Undo 不回寫 Yarn。縮放細節以 visibility 處理而不移除摘要，接點不因縮放移動。

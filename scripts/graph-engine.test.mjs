@@ -7,6 +7,8 @@ import { buildGraphModel } from "../app/graph/model.ts";
 import {
   migrateLayout,
   moveNodes,
+  movePin,
+  cardOnRoute,
   pointOnRoute,
 } from "../app/graph/layout-state.ts";
 import { segmentHitsRect, rectsOverlap } from "../app/graph-layout.ts";
@@ -66,6 +68,18 @@ function assertClear(result, request) {
     }));
   for (const route of Object.values(s.routes)) {
     assert.ok(route.points.length >= 2);
+    if (route.card)
+      assert.ok(
+        cardOnRoute(route.card, route.points),
+        "card stays on its horizontal corridor",
+      );
+    if (route.groupId)
+      assert.ok(
+        s.trunks[route.groupId].points.every((p) =>
+          pointOnRoute(p, route.points, 0.01),
+        ),
+        "branch follows group trunk",
+      );
     for (let i = 1; i < route.points.length; i++) {
       const a = route.points[i - 1],
         b = route.points[i];
@@ -350,4 +364,106 @@ test("multi-branch performance fixture reports routes, crossings, bends and elap
     });
   }
   t.diagnostic(JSON.stringify(times));
+});
+
+test("moving a pin across a straight leg makes a continuous detour without retracing", async () => {
+  const r = fixture(scene("A", "<<jump B>>") + scene("B", "end"));
+  const first = await run(r),
+    edge = Object.values(first.snapshot.routes)[0];
+  const a = edge.points[0],
+    b = edge.points.at(-1),
+    pin = { id: "pin", x: (a.x + b.x) / 2, y: a.y };
+  edge.points.splice(1, 0, { x: pin.x, y: pin.y });
+  edge.pins.push(pin);
+  first.snapshot.routes[edge.id] = movePin(edge, pin.id, {
+    x: pin.x + 5,
+    y: pin.y + 38,
+  });
+  const repaired = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: first.snapshot,
+  });
+  assertClear(repaired, r);
+  const route = repaired.snapshot.routes[edge.id];
+  assert.ok(pointOnRoute(route.pins[0], route.points));
+  assert.equal(
+    new Set(route.points.map((p) => p.x + "," + p.y)).size,
+    route.points.length,
+    "no duplicated vertices",
+  );
+  for (let i = 2; i < route.points.length; i++) {
+    const a = route.points[i - 2],
+      b = route.points[i - 1],
+      c = route.points[i];
+    assert.ok(
+      (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y) >= 0,
+      "no immediate retracing",
+    );
+  }
+  const again = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: repaired.snapshot,
+  });
+  assert.deepEqual(
+    again.snapshot.routes,
+    repaired.snapshot.routes,
+    "settled repair is stable",
+  );
+});
+
+test("repair restores a displaced card corridor and keeps a manually moved shared trunk", async () => {
+  const r = branching(),
+    first = await run(r),
+    branch = r.model.branches[0];
+  const trunk = first.snapshot.trunks[branch.id],
+    oldX = trunk.points.at(-1).x;
+  trunk.points.at(-1).x += 12;
+  trunk.manual = true;
+  for (const id of branch.transitions) {
+    const edge = first.snapshot.routes[id];
+    edge.points = edge.points.map((p, i) =>
+      i > 0 && p.x === oldX ? { ...p, x: p.x + 12 } : p,
+    );
+    edge.error = "等待修整";
+  }
+  const edge = first.snapshot.routes[branch.transitions[1]];
+  // A previously valid endpoint-only repair missed the card while routing around it.
+  edge.points = edge.points.map((p) =>
+    p.y === edge.card.y ? { ...p, y: p.y - 24 } : p,
+  );
+  const result = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: first.snapshot,
+  });
+  assertClear(result, r);
+  assert.deepEqual(result.snapshot.trunks[branch.id], trunk);
+  for (const id of branch.transitions)
+    assert.deepEqual(
+      result.snapshot.routes[id].card,
+      first.snapshot.routes[id].card,
+    );
+});
+
+test("moving a branch source keeps its card lanes and unrelated routes valid", async () => {
+  const r = branching(),
+    first = await run(r),
+    source = r.model.records[0].id,
+    p = first.snapshot.positions[source];
+  const moved = moveNodes(first.snapshot, {
+    [source]: { x: p.x + 12, y: p.y + 20 },
+  });
+  const repaired = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: moved,
+  });
+  assertClear(repaired, r);
+  for (const [id, old] of Object.entries(first.snapshot.routes)) {
+    if (old.card) assert.deepEqual(repaired.snapshot.routes[id].card, old.card);
+    if (old.source !== source && old.target !== source)
+      assert.deepEqual(repaired.snapshot.routes[id], old);
+  }
 });
