@@ -1989,7 +1989,7 @@ export default function Workbench({
                         </span>
                       )}
                       {!errorCount && !warningCount && (
-                        <CircleAlert size={16} />
+                        <Check size={16} />
                       )}
                     </ChromeButton>
                     <ChromeButton

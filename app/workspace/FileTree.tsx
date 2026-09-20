@@ -1,6 +1,5 @@
 "use client";
 import {
-  useRef,
   useState,
   type MouseEvent,
   type KeyboardEvent,
@@ -16,8 +15,8 @@ import {
 import type { Project, DocumentRecord, FileSortMode } from "./types";
 import type { InlineDraft } from "./InlineNameEditor";
 import { treeEntries, withinFolder } from "./file-tree";
+import { useTreeDrag } from "./use-tree-drag";
 import "./file-tree.css";
-const MIME = "application/x-spindle-entry";
 export default function FileTree({
   project,
   sort,
@@ -48,26 +47,8 @@ export default function FileTree({
 }) {
   const [collapsed, setCollapsed] = useState(new Set<string>()),
     [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(""),
-    [drop, setDrop] = useState<{
-      key: string;
-      position: "before" | "after" | "inside";
-    } | null>(null);
-  const drag = useRef("");
-  const stop = () => {
-    drag.current = "";
-    setDragging("");
-    setDrop(null);
-  };
-  const valid = (parent: string) =>
-    !drag.current.startsWith("folder:") ||
-    (parent !== drag.current.slice(7) &&
-      !withinFolder(parent, drag.current.slice(7)));
-  async function move(parent: string, before?: string) {
-    const source = drag.current;
-    stop();
-    if (source) await onMove(source, parent, before);
-  }
+  const { host, dragging, drop, begin, move, finish, cancel, click } =
+    useTreeDrag(project, sort, onMove);
   const render = (parent = "", depth = 0): ReactNode => {
     const entries = treeEntries(project, parent, sort);
     return (
@@ -75,7 +56,7 @@ export default function FileTree({
         {draft?.folder === parent &&
           ["new-document", "new-folder"].includes(draft.kind) &&
           inline()}
-        {entries.map((entry, index) => {
+        {entries.map((entry) => {
           const doc = project.documents.find((d) => d.id === entry.documentId);
           const editing =
             draft &&
@@ -115,52 +96,15 @@ export default function FileTree({
                   "tree-entry file-entry " + (selected ? "active" : "")
                 }
                 data-entry={entry.key}
-                draggable={!draft}
-                onDragStart={(e) => {
-                  drag.current = entry.key;
-                  setDragging(entry.key);
-                  e.dataTransfer.setData(MIME, entry.key);
-                  e.dataTransfer.effectAllowed = "move";
-                }}
-                onDragEnd={stop}
-                onDragOver={(e) => {
-                  if (!drag.current || drag.current === entry.key) {
-                    setDrop(null);
-                    return;
-                  }
-                  const rect = e.currentTarget.getBoundingClientRect(),
-                    ratio = (e.clientY - rect.top) / rect.height;
-                  const position =
-                    isFolder && ratio > 0.25 && ratio < 0.75
-                      ? "inside"
-                      : ratio < 0.5
-                        ? "before"
-                        : "after";
-                  if (!valid(position === "inside" ? entry.path : parent))
-                    return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  e.dataTransfer.dropEffect = "move";
-                  setDrop({ key: entry.key, position });
-                }}
-                onDrop={(e) => {
-                  if (!drop || drop.key !== entry.key) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const into = drop.position === "inside";
-                  void move(
-                    into ? entry.path : parent,
-                    into
-                      ? undefined
-                      : drop.position === "before"
-                        ? entry.key
-                        : entries[index + 1]?.key,
-                  );
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
+                onPointerDown={(e) => {
+                  if (!editing) begin(e, entry.key);
                 }}
                 onContextMenu={menu}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
-                    stop();
+                    cancel();
                     return;
                   }
                   if (e.target instanceof HTMLInputElement) return;
@@ -269,29 +213,21 @@ export default function FileTree({
               onFolder(parent);
             }
           }}
-          onDragOver={(e) => {
-            if (!drag.current || !valid(parent)) return;
-            e.preventDefault();
-            e.stopPropagation();
-            setDrop({ key: "end:" + parent, position: "before" });
-          }}
-          onDrop={(e) => {
-            if (!drag.current || !valid(parent)) return;
-            e.preventDefault();
-            e.stopPropagation();
-            void move(parent);
-          }}
-        >
-          {dragging && !parent && <span>移到專案最外層</span>}
-        </div>
+        />
       </>
     );
   };
   return (
     <div
+      ref={host}
+      onPointerMove={move}
+      onPointerUp={finish}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
+      onClickCapture={click}
       className={"file-tree " + (dragging ? "is-dragging" : "")}
       onKeyDown={(e) => {
-        if (e.key === "Escape") stop();
+        if (e.key === "Escape") cancel();
       }}
     >
       {render()}

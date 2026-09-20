@@ -861,7 +861,7 @@
 @media (max-width: 999px) { .workspace-body > .document-side { position: absolute; height: auto; } }
 
 /* Count badges belong inside the control, including its hit/hover area. */
-.document-icon-tools > .check-button { width:auto; min-width:32px; flex:0 0 auto; padding:0 7px; gap:6px; }
+.document-icon-tools > .check-button { width:auto; min-width:32px; flex:0 0 auto; padding:0 7px; gap:12px; }
 .document-icon-tools > .check-button svg, .document-icon-tools > .check-button b { flex-shrink:0; }
 .document-icon-tools > .check-button b { line-height:20px; font-variant-numeric:tabular-nums; }
 

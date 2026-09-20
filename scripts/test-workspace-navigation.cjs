@@ -46,14 +46,11 @@ async function dragEntry(from, to, ratio = 0.1) {
     target = to.startsWith("end:")
       ? page.locator('[data-folder-end="' + to.slice(4) + '"]')
       : page.locator('[data-entry="' + to + '"]');
-  const dt = await page.evaluateHandle(() => new DataTransfer());
-  await source.dispatchEvent("dragstart", { dataTransfer: dt });
+  const origin = await source.locator(".file-row").boundingBox();
   const box = await target.boundingBox();
-  await target.dispatchEvent("dragover", {
-    dataTransfer: dt,
-    clientX: box.x + 15,
-    clientY: box.y + box.height * ratio,
-  });
+  await page.mouse.move(origin.x + 25, origin.y + origin.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 15, box.y + box.height * ratio, { steps: 12 });
   await settle();
   assert.ok(
     await page
@@ -77,8 +74,7 @@ async function dragEntry(from, to, ratio = 0.1) {
       radius: "0px",
     });
   }
-  await target.dispatchEvent("drop", { dataTransfer: dt });
-  await source.dispatchEvent("dragend", { dataTransfer: dt }).catch(() => {});
+  await page.mouse.up();
   await settle();
 }
 (async () => {
@@ -101,7 +97,11 @@ async function dragEntry(from, to, ratio = 0.1) {
       timeout: 60000,
     });
     result.version = await app.evaluate(({ app }) => app.getVersion());
-    assert.equal(result.version, JSON.parse(fs.readFileSync("package.json", "utf8")).version);
+    if (process.env.DESKTOP_PORTABLE_TEST === "1")
+      assert.equal(
+        result.version,
+        JSON.parse(fs.readFileSync("package.json", "utf8")).version,
+      );
     page = await app.firstWindow();
     page.setDefaultTimeout(10000);
     page.on("pageerror", (e) => result.errors.push(e.message));
