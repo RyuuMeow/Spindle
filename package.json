@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -33,7 +33,8 @@
     "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs",
     "test:hint-priority": "node scripts/test-hint-priority.cjs",
     "desktop:stage": "pnpm desktop:build && node scripts/prepare-desktop.mjs",
-    "test:workspace-navigation": "node scripts/test-workspace-navigation.cjs"
+    "test:workspace-navigation": "node scripts/test-workspace-navigation.cjs",
+    "test:tree-drag": "node scripts/test-tree-drag.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -220,6 +220,7 @@ const request = (a) => page.evaluate((a) => window.yarnDesktop.request(a), a);
     await page.mouse.move(o.x + 105, o.y - 15, { steps: 14 });
     await page.mouse.up();
     await settle();
+    assert.equal(before.length, 2, "forward and feedback edges are present");
     const after = await paths(),
       next = await orphan.boundingBox();
     assert.ok(Math.abs(next.x - o.x) > 30);

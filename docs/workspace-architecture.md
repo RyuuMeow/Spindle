@@ -80,3 +80,7 @@ emptyParameterHint 同時讀取游標兩側，內建語義位置與自訂位置�
 FileTree 負責選取、折疊、命名入口和拖移命中；file-tree.ts 共用資料夾合法性、移動規劃、混合順序。Project.folders 保存空資料夾，treeOrder 保存文件 ID／資料夾路徑鍵的排列；舊資料缺欄位仍可還原。建立與移動透過具名 IPC，renderer 不取得任意 filesystem。單次資料夾移動先驗證來源／目的在 root 內、排除 symlink 和同名，完成磁碟 rename 後才映射全部子文件路徑及 metadata，文字、版本與 DocumentId 保持不變。資料夾移到系統垃圾桶前保留各 Yarn 文件快照；App 可逐檔復原，完整目錄及其他檔案可從系統垃圾桶復原。
 
 ReadingEditor 接受 goTo nonce 以區分外部定位與游標回報，解除覆蓋目標的折疊再捲動。DialogueReader 是唯讀、來源行對應的 React 畫面，不生成或回寫 Yarn；書本狀態屬於 tab。StatisticsPanel 僅聚合目前文件，沿用 document-side 寬度與窄窗規則。desktop:stage 更新 renderer、主程序服務與版本資訊後才供 UI 測試／打包使用；只清理驗證位於 dist-desktop/app 下的生成 renderer，避免過期 hash bundle 混入發行。
+
+### 穩定路由與指標拖移（0.7.1）
+
+createConnectionRouter 在每個 Canvas 內保留上一組路徑，核對端點尺寸、連線拓撲及新障礙；有效路徑直接沿用。routeConnections 的幾何與標籤分兩階段，標籤位置不作幾何障礙；短引線也檢查碰撞。快取不寫入劇本或跨窗共享歷史。useTreeDrag 使用 pointer capture 與來源鍵，依 elementFromPoint 命中現有樹列／層尾，放開再呼叫同一 moveEntry 驗證與磁碟服務；不產生 OS 檔案拖曳 payload。

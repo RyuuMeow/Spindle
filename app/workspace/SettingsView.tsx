@@ -389,7 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.7.0：資料夾與行內操作、純閱讀與分析側欄、閱讀定位，以及更清楚的流程佈線與診斷狀態。
+                    0.7.1：穩定的圖表局部佈線、整列劇本拖移，以及更清楚的檢查狀態。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

@@ -1,6 +1,14 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.7.0**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
+版本：Windows x64 **0.7.1**，2026-09-20。已完成打包與隔離 profile 的 Portable 互動驗證。
+
+## 0.7.1 拖移與路由修正
+
+- [0.7.1 Portable 拖移／圖表](../outputs/stable-routing-portable-0.7.1/results.json)及[完整工作區](../outputs/stable-routing-workspace-portable-0.7.1/results.json)皆通過；App 版本核對為 0.7.1，沒有頁面錯誤。樹拖移以 Chromium 滑鼠按下／移動／放開驗證，不再合成 DataTransfer；實體多螢幕與混合 DPI 仍未實測。
+
+- 穩定路由、壓縮間距、標籤不推線與受阻局部更新已加入幾何回歸。
+- [指標互動](../outputs/tree-drag-complete/results.json)：Shop、Untitled 2、深層文件移出，起拖門檻、Esc 取消、資料夾移動、混合診斷 12px 間距，以及圖上實際拖動無關節點的線路穩定性通過。
+- [工作區回歸](../outputs/stable-routing-workspace-ui/results.json)：完整七個分支標籤、大綱、純閱讀、複製、側欄與窄窗通過。
 
 ## 0.7.0 工作區、閱讀與流程修訂
 
@@ -51,8 +59,8 @@
 - [0.7.0 Portable 工作區互動](../outputs/workspace-navigation-portable-0.7.0/results.json)全部通過，核對 App 版本為 0.7.0 且沒有頁面錯誤；[提示優先順序回歸](../outputs/workspace-navigation-hint-regression/results.json)涵蓋純文字、閱讀與節點編輯。
 
 - [0.7.0 Portable 原生啟動](../outputs/workspace-navigation-startup-0.7.0/results.json)通過自行顯示視窗、兩個隔離執行個體、解壓資源存活與重複啟動喚回；本機 225% DPI，沒有用強制 show 取代啟動驗證。
-- TypeScript、修改範圍 lint、網頁及桌面 production build 通過；本輪改動範圍見 [lint 報告](../outputs/workspace-navigation-lint.json)。全專案既有 lint 基線未清零。
-- 單元與服務回歸 **100／100**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
+- TypeScript、修改範圍 lint、網頁及桌面 production build 通過；本輪六個模組見 [lint 報告](../outputs/stable-routing-lint.json)。全專案既有 lint 基線未清零。
+- 單元與服務回歸 **105／105**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
 - [0.6.5 Portable 提示互動](../outputs/hint-priority-portable-0.6.5/results.json)：空值判斷、hover 取代、候選互斥、Esc 與失焦，三種模式全數通過；安裝精靈及真正 IME／混合 DPI 未實測。
 - [0.6.4 Portable 互動](../outputs/sync-language-portable-0.6.4/results.json)：純文字／閱讀／圖表即時同步與共享 Undo、跨檔變數補全、內建指令參數說明、靜默更名、無確認刪除、Windows 資源回收筒與 App 復原，全數通過且無頁面錯誤。
 - [0.6.3 Portable 互動](../outputs/refinement-portable-0.6.3/results.json)：三個編輯入口、相同 29px 補全列高與參數文字寬度、空白行與 BOM／CRLF 保留、頂部新增與雙擊改名、800px 窄窗及 100／125／150% App 縮放提示定位，全數通過且無頁面錯誤。
@@ -79,4 +87,4 @@
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `feat/workspace-reading-navigation` 整理工作區樹、閱讀與流程；前版基線為 `v0.6.5`，交付標記為 `v0.7.0`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪在 `fix/stable-routing-and-tree-drag` 修正拖移與路由；前版基線 `v0.7.0`，交付標記 `v0.7.1`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
