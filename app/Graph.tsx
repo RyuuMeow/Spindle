@@ -61,7 +61,7 @@ import {
   CARD_WIDTH,
   CARD_HEIGHT,
   layoutGraph,
-  routeConnections,
+  createConnectionRouter,
   type Point,
   type RoutedConnection,
 } from "./graph-layout";
@@ -345,6 +345,29 @@ function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
           }}
         />
       </g>
+      {showLabel && route.labelAnchor && (
+        <line
+          x1={route.labelAnchor.x}
+          y1={route.labelAnchor.y}
+          x2={Math.max(
+            route.labelRect.x,
+            Math.min(
+              route.labelRect.x + route.labelRect.width,
+              route.labelAnchor.x,
+            ),
+          )}
+          y2={Math.max(
+            route.labelRect.y,
+            Math.min(
+              route.labelRect.y + route.labelRect.height,
+              route.labelAnchor.y,
+            ),
+          )}
+          stroke={active ? "#d4dfeb" : "#777"}
+          strokeWidth={1}
+          pointerEvents="none"
+        />
+      )}
       {showLabel && (
         <EdgeLabelRenderer>
           <button
@@ -743,6 +766,7 @@ function Canvas({
       })),
     [records, positions, automatic, cardHeights, editing],
   );
+  const routeConnections = useMemo(() => createConnectionRouter(), []);
   const routes = useMemo(
     () =>
       routeConnections(
@@ -762,7 +786,7 @@ function Canvas({
           };
         }),
       ),
-    [geometry, groups],
+    [geometry, groups, routeConnections],
   );
   const edges: RouteEdge[] = routes.map((route) => {
     const group = groups.find((group) => group.id === route.id)!;

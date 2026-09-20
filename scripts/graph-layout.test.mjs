@@ -197,7 +197,7 @@ test("visible labels stay attached to their own path, and direct transitions nee
     assert.ok(
       route.points.slice(1).some((b, index) => {
         const a = route.points[index],
-          p = route.labelPoint;
+          p = route.labelAnchor || route.labelPoint;
         return a.x === b.x
           ? p.x === a.x &&
               p.y >= Math.min(a.y, b.y) &&
@@ -288,4 +288,44 @@ test("incomplete condition blocks mark graph relationships as unresolved", () =>
   assert.equal(unfinishedExpression.links[0].unresolved, true);
   const orphanElse = parseStory("<<else>>\n<<jump Shop>>");
   assert.equal(orphanElse.links[0].unresolved, true);
+});
+
+
+test("unrelated scene movement preserves connection geometry and feedback lanes", () => {
+  const cards = [rect("a", 0, 100), rect("b", 460, 100), rect("other", 0, 600)];
+  const edges = [edge("a", "b"), edge("b", "a")];
+  const before = routeConnections(cards, edges);
+  const after = routeConnections(cards.map(r => r.id === "other" ? {...r, y:-300} : r), edges, before);
+  assert.deepEqual(after.map(r=>r.path),before.map(r=>r.path));
+});
+test("moving a sibling target does not reshuffle ports on a stationary branch", () => {
+  const cards = [rect("a",0,0),rect("b",460,0),rect("c",460,300)];
+  const edges = [edge("a","b"),edge("a","c")];
+  const before = routeConnections(cards,edges);
+  const after = routeConnections(cards.map(r=>r.id==="c"?{...r,y:-250}:r),edges,before);
+  assert.equal(after[0].path,before[0].path);
+  assert.notEqual(after[1].path,before[1].path);
+});
+test("a moved obstacle invalidates only the paths it now obstructs", () => {
+  const cards = [rect("a",0,0),rect("b",700,0),rect("obstacle",350,350),rect("c",0,700),rect("d",700,700)];
+  const edges=[edge("a","b"),edge("c","d")];
+  const before=routeConnections(cards,edges),moved=cards.map(r=>r.id==="obstacle"?{...r,y:0}:r);
+  const after=routeConnections(moved,edges,before);
+  assert.notEqual(after[0].path,before[0].path);assert.equal(after[1].path,before[1].path);
+  assertNoCardIntersections(after,moved);
+});
+test("compressed real gaps remain direct instead of producing escape loops",()=>{
+  for(const gap of [4,12,28,40]) {
+    const cards=[rect("a",0,0),rect("b",CARD_WIDTH+gap,0)];
+    const [route]=routeConnections(cards,[edge("a","b")]);
+    assertNoCardIntersections([route],cards);assert.equal(route.points.length,2);
+    assert.equal(route.points[1].x-route.points[0].x,gap);
+  }
+});
+test("long labels cannot force unrelated lines into detours",()=>{
+  const ids=["a","b","c","d"],edges=[edge("a","b"),edge("a","c"),edge("b","d"),edge("c","a")];
+  const cards=geometry(ids,edges);
+  const labelled=routeConnections(cards,edges.map(e=>({...e,labelWidth:220})));
+  const plain=routeConnections(cards,edges.map(e=>({...e,label:false})));
+  assert.deepEqual(labelled.map(r=>r.path),plain.map(r=>r.path));
 });

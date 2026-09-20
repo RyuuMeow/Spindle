@@ -158,21 +158,27 @@ function simplify(points: Point[]): Point[] {
   );
 }
 
-/** Rectilinear A* on obstacle boundaries. It also routes around earlier labels. */
-function findPath(
-  start: Point,
-  end: Point,
-  obstacles: GraphRect[],
-  previousRoutes: RoutedConnection[],
-): Point[] {
+/** Rectilinear A* around cards. Labels never deform connection geometry. */
+function findPath(start: Point, end: Point, obstacles: GraphRect[]): Point[] {
+  const midX = (start.x + end.x) / 2,
+    midY = (start.y + end.y) / 2;
+  const simple = [
+    [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end],
+    [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end],
+  ];
+  for (const candidate of simple) {
+    const points = simplify(
+      candidate.filter(
+        (p, i, all) => !i || p.x !== all[i - 1].x || p.y !== all[i - 1].y,
+      ),
+    );
+    if (!obstacles.some((rect) => intersects(points, rect))) return points;
+  }
   const xs = [
     ...new Set([
       start.x,
       end.x,
       ...obstacles.flatMap((r) => [r.x, r.x + r.width]),
-      ...previousRoutes.flatMap((r) =>
-        r.points.flatMap((p) => [p.x - 16, p.x + 16]),
-      ),
     ]),
   ].sort((a, b) => a - b);
   const ys = [
@@ -180,9 +186,6 @@ function findPath(
       start.y,
       end.y,
       ...obstacles.flatMap((r) => [r.y, r.y + r.height]),
-      ...previousRoutes.flatMap((r) =>
-        r.points.flatMap((p) => [p.y - 16, p.y + 16]),
-      ),
     ]),
   ].sort((a, b) => a - b);
   const key = (x: number, y: number, d: number) => `${x},${y},${d}`;
@@ -213,52 +216,11 @@ function findPath(
       const b = { x: xs[nx], y: ys[ny] };
       if (obstacles.some((rect) => segmentHitsRect(a, b, rect))) continue;
       const id = key(nx, ny, nd);
-      let crossingCost = 0;
-      for (const route of previousRoutes)
-        for (let i = 1; i < route.points.length; i++) {
-          const c = route.points[i - 1],
-            e = route.points[i];
-          if (
-            a.x === b.x &&
-            c.x === e.x &&
-            a.x === c.x &&
-            Math.min(Math.max(a.y, b.y), Math.max(c.y, e.y)) >
-              Math.max(Math.min(a.y, b.y), Math.min(c.y, e.y))
-          )
-            crossingCost += 400;
-          else if (
-            a.y === b.y &&
-            c.y === e.y &&
-            a.y === c.y &&
-            Math.min(Math.max(a.x, b.x), Math.max(c.x, e.x)) >
-              Math.max(Math.min(a.x, b.x), Math.min(c.x, e.x))
-          )
-            crossingCost += 400;
-          else if (
-            a.x === b.x &&
-            c.y === e.y &&
-            a.x > Math.min(c.x, e.x) &&
-            a.x < Math.max(c.x, e.x) &&
-            c.y > Math.min(a.y, b.y) &&
-            c.y < Math.max(a.y, b.y)
-          )
-            crossingCost += 80;
-          else if (
-            a.y === b.y &&
-            c.x === e.x &&
-            c.x > Math.min(a.x, b.x) &&
-            c.x < Math.max(a.x, b.x) &&
-            a.y > Math.min(c.y, e.y) &&
-            a.y < Math.max(c.y, e.y)
-          )
-            crossingCost += 80;
-        }
       const cost =
         costs.get(current.id)! +
         Math.abs(a.x - b.x) +
         Math.abs(a.y - b.y) +
-        (d && d !== nd ? 80 : 0) +
-        crossingCost;
+        (d && d !== nd ? 100 : 0);
       if (cost >= (costs.get(id) ?? Infinity)) continue;
       costs.set(id, cost);
       previous.set(id, current.id);
@@ -270,12 +232,8 @@ function findPath(
     }
   }
   if (!finish)
-    return [
-      start,
-      { x: start.x, y: Math.min(...ys) - 40 },
-      { x: end.x, y: Math.min(...ys) - 40 },
-      end,
-    ];
+    // Overlapping cards may enclose an endpoint. Keep the connector local.
+    return simplify([start, { x: end.x, y: start.y }, end]);
   const result: Point[] = [];
   for (let id: string | undefined = finish; id; id = previous.get(id)) {
     const state = states.get(id)!;
@@ -285,6 +243,9 @@ function findPath(
 }
 
 export type RoutedConnection = GraphConnection & {
+  sourceRect: GraphRect;
+  targetRect: GraphRect;
+  portSignature: string;
   points: Point[];
   path: string;
   sourceSide: Side;
@@ -292,31 +253,75 @@ export type RoutedConnection = GraphConnection & {
   sourceFraction: number;
   targetFraction: number;
   labelPoint: Point;
+  labelAnchor?: Point;
   labelRect: GraphRect;
   labelVisible: boolean;
 };
 
+function sameRect(a: GraphRect, b: GraphRect) {
+  return (
+    a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+  );
+}
+function padded(rect: GraphRect, margin: number): GraphRect {
+  return {
+    ...rect,
+    x: rect.x - margin,
+    y: rect.y - margin,
+    width: rect.width + margin * 2,
+    height: rect.height + margin * 2,
+  };
+}
+function intersects(points: Point[], rect: GraphRect) {
+  return points.slice(1).some((p, i) => segmentHitsRect(points[i], p, rect));
+}
+
+/** Keep valid connections fixed; moved endpoints and newly obstructed paths alone reroute. */
+export function createConnectionRouter() {
+  let previous: RoutedConnection[] = [];
+  return (rects: GraphRect[], connections: GraphConnection[]) => {
+    previous = routeConnections(rects, connections, previous);
+    return previous;
+  };
+}
 export function routeConnections(
   rects: GraphRect[],
   connections: GraphConnection[],
+  previous: RoutedConnection[] = [],
 ): RoutedConnection[] {
-  const byId = new Map(rects.map((rect) => [rect.id, rect]));
-  const labels: GraphRect[] = [],
-    routed: RoutedConnection[] = [];
-  let feedbackLane = 0;
-  for (const connection of [...connections].sort((a, b) => {
-    const backward = (e: GraphConnection) =>
-      (byId.get(e.target)?.x ?? 0) <= (byId.get(e.source)?.x ?? 0) ? 1 : 0;
-    return backward(a) - backward(b);
-  })) {
-    const labelWidth = Math.max(
-      80,
-      Math.min(220, connection.labelWidth || LABEL_WIDTH),
-    );
+  const byId = new Map(rects.map((r) => [r.id, r])),
+    old = new Map(previous.map((r) => [r.id, r]));
+  const routed: RoutedConnection[] = [];
+  for (const connection of connections) {
     const source = byId.get(connection.source),
       target = byId.get(connection.target);
     if (!source || !target) continue;
-    const feedback = target.x < source.x - CARD_WIDTH / 2;
+    // Source order belongs to the story, never to the Y coordinate of a dragged neighbour.
+    const siblings = connections.filter((e) => e.source === connection.source),
+      incoming = connections.filter((e) => e.target === connection.target);
+    const portSignature = JSON.stringify([
+      siblings.map((e) => e.id),
+      incoming.map((e) => e.id),
+    ]);
+    const cached = old.get(connection.id);
+    const reusable =
+      cached &&
+      cached.source === connection.source &&
+      cached.target === connection.target &&
+      cached.portSignature === portSignature &&
+      sameRect(cached.sourceRect, source) &&
+      sameRect(cached.targetRect, target) &&
+      !rects.some(
+        (r) =>
+          r.id !== source.id &&
+          r.id !== target.id &&
+          intersects(cached.points, padded(r, 6)),
+      );
+    if (reusable) {
+      routed.push({ ...cached, ...connection });
+      continue;
+    }
+    const feedback = target.x + target.width < source.x;
     let sourceSide: Side, targetSide: Side;
     if (source.id === target.id) {
       sourceSide = "right";
@@ -324,54 +329,65 @@ export function routeConnections(
     } else if (feedback) {
       sourceSide = "top";
       targetSide = "top";
-    } else if (Math.abs(target.x - source.x) > CARD_WIDTH / 2) {
-      sourceSide = target.x > source.x ? "right" : "left";
-      targetSide = sourceSide === "right" ? "left" : "right";
+    } else if (target.x >= source.x + source.width) {
+      sourceSide = "right";
+      targetSide = "left";
+    } else if (source.x >= target.x + target.width) {
+      sourceSide = "left";
+      targetSide = "right";
     } else {
       sourceSide = target.y > source.y ? "right" : "left";
       targetSide = sourceSide;
     }
-    const siblings = connections
-      .filter((e) => e.source === connection.source)
-      .sort(
-        (a, b) => (byId.get(a.target)?.y || 0) - (byId.get(b.target)?.y || 0),
-      );
-    const incoming = connections
-      .filter((e) => e.target === connection.target)
-      .sort(
-        (a, b) => (byId.get(a.source)?.y || 0) - (byId.get(b.source)?.y || 0),
-      );
     const fraction = (items: GraphConnection[]) =>
       items.length < 2
         ? 0.5
         : 0.08 +
           (0.84 * items.findIndex((e) => e.id === connection.id)) /
             (items.length - 1);
-    const sourceFraction = fraction(siblings);
-    const targetFraction = fraction(incoming);
-    const obstacles = [
-      ...rects.map((rect) => ({
-        ...rect,
-        x: rect.x - 22,
-        y: rect.y - 22,
-        width: rect.width + 44,
-        height: rect.height + 44,
-      })),
-      ...labels,
-    ];
-    const start = port(source, sourceSide, 22, sourceFraction),
-      end = port(target, targetSide, 22, targetFraction);
+    const sourceFraction = fraction(siblings),
+      targetFraction = fraction(incoming);
+    // A narrow real gap must remain a gap after adding visual clearance.
+    const clearance = (rect: GraphRect) =>
+      Math.min(
+        8,
+        ...rects
+          .filter((r) => r.id !== rect.id)
+          .map((r) => {
+            const dx = Math.max(
+              r.x - rect.x - rect.width,
+              rect.x - r.x - r.width,
+              0,
+            );
+            const dy = Math.max(
+              r.y - rect.y - rect.height,
+              rect.y - r.y - r.height,
+              0,
+            );
+            return Math.max(dx, dy) / 3;
+          }),
+      );
+    const sourceMargin = clearance(source),
+      targetMargin = clearance(target);
+    const obstacles = rects.map((r) => padded(r, clearance(r)));
+    const start = port(source, sourceSide, sourceMargin, sourceFraction),
+      end = port(target, targetSide, targetMargin, targetFraction);
+    // Feedback lanes depend only on their endpoints, not on unrelated scene bounds.
     const lane =
-      Math.min(...rects.map((r) => r.y)) -
-      60 -
-      (feedback ? feedbackLane++ * 64 : 0);
+      Math.min(source.y, target.y) -
+      48 -
+      siblings.findIndex((e) => e.id === connection.id) * 24;
     const middle = feedback
       ? [
-          ...findPath(start, { x: start.x, y: lane }, obstacles, routed),
-          { x: end.x, y: lane },
-          ...findPath({ x: end.x, y: lane }, end, obstacles, routed),
+          ...findPath(start, { x: start.x, y: lane }, obstacles),
+          ...findPath(
+            { x: start.x, y: lane },
+            { x: end.x, y: lane },
+            obstacles,
+          ),
+          ...findPath({ x: end.x, y: lane }, end, obstacles),
         ]
-      : findPath(start, end, obstacles, routed);
+      : findPath(start, end, obstacles);
     const points = simplify(
       [
         port(source, sourceSide, 0, sourceFraction),
@@ -381,72 +397,148 @@ export function routeConnections(
         (p, i, all) => !i || p.x !== all[i - 1].x || p.y !== all[i - 1].y,
       ),
     );
-    const segments = points.slice(1).map((b, i) => ({
-      a: points[i],
-      b,
-      length: Math.abs(points[i].x - b.x) + Math.abs(points[i].y - b.y),
-    }));
-    let label: Point | undefined, labelRect: GraphRect | undefined;
-    for (const segment of [...segments].sort(
-      (a, b) =>
-        (b.a.y === b.b.y ? 1 : 0) - (a.a.y === a.b.y ? 1 : 0) ||
-        b.length - a.length,
-    )) {
-      if (connection.label === false) break;
-      if (
-        segment.length <
-        (segment.a.y === segment.b.y ? labelWidth + 16 : LABEL_HEIGHT + 16)
-      )
-        continue;
-      for (const fraction of [0.5, 0.3, 0.7]) {
-        const middle = {
-          x: segment.a.x + (segment.b.x - segment.a.x) * fraction,
-          y: segment.a.y + (segment.b.y - segment.a.y) * fraction,
-        };
-        const candidate = {
-          id: `label:${connection.id}`,
-          x: middle.x - labelWidth / 2,
-          y: middle.y - LABEL_HEIGHT / 2,
-          width: labelWidth,
-          height: LABEL_HEIGHT,
-        };
-        if ([...rects, ...labels].some((rect) => rectsOverlap(candidate, rect)))
-          continue;
-        if (
-          routed.some((route) =>
-            route.points
-              .slice(1)
-              .some((b, i) => segmentHitsRect(route.points[i], b, candidate)),
-          )
-        )
-          continue;
-        label = middle;
-        labelRect = candidate;
-        break;
-      }
-      if (label) break;
-    }
-    const labelVisible = !!label && !!labelRect;
-    if (labelRect) labels.push(labelRect);
     routed.push({
       ...connection,
+      sourceRect: source,
+      targetRect: target,
+      portSignature,
       sourceSide,
       targetSide,
       sourceFraction,
       targetFraction,
       points,
-      path: points
-        .map((point, i) => `${i ? "L" : "M"}${point.x},${point.y}`)
-        .join(" "),
-      labelPoint: label || points[0],
-      labelRect: labelRect || {
-        id: `label:${connection.id}`,
+      path: points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" "),
+      labelPoint: points[0],
+      labelRect: {
+        id: "label:" + connection.id,
         ...points[0],
         width: 0,
         height: 0,
       },
-      labelVisible,
+      labelVisible: false,
     });
   }
-  return routed;
+  // Place text after all lines. Crowded text may sit beside its line with a short leader.
+  const labels: GraphRect[] = [];
+  const result = routed.map((route) => ({
+    ...route,
+    labelVisible: false,
+    labelAnchor: undefined as Point | undefined,
+    labelRect: { ...route.labelRect, width: 0, height: 0 },
+  }));
+  const clearLeader = (
+    route: RoutedConnection,
+    anchor: Point,
+    candidate: GraphRect,
+  ) => {
+    const end = {
+      x: Math.max(
+        candidate.x,
+        Math.min(candidate.x + candidate.width, anchor.x),
+      ),
+      y: Math.max(
+        candidate.y,
+        Math.min(candidate.y + candidate.height, anchor.y),
+      ),
+    };
+    return (
+      ![...rects, ...labels].some((r) => segmentHitsRect(anchor, end, r)) &&
+      !routed.some(
+        (other) =>
+          other.id !== route.id &&
+          other.points.slice(1).some((b, i) => {
+            const a = other.points[i];
+            return segmentHitsRect(anchor, end, {
+              id: other.id,
+              x: Math.min(a.x, b.x) - 0.5,
+              y: Math.min(a.y, b.y) - 0.5,
+              width: Math.abs(a.x - b.x) + 1,
+              height: Math.abs(a.y - b.y) + 1,
+            });
+          }),
+      )
+    );
+  };
+  const validLabel = (
+    route: RoutedConnection,
+    candidate: GraphRect,
+    anchor?: Point,
+  ) =>
+    ![...rects, ...labels].some((r) => rectsOverlap(candidate, r)) &&
+    !routed.some(
+      (other) => other.id !== route.id && intersects(other.points, candidate),
+    ) &&
+    (!anchor || clearLeader(route, anchor, candidate));
+  // Reserve valid previous labels before finding positions for changed routes.
+  for (const route of result) {
+    const cached = old.get(route.id),
+      width = Math.max(80, Math.min(220, route.labelWidth || LABEL_WIDTH));
+    if (
+      route.label !== false &&
+      cached?.labelVisible &&
+      cached.path === route.path &&
+      cached.labelRect.width === width &&
+      validLabel(route, cached.labelRect, cached.labelAnchor)
+    ) {
+      route.labelVisible = true;
+      route.labelPoint = cached.labelPoint;
+      route.labelAnchor = cached.labelAnchor;
+      route.labelRect = cached.labelRect;
+      labels.push(cached.labelRect);
+    }
+  }
+  for (const route of result) {
+    if (route.label === false || route.labelVisible) continue;
+    const width = Math.max(80, Math.min(220, route.labelWidth || LABEL_WIDTH));
+    const segments = route.points
+      .slice(1)
+      .map((b, i) => ({
+        a: route.points[i],
+        b,
+        length:
+          Math.abs(route.points[i].x - b.x) + Math.abs(route.points[i].y - b.y),
+      }))
+      .sort(
+        (a, b) =>
+          Number(b.a.y === b.b.y) - Number(a.a.y === a.b.y) ||
+          b.length - a.length,
+      );
+    outer: for (const offset of [0, -28, 28, -44, 44])
+      for (const segment of segments) {
+        if (
+          segment.length <
+          (offset
+            ? 20
+            : segment.a.y === segment.b.y
+              ? width + 12
+              : LABEL_HEIGHT + 12)
+        )
+          continue;
+        for (const fraction of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+          const p = {
+            x: segment.a.x + (segment.b.x - segment.a.x) * fraction,
+            y: segment.a.y + (segment.b.y - segment.a.y) * fraction,
+          };
+          const center = {
+            x: p.x + (segment.a.x === segment.b.x ? offset * 3 : 0),
+            y: p.y + (segment.a.y === segment.b.y ? offset : 0),
+          };
+          const candidate = {
+            id: "label:" + route.id,
+            x: center.x - width / 2,
+            y: center.y - LABEL_HEIGHT / 2,
+            width,
+            height: LABEL_HEIGHT,
+          };
+          if (!validLabel(route, candidate, offset ? p : undefined)) continue;
+          if (offset) route.labelAnchor = p;
+          route.labelVisible = true;
+          route.labelPoint = center;
+          route.labelRect = candidate;
+          labels.push(candidate);
+          break outer;
+        }
+      }
+  }
+  return result;
 }
