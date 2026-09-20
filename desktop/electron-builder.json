@@ -19,7 +19,8 @@
     "dist-desktop/renderer/**/*",
     "package.json",
     "!node_modules/**/*",
-    "desktop/icon.png"
+    "desktop/icon.png",
+    "desktop/window-lifecycle.cjs"
   ],
   "asar": true,
   "win": {

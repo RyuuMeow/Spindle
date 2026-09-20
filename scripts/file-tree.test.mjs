@@ -83,6 +83,16 @@ test("disk folders and mixed order survive a fresh profile; failed moves/trash p
   );
   fs.writeFileSync(path.join(root, "root.yarn"), "title: Root\n---\n===");
   let failTrash = true;
+  const rename = fs.renameSync;
+  fs.renameSync = (from, to) => {
+    if (
+      failTrash &&
+      from === path.join(root, "Empty") &&
+      to.endsWith("payload")
+    )
+      throw Error("trash unavailable");
+    return rename(from, to);
+  };
   const services = {
     chooseFolder: async () => root,
     chooseFiles: async () => [],
@@ -157,9 +167,10 @@ test("disk folders and mixed order survive a fresh profile; failed moves/trash p
       projectId: p.id,
       name: "Empty",
     });
-    assert.ok(fs.existsSync(path.join(base, "trashed")));
+    assert.ok(fs.readdirSync(path.join(root, ".yarn-workbench/trash")).length);
     assert.ok(!service.engine.project(p.id).folders.includes("Empty"));
   } finally {
+    fs.renameSync = rename;
     service.dispose();
   }
 });

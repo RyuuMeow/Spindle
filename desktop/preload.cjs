@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld("yarnDesktop", {
   ready: () => ipcRenderer.invoke("workspace:ready"),
   subscribe: (callback) => subscribe("workspace:changed", callback),
   session: {
+    project: (projectId) =>
+      ipcRenderer.invoke("workspace:project-view", projectId),
     load: () => ipcRenderer.invoke("workspace:session-load"),
     save: (value) => ipcRenderer.invoke("workspace:session-save", value),
   },

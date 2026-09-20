@@ -1,6 +1,17 @@
-import { addFolder, applyTreeMove, planTreeMove, projectFolders, withinFolder } from "./file-tree";
+import {
+  addFolder,
+  applyTreeMove,
+  planTreeMove,
+  projectFolders,
+  withinFolder,
+} from "./file-tree";
 import { appendedScene, renamedSceneByName } from "./authoring";
-import { EditorState, ChangeSet, Text, type Transaction } from "@codemirror/state";
+import {
+  EditorState,
+  ChangeSet,
+  Text,
+  type Transaction,
+} from "@codemirror/state";
 import {
   collab,
   getSyncedVersion,
@@ -88,23 +99,42 @@ class BrowserService {
       else if (a.type === "transaction")
         this.engine.transaction(p.id, a.label, a.documents);
       else if (a.type === "createScene" || a.type === "renameScene") {
-        const documents = a.type === "createScene" ? appendedScene(p, a.documentId, a.version, a.name) : renamedSceneByName(p, a.documentId, a.version, a.fromName, a.name).documents;
-        this.engine.transaction(p.id, a.type === "createScene" ? "新增場景" : "更名場景", documents);
+        const documents =
+          a.type === "createScene"
+            ? appendedScene(p, a.documentId, a.version, a.name)
+            : renamedSceneByName(p, a.documentId, a.version, a.fromName, a.name)
+                .documents;
+        this.engine.transaction(
+          p.id,
+          a.type === "createScene" ? "新增場景" : "更名場景",
+          documents,
+        );
         documentId = a.documentId;
       } else if (a.type === "createDocument")
-        documentId = this.engine.create(p.id, a.name, a.text, a.firstInOrder).id;
+        documentId = this.engine.create(
+          p.id,
+          a.name,
+          a.text,
+          a.firstInOrder,
+        ).id;
       else if (a.type === "createFolder") addFolder(p, a.name);
-      else if (a.type === "moveEntry") applyTreeMove(p, planTreeMove(p,a.entry,a.parent,a.name,a.before));
+      else if (a.type === "moveEntry")
+        applyTreeMove(p, planTreeMove(p, a.entry, a.parent, a.name, a.before));
       else if (a.type === "trashFolder") {
-        const children=p.documents.filter(d=>withinFolder(d.name,a.name));
-        for (const d of children) this.engine.checkpoint(p.id,d.id,"刪除資料夾",true);
-        p.documents=p.documents.filter(d=>!children.includes(d));
-        p.folders=projectFolders(p).filter(f=>f!==a.name&&!withinFolder(f,a.name));
-      }
-      else if (a.type === "renameProject") p.name = a.name;
+        const children = p.documents.filter((d) =>
+          withinFolder(d.name, a.name),
+        );
+        for (const d of children)
+          this.engine.checkpoint(p.id, d.id, "刪除資料夾", true);
+        p.documents = p.documents.filter((d) => !children.includes(d));
+        p.folders = projectFolders(p).filter(
+          (f) => f !== a.name && !withinFolder(f, a.name),
+        );
+      } else if (a.type === "renameProject") p.name = a.name;
       else if (a.type === "renameDocument") {
         const d = this.engine.document(p.id, a.documentId);
-        if (d.name === a.name) return { snapshot: this.snapshot(), projectId, documentId: d.id };
+        if (d.name === a.name)
+          return { snapshot: this.snapshot(), projectId, documentId: d.id };
         const temporary = this.engine.create(p.id, a.name, d.text);
         p.documents = p.documents.filter((x) => x.id !== temporary.id);
         d.name = a.name;
@@ -132,11 +162,20 @@ class BrowserService {
       else if (a.type === "removeDocument") {
         this.engine.checkpoint(p.id, a.documentId, "移到垃圾桶", true);
         p.documents = p.documents.filter((d) => d.id !== a.documentId);
+      } else if (a.type === "purgeTrash") {
+        p.recovery = p.recovery.filter(
+          (e) =>
+            !e.deleted || (a.recoveryId !== undefined && e.id !== a.recoveryId),
+        );
       } else if (a.type === "recover") {
         const e = p.recovery.find((e) => e.id === a.recoveryId);
         if (!e) throw Error("找不到快照");
         if (e.documentId === "@commands") {
-          if (a.expectedText !== undefined && JSON.stringify(p.commands) !== a.expectedText) throw Error("指令已變更，請重新比較後再還原");
+          if (
+            a.expectedText !== undefined &&
+            JSON.stringify(p.commands) !== a.expectedText
+          )
+            throw Error("指令已變更，請重新比較後再還原");
           const previous = p.commands,
             next = JSON.parse(e.text);
           validateCommands(next);
@@ -154,7 +193,12 @@ class BrowserService {
         } else {
           const d = p.documents.find((d) => d.id === e.documentId);
           if (d) {
-            if ((a.expectedVersion !== undefined && d.version !== a.expectedVersion) || (a.expectedText !== undefined && d.text !== a.expectedText)) throw Error("內容已變更，請重新比較後再還原");
+            if (
+              (a.expectedVersion !== undefined &&
+                d.version !== a.expectedVersion) ||
+              (a.expectedText !== undefined && d.text !== a.expectedText)
+            )
+              throw Error("內容已變更，請重新比較後再還原");
             this.engine.checkpoint(p.id, d.id, "恢復前");
             this.engine.replace(p.id, d.id, e.text, "恢復");
             documentId = d.id;
@@ -166,6 +210,8 @@ class BrowserService {
             documentId = this.engine.create(p.id, name, e.text).id;
           }
         }
+        if (e?.deleted)
+          p.recovery = p.recovery.filter((item) => item.id !== e.id);
       } else if (a.type === "sortDocuments")
         p.documents = a.documentIds.map((id) => this.engine.document(p.id, id));
       else if (a.type === "export") {
@@ -215,14 +261,21 @@ export class WorkspaceClient {
   private adapter: { request: (a: WorkspaceAction) => Promise<ActionResult> };
   private states = new Map<string, EditorState>();
   private listeners = new Set<() => void>();
-  private sourceListeners = new Set<(id:string, transaction:Transaction)=>void>();
-  subscribeSourceChanges = (listener:(id:string, transaction:Transaction)=>void) => {
+  private sourceListeners = new Set<
+    (id: string, transaction: Transaction) => void
+  >();
+  subscribeSourceChanges = (
+    listener: (id: string, transaction: Transaction) => void,
+  ) => {
     this.sourceListeners.add(listener);
-    return () => { this.sourceListeners.delete(listener); };
+    return () => {
+      this.sourceListeners.delete(listener);
+    };
   };
-  private applyState(id:string,transaction:Transaction) {
-    this.states.set(id,transaction.state);
-    if(transaction.docChanged)for(const listener of this.sourceListeners)listener(id,transaction);
+  private applyState(id: string, transaction: Transaction) {
+    this.states.set(id, transaction.state);
+    if (transaction.docChanged)
+      for (const listener of this.sourceListeners) listener(id, transaction);
   }
   private state: WorkspaceSnapshot = {
     projects: [],
@@ -296,7 +349,7 @@ export class WorkspaceClient {
       documents: legacy.documents || [],
       commands: legacy.config?.commands || [],
     };
-    if (pristine) {
+    if (pristine && !window.yarnDesktop) {
       input.name = "The Last Light";
       input.documents = initialDocs;
       input.commands = initialCommands;
@@ -358,6 +411,11 @@ export class WorkspaceClient {
               );
           }
         }
+      const ids = new Set(
+        snapshot.projects.flatMap((p) => p.documents.map((d) => d.id)),
+      );
+      for (const id of this.states.keys())
+        if (!ids.has(id)) this.states.delete(id);
       this.authority = snapshot;
       this.emit();
     });
@@ -382,34 +440,49 @@ export class WorkspaceClient {
     this.applyState(documentId, state.update({ changes }));
     this.error = "";
     this.emit();
-    void this.flush().catch((error) => this.fail(error));
+    void this.flush(projectId).catch((error) => this.fail(error));
+  }
+  hasPendingWritesIn(projectId?: string) {
+    return this.state.projects
+      .filter((p) => !projectId || p.id === projectId)
+      .some((p) =>
+        p.documents.some(
+          (d) =>
+            this.composing.has(d.id) ||
+            (this.states.has(d.id) &&
+              sendableUpdates(this.states.get(d.id)!).length > 0) ||
+            ["pending", "saving"].includes(d.status),
+        ),
+      );
   }
   get hasPendingWrites() {
-    return (
-      this.composing.size > 0 ||
-      [...this.states.values()].some(
-        (state) => sendableUpdates(state).length > 0,
-      ) ||
-      this.state.projects.some((p) =>
-        p.documents.some((d) => ["pending", "saving"].includes(d.status)),
-      )
+    return this.hasPendingWritesIn();
+  }
+  async prepareClose(projectId?: string) {
+    const ids = new Set(
+      this.state.projects
+        .filter((p) => !projectId || p.id === projectId)
+        .flatMap((p) => p.documents.map((d) => d.id)),
     );
+    if ([...this.composing].some((id) => ids.has(id)))
+      throw Error("文字仍在組字中，請完成輸入後再離開。");
+    await this.flush(projectId);
   }
-  async prepareClose() {
-    if (this.composing.size)
-      throw Error("文字仍在組字中，請完成輸入後再關閉。");
-    await this.flush();
-    if (this.error) throw Error(this.error);
-  }
-  flush(): Promise<void> {
-    if (this.pumping) return this.pumping;
+  async flush(projectId?: string): Promise<void> {
+    if (this.pumping) {
+      await this.pumping;
+      return this.flush(projectId);
+    }
     this.pumping = (async () => {
       for (;;) {
         let pending = false;
-        for (const p of this.authority.projects)
+        for (const p of this.authority.projects.filter(
+          (p) => !projectId || p.id === projectId,
+        ))
           for (const d of p.documents) {
             if (this.composing.has(d.id)) continue;
-            const state = this.states.get(d.id)!;
+            const state = this.states.get(d.id);
+            if (!state) continue;
             const updates = sendableUpdates(state);
             if (!updates.length) continue;
             pending = true;
@@ -438,13 +511,13 @@ export class WorkspaceClient {
       else {
         await new Promise((resolve) => setTimeout(resolve, 30));
         this.composing.delete(action.documentId);
-        await this.flush();
+        await this.flush(action.projectId);
       }
       const result = await this.adapter.request(action);
       await this.reconcile(result.snapshot);
       return result;
     }
-    await this.flush();
+    if ("projectId" in action) await this.flush(action.projectId);
     const result = await this.adapter.request(action);
     await this.reconcile(result.snapshot);
     return result;

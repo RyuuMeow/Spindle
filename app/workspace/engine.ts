@@ -153,8 +153,14 @@ export function validateProject(value: unknown): Project {
   )
     throw Error("專案資料格式錯誤");
   validateCommands(p.commands);
-  p.folders=Array.isArray(p.folders)?p.folders.filter(n=>typeof n==="string"&&validDocumentName(n+"/folder.yarn")):[];
-  p.treeOrder=Array.isArray(p.treeOrder)?p.treeOrder.filter(n=>typeof n==="string"):[];
+  p.folders = Array.isArray(p.folders)
+    ? p.folders.filter(
+        (n) => typeof n === "string" && validDocumentName(n + "/folder.yarn"),
+      )
+    : [];
+  p.treeOrder = Array.isArray(p.treeOrder)
+    ? p.treeOrder.filter((n) => typeof n === "string")
+    : [];
   const ids = new Set<string>(),
     names = new Set<string>();
   for (const d of p.documents) {
@@ -186,8 +192,15 @@ export function restoreProjects(input: unknown) {
       id: typeof p.id === "string" ? p.id : uuid(),
       name: typeof p.name === "string" ? p.name : `復原專案 ${index + 1}`,
       commands: [],
-      folders: Array.isArray(p.folders) ? p.folders.filter(n=>typeof n==="string" && validDocumentName(n+"/folder.yarn")) : [],
-      treeOrder: Array.isArray(p.treeOrder) ? p.treeOrder.filter(n=>typeof n==="string") : [],
+      folders: Array.isArray(p.folders)
+        ? p.folders.filter(
+            (n) =>
+              typeof n === "string" && validDocumentName(n + "/folder.yarn"),
+          )
+        : [],
+      treeOrder: Array.isArray(p.treeOrder)
+        ? p.treeOrder.filter((n) => typeof n === "string")
+        : [],
       excluded: Array.isArray(p.excluded)
         ? p.excluded.filter((n) => typeof n === "string")
         : [],
@@ -256,6 +269,11 @@ export class DocumentEngine {
     const d = this.project(projectId).documents.find((d) => d.id === id);
     if (!d) throw Error("找不到文件");
     return d;
+  }
+  resetDocument(id: string) {
+    this.logs.delete(id);
+    this.history.delete(id);
+    this.redoHistory.delete(id);
   }
   updates(projectId: string, id: string, version: number): WireUpdate[] {
     this.document(projectId, id);
@@ -381,7 +399,12 @@ export class DocumentEngine {
       { id, version: d.version, edits: difference(d.text, value) },
     ]);
   }
-  create(projectId: string, name: string, value: string, firstInOrder?: string[]) {
+  create(
+    projectId: string,
+    name: string,
+    value: string,
+    firstInOrder?: string[],
+  ) {
     const p = this.project(projectId);
     name = name.replace(/\\/g, "/");
     if (
@@ -392,10 +415,16 @@ export class DocumentEngine {
     const d = makeDocument(name, value);
     if (firstInOrder) {
       const rank = new Map(firstInOrder.map((id, index) => [id, index]));
-      const ordered = [...p.documents].sort((a, b) =>
-        (rank.get(a.id) ?? firstInOrder.length) - (rank.get(b.id) ?? firstInOrder.length));
-      const folder = (value: string) => value.slice(0, value.lastIndexOf("/") + 1);
-      const first = ordered.findIndex(item => folder(item.name) === folder(name));
+      const ordered = [...p.documents].sort(
+        (a, b) =>
+          (rank.get(a.id) ?? firstInOrder.length) -
+          (rank.get(b.id) ?? firstInOrder.length),
+      );
+      const folder = (value: string) =>
+        value.slice(0, value.lastIndexOf("/") + 1);
+      const first = ordered.findIndex(
+        (item) => folder(item.name) === folder(name),
+      );
       ordered.splice(first < 0 ? ordered.length : first, 0, d);
       p.documents = ordered;
       if (p.treeOrder) p.treeOrder = ["file:" + d.id, ...p.treeOrder];

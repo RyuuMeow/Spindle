@@ -14,6 +14,10 @@ await cp(
   new URL("desktop/main.cjs", destination),
 );
 await cp(
+  new URL("desktop/window-lifecycle.cjs", root),
+  new URL("desktop/window-lifecycle.cjs", destination),
+);
+await cp(
   new URL("desktop/preload.cjs", root),
   new URL("desktop/preload.cjs", destination),
 );
@@ -38,8 +42,12 @@ await build({
   target: "node22",
 });
 const stagedRenderer = new URL("dist-desktop/renderer/", destination);
-const relativeStage = path.relative(fileURLToPath(destination), fileURLToPath(stagedRenderer));
-if (relativeStage !== path.join("dist-desktop", "renderer")) throw Error("Unexpected renderer staging path");
+const relativeStage = path.relative(
+  fileURLToPath(destination),
+  fileURLToPath(stagedRenderer),
+);
+if (relativeStage !== path.join("dist-desktop", "renderer"))
+  throw Error("Unexpected renderer staging path");
 // This is generated output below dist-desktop/app; never retain previous hashed bundles.
 await rm(stagedRenderer, { recursive: true, force: true });
 await cp(

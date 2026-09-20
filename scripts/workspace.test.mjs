@@ -137,7 +137,7 @@ test("profile write failure is never reported as a saved draft and can be retrie
   }
 });
 
-test("duplicate identifiers in project metadata do not prevent script recovery", async () => {
+test("invalid project identifiers preserve the manifest and do not enter the editor", async () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "yarn-workbench-test-")),
     root = path.join(base, "project");
   fs.mkdirSync(path.join(root, ".yarn-workbench"), { recursive: true });
@@ -160,15 +160,12 @@ test("duplicate identifiers in project metadata do not prevent script recovery",
     changed: () => {},
   });
   try {
-    const p = (await service.request({ type: "openFolder" })).snapshot
-      .projects[0];
-    assert.equal(p.documents.length, 2);
-    assert.notEqual(p.documents[0].id, p.documents[1].id);
-    assert(
-      fs
-        .readdirSync(path.join(base, "profile"))
-        .some((name) => name.startsWith("project-config-recovery-")),
-    );
+    const file = path.join(root, ".yarn-workbench/project.json"),
+      before = fs.readFileSync(file, "utf8");
+    await assert.rejects(service.request({ type: "openFolder" }), /識別重複/);
+    assert.equal(fs.readFileSync(file, "utf8"), before);
+    assert.equal(service.snapshot().projects.length, 0);
+    assert.equal(fs.readFileSync(path.join(root, "a.yarn"), "utf8"), "A");
   } finally {
     service.dispose();
     assert(
@@ -236,10 +233,15 @@ test("disk-full and read-only failures retain source and draft, then retry succe
     await service.request({ type: "save", projectId: p.id, documentId: d.id });
     assert.equal(service.engine.document(p.id, d.id).status, "error");
     assert.equal(fs.readFileSync(file, "utf8"), "original");
+    const cache = path.join(base, "profile", "workspace-cache");
     assert(
       fs
-        .readFileSync(path.join(base, "profile", "workspace-v2.json"), "utf8")
-        .includes("retained draft"),
+        .readdirSync(cache)
+        .some((name) =>
+          fs
+            .readFileSync(path.join(cache, name), "utf8")
+            .includes("retained draft"),
+        ),
     );
     assert(!fs.readdirSync(root).some((name) => name.endsWith(".tmp")));
     fs.renameSync = originalRename;
@@ -746,6 +748,11 @@ test("trash failure keeps the file and latest recoverable source; retry moves it
   const file = path.join(root, "a.yarn");
   fs.writeFileSync(file, "title: A\n---\noriginal\n===");
   let reject = true;
+  const rename = fs.renameSync;
+  fs.renameSync = (from, to) => {
+    if (reject && from === file) throw Error("trash unavailable");
+    return rename(from, to);
+  };
   const service = new WorkspaceService(path.join(base, "profile"), {
     chooseFolder: async () => root,
     chooseFiles: async () => [],
@@ -771,14 +778,11 @@ test("trash failure keeps the file and latest recoverable source; retry moves it
     await assert.rejects(service.request(action), /trash unavailable/);
     assert(fs.existsSync(file));
     assert.equal(service.snapshot().projects[0].documents.length, 1);
-    assert.equal(
-      service.snapshot().projects[0].recovery.at(-1).text,
-      "latest local text",
-    );
+    assert.equal(fs.readFileSync(file, "utf8"), "latest local text");
     reject = false;
     await service.request(action);
     assert(!fs.existsSync(file));
-    assert(fs.existsSync(path.join(base, "trash.yarn")));
+    assert(fs.readdirSync(path.join(root, ".yarn-workbench/trash")).length);
     const entry = service.snapshot().projects[0].recovery.at(-1);
     await service.request({
       type: "recover",
@@ -787,6 +791,7 @@ test("trash failure keeps the file and latest recoverable source; retry moves it
     });
     assert.equal(fs.readFileSync(file, "utf8"), "latest local text");
   } finally {
+    fs.renameSync = rename;
     service.dispose();
     assert(
       path

@@ -17,6 +17,7 @@ const {
   WorkspaceService,
   atomicWrite,
   restoreSession,
+  navigateSession,
 } = require("./workspace-service.cjs");
 
 protocol.registerSchemesAsPrivileged([
@@ -30,11 +31,18 @@ protocol.registerSchemesAsPrivileged([
 if (!app.commandLine.hasSwitch("user-data-dir"))
   app.setPath("userData", path.join(app.getPath("appData"), "Yarn Workbench"));
 app.setName("Spindle");
+const {
+  synchronizeBindings,
+  flushWindow,
+  initialSession,
+} = require("./window-lifecycle.cjs");
 const origin = "workbench://app";
 const windows = new Map();
 let service,
   sessionFile,
   sessions = {},
+  projectViews = {},
+  projectViewsFile,
   drag = null,
   quitting = false;
 const focused = () =>
@@ -112,8 +120,16 @@ function createWindow(id = randomUUID(), initial) {
   const ready = new Promise((resolve) => {
     signalReady = resolve;
   });
-  windows.set(id, { id, window, ready, signalReady });
+  const binding = initial || sessions[id]?.session;
+  windows.set(id, {
+    id,
+    window,
+    ready,
+    signalReady,
+    projectId: binding?.screen === "home" ? "" : binding?.projectId || "",
+  });
   if (initial) sessions[id] = { ...sessions[id], session: initial };
+  synchronizeBindings(service, windows);
   window.removeMenu();
   let shown = false;
   function showInitialWindow() {
@@ -144,23 +160,29 @@ function createWindow(id = randomUUID(), initial) {
     if (closePending) return;
     closePending = true;
     const token = randomUUID();
+    const closingProject = windows.get(id)?.projectId;
     const finish = async (error) => {
       clearTimeout(timer);
       ipcMain.removeListener("workspace:close-prepared", acknowledged);
       if (window.isDestroyed()) return;
       if (error) {
         window.webContents.send("workspace:close-cancelled");
-        await dialog.showMessageBox(window, {
+        const choice = await dialog.showMessageBox(window, {
           type: "warning",
           title: "尚未完成保存",
           message: "視窗已保留，請重試保存後再關閉。",
           detail: error,
-          buttons: ["繼續編輯"],
+          buttons: ["重試保存", "返回編輯"],
+          defaultId: 1,
+          cancelId: 1,
         });
         closePending = false;
+        if (choice.response === 0) window.close();
         return;
       }
       try {
+        if (windows.get(id)?.projectId !== closingProject)
+          throw Error("保存期間工作區已變更，視窗已保留。");
         completeClose();
       } catch (error) {
         closePending = false;
@@ -186,34 +208,7 @@ function createWindow(id = randomUUID(), initial) {
     window.webContents.send("workspace:prepare-close", token);
   });
   function completeClose() {
-    const failures = service.flush();
-    if (failures.length || service.profileError) {
-      const choice = dialog.showMessageBoxSync(window, {
-        type: "warning",
-        title: "部分文件尚未寫入磁碟",
-        message: "自動保存未完成",
-        detail:
-          failures
-            .map((d) => d.name + "：" + (d.error || "輸入尚未完成"))
-            .join("\n") +
-          (service.profileError
-            ? "\n" +
-              service.profileError +
-              "\n復原草稿尚未保存，關閉可能遺失資料。請先重試或另存。"
-            : "\n復原草稿會保留。"),
-        buttons: [
-          "繼續編輯",
-          service.profileError ? "仍然關閉" : "保留草稿並關閉",
-        ],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      if (choice === 0) {
-        closePending = false;
-        window.webContents.send("workspace:close-cancelled");
-        return;
-      }
-    }
+    flushWindow(service, windows.get(id));
     if (windows.size > 1) delete sessions[id];
     else
       sessions[id] = {
@@ -231,6 +226,7 @@ function createWindow(id = randomUUID(), initial) {
   }
   window.on("closed", () => {
     windows.delete(id);
+    synchronizeBindings(service, windows);
   });
   let geometryTimer;
   for (const event of ["move", "resize", "maximize", "unmaximize"])
@@ -330,13 +326,111 @@ async function moveTab(source, tab, projectId, targetId, point) {
   target.window.focus();
   source.window.webContents.send("workspace:transferred", { tabId: tab.id });
 }
+function saveProjectView(value) {
+  if (value.projectId && value.screen !== "home") {
+    projectViews[value.projectId] = { ...value, screen: "editor" };
+    atomicWrite(projectViewsFile, JSON.stringify(projectViews));
+  }
+}
+function sessionForResult(id, result) {
+  const p = service.engine.project(result.projectId);
+  let value = initialSession(id, p.id, projectViews[p.id]);
+  const documentId =
+    result.documentId || (!value.tabs.length ? p.documents[0]?.id : undefined);
+  if (documentId) {
+    const existing = value.tabs.find((t) => t.documentId === documentId);
+    if (existing) value.activeId = existing.id;
+    else value = navigateSession(value, documentId, {}, randomUUID());
+  }
+  return value;
+}
+async function openPaths(paths, source) {
+  for (const file of paths) {
+    const result = await service.request({ type: "openFiles", paths: [file] });
+    if (!result.projectId) continue;
+    const existing = [...windows.values()].find(
+      (w) => w.projectId === result.projectId,
+    );
+    if (existing) {
+      await existing.ready;
+      existing.window.webContents.send("workspace:opened", result);
+      existing.window.restore();
+      existing.window.show();
+      existing.window.focus();
+    } else if (source && !source.projectId) {
+      source.projectId = result.projectId;
+      sessions[source.id] = {
+        ...sessions[source.id],
+        session: sessionForResult(source.id, result),
+      };
+      await source.ready;
+      source.window.webContents.send("workspace:opened", result);
+    } else {
+      const id = randomUUID();
+      createWindow(id, sessionForResult(id, result));
+    }
+  }
+  synchronizeBindings(service, windows);
+}
 function wire() {
   ipcMain.handle("workspace:ready", (event) => {
     owner(event).signalReady();
   });
   ipcMain.handle("workspace:request", async (event, action) => {
+    const item = owner(event);
+    if (action.type === "openFiles") {
+      const paths =
+        action.paths ||
+        (
+          await dialog.showOpenDialog(item.window, {
+            properties: ["openFile", "multiSelections"],
+            filters: [{ name: "Yarn", extensions: ["yarn"] }],
+          })
+        ).filePaths;
+      if (paths.length) await openPaths(paths, item);
+      return { snapshot: service.snapshot(), cancelled: true };
+    }
+    if (action.type === "closeProject" && item.projectId !== action.projectId)
+      throw Error("工作區保存範圍已改變");
+    if (
+      action.type === "save" &&
+      (!item.projectId || item.projectId !== action.projectId)
+    )
+      throw Error("不可保存其他視窗的專案");
+    if (
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      item.projectId
+    )
+      flushWindow(service, item);
+    const result = await service.request(action);
+    if (
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      result.projectId
+    ) {
+      const existing = [...windows.values()].find(
+        (w) => w.id !== item.id && w.projectId === result.projectId,
+      );
+      if (existing) {
+        await existing.ready;
+        existing.window.webContents.send("workspace:opened", result);
+        existing.window.restore();
+        existing.window.show();
+        existing.window.focus();
+        return { ...result, cancelled: true };
+      }
+    }
+    if (
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      result.projectId &&
+      !result.cancelled
+    )
+      item.pendingProjectId = result.projectId;
+    if (action.type === "closeProject") item.pendingProjectId = "";
+    return result;
+  });
+  ipcMain.handle("workspace:project-view", (event, projectId) => {
     owner(event);
-    return service.request(action);
+    return projectViews[projectId] || null;
   });
   ipcMain.handle(
     "workspace:session-load",
@@ -346,8 +440,19 @@ function wire() {
     const { id } = owner(event);
     if (value.id !== id || !Array.isArray(value.tabs))
       throw Error("工作階段格式錯誤");
+    const item = windows.get(id),
+      nextProjectId = value.screen === "home" ? "" : value.projectId;
+    if (
+      nextProjectId !== item.projectId &&
+      item.pendingProjectId !== nextProjectId
+    )
+      throw Error("工作區切換尚未完成保存或開啟流程");
+    saveProjectView(value);
     sessions[id] = { ...sessions[id], session: value };
+    if (item.pendingProjectId === nextProjectId) delete item.pendingProjectId;
+    windows.get(id).projectId = value.screen === "home" ? "" : value.projectId;
     saveSessions();
+    synchronizeBindings(service, windows);
   });
   ipcMain.handle("workspace:windows", (event) => {
     owner(event);
@@ -407,18 +512,14 @@ else {
     const files = argv.filter(
       (a) =>
         !a.startsWith("-") &&
-        (a.endsWith(".yarn") ||
+        (a.toLowerCase().endsWith(".yarn") ||
           (fs.existsSync(a) && fs.statSync(a).isDirectory())),
     );
     if (service && files.length)
-      service
-        .request({ type: "openFiles", paths: files })
-        .then((r) => {
-          focused()?.webContents.send("workspace:opened", r);
-          focused()?.show();
-          focused()?.focus();
-        })
-        .catch((error) => dialog.showErrorBox("無法開啟", error.message));
+      openPaths(
+        files,
+        [...windows.values()].find((w) => w.window === focused()),
+      ).catch((error) => dialog.showErrorBox("無法開啟", error.message));
     else {
       focused()?.restore();
       focused()?.show();
@@ -431,6 +532,24 @@ else {
       app.setAppUserModelId("com.yarnworkbench.desktop");
       const profile = app.getPath("userData");
       sessionFile = path.join(profile, "windows-v2.json");
+      projectViewsFile = path.join(profile, "project-views-v1.json");
+      if (fs.existsSync(projectViewsFile))
+        try {
+          projectViews = JSON.parse(fs.readFileSync(projectViewsFile, "utf8"));
+          if (
+            !projectViews ||
+            Array.isArray(projectViews) ||
+            typeof projectViews !== "object"
+          )
+            throw Error("專案視圖格式錯誤");
+        } catch (error) {
+          fs.copyFileSync(
+            projectViewsFile,
+            projectViewsFile + ".damaged-" + Date.now(),
+          );
+          projectViews = {};
+          console.error(error);
+        }
       if (fs.existsSync(sessionFile))
         try {
           sessions = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
@@ -464,6 +583,12 @@ else {
           sessions = {};
           console.error(error);
         }
+      if (!fs.existsSync(projectViewsFile)) {
+        for (const value of Object.values(sessions))
+          if (value?.session?.projectId)
+            projectViews[value.session.projectId] = value.session;
+        atomicWrite(projectViewsFile, JSON.stringify(projectViews));
+      }
       service = new WorkspaceService(profile, {
         chooseFolder: async () => {
           const r = await dialog.showOpenDialog(focused(), {
@@ -516,28 +641,44 @@ else {
       );
       session.defaultSession.setPermissionCheckHandler(() => false);
       wire();
-      const restored = Object.keys(sessions).filter(
-        (id) => sessions[id]?.session?.tabs?.length,
+      const files = process.argv.filter(
+        (a) => !a.startsWith("-") && a.toLowerCase().endsWith(".yarn"),
       );
-      if (restored.length) restored.forEach((id) => createWindow(id));
-      else createWindow();
-      const files = process.argv.filter((a) => a.endsWith(".yarn"));
-      if (files.length)
-        service
-          .request({ type: "openFiles", paths: files })
-          .then((r) => {
-            const target = [...windows.values()].find(
-              (item) => item.window === focused(),
-            );
-            if (target)
-              void target.ready.then(() => {
-                if (!target.window.isDestroyed())
-                  target.window.webContents.send("workspace:opened", r);
-              });
-          })
-          .catch(console.error);
+      void (async () => {
+        if (files.length) {
+          await openPaths(files);
+          return;
+        }
+        const last =
+          service.catalog.preferences.reopenLastProject &&
+          service.catalog.entries.find(
+            (e) => e.id === service.catalog.preferences.lastProjectId,
+          );
+        if (last) {
+          try {
+            const r = await service.request({
+              type: "openFolder",
+              root: last.root,
+            });
+            const id = randomUUID();
+            createWindow(id, sessionForResult(id, r));
+            return;
+          } catch (error) {
+            service.notices.push("上次專案無法開啟：" + String(error));
+          }
+        }
+        const id = Object.keys(sessions).at(-1) || randomUUID();
+        createWindow(id, initialSession(id));
+      })().catch((error) => {
+        dialog.showErrorBox("無法開啟", error.message);
+        const id = randomUUID();
+        createWindow(id, initialSession(id));
+      });
       app.on("activate", () => {
-        if (!windows.size) createWindow();
+        if (!windows.size) {
+          const id = randomUUID();
+          createWindow(id, initialSession(id));
+        }
       });
     })
     .catch((error) => {

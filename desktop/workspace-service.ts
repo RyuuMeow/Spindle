@@ -1,6 +1,14 @@
-import { addFolder, applyTreeMove, planTreeMove, projectFolders, validFolderName, withinFolder } from "../app/workspace/file-tree";
+import {
+  addFolder,
+  applyTreeMove,
+  planTreeMove,
+  projectFolders,
+  validFolderName,
+  withinFolder,
+} from "../app/workspace/file-tree";
 import fs from "node:fs";
 import { appendedScene, renamedSceneByName } from "../app/workspace/authoring";
+export { navigateSession } from "../app/workspace/navigation";
 export { restoreSession } from "../app/workspace/storage";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -20,28 +28,18 @@ import {
   type DocumentRecord,
 } from "../app/workspace/types";
 
+import {
+  ProjectCatalog,
+  canonicalPath,
+  pathKey,
+  projectConfig,
+  validProjectFolderName,
+} from "./project-catalog";
+import { WorkspaceCache } from "./workspace-cache";
+import { RecoveryStore } from "./recovery-store";
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-export function atomicWrite(
-  file: string,
-  content: string,
-  beforeCommit?: () => void,
-) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const temporary = file + "." + randomUUID() + ".tmp";
-  try {
-    const fd = fs.openSync(temporary, "wx");
-    try {
-      fs.writeFileSync(fd, content, "utf8");
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-    beforeCommit?.();
-    fs.renameSync(temporary, file);
-  } finally {
-    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
-  }
-}
+export { atomicWrite } from "./disk-io";
+import { atomicWrite } from "./disk-io";
 function readJson(file: string): unknown {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
@@ -78,6 +76,10 @@ type Services = {
 
 export class WorkspaceService {
   engine: DocumentEngine;
+  catalog: ProjectCatalog;
+  recoveryStore: RecoveryStore;
+  private cache: WorkspaceCache;
+  private active = new Set<string>();
   notices: string[] = [];
   profileError = "";
   currentProjectId = "";
@@ -118,16 +120,20 @@ export class WorkspaceService {
         );
       }
     this.engine = new DocumentEngine(projects);
+    this.catalog = new ProjectCatalog(profile, projects);
+    this.recoveryStore = new RecoveryStore(profile);
+    this.cache = new WorkspaceCache(profile);
     for (const p of projects) {
+      p.kind ||= p.root ? "project" : "legacy";
       for (const d of p.documents) d.composing = false;
-      if (p.root) {
-        this.scan(p);
-        this.watch(p);
-        for (const d of p.documents) this.schedule(p, d);
-      }
     }
+    for (const p of projects.filter((p) => p.root || p.kind === "standalone"))
+      this.cache.save(p);
+    this.engine.projects = projects.filter(
+      (p) => !p.root && p.kind !== "standalone",
+    );
     this.snapshotTimer = setInterval(() => {
-      for (const p of this.engine.projects)
+      for (const p of this.engine.projects.filter((p) => this.active.has(p.id)))
         for (const d of p.documents)
           if (this.lastSnapshots.get(d.id) !== d.text) {
             this.engine.checkpoint(p.id, d.id, "定期快照");
@@ -140,20 +146,30 @@ export class WorkspaceService {
   snapshot(): WorkspaceSnapshot {
     return structuredClone({
       projects: this.engine.projects,
+      catalog: this.catalog.list(),
+      preferences: this.catalog.preferences,
       currentProjectId: this.currentProjectId,
       notices: this.notices,
     });
   }
   persist() {
-    atomicWrite(this.profileFile, JSON.stringify(this.snapshot()));
+    const state = this.snapshot();
+    for (const p of state.projects.filter(
+      (p) => p.root || p.kind === "standalone",
+    ))
+      this.cache.save(this.recoveryStore.has(p) ? { ...p, recovery: [] } : p);
+    state.projects = state.projects.filter(
+      (p) => !p.root && p.kind !== "standalone",
+    );
+    atomicWrite(this.profileFile, JSON.stringify(state));
   }
   private metadata(p: Project) {
-    if (!p.root) return;
+    if (!p.root || p.kind === "standalone") return;
     const dir = path.join(p.root, ".yarn-workbench");
     if (fs.existsSync(dir) && fs.lstatSync(dir).isSymbolicLink())
       throw Error("專案設定目錄不可為符號連結");
     atomicWrite(
-      path.join(dir, "project.json"),
+      projectConfig(p.root),
       JSON.stringify(
         {
           version: 2,
@@ -173,6 +189,14 @@ export class WorkspaceService {
     );
   }
   private changed() {
+    for (const p of this.engine.projects.filter((p) => this.active.has(p.id))) {
+      try {
+        this.recoveryStore.persist(p);
+        delete p.persistenceError;
+      } catch (error) {
+        p.persistenceError = "版本歷史尚未保存：" + String(error);
+      }
+    }
     try {
       for (const p of this.engine.projects)
         for (const d of p.documents)
@@ -310,6 +334,7 @@ export class WorkspaceService {
     ))
       for (const d of p.documents)
         if (
+          d.composing ||
           d.text !== d.saved ||
           ["error", "conflict", "missing"].includes(d.status)
         ) {
@@ -324,24 +349,64 @@ export class WorkspaceService {
           failures.push(d);
     return failures;
   }
+  setActiveProjects(ids: string[]) {
+    const next = new Set(ids);
+    for (const id of this.active)
+      if (!next.has(id)) {
+        this.watchers.get(id)?.close();
+        this.watchers.delete(id);
+        clearTimeout(this.scans.get(id));
+        this.scans.delete(id);
+        const departing = this.engine.projects.find((p) => p.id === id);
+        if (departing && (departing.root || departing.kind === "standalone")) {
+          this.cache.save(
+            this.recoveryStore.has(departing)
+              ? { ...departing, recovery: [] }
+              : departing,
+          );
+          this.recoveryStore.forget(departing);
+          this.engine.projects = this.engine.projects.filter(
+            (p) => p.id !== id,
+          );
+        }
+        for (const d of departing?.documents || []) {
+          this.engine.resetDocument(d.id);
+          clearTimeout(this.timers.get(d.id));
+          this.timers.delete(d.id);
+        }
+      }
+    const added = [...next].filter((id) => !this.active.has(id));
+    this.active = next;
+    for (const p of this.engine.projects.filter((p) => added.includes(p.id))) {
+      this.scan(p);
+      this.watch(p);
+      for (const d of p.documents) this.schedule(p, d);
+    }
+  }
   private watch(p: Project) {
-    if (!p.root || this.watchers.has(p.id)) return;
+    const watchRoot =
+      p.kind === "standalone" ? path.dirname(p.documents[0].path!) : p.root;
+    if (!watchRoot || this.watchers.has(p.id)) return;
     try {
-      const watcher = fs.watch(p.root, { recursive: true }, (_event, file) => {
-        if (
-          file?.toString().includes(".yarn-workbench") ||
-          file?.toString().endsWith(".tmp")
-        )
-          return;
-        clearTimeout(this.scans.get(p.id));
-        this.scans.set(
-          p.id,
-          setTimeout(() => {
-            this.scan(p);
-            this.changed();
-          }, 180),
-        );
-      });
+      const watcher = fs.watch(
+        watchRoot,
+        { recursive: p.kind !== "standalone" },
+        (_event, file) => {
+          if (
+            file?.toString().includes(".yarn-workbench") ||
+            file?.toString().endsWith(".tmp")
+          )
+            return;
+          clearTimeout(this.scans.get(p.id));
+          this.scans.set(
+            p.id,
+            setTimeout(() => {
+              this.scan(p);
+              this.changed();
+            }, 180),
+          );
+        },
+      );
       watcher.on("error", (error) => {
         this.notices.push("資料夾監看失敗：" + String(error));
         this.services.changed();
@@ -361,8 +426,10 @@ export class WorkspaceService {
         )
           continue;
         const file = path.join(directory, e.name);
-        if (e.isDirectory()) { folders?.push(path.relative(root,file).replace(/\\/g,"/")); visit(file); }
-        else if (e.isFile() && e.name.endsWith(".yarn"))
+        if (e.isDirectory()) {
+          folders?.push(path.relative(root, file).replace(/\\/g, "/"));
+          visit(file);
+        } else if (e.isFile() && e.name.toLowerCase().endsWith(".yarn"))
           found.push(path.relative(root, file).replace(/\\/g, "/"));
       }
     };
@@ -372,10 +439,13 @@ export class WorkspaceService {
     );
   }
   private scan(p: Project) {
-    if (!p.root) return;
+    if (!p.root && p.kind !== "standalone") return;
     try {
       const folders: string[] = [];
-      const names = this.listFiles(p.root, folders);
+      const names =
+        p.kind === "standalone"
+          ? p.documents.map((d) => d.name)
+          : this.listFiles(p.root!, folders);
       p.folders = folders;
       for (const d of p.documents.filter((d) => d.path)) {
         if (!fs.existsSync(d.path!)) {
@@ -403,7 +473,7 @@ export class WorkspaceService {
           !p.excluded.includes(name) &&
           !p.documents.some((d) => d.name.toLowerCase() === name.toLowerCase())
         ) {
-          const file = withinRoot(p.root, name),
+          const file = withinRoot(p.root!, name),
             value = readScript(file);
           const d = this.engine.create(p.id, name, value);
           d.path = file;
@@ -420,15 +490,12 @@ export class WorkspaceService {
   }
   openFolder(root: string) {
     root = fs.realpathSync(root);
-    const existing = this.engine.projects.find(
-      (p) => p.root?.toLowerCase() === root.toLowerCase(),
+    let existing = this.engine.projects.find(
+      (p) =>
+        p.kind !== "standalone" && p.root?.toLowerCase() === root.toLowerCase(),
     );
-    if (existing) {
-      this.scan(existing);
-      this.currentProjectId = existing.id;
-      return existing;
-    }
-    const configFile = path.join(root, ".yarn-workbench", "project.json");
+
+    const configFile = projectConfig(root);
     let metadata: {
       id?: string;
       name?: string;
@@ -441,9 +508,9 @@ export class WorkspaceService {
     if (fs.existsSync(configFile)) {
       try {
         metadata = readJson(configFile) as typeof metadata;
-        if (!metadata || typeof metadata !== "object")
+        if (!metadata || Array.isArray(metadata) || typeof metadata !== "object")
           throw Error("設定格式無效");
-        validateCommands(metadata.commands || []);
+        validateCommands(metadata.commands === undefined ? [] : metadata.commands);
         if (
           metadata.files &&
           (!Array.isArray(metadata.files) ||
@@ -470,33 +537,57 @@ export class WorkspaceService {
         )
           throw Error("專案設定格式無效");
       } catch (error) {
-        const rescue = path.join(
-          this.profile,
-          "project-config-recovery-" + Date.now() + ".json",
-        );
-        atomicWrite(rescue, fs.readFileSync(configFile, "utf8"));
-        this.notices.push(
-          "專案設定無法讀取，劇本仍開啟；救援副本：" +
-            rescue +
-            "；" +
-            String(error),
-        );
-        metadata = {};
+        throw Error("專案設定無法讀取，原始設定已保留：" + String(error));
       }
     }
+    if (!existing) {
+      const cachedId =
+        metadata.id ||
+        this.catalog.entries.find((e) => pathKey(e.root) === pathKey(root))?.id;
+      const cached = cachedId ? this.cache.load(cachedId) : undefined;
+      if (cached?.root && pathKey(cached.root) === pathKey(root)) {
+        existing = cached;
+        this.engine.projects.push(existing);
+        for (const d of existing.documents) {
+          d.version = 0;
+          d.composing = false;
+          this.engine.resetDocument(d.id);
+        }
+      }
+    }
+    if (existing) {
+      existing.kind = "project";
+      if (metadata.name) existing.name = metadata.name;
+      this.recoveryStore.load(existing);
+      this.scan(existing);
+      this.metadata(existing);
+      this.currentProjectId = existing.id;
+      this.active.add(existing.id);
+      this.watch(existing);
+      this.catalog.opened(existing);
+      return existing;
+    }
+
     const p = makeProject(
       metadata.name || path.basename(root),
       [],
       metadata.commands || [],
     );
     p.root = root;
+    p.kind = "project";
     p.id =
-      metadata.id && !this.engine.projects.some((x) => x.id === metadata.id)
+      metadata.id &&
+      !this.engine.projects.some((x) => x.id === metadata.id) &&
+      !this.catalog.entries.some(
+        (e) => e.id === metadata.id && pathKey(e.root) !== pathKey(root),
+      )
         ? metadata.id
         : p.id;
     p.excluded = Array.isArray(metadata.excluded) ? metadata.excluded : [];
     p.folders = [];
-    p.treeOrder = Array.isArray(metadata.treeOrder) ? metadata.treeOrder.filter(k=>typeof k==="string") : [];
+    p.treeOrder = Array.isArray(metadata.treeOrder)
+      ? metadata.treeOrder.filter((k) => typeof k === "string")
+      : [];
     const loaded = this.listFiles(root, p.folders)
       .filter((name) => !p.excluded.includes(name))
       .map((name) => {
@@ -520,18 +611,69 @@ export class WorkspaceService {
           status: "saved" as const,
         };
       });
-    const savedOrder = new Map((metadata.files || []).map((file, index) => [file.name.toLowerCase(), index]));
-    p.documents = loaded.sort((a, b) => (savedOrder.get(a.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER) - (savedOrder.get(b.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER));
+    const savedOrder = new Map(
+      (metadata.files || []).map((file, index) => [
+        file.name.toLowerCase(),
+        index,
+      ]),
+    );
+    p.documents = loaded.sort(
+      (a, b) =>
+        (savedOrder.get(a.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER) -
+        (savedOrder.get(b.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER),
+    );
     validateProject(p);
+    const remap = new Map(
+      (metadata.files || []).flatMap((f) => {
+        const d = p.documents.find((d) => d.name === f.name);
+        return d ? [[f.id, d.id]] : [];
+      }),
+    );
+    this.recoveryStore.load(p, remap);
+    this.metadata(p);
     this.engine.projects.push(p);
     this.currentProjectId = p.id;
-    try {
-      this.metadata(p);
-    } catch (error) {
-      this.notices.push(
-        "專案識別設定尚未寫入；文件內容仍保留於工作區：" + String(error),
-      );
+    this.active.add(p.id);
+    this.watch(p);
+    this.catalog.opened(p);
+    return p;
+  }
+  openStandalone(file: string) {
+    file = canonicalPath(file);
+    let existing = this.engine.projects.find(
+      (p) =>
+        p.kind === "standalone" &&
+        pathKey(p.documents[0]?.path || "") === pathKey(file),
+    );
+    if (!existing) {
+      existing = this.cache.load("single-" + hash(pathKey(file)).slice(0, 24));
+      if (existing) {
+        this.engine.projects.push(existing);
+        for (const d of existing.documents) {
+          d.version = 0;
+          d.composing = false;
+          this.engine.resetDocument(d.id);
+        }
+      }
     }
+    if (existing) {
+      this.recoveryStore.load(existing);
+      this.scan(existing);
+      this.active.add(existing.id);
+      this.watch(existing);
+      return existing;
+    }
+    const p = makeProject(path.basename(file));
+    p.kind = "standalone";
+    p.id = "single-" + hash(pathKey(file)).slice(0, 24);
+    this.engine.projects.push(p);
+    const d = this.engine.create(p.id, path.basename(file), readScript(file));
+    d.path = file;
+    d.diskHash = hash(d.text);
+    d.status = "saved";
+    this.recoveryStore.load(p);
+    this.currentProjectId = p.id;
+    this.active.add(p.id);
     this.watch(p);
     return p;
   }
@@ -544,7 +686,7 @@ export class WorkspaceService {
         updates: this.engine.updates(a.projectId, a.documentId, a.version),
       };
     if (a.type === "bootstrap") {
-      if (!this.engine.projects.length) {
+      if (!this.engine.projects.length && a.legacy?.documents.length) {
         const p = makeProject(
           this.notices.length ? "復原工作區" : a.legacy?.name || "未命名專案",
           this.notices.length ? [] : a.legacy?.documents || [],
@@ -555,7 +697,7 @@ export class WorkspaceService {
         this.currentProjectId = p.id;
       }
     } else if (a.type === "openFolder") {
-      const root = await this.services.chooseFolder();
+      const root = a.root || (await this.services.chooseFolder());
       if (!root) return { snapshot: this.snapshot(), cancelled: true };
       projectId = this.openFolder(root).id;
     } else if (a.type === "openFiles") {
@@ -566,20 +708,98 @@ export class WorkspaceService {
           projectId = this.openFolder(file).id;
           continue;
         }
-        if (!file.endsWith(".yarn")) throw Error("請開啟 .yarn 或專案資料夾");
-        const p = this.openFolder(path.dirname(file));
+        if (!file.toLowerCase().endsWith(".yarn"))
+          throw Error("請開啟 .yarn 或專案資料夾");
+        const match = this.catalog.match(file);
+        const p = match
+          ? this.openFolder(match.root)
+          : this.openStandalone(file);
         projectId = p.id;
         documentId = p.documents.find(
-          (d) => d.path?.toLowerCase() === path.resolve(file).toLowerCase(),
+          (d) => d.path?.toLowerCase() === canonicalPath(file).toLowerCase(),
         )?.id;
       }
     } else if (a.type === "createProject") {
       const root = a.root || (await this.services.chooseFolder());
       if (!root) return { snapshot: this.snapshot(), cancelled: true };
-      const p = this.openFolder(root);
-      p.name = a.name.trim() || path.basename(root);
+      if (!validProjectFolderName(a.name))
+        throw Error("請輸入有效的專案資料夾名稱");
+      const parent = canonicalPath(root),
+        target = path.join(parent, a.name);
+      if (fs.existsSync(target)) throw Error("目的資料夾已存在");
+      fs.mkdirSync(target);
+      const p = this.openFolder(target);
+      projectId = p.id;
+    } else if (a.type === "chooseProjectParent") {
+      const selected = await this.services.chooseFolder();
+      return {
+        snapshot: this.snapshot(),
+        path: selected || undefined,
+        cancelled: !selected,
+      };
+    } else if (a.type === "catalog") {
+      const entry = this.catalog.entries.find((e) => e.id === a.id);
+      if (!entry) throw Error("專案紀錄已不存在");
+      if (a.operation === "reveal") this.services.reveal(entry.root);
+      else if (a.operation === "rename") {
+        this.catalog.rename(a.id, a.name || "");
+        const loaded = this.engine.projects.find((p) => p.id === a.id);
+        if (loaded) loaded.name = a.name!.trim();
+      } else this.catalog.remove(a.id, a.operation === "removeRecent");
+    } else if (a.type === "preferences") {
+      this.catalog.preferences.reopenLastProject = a.reopenLastProject;
+      this.catalog.persist();
+    } else if (a.type === "closeProject") {
+      const failed = this.flush(a.projectId);
+      if (
+        failed.length ||
+        this.profileError ||
+        this.engine.project(a.projectId).persistenceError
+      )
+        throw Error(
+          failed.map((d) => d.name + "：" + d.error).join("\n") ||
+            this.engine.project(a.projectId).persistenceError ||
+            this.profileError,
+        );
+      if (this.catalog.preferences.lastProjectId === a.projectId) {
+        delete this.catalog.preferences.lastProjectId;
+        this.catalog.persist();
+      }
+    } else if (a.type === "migrateDraft") {
+      const legacy = this.engine.project(a.projectId);
+      const created = await this.execute({
+        type: "createProject",
+        name: a.name,
+        root: a.root,
+      });
+      const p = this.engine.project(created.projectId!);
+      p.commands = structuredClone(legacy.commands);
+      p.commandDraft = structuredClone(legacy.commandDraft);
+      const remap = new Map<string, string>();
+      for (const d of legacy.documents) {
+        const result = await this.execute({
+          type: "createDocument",
+          projectId: p.id,
+          name: d.name,
+          text: d.text,
+        });
+        if (result.documentId) remap.set(d.id, result.documentId);
+      }
+      p.recovery = structuredClone(legacy.recovery).map((e) => ({
+        ...e,
+        documentId: remap.get(e.documentId) || e.documentId,
+        files: e.files?.map((f) => ({ ...f, id: remap.get(f.id) || f.id })),
+      }));
+      this.recoveryStore.persist(p);
       this.metadata(p);
       projectId = p.id;
+      this.engine.projects = this.engine.projects.filter(
+        (item) => item !== legacy,
+      );
+    } else if (a.type === "purgeTrash") {
+      const p = this.engine.project(a.projectId);
+      this.recoveryStore.load(p);
+      this.recoveryStore.purge(p, a.recoveryId);
     } else if (a.type === "import") {
       const p = validateProject(a.project);
       p.id = randomUUID();
@@ -606,8 +826,16 @@ export class WorkspaceService {
         this.engine.transaction(p.id, a.label, a.documents);
         for (const d of p.documents) this.schedule(p, d);
       } else if (a.type === "createScene" || a.type === "renameScene") {
-        const documents = a.type === "createScene" ? appendedScene(p, a.documentId, a.version, a.name) : renamedSceneByName(p, a.documentId, a.version, a.fromName, a.name).documents;
-        this.engine.transaction(p.id, a.type === "createScene" ? "新增場景" : "更名場景", documents);
+        const documents =
+          a.type === "createScene"
+            ? appendedScene(p, a.documentId, a.version, a.name)
+            : renamedSceneByName(p, a.documentId, a.version, a.fromName, a.name)
+                .documents;
+        this.engine.transaction(
+          p.id,
+          a.type === "createScene" ? "新增場景" : "更名場景",
+          documents,
+        );
         documentId = a.documentId;
         for (const d of p.documents) this.schedule(p, d);
       } else if (a.type === "composition") {
@@ -622,6 +850,7 @@ export class WorkspaceService {
       } else if (a.type === "renameProject") {
         p.name = a.name.trim() || p.name;
         this.metadata(p);
+        this.catalog.opened(p);
       } else if (a.type === "commands") {
         validateCommands(a.commands);
         const previous = p.commands;
@@ -679,14 +908,26 @@ export class WorkspaceService {
               if (createdFile && createdIdentity) {
                 try {
                   const current = fs.lstatSync(createdFile);
-                  if (!current.isSymbolicLink() && current.dev === createdIdentity.dev && current.ino === createdIdentity.ino)
+                  if (
+                    !current.isSymbolicLink() &&
+                    current.dev === createdIdentity.dev &&
+                    current.ino === createdIdentity.ino
+                  )
                     fs.unlinkSync(createdFile);
                 } catch (cleanupError) {
-                  if ((cleanupError as NodeJS.ErrnoException).code !== "ENOENT") cleanupFailure = cleanupError;
+                  if ((cleanupError as NodeJS.ErrnoException).code !== "ENOENT")
+                    cleanupFailure = cleanupError;
                 }
               }
-              p.documents = p.documents.filter(document => document.id !== d.id);
-              if (cleanupFailure) throw Error(String(error) + "；未完成檔案無法清理，請檢查磁碟權限後重試：" + String(cleanupFailure));
+              p.documents = p.documents.filter(
+                (document) => document.id !== d.id,
+              );
+              if (cleanupFailure)
+                throw Error(
+                  String(error) +
+                    "；未完成檔案無法清理，請檢查磁碟權限後重試：" +
+                    String(cleanupFailure),
+                );
               throw error;
             }
             d.status = "error";
@@ -749,37 +990,50 @@ export class WorkspaceService {
           documentId = copy.id;
         }
       } else if (a.type === "createFolder") {
-        const draft=structuredClone(p);
-        addFolder(draft,a.name);
-        if (p.root) fs.mkdirSync(path.dirname(withinRoot(p.root,a.name+"/folder.yarn")));
-        p.folders=draft.folders; p.treeOrder=draft.treeOrder;
+        const draft = structuredClone(p);
+        addFolder(draft, a.name);
+        if (p.root)
+          fs.mkdirSync(
+            path.dirname(withinRoot(p.root, a.name + "/folder.yarn")),
+          );
+        p.folders = draft.folders;
+        p.treeOrder = draft.treeOrder;
         this.metadata(p);
       } else if (a.type === "moveEntry") {
-        const plan=planTreeMove(p,a.entry,a.parent,a.name,a.before);
-        if (p.root && plan.path!==plan.target) {
-          for (const d of plan.documents) if (d.path && !this.saveDocument(p,d)) throw Error(d.error||"請先完成儲存");
-          const from=plan.folder?path.dirname(withinRoot(p.root,plan.path+"/folder.yarn")):withinRoot(p.root,plan.path);
-          const to=plan.folder?path.dirname(withinRoot(p.root,plan.target+"/folder.yarn")):withinRoot(p.root,plan.target);
-          if (fs.existsSync(to) && from.toLowerCase()!==to.toLowerCase()) throw Error("目的位置已存在");
+        const plan = planTreeMove(p, a.entry, a.parent, a.name, a.before);
+        if (p.root && plan.path !== plan.target) {
+          for (const d of plan.documents)
+            if (d.path && !this.saveDocument(p, d))
+              throw Error(d.error || "請先完成儲存");
+          const from = plan.folder
+            ? path.dirname(withinRoot(p.root, plan.path + "/folder.yarn"))
+            : withinRoot(p.root, plan.path);
+          const to = plan.folder
+            ? path.dirname(withinRoot(p.root, plan.target + "/folder.yarn"))
+            : withinRoot(p.root, plan.target);
+          if (fs.existsSync(to) && from.toLowerCase() !== to.toLowerCase())
+            throw Error("目的位置已存在");
           // Both paths are verified inside the project, including symlink ancestors.
-          if (plan.folder || plan.documents.some(d=>d.path)) fs.renameSync(from,to);
-          for (const d of plan.documents) if (d.path) d.path=withinRoot(p.root,plan.mapPath(d.name));
+          if (plan.folder || plan.documents.some((d) => d.path))
+            fs.renameSync(from, to);
+          for (const d of plan.documents)
+            if (d.path) d.path = withinRoot(p.root, plan.mapPath(d.name));
         }
-        applyTreeMove(p,plan);
+        applyTreeMove(p, plan);
         this.metadata(p);
       } else if (a.type === "trashFolder") {
-        if (!validFolderName(a.name) || !projectFolders(p).includes(a.name)) throw Error("資料夾已不存在");
-        const children=p.documents.filter(d=>withinFolder(d.name,a.name));
-        for(const d of children) this.engine.checkpoint(p.id,d.id,"刪除資料夾",true);
-        this.persist();
-        if (p.root) {
-          const target=path.dirname(withinRoot(p.root,a.name+"/folder.yarn"));
-          if(!this.services.trash) throw Error("目前無法使用垃圾桶，資料夾已保留");
-          await this.services.trash(target);
+        if (!validFolderName(a.name) || !projectFolders(p).includes(a.name))
+          throw Error("資料夾已不存在");
+        const children = p.documents.filter((d) =>
+          withinFolder(d.name, a.name),
+        );
+        for (const d of children)
+          if (!this.saveDocument(p, d)) throw Error(d.error || "請先完成保存");
+        this.recoveryStore.moveToTrash(p, a.name, true);
+        for (const d of children) {
+          clearTimeout(this.timers.get(d.id));
+          this.engine.resetDocument(d.id);
         }
-        for(const d of children) clearTimeout(this.timers.get(d.id));
-        p.folders=projectFolders(p).filter(f=>f!==a.name&&!withinFolder(f,a.name));
-        p.documents=p.documents.filter(d=>!children.includes(d));
         this.metadata(p);
       } else if (a.type === "renameDocument") {
         const d = this.engine.document(p.id, a.documentId),
@@ -793,7 +1047,7 @@ export class WorkspaceService {
           throw Error("檔名無效或已存在");
         if (d.path && p.root) {
           if (!this.saveDocument(p, d)) throw Error(d.error || "請先完成儲存");
-          const target = withinRoot(p.root, name);
+          const target = withinRoot(p.root!, name);
           if (
             fs.existsSync(target) &&
             target.toLowerCase() !== d.path.toLowerCase()
@@ -807,25 +1061,11 @@ export class WorkspaceService {
         this.metadata(p);
       } else if (a.type === "removeDocument") {
         const d = this.engine.document(p.id, a.documentId);
-        this.engine.checkpoint(
-          p.id,
-          d.id,
-          a.deleteDisk ? "刪除檔案" : "從專案移除",
-          true,
-        );
-        this.persist();
+        if (!p.root) throw Error("單檔模式不提供專案刪除操作");
+        if (!this.saveDocument(p, d)) throw Error(d.error || "請先完成保存");
+        this.recoveryStore.moveToTrash(p, d.name, false);
         clearTimeout(this.timers.get(d.id));
-        if (a.deleteDisk && d.path) {
-          if (p.root) withinRoot(p.root, d.name);
-          try {
-            if (!this.services.trash) throw Error("目前無法使用垃圾桶，檔案已保留");
-            await this.services.trash(d.path);
-          } catch (error) {
-            this.schedule(p, d);
-            throw error;
-          }
-        } else if (d.path) p.excluded.push(d.name);
-        p.documents = p.documents.filter((x) => x.id !== d.id);
+        this.engine.resetDocument(d.id);
         this.metadata(p);
       } else if (a.type === "resolve") {
         const d = this.engine.document(p.id, a.documentId);
@@ -844,8 +1084,21 @@ export class WorkspaceService {
       } else if (a.type === "recover") {
         const entry = p.recovery.find((e) => e.id === a.recoveryId);
         if (!entry) throw Error("找不到復原項目");
+        if (entry.deleted) {
+          const before = new Set(p.documents.map((d) => d.id));
+          documentId = this.recoveryStore.restore(p, entry);
+          for (const d of p.documents)
+            if (!before.has(d.id)) this.engine.resetDocument(d.id);
+          this.metadata(p);
+          this.changed();
+          return { snapshot: this.snapshot(), documentId };
+        }
         if (entry.documentId === "@commands") {
-          if (a.expectedText !== undefined && JSON.stringify(p.commands) !== a.expectedText) throw Error("指令已變更，請重新比較後再還原");
+          if (
+            a.expectedText !== undefined &&
+            JSON.stringify(p.commands) !== a.expectedText
+          )
+            throw Error("指令已變更，請重新比較後再還原");
           const commands = JSON.parse(entry.text);
           validateCommands(commands);
           const previous = p.commands;
@@ -870,7 +1123,12 @@ export class WorkspaceService {
         }
         const d = p.documents.find((d) => d.id === entry.documentId);
         if (d) {
-          if ((a.expectedVersion !== undefined && d.version !== a.expectedVersion) || (a.expectedText !== undefined && d.text !== a.expectedText)) throw Error("內容已變更，請重新比較後再還原");
+          if (
+            (a.expectedVersion !== undefined &&
+              d.version !== a.expectedVersion) ||
+            (a.expectedText !== undefined && d.text !== a.expectedText)
+          )
+            throw Error("內容已變更，請重新比較後再還原");
           this.engine.checkpoint(p.id, d.id, "恢復快照前");
           this.engine.replace(p.id, d.id, entry.text, "恢復快照");
           this.schedule(p, d);
@@ -882,11 +1140,11 @@ export class WorkspaceService {
             p.documents.some(
               (d) => d.name.toLowerCase() === name.toLowerCase(),
             ) ||
-            (p.root && fs.existsSync(withinRoot(p.root, name)))
+            (p.root && fs.existsSync(withinRoot(p.root!, name)))
           )
             name = entry.name.replace(/\.yarn$/, `-recovered-${i++}.yarn`);
           if (p.root) {
-            const file = withinRoot(p.root, name);
+            const file = withinRoot(p.root!, name);
             fs.mkdirSync(path.dirname(file), { recursive: true });
             fs.writeFileSync(file, entry.text, {
               encoding: "utf8",
@@ -897,7 +1155,7 @@ export class WorkspaceService {
           documentId = restored.id;
           p.excluded = p.excluded.filter((n) => n !== name);
           if (p.root) {
-            restored.path = withinRoot(p.root, name);
+            restored.path = withinRoot(p.root!, name);
             restored.diskHash = hash(restored.text);
             restored.status = "saved";
             this.metadata(p);
