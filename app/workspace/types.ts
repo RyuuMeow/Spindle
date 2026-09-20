@@ -169,6 +169,7 @@ export type WorkspaceAction =
       documentId: string;
       deleteDisk: boolean;
     }
+  | { type: "registerCommand"; projectId: string; command: Command }
   | { type: "commands"; projectId: string; commands: Command[] }
   | { type: "commandDraft"; projectId: string; draft: unknown }
   | {

@@ -15,21 +15,21 @@ pnpm desktop:pack
 
 Windows x64 0.9.0 產物在 `release/`：`Spindle-0.9.0-Setup-x64.exe` 與 `Spindle-0.9.0-Portable-x64.exe`。打包包含離線 Monaco、CodeMirror、ELK Worker、libavoid WASM、引擎授權檔與主程序文件服務，不依賴編輯器 CDN。程式未簽章。
 
-Spindle 為原 Yarn Workbench 的新名稱；沿用原 App profile、專案 `.yarn-workbench` 及安裝識別，保留既有資料。SVG 原檔在 `public/brand/`，桌面圖示由專案素材產生。
+Spindle 為原 Yarn Workbench 的新名稱；沿用原 App profile、專案 `.spindle` 及安裝識別，保留既有資料。SVG 原檔在 `public/brand/`，桌面圖示由專案素材產生。
 
 Portable 開啟時會先顯示「正在解壓並啟動」；0.2.1 改用 ZIP 與每次啟動獨立的暫存目錄。更新時先關閉舊版，再開新版本；兩者沿用同一個 App profile。
 
 ## 保存與恢復
 
-- 預設啟動顯示獨立專案列表，可開啟資料夾或建立同名子資料夾專案；既有資料夾沒有設定檔時才建立 `.yarn-workbench/project.json`。損毀設定不會被靜默覆寫。
+- 預設啟動顯示獨立專案列表，可開啟資料夾或建立同名子資料夾專案；既有資料夾沒有設定檔時才建立 `.spindle/project.json`。損毀設定不會被靜默覆寫。
 - 完整專案列表不限數量，可搜尋、行內改名、從列表移除；Project 選單只列最近 5 個。移除紀錄不刪磁碟資料。設定可選擇啟動時開啟上次專案，預設關閉。
 - 直接開啟 `.yarn` 時，依已知專案最深層實際路徑辨識歸屬；否則開獨立單檔視窗，自動寫回原檔，不在所在資料夾建立專案。
 - 停止輸入 800ms 後寫回原檔，中文組字期間暫停。Ctrl+S 立即保存。桌面不再顯示日常「儲存全部／存成檔案」入口。語法錯誤不阻止劇本保存。
 - 舊無路徑草稿保留在初始畫面的「待移轉草稿」，預覽後可轉存為正式專案。匯出只建立交付副本；保存失敗時保留另存救援。
 - 偵測外部修改、刪除、唯讀或寫入失敗時保留內容。雙方都有修改時暫停該檔自動保存，提供比較、採用磁碟版本、覆寫或另存。
-- 劇本移到垃圾桶不再要求確認；完整檔案／資料夾（含非 Yarn 資源）移入專案 `.yarn-workbench/trash/`，不另送 Windows 資源回收筒；舊系統垃圾桶內容不操作。移除入口統一為垃圾桶。更名與日常保存不顯示轉圈，失敗仍保留錯誤。
+- 劇本移到垃圾桶不再要求確認；完整檔案／資料夾（含非 Yarn 資源）移入專案 `.spindle/trash/`，不另送 Windows 資源回收筒；舊系統垃圾桶內容不操作。移除入口統一為垃圾桶。更名與日常保存不顯示轉圈，失敗仍保留錯誤。
 - 每分鐘對有變更文件留下快照，每份保留最近 50 份；最近刪除保留 30 天。指令設定另有復原快照，非法表單輸入保留為草稿。
-- 專案名稱、文件識別與有效指令定義寫入 `.yarn-workbench/project.json`；專案歷史在 `.yarn-workbench/history/`，單檔歷史與視窗布局在 App profile。Windows 安裝版及 portable 預設皆使用 `%APPDATA%/Yarn Workbench`，portable 不把資料放在 exe 旁。
+- 專案名稱、文件識別與有效指令定義寫入 `.spindle/project.json`；專案歷史在 `.spindle/history/`，單檔歷史與視窗布局在 App profile。Windows 安裝版及 portable 預設皆使用 `%APPDATA%/Yarn Workbench`，portable 不把資料放在 exe 旁。
 - v1 專案備份仍可匯入。v2 備份包含相對路徑、指令定義與指令草稿；桌面匯入備份保留為待移轉草稿，再轉存正式專案；保留原專案。
 - 網頁資料存於該瀏覽器的 localStorage，與桌面 profile 分開；請用專案備份轉移。清除網站資料會移除網頁工作區。
 

@@ -45,6 +45,7 @@ const editable = new Compartment();
 export type SceneEditorBindings = {
   documents: DocumentRecord[];
   commands: Command[];
+  onRegisterCommand?: (command: Command) => void;
   onDocumentEdit: (
     documentId: string,
     edits: TextEdit[],
@@ -285,6 +286,7 @@ export default function SceneEditor(props: Props) {
               ),
             ],
             () => collectVariables(latest.current.documents),
+            (command) => latest.current.onRegisterCommand?.(command),
           ),
           EditorView.updateListener.of((update) => {
             if (

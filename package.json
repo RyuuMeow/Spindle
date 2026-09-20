@@ -37,7 +37,8 @@
     "test:tree-drag": "node scripts/test-tree-drag.cjs",
     "test:graph-ui": "node scripts/test-graph-layout-ui.cjs",
     "test:project-lifecycle": "node --test scripts/project-lifecycle.test.mjs",
-    "test:project-launcher": "node scripts/test-project-launcher.cjs"
+    "test:project-launcher": "node scripts/test-project-launcher.cjs",
+    "test:command-quick-fix": "node scripts/test-command-quick-fix.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

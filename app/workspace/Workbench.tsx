@@ -61,6 +61,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import type { Command } from "../parser";
 import { ChromeButton } from "@/components/ChromeButton";
 import WorkspaceTabs from "../WorkspaceTabs";
 import CodeEditor from "../CodeEditor";
@@ -483,6 +484,9 @@ export default function Workbench({
   useEffect(() => {
     document.title = `${doc?.name || project?.name || "Spindle"} — ${project?.name || ""} · Spindle`;
   }, [doc?.name, project?.name]);
+  function registerCommand(command: Command) {
+    void perform({ type: "registerCommand", projectId: project.id, command });
+  }
   async function perform(action: WorkspaceAction) {
     try {
       if (
@@ -2448,6 +2452,7 @@ export default function Workbench({
                   }
                 >
                   <CodeEditor
+                    onRegisterCommand={registerCommand}
                     persistedView={active.sourceView}
                     onView={(sourceView) => tabPatch({ sourceView })}
                     onNavigate={go}
@@ -2500,6 +2505,7 @@ export default function Workbench({
               )}
               {!active.dialogueOnly && mode === "rendered" && (
                 <ReadingEditor
+                  onRegisterCommand={registerCommand}
                   goTo={goto}
                   scenes={analysis.nodes}
                   canNavigate={(name) =>
@@ -2561,6 +2567,7 @@ export default function Workbench({
               )}
               {!active.dialogueOnly && mode === "graph" && (
                 <Graph
+                  onRegisterCommand={registerCommand}
                   key={active.id + ":" + doc.id}
                   file={doc.name}
                   documents={project.documents}

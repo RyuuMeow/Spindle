@@ -1,3 +1,4 @@
+import { findCommand } from "../app/command-catalog";
 import {
   addFolder,
   applyTreeMove,
@@ -173,7 +174,7 @@ export class WorkspaceService {
   }
   private metadata(p: Project) {
     if (!p.root || p.kind === "standalone") return;
-    const dir = path.join(p.root, ".yarn-workbench");
+    const dir = path.join(p.root, ".spindle");
     if (fs.existsSync(dir) && fs.lstatSync(dir).isSymbolicLink())
       throw Error("專案設定目錄不可為符號連結");
     atomicWrite(
@@ -401,7 +402,7 @@ export class WorkspaceService {
         { recursive: p.kind !== "standalone" },
         (_event, file) => {
           if (
-            file?.toString().includes(".yarn-workbench") ||
+            file?.toString().includes(".spindle") ||
             file?.toString().endsWith(".tmp")
           )
             return;
@@ -430,7 +431,7 @@ export class WorkspaceService {
       for (const e of fs.readdirSync(directory, { withFileTypes: true })) {
         if (
           e.isSymbolicLink() ||
-          [".git", ".yarn-workbench", "node_modules"].includes(e.name)
+          [".git", ".spindle", "node_modules"].includes(e.name)
         )
           continue;
         const file = path.join(directory, e.name);
@@ -866,10 +867,19 @@ export class WorkspaceService {
         p.name = a.name.trim() || p.name;
         this.metadata(p);
         this.catalog.opened(p);
-      } else if (a.type === "commands") {
-        validateCommands(a.commands);
+      } else if (a.type === "commands" || a.type === "registerCommand") {
+        if (
+          a.type === "registerCommand" &&
+          findCommand(a.command.name, p.commands)
+        )
+          return { snapshot: this.snapshot() };
+        const commands =
+          a.type === "registerCommand"
+            ? [...p.commands, a.command]
+            : a.commands;
+        validateCommands(commands);
         const previous = p.commands;
-        if (JSON.stringify(previous) !== JSON.stringify(a.commands)) {
+        if (JSON.stringify(previous) !== JSON.stringify(commands)) {
           p.recovery.push({
             id: randomUUID(),
             documentId: "@commands",
@@ -885,7 +895,7 @@ export class WorkspaceService {
             );
           this.persist();
         }
-        p.commands = a.commands;
+        p.commands = commands;
         try {
           this.metadata(p);
         } catch (error) {

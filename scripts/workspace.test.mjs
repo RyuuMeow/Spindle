@@ -140,11 +140,11 @@ test("profile write failure is never reported as a saved draft and can be retrie
 test("invalid project identifiers preserve the manifest and do not enter the editor", async () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "yarn-workbench-test-")),
     root = path.join(base, "project");
-  fs.mkdirSync(path.join(root, ".yarn-workbench"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".spindle"), { recursive: true });
   fs.writeFileSync(path.join(root, "a.yarn"), "A");
   fs.writeFileSync(path.join(root, "b.yarn"), "B");
   fs.writeFileSync(
-    path.join(root, ".yarn-workbench", "project.json"),
+    path.join(root, ".spindle", "project.json"),
     JSON.stringify({
       files: [
         { id: "same", name: "a.yarn" },
@@ -160,7 +160,7 @@ test("invalid project identifiers preserve the manifest and do not enter the edi
     changed: () => {},
   });
   try {
-    const file = path.join(root, ".yarn-workbench/project.json"),
+    const file = path.join(root, ".spindle/project.json"),
       before = fs.readFileSync(file, "utf8");
     await assert.rejects(service.request({ type: "openFolder" }), /識別重複/);
     assert.equal(fs.readFileSync(file, "utf8"), before);
@@ -782,7 +782,7 @@ test("trash failure keeps the file and latest recoverable source; retry moves it
     reject = false;
     await service.request(action);
     assert(!fs.existsSync(file));
-    assert(fs.readdirSync(path.join(root, ".yarn-workbench/trash")).length);
+    assert(fs.readdirSync(path.join(root, ".spindle/trash")).length);
     const entry = service.snapshot().projects[0].recovery.at(-1);
     await service.request({
       type: "recover",

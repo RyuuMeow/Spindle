@@ -83,7 +83,7 @@ export class RecoveryStore {
       return checked(this.profile, "single-file-history/" + p.id);
     if (!p.root) throw Error("此工作區沒有磁碟專案");
     projectConfig(p.root);
-    return checked(p.root, ".yarn-workbench");
+    return checked(p.root, ".spindle");
   }
   private index(p: Project) {
     return checked(this.base(p), "history/index.json");

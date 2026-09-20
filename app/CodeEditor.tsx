@@ -1,4 +1,5 @@
 "use client";
+import { unregisteredCommand } from "./command-quick-fix";
 import { sourceCommandAssistance } from "./source-command-assistance";
 import { sceneLink } from "./scene-link";
 import {
@@ -42,6 +43,7 @@ export default function CodeEditor({
   persistedView,
   onView,
   onNavigate,
+  onRegisterCommand,
 }: {
   monacoRef: RefObject<unknown>;
   modelEpoch: number;
@@ -64,6 +66,7 @@ export default function CodeEditor({
   onComposition?: (active: boolean) => void;
   persistedView?: import("monaco-editor").editor.ICodeEditorViewState;
   onView?: (view: import("monaco-editor").editor.ICodeEditorViewState) => void;
+  onRegisterCommand?: (command: Command) => void;
   onNavigate?: (file: string, line: number) => void;
 }) {
   const currentDoc = useRef(doc),
@@ -94,15 +97,16 @@ export default function CodeEditor({
   const undoCallback = useRef(onUndo);
 
   const compositionCallback = useRef(onComposition);
+  const composing = useRef(false);
 
   const api = useRef<typeof import("monaco-editor") | null>(null),
     providers = useRef<IDisposable[]>([]),
-    latest = useRef({ commands, nodes, variables });
+    latest = useRef({ commands, nodes, variables, onRegisterCommand });
   useLayoutEffect(() => {
     cursorCallback.current = onCursor;
     undoCallback.current = onUndo;
     compositionCallback.current = onComposition;
-    latest.current = { commands, nodes, variables };
+    latest.current = { commands, nodes, variables, onRegisterCommand };
   });
   const hintChanges = useRef<import("monaco-editor").Emitter<void> | null>(
     null,
@@ -390,6 +394,124 @@ export default function CodeEditor({
           () => latest.current.variables,
         );
         editor.onDidDispose(() => assistance.dispose());
+        const register = editor.addCommand(
+          0,
+          (_context, line: string, column: number, lineNumber: number) => {
+            if (editor.getModel()?.getLineContent(lineNumber) !== line) return;
+            const candidate = unregisteredCommand(
+              line,
+              column,
+              latest.current.commands,
+            );
+            if (candidate)
+              latest.current.onRegisterCommand?.(candidate.command);
+          },
+        );
+        const fixes = m.languages.registerCodeActionProvider("yarn", {
+          providedCodeActionKinds: ["quickfix"],
+          provideCodeActions(
+            model: editor.ITextModel,
+            range: import("monaco-editor").Range,
+          ) {
+            if (
+              model !== editor.getModel() ||
+              !latest.current.onRegisterCommand
+            )
+              return { actions: [], dispose() {} };
+            const line = model.getLineContent(range.startLineNumber);
+            const candidate = unregisteredCommand(
+              line,
+              range.startColumn - 1,
+              latest.current.commands,
+            );
+            return {
+              actions:
+                candidate && register
+                  ? [
+                      {
+                        title: "新增指令「" + candidate.command.name + "」",
+                        kind: "quickfix",
+                        isPreferred: true,
+                        command: {
+                          id: register,
+                          title: "新增指令",
+                          arguments: [
+                            line,
+                            range.startColumn - 1,
+                            range.startLineNumber,
+                          ],
+                        },
+                      },
+                    ]
+                  : [],
+              dispose() {},
+            };
+          },
+        });
+        editor.addAction({
+          id: "spindle.quickFix",
+          label: "快速修正",
+          keybindings: [m.KeyMod.Alt | m.KeyCode.Enter],
+          run: () => {
+            if (composing.current) return;
+            const model = editor.getModel(),
+              position = editor.getPosition();
+            const candidate =
+              model &&
+              position &&
+              unregisteredCommand(
+                model.getLineContent(position.lineNumber),
+                position.column - 1,
+                latest.current.commands,
+              );
+            if (candidate && latest.current.onRegisterCommand)
+              latest.current.onRegisterCommand(candidate.command);
+            else return editor.getAction("editor.action.quickFix")?.run();
+          },
+        });
+        const quickHover = m.languages.registerHoverProvider("yarn", {
+          provideHover(model: editor.ITextModel, position: Position) {
+            if (
+              model !== editor.getModel() ||
+              !register ||
+              !latest.current.onRegisterCommand
+            )
+              return null;
+            const line = model.getLineContent(position.lineNumber);
+            const candidate = unregisteredCommand(
+              line,
+              position.column - 1,
+              latest.current.commands,
+            );
+            if (!candidate) return null;
+            const args = encodeURIComponent(
+              JSON.stringify([line, position.column - 1, position.lineNumber]),
+            );
+            return {
+              range: new m.Range(
+                position.lineNumber,
+                candidate.from + 1,
+                position.lineNumber,
+                candidate.to + 1,
+              ),
+              contents: [
+                {
+                  value:
+                    "[新增指令](command:" +
+                    register +
+                    "?" +
+                    args +
+                    ") · Alt+Enter",
+                  isTrusted: { enabledCommands: [register] },
+                },
+              ],
+            };
+          },
+        });
+        editor.onDidDispose(() => {
+          fixes.dispose();
+          quickHover.dispose();
+        });
         editorRef.current = editor;
         api.current = m;
         for (const model of m.editor.getModels()) {
@@ -498,8 +620,14 @@ export default function CodeEditor({
           window.removeEventListener("keyup", key, true);
           window.removeEventListener("blur", blur);
         });
-        editor.onDidCompositionStart(() => compositionCallback.current?.(true));
-        editor.onDidCompositionEnd(() => compositionCallback.current?.(false));
+        editor.onDidCompositionStart(() => {
+          composing.current = true;
+          compositionCallback.current?.(true);
+        });
+        editor.onDidCompositionEnd(() => {
+          composing.current = false;
+          compositionCallback.current?.(false);
+        });
         if (undoCallback.current) {
           editor.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.KeyZ, () =>
             undoCallback.current?.(),

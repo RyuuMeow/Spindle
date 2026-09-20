@@ -26,9 +26,9 @@ renderer 離開前完成交易與草稿、保存視圖、flush 指定工作區�
 
 Windows 的暫時性 EPERM／EBUSY／EACCES 最多重試三次，每次仍重新核對磁碟版本並使用暫存檔替換，不退回直接覆寫。持續失敗則保留錯誤與重試入口。profile 本身寫入失敗時，無路徑草稿標為失敗；關閉提示不宣稱草稿已保存。
 
-專案 `.yarn-workbench/project.json` 保存名稱、有效指令、相對路徑與文件 ID。profile 的 `workspace-v2.json` 保留舊無路徑草稿，`workspace-cache/` 按需保存每個工作區草稿；`project-catalog-v1.json` 保存專案紀錄與啟動偏好，`windows-v2.json` 保存各視窗綁定與布局，`project-views-v1.json` 保存專案重新開啟的視圖。開啟同一資料夾重用專案；複製專案目錄時避免與已開啟專案重用文件 ID。
+專案 `.spindle/project.json` 保存名稱、有效指令、相對路徑與文件 ID。profile 的 `workspace-v2.json` 保留舊無路徑草稿，`workspace-cache/` 按需保存每個工作區草稿；`project-catalog-v1.json` 保存專案紀錄與啟動偏好，`windows-v2.json` 保存各視窗綁定與布局，`project-views-v1.json` 保存專案重新開啟的視圖。開啟同一資料夾重用專案；複製專案目錄時避免與已開啟專案重用文件 ID。
 
-`recovery-store.ts` 管理 `.yarn-workbench/history/index.json` 與 `trash/<entry-id>/entry.json + payload`。單檔歷史使用 profile 的 `single-file-history/<identity>/`。只為活動工作區每分鐘建立快照，每文件／指令保留 50 份，垃圾桶保留 30 天。
+`recovery-store.ts` 管理 `.spindle/history/index.json` 與 `trash/<entry-id>/entry.json + payload`。單檔歷史使用 profile 的 `single-file-history/<identity>/`。只為活動工作區每分鐘建立快照，每文件／指令保留 50 份，垃圾桶保留 30 天。
 
 刪除先保存文件，再以 prepared → deleted 日誌移動完整目錄（含非 Yarn 檔）；復原以 restoring 日誌移回，碰撞使用 recovered 名稱。永久刪除以 purging 日誌刪 payload，索引持久化後才移除操作紀錄。索引寫入失敗保留日誌，重試／重啟可完成操作，不讓已刪除項目復活；符號連結不跟隨。全域 Windows 垃圾桶不參與新操作。
 
@@ -74,7 +74,7 @@ Workbench 組合 SettingsView、SearchOverlay、CommandManager、HistoryView 及
 
 ### Spindle 品牌相容性（0.6.0）
 
-顯示名稱與可執行檔改為 Spindle；保留 com.yarnworkbench.desktop 安裝識別、Yarn Workbench profile 路徑、localStorage key、.yarn-workbench 與備份格式。顯式 --user-data-dir 優先，不改動隔離測試或使用者指定路徑。
+顯示名稱與可執行檔改為 Spindle；保留 com.yarnworkbench.desktop 安裝識別、Yarn Workbench profile 路徑、localStorage key、.spindle 與備份格式。顯式 --user-data-dir 優先，不改動隔離測試或使用者指定路徑。
 
 Ctrl 連結由共用 sceneLink 解析來源範圍，解析後先確認唯一存在的目標。Monaco 與 CodeMirror 都用同一命中範圍顯示和導航；裝飾不新增內容交易。指令提示共享 metadata，Monaco 跳脫 Markdown，CodeMirror 用 textContent 建構 DOM。
 
@@ -119,3 +119,7 @@ map-sources.ts 訂閱 WorkspaceClient 每筆共享文件交易。即使圖表未
 0.8.3 的 route-snapping.ts 在互動入口為可見物件計算連接中心吸附，整組使用同一位移，與內容交易無關。route-lanes.ts 由預覽及 Worker 共用，以未受影響線為固定參照；依來源、出口、連續共用前綴、目的地、方向與卡片／pin 先後判別合法共線，只調整自由折點。候選必須保持可見控制點、正交、無折返與避障，再降低重疊及繞路成本。schema 2 的可選 lanes=2 標記讓舊線路（含 lanes=1）修整一次，節點、手動卡片、pin 與視野保留；歷史還原沿用同一流程。
 
 0.8.4 的來源共用判定同步沿兩條折線前進，忽略 pin 造成的額外共線頂點；實際分岔或第一張卡片結束共用前綴。以同一出口的真實路徑判定，不依固定長度或分支組 ID；分岔後重合仍算衝突。每次分線呼叫內快取折線片段與成對前綴，拖動或 Worker 下次請求重新建立快取。lanes=1 遷移重新計算自由折點，但不再重新吸附已存在卡片。
+
+### 指令快速註冊與專案目錄
+
+專案設定、歷史及垃圾桶統一使用 `.spindle/`，不讀取或遷移舊 `.yarn-workbench/`。`command-quick-fix.ts` 只從完整呼叫建立保守的參數定義；純文字、閱讀與節點編輯共用。`registerCommand` 由工作區服務基於目前指令集追加並去重，沿用驗證、歷史與持久化，不由 renderer 覆蓋整份舊清單；不修改劇本文字。

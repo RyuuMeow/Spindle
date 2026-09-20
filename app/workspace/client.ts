@@ -1,3 +1,4 @@
+import { findCommand } from "../command-catalog";
 import {
   addFolder,
   applyTreeMove,
@@ -138,8 +139,17 @@ class BrowserService {
         const temporary = this.engine.create(p.id, a.name, d.text);
         p.documents = p.documents.filter((x) => x.id !== temporary.id);
         d.name = a.name;
-      } else if (a.type === "commands") {
-        validateCommands(a.commands);
+      } else if (a.type === "commands" || a.type === "registerCommand") {
+        if (
+          a.type === "registerCommand" &&
+          findCommand(a.command.name, p.commands)
+        )
+          return { snapshot: this.snapshot() };
+        const commands =
+          a.type === "registerCommand"
+            ? [...p.commands, a.command]
+            : a.commands;
+        validateCommands(commands);
         p.recovery.push({
           id: uuid(),
           documentId: "@commands",
@@ -148,7 +158,7 @@ class BrowserService {
           at: Date.now(),
           reason: "修改指令前",
         });
-        p.commands = a.commands;
+        p.commands = commands;
       } else if (a.type === "commandDraft") p.commandDraft = a.draft;
       else if (a.type === "save") {
         for (const d of p.documents.filter(

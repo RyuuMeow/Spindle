@@ -59,7 +59,7 @@ test("startup stays empty; new project creates its own folder and strict metadat
     });
     const p = f.service.engine.project(r.projectId);
     assert.equal(p.root, path.join(f.base, "Story"));
-    assert(fs.existsSync(path.join(p.root, ".yarn-workbench/project.json")));
+    assert(fs.existsSync(path.join(p.root, ".spindle/project.json")));
     await assert.rejects(
       f.service.request({ type: "createProject", root: f.base, name: "Story" }),
       /已存在/,
@@ -68,16 +68,10 @@ test("startup stays empty; new project creates its own folder and strict metadat
       f.service.request({ type: "createProject", root: f.base, name: ".." }),
       /有效/,
     );
-    fs.writeFileSync(
-      path.join(p.root, ".yarn-workbench/project.json"),
-      "broken",
-    );
+    fs.writeFileSync(path.join(p.root, ".spindle/project.json"), "broken");
     assert.throws(() => f.service.openFolder(p.root), /設定無法/);
     assert.equal(
-      fs.readFileSync(
-        path.join(p.root, ".yarn-workbench/project.json"),
-        "utf8",
-      ),
+      fs.readFileSync(path.join(p.root, ".spindle/project.json"), "utf8"),
       "broken",
     );
   } finally {
@@ -113,9 +107,8 @@ test("catalog recent removal is independent, rename keeps the folder, and reopen
     });
     assert(fs.existsSync(e.root));
     assert.equal(
-      JSON.parse(
-        fs.readFileSync(path.join(e.root, ".yarn-workbench/project.json")),
-      ).name,
+      JSON.parse(fs.readFileSync(path.join(e.root, ".spindle/project.json")))
+        .name,
       "Display name",
     );
     f.service.openFolder(e.root);
@@ -150,7 +143,7 @@ test("file ownership uses the deepest known directory boundary; unknown files st
     });
     const p = f.service.engine.project(r.projectId);
     assert.equal(p.kind, "standalone");
-    assert(!fs.existsSync(path.join(similar, ".yarn-workbench")));
+    assert(!fs.existsSync(path.join(similar, ".spindle")));
     const d = p.documents[0];
     f.service.engine.replace(p.id, d.id, "standalone saved", "edit");
     await f.service.request({ type: "save", projectId: p.id });
@@ -189,7 +182,7 @@ test("folder trash preserves binary assets and latest text, restores in place, p
     assert.equal(e.kind, "folder");
     assert(
       fs.existsSync(
-        path.join(root, ".yarn-workbench/trash", e.id, "payload/asset.bin"),
+        path.join(root, ".spindle/trash", e.id, "payload/asset.bin"),
       ),
     );
     await f.service.request({
@@ -345,7 +338,7 @@ test("interrupted trash, restore and purge retain journals and retry without dup
       text: "safe",
     });
     const doc = p.documents[0];
-    const index = path.join(p.root, ".yarn-workbench/history/index.json");
+    const index = path.join(p.root, ".spindle/history/index.json");
     let fail = true;
     fs.renameSync = (from, to) => {
       if (fail && to === index) throw Error("index unavailable");
@@ -530,6 +523,50 @@ test("workspace cache failures only block the owning workspace", async () => {
       f.service.engine.project(two.projectId).persistenceError,
       undefined,
     );
+  } finally {
+    f.dispose();
+  }
+});
+
+test("quick registration is atomic, deduplicated and survives reopening", async () => {
+  const f = fixture();
+  try {
+    const r = await f.service.request({
+      type: "createProject",
+      root: f.base,
+      name: "Commands",
+    });
+    const projectId = r.projectId;
+    const command = {
+      name: "show_item",
+      description: "",
+      example: "<<show_item apple>>",
+      params: [
+        { name: "arg1", type: "string", required: true, defaultValue: "" },
+      ],
+    };
+    await Promise.all([
+      f.service.request({ type: "registerCommand", projectId, command }),
+      f.service.request({ type: "registerCommand", projectId, command }),
+      f.service.request({
+        type: "registerCommand",
+        projectId,
+        command: { ...command, name: "show_other" },
+      }),
+    ]);
+    assert.deepEqual(
+      f.service.engine.project(projectId).commands.map((c) => c.name),
+      ["show_item", "show_other"],
+    );
+    const root = f.service.engine.project(projectId).root;
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(root, ".spindle/project.json")))
+        .commands.length,
+      2,
+    );
+    f.restart();
+    await f.service.request({ type: "openFolder", root });
+    assert.equal(f.service.engine.project(projectId).commands.length, 2);
   } finally {
     f.dispose();
   }

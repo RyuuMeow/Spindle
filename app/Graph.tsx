@@ -270,6 +270,7 @@ function Canvas({
   onNodeMenu,
   documents,
   commands,
+  onRegisterCommand,
   onDocumentEdit,
   onDocumentUndo,
   onDocumentSave,
@@ -516,6 +517,7 @@ function Canvas({
           doc={editorDocument}
           node={editing.record.node}
           commands={commands || []}
+          onRegisterCommand={onRegisterCommand}
           onDocumentEdit={onDocumentEdit}
           onDocumentSave={onDocumentSave}
           onDocumentUndo={onDocumentUndo}
@@ -540,6 +542,7 @@ function Canvas({
       onDocumentUndo,
       onDocumentComposition,
       commands,
+      onRegisterCommand,
       onRenameScene,
       onDocumentSave,
       finishEdit,

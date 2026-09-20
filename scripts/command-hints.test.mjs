@@ -327,3 +327,44 @@ test("filled values on either side of caret never cause automatic prompts", () =
     assert.equal(emptyParameterHint(text, at, commands), null, marked);
   }
 });
+
+const quickOutput = path.resolve("outputs/tests/command-quick-fix.cjs");
+buildSync({
+  entryPoints: ["app/command-quick-fix.ts"],
+  outfile: quickOutput,
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+});
+const { unregisteredCommand } = createRequire(import.meta.url)(quickOutput);
+test("unknown command registration infers complete positional literals without changing source", () => {
+  const text = '  <<show_item "red apple" 2 true $item>>';
+  const result = unregisteredCommand(text, 10, []);
+  assert.equal(result.command.name, "show_item");
+  assert.deepEqual(
+    result.command.params.map((p) => p.type),
+    ["string", "number", "boolean", "string"],
+  );
+  assert.deepEqual(
+    result.command.params.map((p) => p.name),
+    ["arg1", "arg2", "arg3", "arg4"],
+  );
+  assert(result.command.params.every((p) => p.required));
+  assert.equal(unregisteredCommand(text, 10, [result.command]), null);
+});
+test("quick registration rejects builtins, comments, incomplete calls and unrelated cursor positions", () => {
+  for (const text of [
+    "<<set $x = 1>>",
+    "// <<unknown>>",
+    "Narrator: <<unknown>>",
+    '<<unknown "unfinished>>',
+    "<<unknown",
+    "<<unknown $a + 1>>",
+  ])
+    assert.equal(unregisteredCommand(text, 5, []), null, text);
+  assert.equal(unregisteredCommand("    <<unknown>>", 1, []), null);
+  assert.equal(
+    unregisteredCommand("<<unknown>>", 4, []).command.params.length,
+    0,
+  );
+});

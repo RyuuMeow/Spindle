@@ -20,6 +20,7 @@ import {
 } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
 import type { Command } from "../parser";
+import { unregisteredCommand } from "../command-quick-fix";
 import { commandCatalog } from "../command-catalog";
 import {
   variableCompletionContext,
@@ -42,6 +43,7 @@ export function commandEditing(
   scenes: () => { name: string; file?: string }[] = () => [],
   characters: () => string[] = () => [],
   variables: () => YarnVariable[] = () => [],
+  register?: (command: Command) => void,
 ) {
   const dismiss = StateEffect.define<boolean>();
   const focusChanged = StateEffect.define<boolean>();
@@ -172,9 +174,43 @@ export function commandEditing(
     };
   };
   return [
+    EditorState.phrases.of({
+      Find: "尋找",
+      Replace: "取代",
+      next: "下一個",
+      previous: "上一個",
+      all: "全部選取",
+      "match case": "區分大小寫",
+      regexp: "正規表示式",
+      "by word": "全字匹配",
+      replace: "取代",
+      "replace all": "全部取代",
+      close: "關閉",
+      "Go to line": "前往行",
+      go: "前往",
+    }),
     indentUnit.of("    "),
     // Keep overlays out of scaled/clipped graph nodes.
     tooltips({ parent: document.body }),
+    keymap.of([
+      {
+        key: "Alt-Enter",
+        run: (view) => {
+          if (!register || view.composing || view.state.readOnly) return false;
+          const pos = view.state.selection.main.head,
+            line = view.state.doc.lineAt(pos);
+          const candidate = unregisteredCommand(
+            line.text,
+            pos - line.from,
+            commands(),
+          );
+          if (!candidate) return false;
+          register(candidate.command);
+          view.dispatch({ effects: closeHoverTooltips });
+          return true;
+        },
+      },
+    ]),
     focused,
     composing,
     dismissed,
@@ -185,6 +221,7 @@ export function commandEditing(
         !!state.field(hints) ||
         state.field(composing) ||
         completionStatus(state) !== null,
+      register,
     ),
     EditorView.domEventHandlers({
       focus: (_event, view) => {

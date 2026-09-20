@@ -20,7 +20,7 @@ export function containsPath(root: string, file: string) {
   );
 }
 export function projectConfig(root: string) {
-  const folder = path.join(root, ".yarn-workbench");
+  const folder = path.join(root, ".spindle");
   if (fs.existsSync(folder) && fs.lstatSync(folder).isSymbolicLink())
     throw Error("專案設定目錄不可為符號連結");
   const file = path.join(folder, "project.json");

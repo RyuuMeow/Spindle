@@ -65,7 +65,7 @@ test("folder moves preserve descendants and sibling order through rename; cycles
   for (const name of [
     "../x",
     ".git",
-    ".yarn-workbench",
+    ".spindle",
     "node_modules",
     "a/../b",
     "CON",
@@ -167,7 +167,7 @@ test("disk folders and mixed order survive a fresh profile; failed moves/trash p
       projectId: p.id,
       name: "Empty",
     });
-    assert.ok(fs.readdirSync(path.join(root, ".yarn-workbench/trash")).length);
+    assert.ok(fs.readdirSync(path.join(root, ".spindle/trash")).length);
     assert.ok(!service.engine.project(p.id).folders.includes("Empty"));
   } finally {
     fs.renameSync = rename;

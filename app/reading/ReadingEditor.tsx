@@ -67,6 +67,7 @@ export type ReadingActions = {
 type Props = {
   doc: DocumentRecord;
   commands: Command[];
+  onRegisterCommand?: (command: Command) => void;
   variables?: YarnVariable[];
   scenes?: { name: string; file: string }[];
   onEdit: (edits: TextEdit[]) => void;
@@ -319,6 +320,7 @@ export default function ReadingEditor(props: Props) {
           () => latest.current.scenes || [],
           () => [],
           () => latest.current.variables || [],
+          (command) => latest.current.onRegisterCommand?.(command),
         ),
         EditorView.updateListener.of((update) => {
           reportFolded(update.state);

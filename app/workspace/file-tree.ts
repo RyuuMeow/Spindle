@@ -29,7 +29,7 @@ export function validFolderName(name: string) {
     !name
       .split("/")
       .some((p) =>
-        [".git", ".yarn-workbench", "node_modules"].includes(p.toLowerCase()),
+        [".git", ".spindle", "node_modules"].includes(p.toLowerCase()),
       )
   );
 }

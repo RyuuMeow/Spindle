@@ -129,7 +129,7 @@ function done(s) {
       .click();
     await page.locator(".project-switch").waitFor();
     assert(
-      fs.existsSync(path.join(base, "New Story/.yarn-workbench/project.json")),
+      fs.existsSync(path.join(base, "New Story/.spindle/project.json")),
     );
     done("create form creates named subfolder and manifest");
     await projectMenu("關閉專案");
@@ -311,7 +311,7 @@ function done(s) {
     page = await app.firstWindow();
     await page.locator(".monaco-editor .view-lines").waitFor();
     assert.equal(await page.locator(".file-list").count(), 0);
-    assert(!fs.existsSync(path.join(base, ".yarn-workbench")));
+    assert(!fs.existsSync(path.join(base, ".spindle")));
     assert.equal((await snap()).projects[0].kind, "standalone");
     done("cold file launch opens independent single-file workspace");
     await page.screenshot({ path: path.join(base, "03-single-file.png") });
@@ -434,9 +434,9 @@ function done(s) {
       catalog = JSON.parse(fs.readFileSync(catalogFile, "utf8"));
     for (let i = 1; i <= 7; i++) {
       const folder = path.join(base, "Recent " + i);
-      fs.mkdirSync(path.join(folder, ".yarn-workbench"), { recursive: true });
+      fs.mkdirSync(path.join(folder, ".spindle"), { recursive: true });
       fs.writeFileSync(
-        path.join(folder, ".yarn-workbench/project.json"),
+        path.join(folder, ".spindle/project.json"),
         JSON.stringify({
           id: "recent-" + i,
           name: "Recent " + i,
@@ -515,7 +515,7 @@ function done(s) {
       .click();
     assert(!(await snap()).catalog.some((p) => p.id === "recent-7"));
     assert(
-      fs.existsSync(path.join(base, "Recent 7/.yarn-workbench/project.json")),
+      fs.existsSync(path.join(base, "Recent 7/.spindle/project.json")),
     );
     done("full catalog search and remove affect records only");
     await app.close();
