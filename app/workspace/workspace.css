@@ -886,3 +886,11 @@
 .statistics-bar b { font-weight:400; color:#aaa; }
 .statistics-bar i { position:absolute; bottom:1px; left:0; height:3px; background:#6f8091; border-radius:2px; }
 button.statistics-bar:hover { color:#fff; background:#ffffff05; }
+
+.workspace-tab-divider { width:1px; height:26px; flex:none; align-self:center; margin:0 8px; background:var(--border); }
+.tree-entry .folder-disclosure { width:24px; min-width:24px; height:30px; flex:0 0 24px; padding:0; line-height:0; display:grid; place-items:center; }
+.tree-entry .folder-disclosure svg { display:block; transform-origin:center; flex:none; }
+.recovery-index .section-heading h2 { margin:0; }
+.recovery-folder-files { display:flex; flex-wrap:wrap; gap:8px; padding:12px 20px; color:var(--muted-foreground); border-bottom:1px solid var(--border); }
+.recovery-folder-files button { padding:4px 8px; border-radius:4px; }
+.recovery-folder-files button.active { background:var(--accent); }

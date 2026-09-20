@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import type { WindowSession } from "./types";
+import type { WindowSession, AppPreferences } from "./types";
 import "./settings.css";
 
 export type WorkspacePreferences = Pick<
@@ -126,7 +126,13 @@ export default function SettingsView({
   onClose,
   version,
   initialSection = "reading",
+  returnLabel = "返回編輯",
+  appPreferences,
+  onAppPreferences,
 }: {
+  appPreferences?: AppPreferences;
+  onAppPreferences?: (reopen: boolean) => void;
+  returnLabel?: string;
   preferences: WorkspacePreferences;
   onChange: (next: WorkspacePreferences) => void;
   onResetLayout: () => void;
@@ -170,7 +176,7 @@ export default function SettingsView({
               {onClose && (
                 <Button variant="ghost" size="sm" onClick={onClose}>
                   <ArrowLeft size={15} />
-                  返回編輯
+                  {returnLabel}
                 </Button>
               )}
             </div>
@@ -290,6 +296,23 @@ export default function SettingsView({
             )}
             {section === "saving" && (
               <>
+                {onAppPreferences && (
+                  <section className="settings-group">
+                    <h3>啟動</h3>
+                    <label className="settings-check">
+                      <Checkbox
+                        checked={!!appPreferences?.reopenLastProject}
+                        onCheckedChange={(value) =>
+                          onAppPreferences(value === true)
+                        }
+                      />
+                      啟動時開啟上次專案
+                    </label>
+                    <p className="setting-help">
+                      關閉專案後，下次啟動仍會顯示專案列表。
+                    </p>
+                  </section>
+                )}
                 <section className="settings-group">
                   <h3>純文字編輯</h3>
                   <label className="settings-check" htmlFor={lineNumbersId}>
@@ -313,7 +336,7 @@ export default function SettingsView({
                       </dt>
                       <dd>
                         {onOpenData
-                          ? "停止輸入後自動寫回原檔。Ctrl+S 立即保存，Ctrl+Shift+S 保存全部。"
+                          ? "停止輸入後自動寫回原檔。Ctrl+S 立即保存，離開工作區前會確認保存完成。"
                           : "編輯內容保留在此瀏覽器的工作區。使用匯出功能下載劇本或專案備份。"}
                       </dd>
                     </div>
@@ -321,15 +344,16 @@ export default function SettingsView({
                       <dt>本機草稿</dt>
                       <dd>
                         {onOpenData
-                          ? "尚未指定檔案位置的劇本保留在本機。使用「存成檔案」建立磁碟原檔。"
+                          ? "舊草稿保留在初始畫面的「待移轉草稿」，可預覽後轉存為正式專案。"
                           : "草稿保留在本機工作區，匯出後可在其他工具開啟。"}
                       </dd>
                     </div>
                     <div>
                       <dt>版本歷史</dt>
                       <dd>
-                        {onOpenData && "有變更時定期建立快照。"}每份劇本保留最近
-                        50 份快照，最近刪除保留 30 天。
+                        {onOpenData &&
+                          "有變更時定期建立快照。專案歷史與垃圾桶保存在專案資料夾；單檔歷史保存在應用程式資料目錄。"}
+                        每份劇本保留最近 50 份快照，最近刪除保留 30 天。
                       </dd>
                     </div>
                   </dl>
@@ -389,7 +413,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.8.4：同來源共用路段不再強制錯開；保留 pin
+                    0.9.0：同來源共用路段不再強制錯開；保留 pin
                     與分岔後的平行間距。
                   </p>
                   <p className="setting-help">

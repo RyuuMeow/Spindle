@@ -1,7 +1,16 @@
 "use client";
 import { sourceCommandAssistance } from "./source-command-assistance";
 import { sceneLink } from "./scene-link";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import type { editor, Position, IDisposable } from "monaco-editor";
 import Editor, { loader } from "@monaco-editor/react";
 import type { Command, Doc, Issue, Node } from "./parser";
 import { commandCatalog } from "./command-catalog";
@@ -34,10 +43,10 @@ export default function CodeEditor({
   onView,
   onNavigate,
 }: {
-  monacoRef: any;
+  monacoRef: RefObject<unknown>;
   modelEpoch: number;
   viewKey: string;
-  viewStates: any;
+  viewStates: RefObject<Record<string, editor.ICodeEditorViewState>>;
   doc: Doc;
   commands: Command[];
   variables?: YarnVariable[];
@@ -47,8 +56,8 @@ export default function CodeEditor({
     s: string,
     event: import("monaco-editor").editor.IModelContentChangedEvent,
   ) => void;
-  onCursor: (p: any) => void;
-  editorRef: any;
+  onCursor: (p: Position) => void;
+  editorRef: RefObject<editor.IStandaloneCodeEditor | null>;
   goTo: { file: string; line: number; column?: number; nonce: number } | null;
   lineNumbers: boolean;
   onUndo?: (redo?: boolean) => void;
@@ -81,15 +90,20 @@ export default function CodeEditor({
     };
   }, []);
   const cursorCallback = useRef(onCursor);
-  cursorCallback.current = onCursor;
+
   const undoCallback = useRef(onUndo);
-  undoCallback.current = onUndo;
+
   const compositionCallback = useRef(onComposition);
-  compositionCallback.current = onComposition;
-  const api = useRef<any>(null),
-    providers = useRef<any[]>([]),
+
+  const api = useRef<typeof import("monaco-editor") | null>(null),
+    providers = useRef<IDisposable[]>([]),
     latest = useRef({ commands, nodes, variables });
-  latest.current = { commands, nodes, variables };
+  useLayoutEffect(() => {
+    cursorCallback.current = onCursor;
+    undoCallback.current = onUndo;
+    compositionCallback.current = onComposition;
+    latest.current = { commands, nodes, variables };
+  });
   const hintChanges = useRef<import("monaco-editor").Emitter<void> | null>(
     null,
   );
@@ -104,7 +118,7 @@ export default function CodeEditor({
     },
     [],
   );
-  const markers = () => {
+  const markers = useCallback(() => {
     if (!api.current) return;
     for (const m of api.current.editor.getModels()) {
       const filename = decodeURIComponent(m.uri.path.slice(1));
@@ -126,25 +140,26 @@ export default function CodeEditor({
           })),
       );
     }
-  };
-  useEffect(markers, [issues, doc.name]);
+  }, [issues]);
+  useEffect(markers, [markers, doc.name]);
+  const restoreCurrentView = useEffectEvent(() => {
+    const e = editorRef.current;
+    if (!e) return;
+    const v = viewStates.current[viewKey] || restoredView.current;
+    if (v) e.restoreViewState(v);
+    else {
+      e.setPosition({ lineNumber: 1, column: 1 });
+      e.setScrollTop(0);
+    }
+    if (goTo?.file === doc.name) {
+      e.setPosition({ lineNumber: goTo.line, column: goTo.column || 1 });
+      e.revealLineInCenter(goTo.line);
+    }
+    const p = e.getPosition();
+    if (p) cursorCallback.current(p);
+  });
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const e = editorRef.current;
-      if (!e) return;
-      const v = viewStates.current[viewKey] || restoredView.current;
-      if (v) e.restoreViewState(v);
-      else {
-        e.setPosition({ lineNumber: 1, column: 1 });
-        e.setScrollTop(0);
-      }
-      if (goTo?.file === doc.name) {
-        e.setPosition({ lineNumber: goTo.line, column: goTo.column || 1 });
-        e.revealLineInCenter(goTo.line);
-      }
-      const p = e.getPosition();
-      if (p) cursorCallback.current(p);
-    });
+    const frame = requestAnimationFrame(() => restoreCurrentView());
     return () => cancelAnimationFrame(frame);
   }, [viewKey]);
   useEffect(() => {
@@ -156,7 +171,7 @@ export default function CodeEditor({
       editorRef.current.revealLineInCenter(goTo.line);
       editorRef.current.focus();
     }
-  }, [goTo, doc.name]);
+  }, [goTo, doc.name, editorRef]);
   if (!localeReady)
     return <div className="editor-loading">正在載入文字編輯器…</div>;
   return (
@@ -182,7 +197,11 @@ export default function CodeEditor({
       beforeMount={(m) => {
         api.current = m;
         monacoRef.current = m;
-        if (!m.languages.getLanguages().some((l: any) => l.id === "yarn"))
+        if (
+          !m.languages
+            .getLanguages()
+            .some((l: { id: string }) => l.id === "yarn")
+        )
           m.languages.register({ id: "yarn", extensions: [".yarn"] });
         if (onUndo) {
           m.editor.registerCommand("undo", () => undoCallback.current?.());
@@ -247,7 +266,7 @@ export default function CodeEditor({
         providers.current = [
           m.languages.registerCompletionItemProvider("yarn", {
             triggerCharacters: ["<", " ", "$"],
-            provideCompletionItems(model: any, pos: any) {
+            provideCompletionItems(model: editor.ITextModel, pos: Position) {
               const word = model.getWordUntilPosition(pos),
                 prefix = model
                   .getLineContent(pos.lineNumber)

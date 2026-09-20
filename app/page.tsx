@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { WorkspaceClient } from "./workspace/client";
+import DesktopWorkspace from "./workspace/DesktopWorkspace";
 import Workbench from "./workspace/Workbench";
 import type { WindowSession } from "./workspace/types";
 
@@ -49,5 +50,9 @@ export default function Home() {
         <div className="empty-editor">正在開啟本機工作區…</div>
       </main>
     );
-  return <Workbench client={ready.client} initialSession={ready.session} />;
+  return window.yarnDesktop ? (
+    <DesktopWorkspace client={ready.client} initialSession={ready.session} />
+  ) : (
+    <Workbench client={ready.client} initialSession={ready.session} />
+  );
 }

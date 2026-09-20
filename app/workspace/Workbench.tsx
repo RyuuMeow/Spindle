@@ -134,9 +134,11 @@ const saveLabels = {
 export default function Workbench({
   client,
   initialSession,
+  onNavigate,
 }: {
   client: WorkspaceClient;
   initialSession: WindowSession | null;
+  onNavigate?: (action: WorkspaceAction | "home" | "create") => Promise<void>;
 }) {
   const snapshot = useSyncExternalStore(
     client.subscribe,
@@ -148,9 +150,21 @@ export default function Workbench({
       initialSession ||
       defaultSession(client.windowId, snapshot.currentProjectId),
   );
-  useEffect(()=>client.subscribeSourceChanges((id,transaction)=>{
-    setSession(s=>mapSessionGraphSources(s,id,transaction.changes,transaction.state.doc.toString(),transaction.startState.doc.toString()));
-  }),[client]);
+  useEffect(
+    () =>
+      client.subscribeSourceChanges((id, transaction) => {
+        setSession((s) =>
+          mapSessionGraphSources(
+            s,
+            id,
+            transaction.changes,
+            transaction.state.doc.toString(),
+            transaction.startState.doc.toString(),
+          ),
+        );
+      }),
+    [client],
+  );
   const [menu, setMenu] = useState<MenuState | null>(null),
     [prompt, setPrompt] = useState<Prompt | null>(null),
     [promptValue, setPromptValue] = useState(""),
@@ -200,6 +214,7 @@ export default function Workbench({
   const project =
     snapshot.projects.find((p) => p.id === session.projectId) ||
     snapshot.projects[0];
+  const standalone = project?.kind === "standalone";
   const tabs = session.tabs.filter(
     (t) =>
       !!utilityNames[t.documentId] ||
@@ -306,7 +321,7 @@ export default function Workbench({
       description: "目前版本會先保留，還原後可從版本歷史取回。",
       submitLabel: "還原此版本",
       run: async () => {
-        await client.flush();
+        await client.flush(project.id);
         const result = await perform({
           type: "recover",
           projectId: project.id,
@@ -349,30 +364,103 @@ export default function Workbench({
   }, [session, project?.id, client]);
   const [closing, setClosing] = useState(false);
   const [closeSaving, setCloseSaving] = useState(false);
-  const prepareClose = useEffectEvent(async (token: string) => {
-    setCloseSaving(client.hasPendingWrites);
-    setClosing(true);
-    try {
-      // Let the pending-save panel paint before main-process disk writes.
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  const [leaveFailure, setLeaveFailure] = useState<{
+    message: string;
+    action: WorkspaceAction | "home" | "create";
+  } | null>(null);
+  const leaving = useRef(false);
+  async function saveBeforeLeaving() {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    await client.prepareClose(project.id);
+    const sourceView = editorRef.current?.saveViewState();
+    const saved = {
+      ...session,
+      screen: "editor" as const,
+      projectId: project.id,
+      tabs: session.tabs.map((t) =>
+        t.id === active?.id && mode === "source" && sourceView
+          ? { ...t, sourceView }
+          : t,
+      ),
+    };
+    await client.saveSession(saved);
+    await client.action({ type: "save", projectId: project.id });
+    const state = client.getSnapshot(),
+      current = state.projects.find((p) => p.id === project.id);
+    const failed = current?.documents.find(
+      (d) => d.composing || ["error", "conflict", "missing"].includes(d.status),
+    );
+    if (
+      failed ||
+      current?.persistenceError ||
+      state.notices.find((message) => message.startsWith("復原草稿寫入失敗："))
+    )
+      throw Error(
+        (failed?.composing
+          ? "同一專案的編輯器仍在組字中，請完成輸入後重試。"
+          : failed?.error) ||
+          current?.persistenceError ||
+          state.notices.find((message) =>
+            message.startsWith("復原草稿寫入失敗："),
+          ) ||
+          "保存未完成",
       );
-      await client.prepareClose();
-      await client.saveSession({
-        ...session,
-        projectId: project?.id || session.projectId,
-      });
+  }
+  async function leaveWorkspace(action: WorkspaceAction | "home" | "create") {
+    if (!onNavigate || leaving.current) return;
+    leaving.current = true;
+    setClosing(true);
+    setCloseSaving(false);
+    const timer = setTimeout(() => {
+      if (client.hasPendingWritesIn(project.id)) setCloseSaving(true);
+    }, 250);
+    try {
+      await saveBeforeLeaving();
+      if (typeof action === "string")
+        await client.action({ type: "closeProject", projectId: project.id });
+      await onNavigate(action);
+    } catch (error) {
+      setLeaveFailure({ message: String(error), action });
+    } finally {
+      clearTimeout(timer);
+      leaving.current = false;
+      setClosing(false);
+      setCloseSaving(false);
+    }
+  }
+  const prepareClose = useEffectEvent(async (token: string) => {
+    if (leaving.current) {
+      window.yarnDesktop?.closePrepared(token, "工作區正在切換，請稍後重試。");
+      return;
+    }
+    leaving.current = true;
+    setClosing(true);
+    setCloseSaving(false);
+    const timer = setTimeout(() => {
+      if (client.hasPendingWritesIn(project.id)) setCloseSaving(true);
+    }, 250);
+    try {
+      await saveBeforeLeaving();
       window.yarnDesktop?.closePrepared(token);
     } catch (error) {
       setClosing(false);
       window.yarnDesktop?.closePrepared(token, String(error));
+      notify(String(error));
+    } finally {
+      clearTimeout(timer);
+      leaving.current = false;
     }
   });
   useEffect(() => {
     const desktop = window.yarnDesktop;
     if (!desktop) return;
     const prepare = desktop.onPrepareClose((token) => void prepareClose(token));
-    const cancel = desktop.onCloseCancelled(() => setClosing(false));
+    const cancel = desktop.onCloseCancelled(() => {
+      setClosing(false);
+      setCloseSaving(false);
+    });
     return () => {
       prepare();
       cancel();
@@ -396,7 +484,19 @@ export default function Workbench({
   }, [doc?.name, project?.name]);
   async function perform(action: WorkspaceAction) {
     try {
+      if (
+        onNavigate &&
+        ["openFolder", "createProject", "migrateDraft"].includes(action.type)
+      ) {
+        await leaveWorkspace(action);
+        return;
+      }
       const result = await client.action(action);
+      if (onNavigate && action.type === "import") {
+        await leaveWorkspace("home");
+        notify("備份已匯入待移轉草稿，請從初始畫面轉存為正式專案。");
+        return;
+      }
       if (action.type === "save") {
         const recoveryFailure = result.snapshot.notices.find((message) =>
           message.startsWith("復原草稿寫入失敗："),
@@ -534,7 +634,7 @@ export default function Workbench({
   }
   async function closeTabs(ids: string[], force = false) {
     if (!force) {
-      await client.flush();
+      await client.flush(project.id);
       // Command drafts, including invalid intermediate input, are persisted independently.
       const result = await perform({ type: "save", projectId: project.id });
       if (!result) return;
@@ -592,6 +692,11 @@ export default function Workbench({
   }
   async function selectProject(id: string, force = false) {
     if (id === project.id) return;
+    if (onNavigate) {
+      const entry = snapshot.catalog?.find((p) => p.id === id);
+      if (entry) await leaveWorkspace({ type: "openFolder", root: entry.root });
+      return;
+    }
     setInlineDraft(null);
     setActiveFolder(null);
     resetTransient();
@@ -641,6 +746,10 @@ export default function Workbench({
   }
   async function adopt(result: ActionResult | undefined, force = false) {
     if (!result || result.cancelled) return;
+    if (onNavigate && result.projectId === project.id) {
+      if (result.documentId) openDocument(result.documentId, false);
+      return;
+    }
     const id = result.projectId;
     setInlineDraft(null);
     setActiveFolder(null);
@@ -688,6 +797,10 @@ export default function Workbench({
     setInlineDraft(next);
   }
   function newDocument(inNewTab = false) {
+    if (standalone) {
+      void perform({ type: "openFiles" });
+      return;
+    }
     const candidate = activeFolder ?? folderOf(doc?.name || "");
     const folder = projectFolders(project).includes(candidate) ? candidate : "";
     setSearchOpen(false);
@@ -802,7 +915,7 @@ export default function Workbench({
     );
   }
   async function duplicateDocument(d: DocumentRecord) {
-    await client.flush();
+    await client.flush(project.id);
     const latest = client
       .getSnapshot()
       .projects.find((p) => p.id === project.id)!;
@@ -863,7 +976,7 @@ export default function Workbench({
       previous ? { ...previous, busy: true, error: undefined } : previous,
     );
     try {
-      await client.flush();
+      await client.flush(project.id);
       const latest = client
         .getSnapshot()
         .projects.find((p) => p.id === project.id);
@@ -1135,19 +1248,6 @@ export default function Workbench({
       ...(window.yarnDesktop
         ? [
             {
-              label: "另存新檔…",
-              run: () =>
-                void perform({
-                  type: "saveAs",
-                  projectId: project.id,
-                  documentId: d.id,
-                }).then((r) => {
-                  if (r?.projectId === project.id && r.documentId)
-                    openDocument(r.documentId);
-                  else void adopt(r);
-                }),
-            },
-            {
               label: "在檔案總管顯示",
               disabled: !d.path,
               run: () =>
@@ -1204,7 +1304,7 @@ export default function Workbench({
         icon: <Copy size={15} />,
         run: () =>
           void (async () => {
-            await client.flush();
+            await client.flush(project.id);
             const latest = client
               .getSnapshot()
               .projects.find((p) => p.id === project.id)!;
@@ -1256,7 +1356,7 @@ export default function Workbench({
                   icon: <FileText size={15} />,
                   run: () =>
                     void (async () => {
-                      await client.flush();
+                      await client.flush(project.id);
                       const latest = client
                         .getSnapshot()
                         .projects.find((p) => p.id === project.id)!;
@@ -1392,7 +1492,7 @@ export default function Workbench({
   const keyboard = useEffectEvent((e: globalThis.KeyboardEvent) => {
     const mod = e.ctrlKey || e.metaKey,
       key = e.key.toLowerCase();
-    if (e.defaultPrevented) return;
+    if (e.defaultPrevented || closing) return;
     const overlay =
       e.target instanceof Element &&
       e.target.closest(
@@ -1640,7 +1740,7 @@ export default function Workbench({
           <ChromeButton
             aria-label="切換劇本側欄"
             title="切換劇本側欄"
-            disabled={utility}
+            disabled={utility || standalone}
             onClick={() => {
               setSideFocus("left");
               setSession((s) => ({ ...s, left: !s.left }));
@@ -1660,67 +1760,74 @@ export default function Workbench({
             <DropdownMenuContent className="desktop-menu project-menu">
               <DropdownMenuItem
                 onSelect={() =>
-                  ask({
-                    title: "新增專案",
-                    label: "專案名稱",
-                    value: "我的故事",
-                    run: async (name) => {
-                      await adopt(
-                        await perform({ type: "createProject", name }),
-                      );
-                    },
-                  })
+                  onNavigate
+                    ? void leaveWorkspace("create")
+                    : ask({
+                        title: "新增專案",
+                        label: "專案名稱",
+                        value: "我的故事",
+                        run: async (name) => {
+                          await adopt(
+                            await perform({ type: "createProject", name }),
+                          );
+                        },
+                      })
                 }
               >
-                新增專案…
+                <FolderPlus size={15} />
+                建立專案
               </DropdownMenuItem>
-              {window.yarnDesktop && (
+              {onNavigate && (
                 <>
                   <DropdownMenuItem
-                    onSelect={() =>
-                      void perform({ type: "openFolder" }).then(adopt)
-                    }
+                    onSelect={() => void leaveWorkspace({ type: "openFolder" })}
                   >
-                    <FolderOpen size={15} /> 開啟專案資料夾…
+                    <FolderOpen size={15} />
+                    開啟專案資料夾…
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() =>
-                      void perform({ type: "openFiles" }).then(adopt)
-                    }
+                    onSelect={() => void perform({ type: "openFiles" })}
                   >
+                    <FileText size={15} />
                     開啟劇本…
                   </DropdownMenuItem>
                 </>
               )}
-              <DropdownMenuItem onSelect={() => input.current?.click()}>
-                匯入劇本或專案備份…
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() =>
-                  ask({
-                    title: "更名專案",
-                    label: "專案名稱",
-                    value: project.name,
-                    run: async (name) => {
-                      await perform({
-                        type: "renameProject",
-                        projectId: project.id,
-                        name,
-                      });
-                    },
-                  })
-                }
-              >
-                更名專案…
-              </DropdownMenuItem>
+              {!standalone && (
+                <DropdownMenuItem onSelect={() => input.current?.click()}>
+                  <FilePlus2 size={15} />
+                  匯入劇本或專案備份…
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
-              {snapshot.projects.map((p) => (
+              {(onNavigate
+                ? (snapshot.catalog || []).filter((p) => p.recent).slice(0, 5)
+                : snapshot.projects
+              ).map((p) => (
                 <DropdownMenuItem
                   key={p.id}
+                  disabled={"unavailable" in p && !!p.unavailable}
                   onSelect={() => void selectProject(p.id)}
+                  onContextMenu={(event) => {
+                    if (!onNavigate) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    showMenu(event, [
+                      {
+                        label: "從最近列表中移除",
+                        icon: <Trash2 size={15} />,
+                        run: () =>
+                          void perform({
+                            type: "catalog",
+                            operation: "removeRecent",
+                            id: p.id,
+                          }),
+                      },
+                    ]);
+                  }}
                 >
                   <Check
-                    size={13}
+                    size={15}
                     style={{
                       visibility: p.id === project.id ? "visible" : "hidden",
                     }}
@@ -1729,59 +1836,70 @@ export default function Workbench({
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() =>
-                  void perform({ type: "save", projectId: project.id })
-                }
-              >
-                儲存全部 <span className="menu-shortcut">Ctrl+Shift+S</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() =>
-                  void perform({ type: "export", projectId: project.id }).then(
-                    (r) => {
-                      if (r && !r.cancelled)
-                        notify(
-                          window.yarnDesktop
-                            ? "專案備份已寫入"
-                            : "已開始下載專案備份",
-                        );
-                    },
-                  )
-                }
-              >
-                匯出專案備份…
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDocument("@recovery")}>
-                <ArchiveRestore size={15} /> 最近刪除與指令復原
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  requestAnimationFrame(openCommands);
-                }}
-              >
-                <Settings2 size={15} /> 自訂指令
-                {commandHasDraft ? " · 有草稿" : ""}
-              </DropdownMenuItem>
+              {!onNavigate && (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void perform({ type: "save", projectId: project.id })
+                  }
+                >
+                  儲存全部<span className="menu-shortcut">Ctrl+Shift+S</span>
+                </DropdownMenuItem>
+              )}
+              {!standalone && (
+                <>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void perform({ type: "export", projectId: project.id })
+                    }
+                  >
+                    <ExternalLink size={15} />
+                    匯出專案備份…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => openDocument("@recovery")}>
+                    <ArchiveRestore size={15} />
+                    最近刪除與指令復原
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => requestAnimationFrame(openCommands)}
+                  >
+                    <Settings2 size={15} />
+                    自訂指令{commandHasDraft ? " · 有草稿" : ""}
+                  </DropdownMenuItem>
+                </>
+              )}
               {project.root && (
                 <DropdownMenuItem
                   onSelect={() =>
                     void perform({ type: "reveal", projectId: project.id })
                   }
                 >
-                  在檔案總管開啟專案資料夾
+                  <FolderOpen size={15} />
+                  在檔案總管開啟
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => openSettings()}>
-                <Settings2 size={15} /> 設定…
+                <Settings2 size={15} />
+                設定…
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openSettings("about")}>
                 關於與使用說明
               </DropdownMenuItem>
-            </DropdownMenuContent>
+              {onNavigate && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => void leaveWorkspace("home")}
+                  >
+                    <X size={15} />
+                    {standalone ? "關閉檔案" : "關閉專案"}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>{" "}
           </DropdownMenu>
         </div>
+        <div className="workspace-tab-divider" aria-hidden="true" />
         <WorkspaceTabs
           activeId={active?.id || ""}
           tabs={tabs.map((t) => {
@@ -1992,9 +2110,7 @@ export default function Workbench({
                           <b>{warningCount}</b>
                         </span>
                       )}
-                      {!errorCount && !warningCount && (
-                        <Check size={16} />
-                      )}
+                      {!errorCount && !warningCount && <Check size={16} />}
                     </ChromeButton>
                     <ChromeButton
                       title="作者統計"
@@ -2050,6 +2166,7 @@ export default function Workbench({
         }
       >
         {session.left &&
+          !standalone &&
           (!utility || inlineDraft?.kind.endsWith("document")) && (
             <aside
               className="workspace-sidebar"
@@ -2220,6 +2337,16 @@ export default function Workbench({
             <SettingsView
               key={settingsSection}
               initialSection={settingsSection}
+              appPreferences={snapshot.preferences}
+              onAppPreferences={
+                onNavigate
+                  ? (value) =>
+                      void perform({
+                        type: "preferences",
+                        reopenLastProject: value,
+                      })
+                  : undefined
+              }
               preferences={session}
               onChange={(next) => setSession((s) => ({ ...s, ...next }))}
               onResetLayout={() =>
@@ -2246,7 +2373,24 @@ export default function Workbench({
             <RecoveryView
               key={project.id}
               project={project}
-              onRestore={restoreEntry}
+              state={session.recovery}
+              onChange={(recovery) => setSession((s) => ({ ...s, recovery }))}
+              onPurge={async (recoveryId) =>
+                !!(await perform({
+                  type: "purgeTrash",
+                  projectId: project.id,
+                  recoveryId,
+                }))
+              }
+              onRestore={async (entry, expectedVersion, expectedText) =>
+                !!(await perform({
+                  type: "recover",
+                  projectId: project.id,
+                  recoveryId: entry.id,
+                  expectedVersion,
+                  expectedText,
+                }))
+              }
             />
           ) : doc ? (
             <div
@@ -2783,7 +2927,7 @@ export default function Workbench({
           newTab={quickNewTab}
           onNavigate={navigateHit}
           onClose={() => setSearchOpen(false)}
-          onCreate={() => newDocument(quickNewTab)}
+          onCreate={standalone ? undefined : () => newDocument(quickNewTab)}
         />
       )}
       <Dialog
@@ -2871,6 +3015,29 @@ export default function Workbench({
                 重試保存
               </button>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!leaveFailure}
+        onOpenChange={(open) => {
+          if (!open) setLeaveFailure(null);
+        }}
+      >
+        <DialogContent className="workbench-dialog">
+          <DialogTitle>尚未完成保存</DialogTitle>
+          <DialogDescription>{leaveFailure?.message}</DialogDescription>
+          <div className="dialog-actions">
+            <button onClick={() => setLeaveFailure(null)}>返回編輯</button>
+            <button
+              onClick={() => {
+                const action = leaveFailure!.action;
+                setLeaveFailure(null);
+                void leaveWorkspace(action);
+              }}
+            >
+              重試保存
+            </button>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { loader } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
@@ -15,12 +15,20 @@ function HistorySource({
   text,
   compare,
   line,
+  scrollTop,
+  onScroll,
 }: {
   original: string;
   text: string;
   compare: boolean;
   line: number;
+  scrollTop?: number;
+  onScroll?: (top: number) => void;
 }) {
+  const scrolled = useEffectEvent((top: number) => onScroll?.(top));
+  const restoreScroll = useEffectEvent((view: editor.IStandaloneCodeEditor) => {
+    if (scrollTop !== undefined) view.setScrollTop(scrollTop);
+  });
   const host = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -54,10 +62,17 @@ function HistorySource({
           view
             .getModifiedEditor()
             .revealLineInCenter(Math.min(line, modified.getLineCount()));
+          restoreScroll(view.getModifiedEditor());
+          const listener = view
+            .getModifiedEditor()
+            .onDidScrollChange((e: { scrollTop: number }) =>
+              scrolled(e.scrollTop),
+            );
           // Detach before disposal: the diff worker may still be resolving a comparison.
           dispose = () => {
             view.setModel(null);
             view.dispose();
+            listener.dispose();
             before.dispose();
             modified.dispose();
           };
@@ -67,7 +82,12 @@ function HistorySource({
             model: modified,
           });
           view.revealLineInCenter(Math.min(line, modified.getLineCount()));
+          restoreScroll(view);
+          const listener = view.onDidScrollChange((e: { scrollTop: number }) =>
+            scrolled(e.scrollTop),
+          );
           dispose = () => {
+            listener.dispose();
             view.setModel(null);
             view.dispose();
             modified.dispose();
@@ -181,16 +201,32 @@ export function HistoryPreview({
   onRestore,
   toolbarTarget,
   line = 1,
+  compareMode,
+  onCompare,
+  scrollTop,
+  onScroll,
+  disabled,
 }: {
   entry: RecoveryEntry;
   currentText: string;
   stale: boolean;
-  onReturn: () => void;
+  onReturn?: () => void;
   onRestore: () => void;
   toolbarTarget?: HTMLElement | null;
   line?: number;
+  compareMode?: "preview" | "diff";
+  onCompare?: (value: "preview" | "diff") => void;
+  scrollTop?: number;
+  onScroll?: (top: number) => void;
+  disabled?: boolean;
 }) {
-  const [compare, setCompare] = useState("preview");
+  const [localCompare, setCompare] = useState("preview");
+  const compare = compareMode || localCompare;
+  const [folderFile, setFolderFile] = useState(entry.files?.[0]?.id);
+  const text =
+    entry.kind === "folder"
+      ? entry.files?.find((f) => f.id === folderFile)?.text || ""
+      : entry.text;
   const heading = (
     <div
       className={
@@ -198,9 +234,11 @@ export function HistoryPreview({
         (toolbarTarget ? " in-document-toolbar" : "")
       }
     >
-      <ChromeButton title="返回編輯" onClick={onReturn}>
-        <ArrowLeft size={16} />
-      </ChromeButton>
+      {onReturn && (
+        <ChromeButton title="返回編輯" onClick={onReturn}>
+          <ArrowLeft size={16} />
+        </ChromeButton>
+      )}
       <span>
         <strong>{entry.name}</strong>
         <small>{new Date(entry.at).toLocaleString("zh-TW")} · 唯讀</small>
@@ -208,15 +246,21 @@ export function HistoryPreview({
       <SegmentedControl
         label="版本呈現"
         value={compare}
-        onChange={setCompare}
+        onChange={(value) =>
+          onCompare ? onCompare(value as "preview" | "diff") : setCompare(value)
+        }
         options={[
           { value: "preview", label: "預覽" },
           { value: "diff", label: "比較" },
         ]}
       />
-      <button className="history-restore" disabled={stale} onClick={onRestore}>
+      <button
+        className="history-restore"
+        disabled={stale || disabled}
+        onClick={onRestore}
+      >
         <RotateCcw size={14} />
-        還原此版本
+        {entry.deleted ? "復原" : "還原此版本"}
       </button>
     </div>
   );
@@ -225,7 +269,7 @@ export function HistoryPreview({
       {toolbarTarget ? createPortal(heading, toolbarTarget) : heading}
       {stale && (
         <p className="workspace-notice" role="alert">
-          目前內容已變更。請返回編輯，再選取版本重新比較。
+          目前內容已變更。請重新選取版本以比較最新內容。
         </p>
       )}
       {compare === "diff" && (
@@ -233,10 +277,26 @@ export function HistoryPreview({
           紅色：目前版本移除的文字；綠色：還原後加入的文字。
         </p>
       )}
+      {entry.kind === "folder" && (
+        <div className="recovery-folder-files">
+          <span>完整資料夾（包含其他檔案）</span>
+          {entry.files?.map((file) => (
+            <button
+              key={file.id}
+              className={folderFile === file.id ? "active" : ""}
+              onClick={() => setFolderFile(file.id)}
+            >
+              {file.name}
+            </button>
+          ))}
+        </div>
+      )}
       <HistorySource
         original={currentText}
-        text={entry.text}
+        text={text}
         compare={compare === "diff"}
+        scrollTop={scrollTop}
+        onScroll={onScroll}
         line={line}
       />
     </section>
