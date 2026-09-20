@@ -1,3 +1,4 @@
+import { validSnapshot } from "../graph/layout-state";
 import type { Command, Doc } from "../parser";
 import { validateCommands, restoreProjects } from "./engine";
 import {
@@ -15,6 +16,7 @@ const finite = (value: unknown): value is number =>
 function validGraphLayout(value: unknown): boolean {
   if (!record(value)) return false;
   return (
+    (value.layout === undefined || validSnapshot(value.layout)) &&
     (value.positions === undefined ||
       (record(value.positions) &&
         Object.values(value.positions).every(

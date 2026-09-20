@@ -43,6 +43,8 @@ export type LinkContext = {
   text: string;
   line: number;
   preceding?: string[];
+  groupLine?: number;
+  branchOrder?: number;
 };
 export type Link = {
   source: string;
@@ -53,6 +55,7 @@ export type Link = {
   kind: string;
   context?: LinkContext[];
   unresolved?: boolean;
+  column?: number;
 };
 export function contextLabel(context: LinkContext) {
   if (context.kind === "option") return `選擇「${context.text}」`;
@@ -198,13 +201,18 @@ export function parse(docs: Doc[], commands: Command[]) {
         return;
       }
       if (!s) return;
-      while (options.length && indent <= options[options.length - 1].indent)
-        options.pop();
       const optionLine = s.startsWith("->");
+      let sibling: LinkContext | undefined;
+      while (options.length && indent <= options[options.length - 1].indent) {
+        const previous = options.pop()!;
+        if (previous.indent === indent) sibling = previous.context[0];
+      }
       if (optionLine) {
         const context: LinkContext[] = [
           {
             kind: "option",
+            groupLine: sibling?.groupLine ?? line,
+            branchOrder: sibling ? (sibling.branchOrder ?? 0) + 1 : 0,
             text: s
               .slice(2)
               .replace(/<<.*?>>/g, "")
@@ -234,7 +242,7 @@ export function parse(docs: Doc[], commands: Command[]) {
         const tokens = tokenize(match[1].trim()),
           name = tokens.shift() || "",
           args = tokens,
-          column = raw.indexOf("<<") + 1;
+          column = raw.indexOf(s) + (match.index || 0) + 1;
         n.calls.push({ name, args, line, column });
         if (
           (name === "if" || name === "once") &&
@@ -246,6 +254,8 @@ export function parse(docs: Doc[], commands: Command[]) {
             line,
             branch: {
               kind: name === "if" && !args.length ? "unknown" : name,
+              groupLine: line,
+              branchOrder: 0,
               text: args.join(" ") || (name === "if" ? "if 缺少條件" : ""),
               line,
             },
@@ -265,6 +275,8 @@ export function parse(docs: Doc[], commands: Command[]) {
           } else {
             block.branch = {
               kind: name === "elseif" && !args.length ? "unknown" : name,
+              groupLine: block.line,
+              branchOrder: (block.branch.branchOrder ?? 0) + 1,
               text:
                 name === "else"
                   ? block.name === "once"
@@ -301,6 +313,7 @@ export function parse(docs: Doc[], commands: Command[]) {
               ].sort((a, b) => a.line - b.line);
             links.push({
               source: n.id,
+              column,
               target,
               line,
               label: context.map(contextLabel).join(" · "),
