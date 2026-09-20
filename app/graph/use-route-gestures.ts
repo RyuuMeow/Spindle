@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { Point, GraphRect } from "../graph-layout";
+import { snapPin } from "./route-snapping";
 import { previewRoutes } from "./manual-routing";
 import { cloneLayout, movePin, type GraphLayoutSnapshot } from "./layout-state";
 import type { RouteAction } from "./RouteEditor";
@@ -29,10 +30,20 @@ export function useRouteGestures(
       if (action.kind === "pin") {
         const pin = route.pins.find((p) => p.id === action.id);
         if (!pin) return;
-        next.routes[id] = movePin(route, action.id, {
-          x: pin.x + delta.x,
-          y: pin.y + delta.y,
-        });
+        next.routes[id] = movePin(
+          route,
+          action.id,
+          snapPin(
+            next,
+            route,
+            action.id,
+            {
+              x: pin.x + delta.x,
+              y: pin.y + delta.y,
+            },
+            Object.fromEntries(geometry.map((r) => [r.id, r])),
+          ),
+        );
       }
       next.revision = layoutRef.current.revision + 1;
       previewLayout(

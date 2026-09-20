@@ -1,6 +1,8 @@
 import type { ELK, ElkNode, ElkExtendedEdge } from "elkjs/lib/elk-api";
 import type { GraphRect, Point, Side } from "../graph-layout";
 import { segmentHitsRect, rectsOverlap } from "../graph-layout";
+import { separateLanes } from "./route-lanes";
+import { ALIGN_SNAP } from "./route-snapping";
 import { avoidRoutes } from "./avoid";
 import { connectLeg, retraces, previewRoute } from "./manual-routing";
 import {
@@ -466,6 +468,38 @@ export async function computeLayout(
       .map((e) => [e.id, state.routes[e.id]?.card || cardSlots.get(e.id)!])
       .filter(([, c]) => !!c) as [string, CardAnchor][],
   );
+  // Align automatic cards to a nearby port, without moving scenes or explicit pins.
+  for (const e of model.groups) {
+    const c = cards.get(e.id),
+      old = state.routes[e.id];
+    if (
+      !c ||
+      c.manual ||
+      old?.pins.length ||
+      (old && request.snapshot.lanes === 1)
+    )
+      continue;
+    const s = byId.get(e.source)!,
+      t = byId.get(e.target)!;
+    const anchors = [
+      center(t, old?.targetSide || (t.x < s.x ? "bottom" : "left")),
+      center(s, old?.sourceSide || "right"),
+    ];
+    const y = anchors
+      .map((p) => p.y)
+      .filter((y) => Math.abs(y - c.y) <= ALIGN_SNAP)
+      .sort((a, b) => Math.abs(a - c.y) - Math.abs(b - c.y))[0];
+    if (y === undefined) continue;
+    const candidate = boxOf(e.id, { ...c, y });
+    if (
+      !boxes.some((b) => rectsOverlap(expand(candidate, 8), b)) &&
+      !Array.from(cards).some(
+        ([id, card]) =>
+          id !== e.id && rectsOverlap(expand(candidate, 24), boxOf(id, card)),
+      )
+    )
+      c.y = y;
+  }
   const trunkLegs = model.branches.flatMap((branch) => {
     const trunk = state.trunks[branch.id];
     if (
@@ -567,13 +601,8 @@ export async function computeLayout(
       card,
     };
     const fixed: Point[][] = [[start, outside(start, sourceSide)]];
-    if (trunk && sourceSide === "right") {
-      const split = trunk.points.at(-1)!;
-      fixed[0] = [
-        ...trunk.points.map((p) => ({ ...p })),
-        ...(!old?.controlOrder ? [{ x: split.x, y: card?.y ?? split.y }] : []),
-      ];
-    }
+    if (trunk && sourceSide === "right")
+      fixed[0] = trunk.points.map((p) => ({ ...p }));
     const controls = orderedControls({
       ...route,
       points: old?.points || [start, end],
@@ -645,6 +674,7 @@ export async function computeLayout(
       } else state.routes[route.id] = { ...route, points: result };
     }
   }
+  separateLanes(state, boxes, new Set(plans.map((p) => p.route.id)));
   state.initialized = true;
   state.revision++;
   return {

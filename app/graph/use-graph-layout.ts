@@ -1,3 +1,4 @@
+import { snapObjects } from "./route-snapping";
 import { moveObjects } from "./manual-routing";
 import {
   useCallback,
@@ -292,7 +293,13 @@ export function useGraphLayout(settings: Settings) {
   const translate = useCallback(
     (positions: Record<string, Point>) => {
       if (cancelledGesture.current) return;
-      apply(moveObjects(current.current, positions, latest.current.sizes));
+      apply(
+        moveObjects(
+          current.current,
+          snapObjects(current.current, positions, latest.current.sizes),
+          latest.current.sizes,
+        ),
+      );
     },
     [apply],
   );

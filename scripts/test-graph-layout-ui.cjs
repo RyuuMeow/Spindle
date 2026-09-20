@@ -148,6 +148,39 @@ const result = { errors: [], console: [], requests: [] };
           trunks: s.layout.trunks,
         }),
       );
+    // A near-aligned dragged card snaps to the destination center, in one undoable gesture.
+    const beforeSnap = await state();
+    const snapLabel = page.locator(".flow-edge-label").first();
+    const snapId = await snapLabel.getAttribute("data-route-id");
+    const snapRoute = beforeSnap.layout.routes[snapId];
+    const snapBox = await snapLabel.boundingBox();
+    const destinationY = snapRoute.points.at(-1).y;
+    await page.mouse.move(
+      snapBox.x + snapBox.width / 2,
+      snapBox.y + snapBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      snapBox.x + snapBox.width / 2 + 1,
+      snapBox.y +
+        snapBox.height / 2 +
+        (destinationY + 4 - snapRoute.card.y) * beforeSnap.viewport.zoom,
+      { steps: 10 },
+    );
+    await page.mouse.up();
+    await page.waitForTimeout(650);
+    const afterSnap = await state();
+    assert.ok(
+      Math.abs(afterSnap.layout.routes[snapId].card.y - destinationY) < 0.01,
+      "small offset snaps exactly to target center",
+    );
+    assert.deepEqual(afterSnap.layout.positions, beforeSnap.layout.positions);
+    assertRouteGeometry(afterSnap);
+    result.snapAlignment = true;
+    await page.screenshot({ path: path.join(out, "snapped.png") });
+    await page.getByRole("button", { name: "復原布局", exact: true }).click();
+    await settle();
+    assert.deepEqual(geometry(await state()), geometry(beforeSnap));
     const initial = await state();
     assert.equal(initial.layout.schema, 2);
     const byName = (name) =>

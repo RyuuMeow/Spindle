@@ -24,6 +24,19 @@ await build({
   outfile: "outputs/graph-engine-test.mjs",
 });
 const { computeLayout } = await import("../outputs/graph-engine-test.mjs");
+await build({
+  stdin: {
+    contents:
+      'export * from "./app/graph/route-lanes.ts"; export * from "./app/graph/manual-routing.ts";',
+    resolveDir: process.cwd(),
+  },
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  outfile: "outputs/graph-lane-integration.mjs",
+});
+const { laneConflict, previewRoutes } =
+  await import("../outputs/graph-lane-integration.mjs");
 const elk = new ELK();
 const scene = (name, body) => "title: " + name + "\n---\n" + body + "\n===\n";
 function fixture(text) {
@@ -359,8 +372,19 @@ test("multi-branch performance fixture reports routes, crossings, bends and elap
         )
           crossings++;
       }
+    const sourceId = r.model.records[Math.floor(count / 2)].id;
+    const moved = moveNodes(result.snapshot, {
+      [sourceId]: {
+        x: result.snapshot.positions[sourceId].x + 24,
+        y: result.snapshot.positions[sourceId].y + 36,
+      },
+    });
+    const dragStart = performance.now();
+    previewRoutes(moved, r.sizes);
+    const previewMs = performance.now() - dragStart;
     times.push({
       nodes: count,
+      previewMs: Math.round(previewMs),
       routes: routes.length,
       elapsedMs: Math.round(result.elapsed),
       crossings,
@@ -659,4 +683,72 @@ test("moving endpoints does not keep obsolete automatic bends or a backward trun
   assert.equal(trunk.points[1].x - trunk.points[0].x, 24);
   for (const route of Object.values(next.snapshot.routes))
     assert.equal(route.fixedSegments.length, 0);
+});
+
+test("worker and drag preview separate overlapping branch exits without moving cards", async () => {
+  const r = fixture(
+    scene("A", "-> One\n  <<jump B>>\n-> Two\n  <<jump C>>") +
+      scene("B", "hello") +
+      scene("C", "hello"),
+  );
+  const first = await run(r),
+    s = first.snapshot;
+  const [a, b, c] = r.model.records.map((r) => r.id);
+  s.positions = {
+    [a]: { x: 0, y: 0 },
+    [b]: { x: 1000, y: 120 },
+    [c]: { x: 1000, y: 280 },
+  };
+  const routes = Object.values(s.routes);
+  for (const [i, edge] of routes.entries()) {
+    edge.card = {
+      x: 450,
+      y: 50 + i * 80,
+      width: 180,
+      height: 38,
+      manual: true,
+    };
+    edge.reroute = true;
+  }
+  const preview = previewRoutes(structuredClone(s), r.sizes);
+  const repaired = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: preview,
+  });
+  assertClear(repaired, r);
+  const after = Object.values(repaired.snapshot.routes);
+  assert.equal(laneConflict(after[0], [after[1]], repaired.snapshot), 0);
+  for (const edge of after) {
+    assert.deepEqual(edge.card, s.routes[edge.id].card);
+    assert.deepEqual(
+      edge.points,
+      preview.routes[edge.id].points,
+      "release preserves the lane preview in a feasible corridor",
+    );
+  }
+});
+test("lane migration repairs overlap once without moving explicit controls", async () => {
+  const r = branching(),
+    first = await run(r),
+    old = structuredClone(first.snapshot);
+  delete old.lanes;
+  const repaired = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: old,
+  });
+  assert.equal(repaired.snapshot.lanes, 1);
+  assert.deepEqual(repaired.snapshot.positions, old.positions);
+  for (const [id, edge] of Object.entries(old.routes)) {
+    assert.deepEqual(repaired.snapshot.routes[id].pins, edge.pins);
+    if (edge.card?.manual)
+      assert.deepEqual(repaired.snapshot.routes[id].card, edge.card);
+  }
+  const again = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: repaired.snapshot,
+  });
+  assert.deepEqual(again.snapshot.routes, repaired.snapshot.routes);
 });

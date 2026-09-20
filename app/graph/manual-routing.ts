@@ -11,6 +11,7 @@ import {
   type GraphLayoutSnapshot,
   type TrunkGeometry,
 } from "./layout-state";
+import { separateLanes } from "./route-lanes";
 export const stub = (p: Point, side: Side, n = 24): Point => ({
   x: p.x + (side === "right" ? n : side === "left" ? -n : 0),
   y: p.y + (side === "bottom" ? n : side === "top" ? -n : 0),
@@ -136,6 +137,11 @@ export function previewRoutes(
       width: r.card!.width,
       height: r.card!.height,
     }));
+  const affected = new Set(
+    Object.values(state.routes)
+      .filter((r) => r.reroute)
+      .map((r) => r.id),
+  );
   for (const r of Object.values(state.routes))
     if (r.reroute) {
       const s = boxes.find((b) => b.id === r.source),
@@ -145,7 +151,7 @@ export function previewRoutes(
       const trunk = r.groupId ? state.trunks[r.groupId] : undefined;
       state.routes[r.id] = previewRoute(r, [...boxes, ...cards], trunk);
     }
-  return state;
+  return separateLanes(state, boxes, affected);
 }
 /** React Flow positions cover scenes and line cards, including a mixed selection. */
 export function moveObjects(
