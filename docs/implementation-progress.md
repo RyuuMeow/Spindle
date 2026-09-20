@@ -1,6 +1,16 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.8.2**，2026-09-20。
+版本：Windows x64 **0.8.3**，2026-09-20。
+
+## 0.8.3 吸附對齊與依目的地分線
+
+- 場景、卡片與 pin 的小幅錯位依相關接點吸附；混合選取保持相對位置，上下接點使用正確的對齊軸。自動卡片對齊仍遵守分支順序與間距。
+- 不同去向使用平行 16 單位線距；同目的地、同方向末段保留匯流，短幹線保留。只調整受影響自由折點，不搬動未選物件或刪除 pin。
+- 拖動預覽與 Worker 共用分線，舊布局及 Undo 歷史原位修線一次；不重新排版。
+- [單元／服務測試](../outputs/lanes-unit.log) **142／142**，TypeScript 與 [20 檔範圍 lint](../outputs/lanes-lint.json)通過；既有全庫 lint 基線未清零。測试涵蓋水平／垂直間距、三條去向、同向匯流與反向／卡片前禁止假匯流、避障、pin 保留、整組吸附、預覽／Worker 一致與遷移。
+- [桌面互動](../outputs/lanes-ui/result.json)與最終 [0.8.3 Portable 實包驗收](../outputs/lanes-portable-0.8.3/result.json)通過實際滑鼠吸附、一次 Undo、pin／卡片／多選操作、模式切換、舊版歷史及重啟恢復；頁面錯誤為零，離線 Worker／WASM 正常。
+- [網頁 build](../outputs/lanes-web-build.log)、[桌面 build](../outputs/lanes-stage.log)及[兩種 Windows 封裝](../outputs/lanes-package.log)通過；[SHA256／離線資源核對](../outputs/lanes-release-verification.json)。安裝精靈、混合 DPI、多螢幕未實測。
+- [效能記錄](../outputs/lanes-unit.log)包含 10／50／120 節點直線流程及 12／36／72 節點多分支的整理耗時、局部預覽耗時、交叉及轉折數；Node 幾何耗時不等於畫面輸入延遲，亦不代表任意圖全局最優。
 
 ## 0.8.2 以可見控制點理線
 

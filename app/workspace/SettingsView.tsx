@@ -389,8 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.8.2：透過節點、卡片與 pin
-                    理線；取消線段拖曳，移除多餘繞線與路線衝突提示。
+                    0.8.3：小幅錯位自動吸附對齊；不同去向使用平行間距，同目的地保留匯流。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。
