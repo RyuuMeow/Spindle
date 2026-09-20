@@ -123,7 +123,7 @@ test("group move transports interior pins/cards and preserves exterior geometry"
   };
   const n = moveNodes(s, { a: { x: 30, y: 50 }, b: { x: 230, y: 50 } });
   assert.deepEqual(n.routes.x.pins, [{ id: "p", x: 130, y: 50 }]);
-  assert.deepEqual(n.routes.y, s.routes.y);
+  assert.deepEqual(n.routes.y, { ...s.routes.y, controlOrder: [], reroute: true });
   assert.deepEqual(
     simplify(
       [

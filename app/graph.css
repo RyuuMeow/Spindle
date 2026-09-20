@@ -720,14 +720,13 @@
   max-height: none;
 }
 .flow-route-hit {
+  cursor: pointer;
   stroke: transparent;
   stroke-width: 14px;
   pointer-events: stroke;
   fill: none;
 }
-.flow-route-hit.is-editable:hover {
-  stroke: rgba(176, 203, 225, 0.14);
-}
+
 .flow-route-pin {
   fill: #252b30;
   stroke: #b6cfe0;
@@ -743,14 +742,12 @@
   stroke: transparent;
   stroke-width: 16;
   pointer-events: stroke;
-  cursor: ew-resize;
+  cursor: pointer;
 }
 .flow-trunk-hit:hover {
   stroke: rgba(176, 203, 225, 0.14);
 }
-.flow-edge-label.has-conflict {
-  border-color: #ad7845;
-}
+
 .flow-layout-error {
   position: absolute;
   bottom: 66px;

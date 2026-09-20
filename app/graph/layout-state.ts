@@ -34,6 +34,7 @@ export type TrunkGeometry = {
 };
 export type GraphLayoutSnapshot = {
   schema: 2;
+  routing?: "pins";
   revision: number;
   initialized: boolean;
   positions: Record<string, Point>;
@@ -78,7 +79,7 @@ export function migrateLayout(
   state: GraphState | undefined,
   model: GraphModel,
 ): GraphLayoutSnapshot {
-  if (state?.layout?.schema === 2) return cloneLayout(state.layout);
+  if (state?.layout?.schema === 2) return normalizeRouting(state.layout);
   const positions: Record<string, Point> = {};
   for (const record of model.records) {
     const p = state?.positions?.[record.node?.id || record.id];
@@ -86,6 +87,7 @@ export function migrateLayout(
   }
   return {
     schema: 2,
+    routing: "pins",
     revision: 0,
     initialized: Object.keys(positions).length > 0,
     positions,
@@ -121,35 +123,6 @@ export function simplify(points: Point[], keep: Point[] = []): Point[] {
 export function pathData(points: Point[]) {
   return points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" ");
 }
-export function projectCard(
-  points: Point[],
-  point: Point,
-  width: number,
-  height: number,
-  peers: CardAnchor[] = [],
-  fallback?: CardAnchor,
-): CardAnchor {
-  const candidates = points.slice(1).flatMap((b, i) => {
-    const a = points[i];
-    if (a.y !== b.y || Math.abs(b.x - a.x) < width + 16) return [];
-    const low = Math.min(a.x, b.x) + width / 2 + 8,
-      high = Math.max(a.x, b.x) - width / 2 - 8;
-    let x = Math.max(low, Math.min(high, point.x));
-    const peer = peers.find(
-      (p) => Math.abs(p.x - x) < 12 && p.x >= low && p.x <= high,
-    );
-    if (peer) x = peer.x;
-    return [{ x, y: a.y, width, height, manual: true }];
-  });
-  return (
-    candidates.sort(
-      (a, b) =>
-        Math.hypot(a.x - point.x, a.y - point.y) -
-        Math.hypot(b.x - point.x, b.y - point.y),
-    )[0] ||
-    fallback || { x: point.x, y: point.y, width, height, manual: true }
-  );
-}
 export function moveNodes(
   state: GraphLayoutSnapshot,
   moved: Record<string, Point>,
@@ -178,6 +151,9 @@ export function moveNodes(
         r.card.x += a.x;
         r.card.y += a.y;
       }
+    } else if (a || b) {
+      freezeControlOrder(r);
+      r.reroute = true;
     }
   }
   for (const t of Object.values(next.trunks)) {
@@ -212,35 +188,10 @@ export function orderedControls(route: RouteGeometry) {
           },
         ]
       : []),
-    ...route.pins.map((p) => {
-      const i = route.points
-        .slice(1)
-        .findIndex((b, i) => pointOnRoute(p, [route.points[i], b], 0.01));
-      const a = i >= 0 ? route.points[i] : undefined,
-        b = i >= 0 ? route.points[i + 1] : undefined;
-      const axis =
-          p.axis || (a && b && a.x === b.x ? "vertical" : "horizontal"),
-        d =
-          p.direction ||
-          (a && b && (axis === "horizontal" ? b.x - a.x : b.y - a.y) < 0
-            ? -1
-            : 1);
-      const offset =
-        axis === "horizontal" ? { x: 8 * d, y: 0 } : { x: 0, y: 8 * d };
-      return {
-        key: "pin:" + p.id,
-        center: p,
-        points: [
-          { x: p.x - offset.x, y: p.y - offset.y },
-          { x: p.x, y: p.y },
-          { x: p.x + offset.x, y: p.y + offset.y },
-        ],
-      };
-    }),
-    ...route.fixedSegments.map((s, i) => ({
-      key: "segment:" + (s.id || i),
-      center: s.a,
-      points: [s.a, s.b],
+    ...route.pins.map((p) => ({
+      key: "pin:" + p.id,
+      center: p,
+      points: [{ x: p.x, y: p.y }],
     })),
   ];
   const rank = (p: Point) => {
@@ -272,19 +223,6 @@ export function orderedControls(route: RouteGeometry) {
   return order.map((k) => controls.find((c) => c.key === k)!);
 }
 export function freezeControlOrder(route: RouteGeometry) {
-  for (const p of route.pins)
-    if (!p.axis || !p.direction) {
-      const i = route.points
-        .slice(1)
-        .findIndex((b, i) => pointOnRoute(p, [route.points[i], b], 0.01));
-      const a = i >= 0 ? route.points[i] : undefined,
-        b = i >= 0 ? route.points[i + 1] : undefined;
-      p.axis ||= a && b && a.x === b.x ? "vertical" : "horizontal";
-      p.direction ||=
-        a && b && (p.axis === "horizontal" ? b.x - a.x : b.y - a.y) < 0
-          ? -1
-          : 1;
-    }
   route.controlOrder = orderedControls(route).map((c) => c.key);
 }
 export function movePin(
@@ -325,34 +263,6 @@ export function cardOnRoute(card: CardAnchor, points: Point[]): boolean {
       Math.max(a.x, b.x) >= card.x + card.width / 2
     );
   });
-}
-export function moveSegment(
-  route: RouteGeometry,
-  index: number,
-  point: Point,
-): RouteGeometry {
-  const next = structuredClone(route);
-  freezeControlOrder(next);
-  const a = next.points[index],
-    b = next.points[index + 1];
-  if (!a || !b) return next;
-  const horizontal = a.y === b.y;
-  const na = horizontal ? { x: a.x, y: point.y } : { x: point.x, y: a.y };
-  const nb = horizontal ? { x: b.x, y: point.y } : { x: point.x, y: b.y };
-  const prefix = next.points.slice(0, index),
-    suffix = next.points.slice(index + 2);
-  if (index === 0) prefix.push({ ...a });
-  if (index === next.points.length - 2) suffix.unshift({ ...b });
-  next.points = simplify([...prefix, na, nb, ...suffix], next.pins);
-  next.fixedSegments = [
-    ...next.fixedSegments.filter(
-      (s) => !(pointOnRoute(s.a, [a, b]) && pointOnRoute(s.b, [a, b])),
-    ),
-    { id: crypto.randomUUID(), a: na, b: nb },
-  ];
-  freezeControlOrder(next);
-  next.reroute = true;
-  return next;
 }
 export function pointOnRoute(p: Point, points: Point[], tolerance = 1) {
   return points.slice(1).some((b, i) => {
@@ -417,4 +327,44 @@ export function validSnapshot(value: unknown): boolean {
       (t) => t && Array.isArray(t.points) && t.points.every(point),
     )
   );
+}
+
+/** Retire hidden segment/direction locks once, while preserving all visible controls. */
+export function normalizeRouting(
+  state: GraphLayoutSnapshot,
+): GraphLayoutSnapshot {
+  const next = cloneLayout(state);
+  const legacy = next.routing !== "pins";
+  next.routing = "pins";
+  for (const route of Object.values(next.routes)) {
+    if (
+      legacy ||
+      route.fixedSegments.length ||
+      route.pins.some((p) => p.axis || p.direction)
+    ) {
+      freezeControlOrder(route);
+      route.fixedSegments = [];
+      route.pins = route.pins.map(({ id, x, y }) => ({ id, x, y }));
+      delete route.error;
+      route.reroute = true;
+    }
+  }
+  for (const trunk of Object.values(next.trunks)) {
+    if (!trunk.manual || !trunk.points.length) continue;
+    const start = trunk.points[0];
+    trunk.points = [{ ...start }, { x: start.x + 24, y: start.y }];
+    delete trunk.manual;
+    for (const route of Object.values(next.routes))
+      if (route.groupId === trunk.id) route.reroute = true;
+  }
+  return next;
+}
+
+export function moveTrunkSource(trunk: TrunkGeometry, port: Point) {
+  const origin = trunk.points[0];
+  if (!origin) return;
+  const dx = port.x - origin.x,
+    dy = port.y - origin.y;
+  if (dx || dy)
+    trunk.points = trunk.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
 }

@@ -2,10 +2,11 @@ import type { ELK, ElkNode, ElkExtendedEdge } from "elkjs/lib/elk-api";
 import type { GraphRect, Point, Side } from "../graph-layout";
 import { segmentHitsRect, rectsOverlap } from "../graph-layout";
 import { avoidRoutes } from "./avoid";
-import { connectLeg, retraces } from "./manual-routing";
+import { connectLeg, retraces, previewRoute } from "./manual-routing";
 import {
   center,
-  cloneLayout,
+  moveTrunkSource,
+  normalizeRouting,
   simplify,
   pointOnRoute,
   cardOnRoute,
@@ -79,7 +80,7 @@ export async function computeLayout(
 ): Promise<GraphLayoutResult> {
   const started = performance.now(),
     { model, sizes, labels } = request;
-  const state = cloneLayout(request.snapshot),
+  const state = normalizeRouting(request.snapshot),
     errors: string[] = [];
   if (!engine) throw Error("ELK engine is required");
   const all = request.scope.kind === "all";
@@ -299,14 +300,7 @@ export async function computeLayout(
   for (const trunk of Object.values(state.trunks)) {
     const source = byId.get(trunk.source);
     if (!source || trunk.points.length < 2) continue;
-    const port = center(source, "right"),
-      old = trunk.points[0],
-      second = trunk.points[1];
-    if (!same(port, old)) {
-      if (second.y === old.y) second.y = port.y;
-      else if (second.x === old.x) second.x = port.x;
-      trunk.points[0] = port;
-    }
+    moveTrunkSource(trunk, center(source, "right"));
   }
   // Explicit card-only arrangement never moves scene nodes or unselected cards.
   const selectedGroups = new Map<string, typeof model.groups>();
@@ -554,9 +548,6 @@ export async function computeLayout(
       !retraces(old.points) &&
       old.pins.every((p) => pointOnRoute(p, old.points)) &&
       constraintsMatch(old.points) &&
-      old.fixedSegments.every(
-        (s) => pointOnRoute(s.a, old.points) && pointOnRoute(s.b, old.points),
-      ) &&
       (!old.error || old.error === "等待修整")
     ) {
       delete old.error;
@@ -571,11 +562,11 @@ export async function computeLayout(
       targetSide,
       points: [],
       pins: old?.pins || [],
-      fixedSegments: old?.fixedSegments || [],
+      fixedSegments: [],
       ...(old?.controlOrder ? { controlOrder: old.controlOrder } : {}),
       card,
     };
-    let fixed: Point[][] = [[start, outside(start, sourceSide)]];
+    const fixed: Point[][] = [[start, outside(start, sourceSide)]];
     if (trunk && sourceSide === "right") {
       const split = trunk.points.at(-1)!;
       fixed[0] = [
@@ -591,60 +582,6 @@ export async function computeLayout(
       outside(end, targetSide),
       end,
     ]);
-    const rank = (p: Point) => {
-      let distance = 0;
-      const pts = old?.points || [];
-      for (let i = 1; i < pts.length; i++) {
-        if (pointOnRoute(p, [pts[i - 1], pts[i]]))
-          return (
-            distance +
-            Math.abs(p.x - pts[i - 1].x) +
-            Math.abs(p.y - pts[i - 1].y)
-          );
-        distance +=
-          Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
-      }
-      return distance;
-    };
-    if (
-      old &&
-      old.points.length > 2 &&
-      !old.reroute &&
-      !old.controlOrder &&
-      !retraces(old.points) &&
-      !old.error &&
-      constraintsMatch(old.points)
-    ) {
-      const interior = old.points.slice(1, -1);
-      const portions: Point[][] = [];
-      const allBoxes = [
-        ...boxes,
-        ...Array.from(cards, ([id, c]) => boxOf(id, c)).filter(
-          (b) => b.id !== e.id,
-        ),
-      ];
-      for (let i = 1; i < interior.length; i++)
-        if (clear([interior[i - 1], interior[i]], allBoxes))
-          portions.push([interior[i - 1], interior[i]]);
-      // Preserve every valid exterior segment. Only holes and moved endpoints are routed.
-      for (const pin of route.pins)
-        if (!portions.some((p) => pointOnRoute(pin, p)))
-          portions.push([{ x: pin.x, y: pin.y }]);
-      for (const segment of route.fixedSegments)
-        if (
-          !portions.some(
-            (p) => pointOnRoute(segment.a, p) && pointOnRoute(segment.b, p),
-          )
-        )
-          portions.push([segment.a, segment.b]);
-      portions.sort((a, b) => rank(a[0]) - rank(b[0]));
-      if (portions.length)
-        fixed = [
-          [start, outside(start, sourceSide)],
-          ...portions,
-          [outside(end, targetSide), end],
-        ];
-    }
     const legs = fixed
       .slice(1)
       .map((part, i) => ({
@@ -670,10 +607,12 @@ export async function computeLayout(
       const points: Point[] = [];
       plan.fixed.forEach((part, i) => {
         if (i) {
-          const manual = plan.old?.controlOrder;
-          const candidate = manual
-            ? connectLeg(plan.fixed[i - 1], part, obstacles)
-            : null;
+          const candidate = connectLeg(
+            plan.fixed[i - 1],
+            part,
+            obstacles,
+            points,
+          );
           points.push(
             ...(candidate || solved.get(plan.edge.id + ":" + (i - 1)) || []),
           );
@@ -692,27 +631,17 @@ export async function computeLayout(
         !clear(result, blockers) ||
         retraces(result) ||
         !plan.matches(result) ||
-        !route.pins.every((p) => pointOnRoute(p, result)) ||
-        !route.fixedSegments.every(
-          (s) => pointOnRoute(s.a, result) && pointOnRoute(s.b, result),
-        )
+        !route.pins.every((p) => pointOnRoute(p, result))
       ) {
-        const message =
-          "固定線路與障礙衝突；保留布局，可移動 pin 或恢復自動線路";
+        // Overlapping user controls are valid editing positions. Keep following them
+        // with a short orthogonal fallback instead of restoring stale geometry.
         errors.push(plan.edge.id);
-        state.routes[plan.edge.id] = plan.old
-          ? { ...plan.old, error: message }
-          : {
-              ...route,
-              points:
-                result.length >= 2
-                  ? result
-                  : [
-                      center(byId.get(route.source)!, "right"),
-                      center(byId.get(route.target)!, "left"),
-                    ],
-              error: message,
-            };
+        state.routes[route.id] = previewRoute(
+          { ...route, points: result },
+          [],
+          route.groupId ? state.trunks[route.groupId] : undefined,
+        );
+        delete state.routes[route.id].reroute;
       } else state.routes[route.id] = { ...route, points: result };
     }
   }

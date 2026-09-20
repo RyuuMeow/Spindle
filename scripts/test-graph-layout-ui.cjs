@@ -341,7 +341,7 @@ const result = { errors: [], console: [], requests: [] };
     );
     assertRouteGeometry(afterCard);
     result.card = true;
-    // Shared trunk drag is a single grouped edit.
+    // Shared trunk selects the group but cannot create hidden route constraints.
     const trunk = Object.values(afterCard.layout.trunks)[0],
       split = trunk.points.at(-1),
       ts = await point(split);
@@ -351,9 +351,10 @@ const result = { errors: [], console: [], requests: [] };
     await page.mouse.up();
     await page.waitForTimeout(700);
     const afterTrunk = await state();
-    assert.ok(afterTrunk.layout.trunks[trunk.id].manual);
+    assert.deepEqual(geometry(afterTrunk), geometry(afterCard));
+    assert.equal(afterTrunk.undo.length, afterCard.undo.length);
     assertRouteGeometry(afterTrunk);
-    result.trunk = true;
+    result.trunkNotDraggable = true;
     await label.click({ button: "right" });
     await settle();
     assert.ok(
@@ -642,7 +643,7 @@ const result = { errors: [], console: [], requests: [] };
     await settle();
     assert.deepEqual(geometry(await state()), geometry(mixedBefore));
     result.cardBoxAndMixedMove = true;
-    // Fixed segment edit is local and reversible.
+    // Selected line segments are hit targets only, not draggable controls.
     const segmentBefore = await state(),
       manualRoute = segmentBefore.layout.routes[direct.id];
     await page
@@ -678,14 +679,12 @@ const result = { errors: [], console: [], requests: [] };
     );
     await page.mouse.up();
     await settle();
-    assert.ok(
-      (await state()).layout.routes[direct.id].fixedSegments.length >
-        manualRoute.fixedSegments.length,
-    );
-    await page.getByRole("button", { name: "復原布局", exact: true }).click();
-    await settle();
     assert.deepEqual(geometry(await state()), geometry(segmentBefore));
-    result.segmentUndo = true;
+    assert.equal((await state()).undo.length, segmentBefore.undo.length);
+    result.lineNotDraggable = true;
+    assert.equal(await page.locator(".flow-layout-error").count(), 0);
+    assert.equal(await page.locator(".has-conflict").count(), 0);
+    result.noRouteConflictNotice = true;
     const beforeAll = await state();
     await page.getByRole("button", { name: "自動整理", exact: true }).click();
     await page.waitForTimeout(900);

@@ -1,12 +1,7 @@
 import { useCallback, useRef } from "react";
 import type { Point, GraphRect } from "../graph-layout";
 import { previewRoutes } from "./manual-routing";
-import {
-  cloneLayout,
-  moveSegment,
-  movePin,
-  type GraphLayoutSnapshot,
-} from "./layout-state";
+import { cloneLayout, movePin, type GraphLayoutSnapshot } from "./layout-state";
 import type { RouteAction } from "./RouteEditor";
 import type { useGraphLayout } from "./use-graph-layout";
 export function useRouteGestures(
@@ -38,14 +33,6 @@ export function useRouteGestures(
           x: pin.x + delta.x,
           y: pin.y + delta.y,
         });
-      } else if (action.kind === "segment") {
-        const a = route.points[action.index],
-          b = route.points[action.index + 1];
-        if (a && b)
-          next.routes[id] = moveSegment(route, action.index, {
-            x: a.x + delta.x,
-            y: a.y + delta.y,
-          });
       }
       next.revision = layoutRef.current.revision + 1;
       previewLayout(

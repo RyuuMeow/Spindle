@@ -12,6 +12,7 @@ import type { Point } from "../graph-layout";
 import { buildGraphModel, stamp, type SourceAnchor } from "./model";
 import {
   cloneLayout,
+  normalizeRouting,
   migrateLayout,
   type GraphLayout,
   type GraphState,
@@ -173,11 +174,7 @@ export function useGraphLayout(settings: Settings) {
       if (request.before) push(request.before);
       apply(result.snapshot);
       persist(result.snapshot);
-      setError(
-        result.errors.length
-          ? "部分固定路線有衝突；選取標示的線路以調整或重試。"
-          : "",
-      );
+      setError("");
       if (request.fit)
         requestAnimationFrame(() => latest.current.onArrangeAll());
     };
@@ -319,7 +316,7 @@ export function useGraphLayout(settings: Settings) {
       if (!previous) return;
       to.current = [...to.current, snapshot()].slice(-50);
       const next = previous.layout
-        ? cloneLayout(previous.layout)
+        ? normalizeRouting(previous.layout)
         : migrateLayout(
             { ...latest.current.state, ...previous, layout: undefined },
             latest.current.model,

@@ -23,11 +23,7 @@ import {
   type TrunkGeometry,
 } from "./layout-state";
 import { SemanticText, linkSummary, parentSummary } from "./presentation";
-export type RouteAction =
-  | { kind: "pin"; id: string }
-  | { kind: "segment"; index: number }
-  | { kind: "card" }
-  | { kind: "trunk" };
+export type RouteAction = { kind: "pin"; id: string };
 export type RouteData = {
   route: RoutedConnection;
   geometry: RouteGeometry;
@@ -127,13 +123,7 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
           markerEnd={markerEnd}
           interactionWidth={20}
           style={{
-            stroke: geometry.error
-              ? "#d9a16f"
-              : active
-                ? "#d4dfeb"
-                : muted
-                  ? "#555"
-                  : "#999",
+            stroke: active ? "#d4dfeb" : muted ? "#555" : "#999",
             strokeWidth: active ? 2.4 : 1.6,
             strokeDasharray: item.dynamic
               ? "6 5"
@@ -158,15 +148,9 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
             y1={a.y}
             x2={b.x}
             y2={b.y}
-            className={
-              "flow-route-hit nodrag nopan" + (controls ? " is-editable" : "")
-            }
-            style={{
-              cursor: controls
-                ? a.y === b.y
-                  ? "ns-resize"
-                  : "ew-resize"
-                : "pointer",
+            className="flow-route-hit nodrag nopan"
+            onPointerDown={(e) => {
+              if (e.button === 0) e.stopPropagation();
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -183,12 +167,6 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
                 );
               else data.selectGroup();
             }}
-            onPointerDown={(e) => {
-              if (controls) down(e, { kind: "segment", index });
-            }}
-            onPointerMove={move}
-            onPointerUp={end}
-            onLostPointerCapture={end}
             onContextMenu={data.context}
           />
         );
@@ -280,18 +258,16 @@ export function RouteCard({ data, selected }: NodeProps<RouteCardNode>) {
       className={
         "flow-edge-label flow-route-card" +
         (selected ? " is-active" : "") +
-        (muted ? " is-muted" : "") +
-        (geometry.error ? " has-conflict" : "")
+        (muted ? " is-muted" : "")
       }
       style={{ width: geometry.card!.width, minHeight: geometry.card!.height }}
       title={
-        geometry.error ||
         item.kind +
-          ": " +
-          (item.label || "無條件") +
-          " · 第 " +
-          item.line +
-          " 行"
+        ": " +
+        (item.label || "無條件") +
+        " · 第 " +
+        item.line +
+        " 行"
       }
     >
       <Icon size={14} />

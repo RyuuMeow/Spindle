@@ -203,7 +203,7 @@ test("feedback, self loops, narrow dimensions and long labels remain explicit", 
   );
   assert.ok(loop.points.length >= 4);
 });
-test("infeasible pin is retained and reported instead of silently removed", async () => {
+test("overlapping pin remains connected without exposing a layout conflict", async () => {
   const r = branching(),
     first = await run(r),
     edge = Object.values(first.snapshot.routes)[0],
@@ -218,7 +218,8 @@ test("infeasible pin is retained and reported instead of silently removed", asyn
   });
   assert.ok(next.errors.includes(edge.id));
   assert.deepEqual(next.snapshot.routes[edge.id].pins, edge.pins);
-  assert.deepEqual(next.snapshot.routes[edge.id].points, edge.points);
+  assert.ok(pointOnRoute(edge.pins[0], next.snapshot.routes[edge.id].points));
+  assert.ok(!next.snapshot.routes[edge.id].error);
 });
 test("nested branch groups have separate columns without collapsing same target", async () => {
   const r = fixture(
@@ -416,7 +417,7 @@ test("moving a pin across a straight leg makes a continuous detour without retra
   );
 });
 
-test("repair restores a displaced card corridor and keeps a manually moved shared trunk", async () => {
+test("repair restores a displaced card corridor and retires a legacy dragged trunk", async () => {
   const r = branching(),
     first = await run(r),
     branch = r.model.branches[0];
@@ -442,7 +443,8 @@ test("repair restores a displaced card corridor and keeps a manually moved share
     snapshot: first.snapshot,
   });
   assertClear(result, r);
-  assert.deepEqual(result.snapshot.trunks[branch.id], trunk);
+  assert.ok(!result.snapshot.trunks[branch.id].manual);
+  assert.equal(result.snapshot.trunks[branch.id].points.at(-1).x, oldX);
   for (const id of branch.transitions)
     assert.deepEqual(
       result.snapshot.routes[id].card,
@@ -581,4 +583,80 @@ test("card-only arrange resets selected routes and keeps all unselected geometry
   for (const [id, old] of Object.entries(before.routes))
     if (!selected.includes(id))
       assert.deepEqual(result.snapshot.routes[id], old);
+});
+
+test("legacy dragged segments are retired without moving nodes, cards or pins", async () => {
+  const r = fixture(scene("A", "<<jump B>>") + scene("B", "hello"));
+  const first = await run(r),
+    old = first.snapshot;
+  const edge = Object.values(old.routes)[0];
+  const a = edge.points[0],
+    b = edge.points.at(-1);
+  edge.points = [
+    a,
+    { x: a.x + 40, y: a.y },
+    { x: a.x + 40, y: a.y - 180 },
+    { x: b.x - 40, y: a.y - 180 },
+    { x: b.x - 40, y: b.y },
+    b,
+  ];
+  edge.fixedSegments = [
+    { id: "old-drag", a: edge.points[2], b: edge.points[3] },
+  ];
+  edge.controlOrder = ["segment:old-drag"];
+  delete old.routing;
+  const next = await run({ ...r, scope: { kind: "repair" }, snapshot: old });
+  assert.deepEqual(next.snapshot.positions, old.positions);
+  const route = next.snapshot.routes[edge.id];
+  assert.deepEqual(route.fixedSegments, []);
+  assert.deepEqual(route.pins, []);
+  assert.equal(
+    route.points.length,
+    2,
+    "aligned unobstructed endpoints need one straight line",
+  );
+});
+
+test("pin is a turn point, not an invisible fixed direction corridor", async () => {
+  const r = fixture(scene("A", "<<jump B>>") + scene("B", "hello"));
+  const first = await run(r),
+    edge = Object.values(first.snapshot.routes)[0];
+  first.snapshot.positions[edge.source] = { x: 0, y: 0 };
+  first.snapshot.positions[edge.target] = { x: 800, y: 0 };
+  edge.pins = [{ id: "turn", x: 480, y: 220, axis: "vertical", direction: -1 }];
+  edge.controlOrder = ["pin:turn"];
+  edge.reroute = true;
+  const next = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: first.snapshot,
+  });
+  assertClear(next, r);
+  const route = next.snapshot.routes[edge.id],
+    i = route.points.findIndex((p) => p.x === 480 && p.y === 220);
+  assert.ok(i > 0 && i < route.points.length - 1);
+  const a = route.points[i - 1],
+    b = route.points[i + 1];
+  assert.ok(a.x !== b.x && a.y !== b.y, "the pin can be the actual corner");
+});
+
+test("moving endpoints does not keep obsolete automatic bends or a backward trunk", async () => {
+  const r = branching(),
+    first = await run(r),
+    branch = r.model.branches[0];
+  const id = branch.source,
+    p = first.snapshot.positions[id];
+  const moved = moveNodes(first.snapshot, {
+    [id]: { x: p.x + 80, y: p.y + 16 },
+  });
+  const next = await run({ ...r, scope: { kind: "repair" }, snapshot: moved });
+  assertClear(next, r);
+  const trunk = next.snapshot.trunks[branch.id];
+  assert.ok(
+    trunk.points[1].x > trunk.points[0].x,
+    "exit stub still points out of the node",
+  );
+  assert.equal(trunk.points[1].x - trunk.points[0].x, 24);
+  for (const route of Object.values(next.snapshot.routes))
+    assert.equal(route.fixedSegments.length, 0);
 });

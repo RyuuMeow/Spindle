@@ -2,6 +2,7 @@ import type { Point, GraphRect, Side } from "../graph-layout";
 import { segmentHitsRect } from "../graph-layout";
 import {
   center,
+  moveTrunkSource,
   simplify,
   orderedControls,
   moveNodes,
@@ -19,9 +20,12 @@ const vector = (a: Point, b: Point) => ({
   y: Math.sign(b.y - a.y),
 });
 export function retraces(points: Point[]) {
-  return points.slice(2).some((c, i) => {
-    const a = points[i],
-      b = points[i + 1];
+  const path = points.filter(
+    (p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y,
+  );
+  return path.slice(2).some((c, i) => {
+    const a = path[i],
+      b = path[i + 1];
     return (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y) < 0;
   });
 }
@@ -30,6 +34,7 @@ export function connectLeg(
   before: Point[],
   after: Point[],
   boxes: GraphRect[],
+  previous: Point[] = before,
 ): Point[] | null {
   const from = before.at(-1)!,
     to = after[0];
@@ -59,7 +64,7 @@ export function connectLeg(
   ].map((p) => simplify([from, ...p, to]));
   const valid = candidates.filter(
     (p) =>
-      !retraces(simplify([...before, ...p, ...after])) &&
+      !retraces([...previous, ...p, ...after]) &&
       p
         .slice(1)
         .every((q, i) => !boxes.some((r) => segmentHitsRect(p[i], q, r))),
@@ -98,7 +103,7 @@ export function previewRoute(
   parts.forEach((part, i) => {
     if (i)
       points.push(
-        ...(connectLeg(parts[i - 1], part, boxes) || [
+        ...(connectLeg(parts[i - 1], part, boxes, points) || [
           parts[i - 1].at(-1)!,
           { x: part[0].x, y: parts[i - 1].at(-1)!.y },
           part[0],
@@ -120,14 +125,7 @@ export function previewRoutes(
   for (const trunk of Object.values(state.trunks)) {
     const source = boxes.find((b) => b.id === trunk.source);
     if (!source || trunk.points.length < 2) continue;
-    const port = center(source, "right"),
-      old = trunk.points[0],
-      second = trunk.points[1];
-    if (old.x !== port.x || old.y !== port.y) {
-      if (second.y === old.y) second.y = port.y;
-      else if (second.x === old.x) second.x = port.x;
-      trunk.points[0] = port;
-    }
+    moveTrunkSource(trunk, center(source, "right"));
   }
   const cards = Object.values(state.routes)
     .filter((r) => r.card)

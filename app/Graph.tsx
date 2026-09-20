@@ -73,7 +73,6 @@ import {
 } from "./graph/RouteEditor";
 import {
   center,
-  cloneLayout,
   pathData,
   freezeControlOrder,
   removePin,
@@ -764,10 +763,6 @@ function Canvas({
                         ),
                 };
                 freezeControlOrder(r);
-                Object.assign(pin, {
-                  axis: a.y === b.y ? "horizontal" : "vertical",
-                  direction: (a.y === b.y ? b.x - a.x : b.y - a.y) > 0 ? 1 : -1,
-                });
                 r.pins.push(pin);
                 freezeControlOrder(r);
                 r.points.splice(index + 1, 0, { x: pin.x, y: pin.y });
@@ -1045,9 +1040,7 @@ function Canvas({
         }
         leftDragStart.current =
           event.button === 0 &&
-          !!hit.closest(
-            ".react-flow__node,.flow-route-pin,.flow-route-hit,.flow-trunk-hit",
-          ) &&
+          !!hit.closest(".react-flow__node,.flow-route-pin") &&
           !hit.closest(
             "input,textarea,[contenteditable=true],.flow-scene-editor",
           )
@@ -1284,7 +1277,8 @@ function Canvas({
           </div>
           <p>
             拖曳卡片只調整版面；雙擊或 Enter 編輯原文。左鍵框選，Shift
-            加選，右鍵拖曳平移，滾輪縮放。選線後拖動線段；雙擊支線新增 pin。
+            加選，右鍵拖曳平移，滾輪縮放。移動卡片或 pin 理線；雙擊支線新增
+            pin。
           </p>
           <p>
             {own.length} 個場景 · {out.length}{" "}
@@ -1428,51 +1422,9 @@ function Canvas({
             <TrunkEditor
               key={trunk.id}
               trunk={trunk}
-              ys={Object.values(layout.layout.routes)
-                .filter((r) => r.groupId === trunk.id && r.card)
-                .map((r) => r.card!.y)}
-              selected={groupSelection === trunk.id}
               select={() => {
                 selectEdge("");
                 setGroupSelection(trunk.id);
-              }}
-              begin={beginRoute}
-              end={endRoute}
-              move={(delta) => {
-                const origin = routeDragRef.current;
-                if (!origin) return;
-                const next = cloneLayout(origin),
-                  t = next.trunks[trunk.id];
-                const split = t.points.at(-1)!;
-                const x = split.x + delta.x,
-                  oldX = split.x;
-                const members = Object.values(next.routes).filter(
-                  (r) => r.groupId === t.id,
-                );
-                const limit = Math.min(
-                  ...members
-                    .filter((r) => r.card)
-                    .map((r) => r.card!.x - r.card!.width / 2 - 16),
-                );
-                const source = geometry.find((r) => r.id === t.source)!;
-                const nx = Math.max(
-                  source.x + source.width + 16,
-                  Math.min(limit, x),
-                );
-                split.x = nx;
-                t.manual = true;
-                const prev = t.points.at(-2);
-                if (prev && prev.x === oldX) prev.x = nx;
-                for (const r of members) {
-                  for (let i = 1; i < r.points.length; i++) {
-                    const p = r.points[i];
-                    if (p.x === oldX) p.x = nx;
-                    else if (i >= t.points.length) break;
-                  }
-                  r.error = "等待修整";
-                }
-                next.revision = layout.current.current.revision + 1;
-                layout.preview(next);
               }}
             />
           ))}
