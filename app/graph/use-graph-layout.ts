@@ -331,8 +331,10 @@ export function useGraphLayout(settings: Settings) {
       });
       setError("");
       persist(next);
+      if (Object.values(next.routes).some((r) => r.reroute))
+        request({ kind: "repair" });
     },
-    [apply, persist, snapshot, clearRequestTimer],
+    [apply, persist, snapshot, clearRequestTimer, request],
   );
   return {
     layout,

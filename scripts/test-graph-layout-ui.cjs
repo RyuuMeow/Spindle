@@ -493,6 +493,38 @@ const result = { errors: [], console: [], requests: [] };
     result.persisted = geometry(mapped);
     await app.close();
     app = null;
+    // A legacy history entry must migrate when restored even if node positions did not change.
+    const sessionPath = path.join(profile, "windows-v2.json");
+    const saved = JSON.parse(fs.readFileSync(sessionPath, "utf8"));
+    const session = Object.values(saved).find(
+      (v) => v.session?.tabs?.length,
+    ).session;
+    const tab = session.tabs.find((t) => t.id === session.activeId);
+    const legacy = structuredClone(tab.graph.layout);
+    delete legacy.routing;
+    const legacyRoute = legacy.routes[direct.id],
+      start = legacyRoute.points[0],
+      end = legacyRoute.points.at(-1);
+    legacyRoute.points = [
+      start,
+      { x: start.x + 40, y: start.y },
+      { x: start.x + 40, y: start.y - 400 },
+      { x: end.x - 40, y: start.y - 400 },
+      { x: end.x - 40, y: end.y },
+      end,
+    ];
+    legacyRoute.fixedSegments = [
+      { id: "legacy-drag", a: legacyRoute.points[2], b: legacyRoute.points[3] },
+    ];
+    legacyRoute.controlOrder = [
+      ...(legacyRoute.controlOrder || []),
+      "segment:legacy-drag",
+    ];
+    tab.graph.undo = [
+      ...(tab.graph.undo || []),
+      { layout: legacy, viewport: tab.graph.viewport },
+    ];
+    fs.writeFileSync(sessionPath, JSON.stringify(saved));
     app = await launch({
       executablePath:
         process.env.DESKTOP_EXECUTABLE ||
@@ -524,6 +556,29 @@ const result = { errors: [], console: [], requests: [] };
       "restart must restore full manual geometry",
     );
     result.restart = true;
+    await page.getByRole("button", { name: "復原布局", exact: true }).click();
+    await page.waitForTimeout(800);
+    const migratedHistory = await state();
+    assert.equal(migratedHistory.layout.routing, "pins");
+    assert.ok(
+      Object.values(migratedHistory.layout.routes).every(
+        (r) => !r.reroute && !r.fixedSegments.length,
+      ),
+    );
+    assert.notDeepEqual(
+      migratedHistory.layout.routes[direct.id].points,
+      legacyRoute.points,
+    );
+    assert.deepEqual(migratedHistory.layout.positions, legacy.positions);
+    assert.deepEqual(
+      migratedHistory.layout.routes[direct.id].pins,
+      legacyRoute.pins,
+    );
+    assertRouteGeometry(migratedHistory);
+    await page.getByRole("button", { name: "重做布局", exact: true }).click();
+    await settle();
+    assert.deepEqual(geometry(await state()), result.persisted);
+    result.legacyHistoryMigration = true;
 
     // Full-containment box selection and group movement use a separate node set.
     await page.getByRole("button", { name: "適應全部", exact: true }).click();
