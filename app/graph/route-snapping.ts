@@ -21,6 +21,7 @@ function ports(state: GraphLayoutSnapshot, route: RouteGeometry, sizes: Sizes) {
       ? [
           {
             id,
+            side,
             point: center(
               { id, ...p, ...(sizes[id] || { width: 232, height: 108 }) },
               side,
@@ -74,10 +75,11 @@ export function snapObjects(
   const selected = new Set(Object.keys(moved)),
     dx: number[] = [],
     dy: number[] = [];
-  const propose = (from: Point, to: Point, horizontalOnly = false) => {
-    if (!horizontalOnly && Math.abs(to.x - from.x) <= ALIGN_SNAP)
+  const propose = (from: Point, to: Point, axis: "x" | "y") => {
+    if (axis === "x" && Math.abs(to.x - from.x) <= ALIGN_SNAP)
       dx.push(to.x - from.x);
-    if (Math.abs(to.y - from.y) <= ALIGN_SNAP) dy.push(to.y - from.y);
+    if (axis === "y" && Math.abs(to.y - from.y) <= ALIGN_SNAP)
+      dy.push(to.y - from.y);
   };
   for (const route of Object.values(state.routes)) {
     const ends = ports(state, route, sizes);
@@ -90,8 +92,8 @@ export function snapObjects(
         y: cardMoved.y + route.card.height / 2,
       };
       for (const end of ends)
-        if (!selected.has(end.id)) propose(c, end.point, true);
-      if (!carriesControls) for (const pin of route.pins) propose(c, pin, true);
+        if (!selected.has(end.id)) propose(c, end.point, "y");
+      if (!carriesControls) for (const pin of route.pins) propose(c, pin, "y");
     }
     for (const end of ends)
       if (moved[end.id]) {
@@ -102,21 +104,21 @@ export function snapObjects(
           y: end.point.y + next.y - old.y,
         };
         if (route.card && !selected.has(route.id) && !carriesControls)
-          propose(port, route.card, true);
+          propose(port, route.card, "y");
         if (!route.card)
           for (const other of ends)
             if (!selected.has(other.id))
               propose(
                 port,
                 other.point,
-                route.sourceSide === "left" || route.sourceSide === "right",
+                end.side === "left" || end.side === "right" ? "y" : "x",
               );
         if (!carriesControls)
           for (const pin of route.pins)
             propose(
               port,
               pin,
-              route.sourceSide === "left" || route.sourceSide === "right",
+              end.side === "left" || end.side === "right" ? "y" : "x",
             );
       }
   }

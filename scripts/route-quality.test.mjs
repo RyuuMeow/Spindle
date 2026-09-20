@@ -227,3 +227,17 @@ test("multiple destinations stay separated and repeated repair stays stable", ()
   separateLanes(s, [], new Set(["a", "b", "c"]));
   assert.deepEqual(s, before);
 });
+
+test("vertical port snapping uses its transverse axis without shifting travel distance", () => {
+  const r = route("r", "a", "b", [p(116, 100), p(116, 400)], {
+    sourceSide: "bottom",
+    targetSide: "top",
+  });
+  const s = state(r);
+  s.positions = { a: p(0, 0), b: p(0, 400) };
+  const sizes = {
+    a: { width: 232, height: 100 },
+    b: { width: 232, height: 100 },
+  };
+  assert.deepEqual(snapObjects(s, { b: p(6, 405) }, sizes), { b: p(0, 405) });
+});
