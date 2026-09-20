@@ -1,0 +1,13 @@
+Spindle graph engines
+
+elkjs 0.12.0, Copyright Kiel University and contributors.
+Licensed under EPL-2.0; see elk-EPL-2.0.txt.
+Source: https://github.com/kieler/elkjs/tree/v0.12.0
+
+libavoid-js 0.5.0-beta.5, Copyright Vladyslav Hnatiuk and contributors.
+libavoid / Adaptagrams: Copyright Michael Wybrow and contributors.
+Licensed under LGPL-2.1-or-later; see libavoid-LGPL-2.1.txt.
+Unmodified upstream WASM, loaded as a separate resource.
+Source and build scripts: https://github.com/Aksem/libavoid-js/tree/5062a42fbd82fff562afeebcbb7b1ed45eed8e75
+The source repository records the corresponding Adaptagrams submodule revision.
+You may replace the libavoid WASM module with a compatible modified build and rebuild Spindle. Debugging these modifications is permitted.

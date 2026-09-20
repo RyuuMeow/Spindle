@@ -1,0 +1,90 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {build} from "esbuild";
+import ELK from "elkjs/lib/elk.bundled.js";
+import {parse} from "../app/parser.ts";
+import {buildGraphModel} from "../app/graph/model.ts";
+import {migrateLayout,moveNodes,pointOnRoute} from "../app/graph/layout-state.ts";
+import {segmentHitsRect,rectsOverlap} from "../app/graph-layout.ts";
+await build({entryPoints:["app/graph/layout-engine.ts"],bundle:true,packages:"external",platform:"node",format:"esm",outfile:"outputs/graph-engine-test.mjs"});
+const {computeLayout}=await import("../outputs/graph-engine-test.mjs");
+const elk=new ELK();
+const scene=(name,body)=>"title: "+name+"\n---\n"+body+"\n===\n";
+function fixture(text) {
+ const documents=[{id:"document",name:"story.yarn",text,version:0}],model=buildGraphModel({file:"story.yarn",...parse(documents,[]),documents});
+ return {id:1,modelVersion:model.version,layoutVersion:0,scope:{kind:"all"},model,snapshot:migrateLayout(undefined,model),
+ sizes:Object.fromEntries(model.records.map(r=>[r.id,{width:232,height:100}])),
+ labels:Object.fromEntries(model.groups.filter(g=>g.label).map(g=>[g.id,{text:"choice",width:180,height:38}]))};
+}
+const run=async(r)=>computeLayout({...r,layoutVersion:r.snapshot.revision},undefined,elk);
+function assertClear(result,request) {
+ assert.deepEqual(result.errors,[],"automatic layout must be feasible");
+ const s=result.snapshot,boxes=request.model.records.map(r=>({id:r.id,...s.positions[r.id],...request.sizes[r.id]}));
+ const cards=Object.values(s.routes).filter(r=>r.card).map(r=>({id:r.id,x:r.card.x-r.card.width/2,y:r.card.y-r.card.height/2,width:r.card.width,height:r.card.height}));
+ for(const route of Object.values(s.routes)){
+  assert.ok(route.points.length>=2);
+  for(let i=1;i<route.points.length;i++){
+   const a=route.points[i-1],b=route.points[i];assert.ok(a.x===b.x||a.y===b.y,"orthogonal");
+   for(const box of [...boxes.filter(b=>b.id!==route.source&&b.id!==route.target),...cards.filter(c=>c.id!==route.id)])
+    assert.equal(segmentHitsRect(a,b,box),false,route.id+" intersects "+box.id);
+  }
+ }
+ for(let i=0;i<cards.length;i++)for(let j=i+1;j<cards.length;j++)assert.equal(rectsOverlap(cards[i],cards[j]),false,"cards overlap");
+}
+const branching=()=>fixture(scene("Start","-> One\n  <<jump A>>\n-> Two\n  <<jump B>>\n-> Three\n  <<jump B>>")+scene("A","<<jump End>>")+scene("B","<<if $x>>\n<<jump End>>\n<<else>>\n<<jump Start>>\n<<endif>>")+scene("End","End")+scene("Unrelated","unused"));
+test("ELK + libavoid preserve branch columns, source order and centered ports",async()=>{
+ const request=branching(),result=await run(request);assertClear(result,request);
+ const {snapshot:s}=result;
+ const source=request.model.records[0];assert.ok(request.model.records.slice(1,4).every(r=>s.positions[r.id].x>s.positions[source.id].x));
+ for(const b of request.model.branches){
+  const cards=request.model.groups.filter(g=>g.groupId===b.id).map(g=>s.routes[g.id].card);
+  assert.equal(new Set(cards.map(c=>c.x)).size,1);
+  for(let i=1;i<cards.length;i++)assert.ok(cards[i].y-cards[i].height/2-(cards[i-1].y+cards[i-1].height/2)>=24);
+ }
+ for(const r of Object.values(s.routes))if(r.sourceSide==="right")assert.equal(r.points[0].y,s.positions[r.source].y+50);
+});
+test("unrelated moves and repairs keep existing routes point-for-point",async()=>{
+ const r=branching(),first=await run(r),unrelated=r.model.records.at(-1).id;
+ const moved=moveNodes(first.snapshot,{[unrelated]:{x:-600,y:-600}});
+ const repaired=await run({...r,scope:{kind:"repair"},snapshot:moved});
+ assert.deepEqual(repaired.snapshot.routes,first.snapshot.routes);
+});
+test("selected arrangement leaves other nodes, boundary pin and card fixed",async()=>{
+ const r=branching(),first=await run(r),chosen=r.model.records[1].id;
+ const boundary=r.model.groups.find(g=>g.target===chosen),edge=first.snapshot.routes[boundary.id];
+ const a=edge.points.at(-2);edge.pins.push({id:"manual",x:a.x,y:a.y});
+ const before=structuredClone(first.snapshot);
+ const next=await run({...r,scope:{kind:"selected",ids:[chosen]},snapshot:first.snapshot});
+ for(const record of r.model.records)if(record.id!==chosen)assert.deepEqual(next.snapshot.positions[record.id],before.positions[record.id]);
+ assert.deepEqual(next.snapshot.routes[edge.id].pins,before.routes[edge.id].pins);
+ assert.deepEqual(next.snapshot.routes[edge.id].card,before.routes[edge.id].card);
+});
+test("feedback, self loops, narrow dimensions and long labels remain explicit",async()=>{
+ const r=fixture(scene("A","-> Loop\n  <<jump A>>\n-> Continue\n  <<jump B>>")+scene("B","<<jump A>>"));
+ for(const label of Object.values(r.labels)){label.width=240;label.height=88;}
+ const result=await run(r);assertClear(result,r);
+ const loop=Object.values(result.snapshot.routes).find(e=>e.source===e.target);assert.ok(loop.points.length>=4);
+});
+test("infeasible pin is retained and reported instead of silently removed",async()=>{
+ const r=branching(),first=await run(r),edge=Object.values(first.snapshot.routes)[0],other=r.model.records.at(-1);
+ const p=first.snapshot.positions[other.id];edge.pins.push({id:"blocked",x:p.x+30,y:p.y+30});edge.error="repair";
+ const next=await run({...r,scope:{kind:"repair"},snapshot:first.snapshot});
+ assert.ok(next.errors.includes(edge.id));assert.deepEqual(next.snapshot.routes[edge.id].pins,edge.pins);
+ assert.deepEqual(next.snapshot.routes[edge.id].points,edge.points);
+});
+test("nested branch groups have separate columns without collapsing same target",async()=>{
+ const r=fixture(scene("A","-> One\n  <<if $x>>\n  <<jump B>>\n  <<else>>\n  <<jump C>>\n  <<endif>>\n-> Two\n  <<jump B>>")+scene("B","b")+scene("C","c"));
+ const result=await run(r);assertClear(result,r);
+ assert.equal(Object.keys(result.snapshot.routes).length,3);
+ const nested=r.model.branches.find(b=>b.parentId),outer=r.model.groups.find(g=>g.groupId===nested.parentId);
+ assert.ok(result.snapshot.routes[nested.transitions[0]].card.x>result.snapshot.routes[outer.id].card.x);
+});
+test("layout benchmark records size, elapsed time and bends",async(t)=>{
+ const timings=[];
+ for(const count of [10,50,120]){
+  const r=fixture(Array.from({length:count},(_,i)=>scene("N"+i,i<count-1?"<<jump N"+(i+1)+">>":"End")).join(""));
+  const result=await run(r);assertClear(result,r);
+  timings.push({nodes:count,elapsedMs:Math.round(result.elapsed),bends:Object.values(result.snapshot.routes).reduce((n,r)=>n+r.points.length-2,0)});
+ }
+ t.diagnostic(JSON.stringify(timings));
+});
