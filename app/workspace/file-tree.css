@@ -2,7 +2,7 @@
 .tree-group { position:relative; }
 .tree-entry.file-entry { touch-action:none; margin:2px 8px 2px calc(8px + var(--tree-indent)); position:relative; }
 .tree-entry .folder-disclosure { width:20px; height:30px; flex:none; display:grid; place-items:center; color:#999; }
-.tree-entry .folder-disclosure:hover { color:#eee; }
+.tree-entry .folder-disclosure:hover { background:transparent; color:#999; }
 .tree-entry .file-row { min-width:0; }
 .tree-entry:has(.folder-disclosure) .file-row { padding-left:0; }
 .tree-group.tree-drop-before::before,.tree-group.tree-drop-after::after,.tree-end.tree-drop-before::before { content:""; position:absolute; z-index:3; height:2px; background:#eee; left:calc(8px + var(--tree-indent,0px)); right:8px; border-radius:0; pointer-events:none; }

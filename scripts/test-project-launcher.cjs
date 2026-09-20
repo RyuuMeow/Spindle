@@ -487,10 +487,14 @@ function done(s) {
     await page
       .getByRole("menuitem", { name: "Recent 7", exact: true })
       .click({ button: "right" });
+    assert(await page.locator(".project-menu").isVisible());
     await page
       .getByRole("menuitem", { name: "從最近列表中移除", exact: true })
       .click();
+    await page.getByRole("menuitem", { name: "從最近列表中移除", exact: true }).waitFor({ state: "hidden" });
+    assert(await page.locator(".project-menu").isVisible());
     await page.keyboard.press("Escape");
+    await page.locator(".project-menu").waitFor({ state: "hidden" });
     const recent = (await snap()).catalog.find((p) => p.id === "recent-7");
     assert(recent && !recent.recent);
     done(

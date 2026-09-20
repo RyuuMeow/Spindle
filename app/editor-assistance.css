@@ -123,9 +123,10 @@
   overflow: auto;
 }
 .cm-tooltip.spindle-completions {
-  background: #252525;
+  background: #282828;
   color: #d0d0d0;
-  border: 1px solid #454545;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
   box-shadow: 0 8px 24px #0004;
   font:
     16px/1.5 "SFMono-Regular",
@@ -171,6 +172,7 @@
   min-width: min(430px, calc(100vw - 16px));
   max-width: min(620px, calc(100vw - 16px));
   padding: 0;
+  border-radius: 5px;
 }
 .cm-tooltip.cm-tooltip-autocomplete.spindle-completions > ul > li {
   display: flex;
@@ -219,4 +221,16 @@
   > .right.can-expand-details
   > .details-label {
   width: auto;
+}
+
+/* Match the shared description surface without changing list geometry. */
+.monaco-editor[data-spindle-assisted] .suggest-widget {
+  background: #282828;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0004;
+}
+.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list {
+  border-radius: 5px;
+  overflow: hidden;
 }

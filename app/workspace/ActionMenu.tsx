@@ -19,6 +19,7 @@ export type MenuState = {
   y: number;
   actions: MenuAction[];
   origin?: HTMLElement;
+  parent?: "project";
 };
 export default function ActionMenu({
   menu,
@@ -30,6 +31,7 @@ export default function ActionMenu({
   return (
     <DropdownMenu
       open={!!menu}
+      modal={menu?.parent !== "project"}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
@@ -44,6 +46,9 @@ export default function ActionMenu({
         className="desktop-menu"
         side="bottom"
         align="start"
+        onFocusOutside={(event) => {
+          if (menu?.parent === "project") event.preventDefault();
+        }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           menu?.origin?.focus();

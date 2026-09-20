@@ -1751,7 +1751,9 @@ export default function Workbench({
           </ChromeButton>
           <DropdownMenu
             open={projectMenuOpen}
-            onOpenChange={setProjectMenuOpen}
+            onOpenChange={(open) => {
+              if (open || menu?.parent !== "project") setProjectMenuOpen(open);
+            }}
             modal={false}
           >
             <DropdownMenuTrigger
@@ -1762,7 +1764,12 @@ export default function Workbench({
               <strong>{project.name}</strong>
               <ChevronDown size={13} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="desktop-menu project-menu">
+            <DropdownMenuContent
+              className="desktop-menu project-menu"
+              onInteractOutside={(event) => {
+                if (menu?.parent === "project") event.preventDefault();
+              }}
+            >
               <DropdownMenuItem
                 onSelect={() =>
                   onNavigate
@@ -1817,7 +1824,6 @@ export default function Workbench({
                     if (!onNavigate) return;
                     event.preventDefault();
                     event.stopPropagation();
-                    setProjectMenuOpen(false);
                     showMenu(event, [
                       {
                         label: "從最近列表中移除",
@@ -1830,11 +1836,10 @@ export default function Workbench({
                           }),
                       },
                     ]);
-                    const origin =
-                      document.querySelector<HTMLElement>(".project-switch");
+                    const origin = event.currentTarget as HTMLElement;
                     setMenu((current) =>
                       current
-                        ? { ...current, origin: origin || undefined }
+                        ? { ...current, origin, parent: "project" }
                         : current,
                     );
                   }}
