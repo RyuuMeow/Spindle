@@ -144,7 +144,6 @@ async function shot(name) {
       await page.waitForTimeout(120);
       return (await snapshot()).projects[0].documents[0].text;
     };
-    const currentLine = async () => (await text()).split(/\r?\n/).at(-1);
     async function newLine() {
       await page.keyboard.press("Control+End");
       await page.keyboard.press("Enter");

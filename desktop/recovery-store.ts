@@ -100,7 +100,7 @@ export class RecoveryStore {
   private writeRecord(p: Project, r: TrashRecord) {
     atomicWrite(this.recordFile(p, r.entry.id), JSON.stringify(r));
   }
-  load(p: Project, ids = new Map<string, string>()) {
+  load(p: Project, ids = new Map<string, string>(), copiedIdentity = false) {
     if (this.has(p)) return;
     const file = this.index(p);
     if (fs.existsSync(file)) {
@@ -108,6 +108,14 @@ export class RecoveryStore {
       if (value.version !== 1) throw Error("版本歷史格式不受支援");
       p.recovery = validEntries(value.entries);
     }
+    if (copiedIdentity)
+      for (const entry of p.recovery) {
+        for (const id of [
+          entry.documentId,
+          ...(entry.files || []).map((d) => d.id),
+        ])
+          if (id !== "@commands" && !ids.has(id)) ids.set(id, randomUUID());
+      }
     // The index is also the migration marker. Never reimport the old profile after it exists.
     p.recovery = p.recovery.map((e) => ({
       ...e,

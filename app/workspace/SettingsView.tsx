@@ -129,7 +129,9 @@ export default function SettingsView({
   returnLabel = "返回編輯",
   appPreferences,
   onAppPreferences,
+  workspaceSettings = true,
 }: {
+  workspaceSettings?: boolean;
   appPreferences?: AppPreferences;
   onAppPreferences?: (reopen: boolean) => void;
   returnLabel?: string;
@@ -141,7 +143,9 @@ export default function SettingsView({
   version?: string;
   initialSection?: SettingsSection;
 }) {
-  const [section, setSection] = useState<SettingsSection>(initialSection);
+  const [section, setSection] = useState<SettingsSection>(
+    workspaceSettings ? initialSection : "saving",
+  );
   const [resetVersion, setResetVersion] = useState(0);
   const [zoomResetVersion, setZoomResetVersion] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -156,16 +160,18 @@ export default function SettingsView({
     <section className="settings-workspace" aria-label="設定">
       <div className="settings-layout">
         <nav className="settings-navigation" aria-label="設定分類">
-          {sections.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              aria-current={section === id ? "page" : undefined}
-              onClick={() => setSection(id)}
-            >
-              <Icon size={16} />
-              <span>{label}</span>
-            </button>
-          ))}
+          {sections
+            .filter((item) => workspaceSettings || item.id !== "reading")
+            .map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                aria-current={section === id ? "page" : undefined}
+                onClick={() => setSection(id)}
+              >
+                <Icon size={16} />
+                <span>{label}</span>
+              </button>
+            ))}
         </nav>
         <div className="settings-scroll" key={section}>
           <div className="settings-content">
@@ -313,19 +319,21 @@ export default function SettingsView({
                     </p>
                   </section>
                 )}
-                <section className="settings-group">
-                  <h3>純文字編輯</h3>
-                  <label className="settings-check" htmlFor={lineNumbersId}>
-                    <Checkbox
-                      id={lineNumbersId}
-                      checked={preferences.lineNumbers}
-                      onCheckedChange={(checked) =>
-                        change({ lineNumbers: checked === true })
-                      }
-                    />
-                    顯示行號
-                  </label>
-                </section>
+                {workspaceSettings && (
+                  <section className="settings-group">
+                    <h3>純文字編輯</h3>
+                    <label className="settings-check" htmlFor={lineNumbersId}>
+                      <Checkbox
+                        id={lineNumbersId}
+                        checked={preferences.lineNumbers}
+                        onCheckedChange={(checked) =>
+                          change({ lineNumbers: checked === true })
+                        }
+                      />
+                      顯示行號
+                    </label>
+                  </section>
+                )}
                 <section className="settings-group">
                   <h3>保存方式</h3>
                   <dl className="settings-description-list">
@@ -373,7 +381,7 @@ export default function SettingsView({
                     ["快速開啟劇本", "Ctrl + P"],
                     ["搜尋整個專案", "Ctrl + Shift + F"],
                     ["立即保存", "Ctrl + S"],
-                    ["保存全部", "Ctrl + Shift + S"],
+                    ...(!onOpenData ? [["保存全部", "Ctrl + Shift + S"]] : []),
                     ["新增分頁", "Ctrl + T"],
                     ["關閉目前分頁", "Ctrl + W"],
                     ["重開關閉的分頁", "Ctrl + Shift + T"],
@@ -413,8 +421,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.9.0：同來源共用路段不再強制錯開；保留 pin
-                    與分岔後的平行間距。
+                    0.9.0：新增初始畫面與專案列表、獨立單檔編輯、專案內歷史與垃圾桶，並保存復原頁狀態。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

@@ -153,11 +153,19 @@ export class WorkspaceService {
     });
   }
   persist() {
-    const state = this.snapshot();
-    for (const p of state.projects.filter(
+    for (const p of this.engine.projects.filter(
       (p) => p.root || p.kind === "standalone",
-    ))
-      this.cache.save(this.recoveryStore.has(p) ? { ...p, recovery: [] } : p);
+    )) {
+      try {
+        this.cache.save(this.recoveryStore.has(p) ? { ...p, recovery: [] } : p);
+        if (p.persistenceError?.startsWith("工作區草稿尚未保存："))
+          delete p.persistenceError;
+      } catch (error) {
+        // A different window's cache must not block leaving this workspace.
+        p.persistenceError = "工作區草稿尚未保存：" + String(error);
+      }
+    }
+    const state = this.snapshot();
     state.projects = state.projects.filter(
       (p) => !p.root && p.kind !== "standalone",
     );
@@ -508,9 +516,15 @@ export class WorkspaceService {
     if (fs.existsSync(configFile)) {
       try {
         metadata = readJson(configFile) as typeof metadata;
-        if (!metadata || Array.isArray(metadata) || typeof metadata !== "object")
+        if (
+          !metadata ||
+          Array.isArray(metadata) ||
+          typeof metadata !== "object"
+        )
           throw Error("設定格式無效");
-        validateCommands(metadata.commands === undefined ? [] : metadata.commands);
+        validateCommands(
+          metadata.commands === undefined ? [] : metadata.commands,
+        );
         if (
           metadata.files &&
           (!Array.isArray(metadata.files) ||
@@ -597,6 +611,7 @@ export class WorkspaceService {
         return {
           id:
             id &&
+            p.id === metadata.id &&
             !this.engine.projects.some((project) =>
               project.documents.some((document) => document.id === id),
             )
@@ -629,7 +644,7 @@ export class WorkspaceService {
         return d ? [[f.id, d.id]] : [];
       }),
     );
-    this.recoveryStore.load(p, remap);
+    this.recoveryStore.load(p, remap, !!metadata.id && p.id !== metadata.id);
     this.metadata(p);
     this.engine.projects.push(p);
     this.currentProjectId = p.id;

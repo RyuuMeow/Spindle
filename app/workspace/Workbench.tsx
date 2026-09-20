@@ -165,6 +165,7 @@ export default function Workbench({
       }),
     [client],
   );
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null),
     [prompt, setPrompt] = useState<Prompt | null>(null),
     [promptValue, setPromptValue] = useState(""),
@@ -1748,7 +1749,11 @@ export default function Workbench({
           >
             <PanelLeft size={18} />
           </ChromeButton>
-          <DropdownMenu>
+          <DropdownMenu
+            open={projectMenuOpen}
+            onOpenChange={setProjectMenuOpen}
+            modal={false}
+          >
             <DropdownMenuTrigger
               className="project-switch"
               aria-label={project.name}
@@ -1812,6 +1817,7 @@ export default function Workbench({
                     if (!onNavigate) return;
                     event.preventDefault();
                     event.stopPropagation();
+                    setProjectMenuOpen(false);
                     showMenu(event, [
                       {
                         label: "從最近列表中移除",
@@ -1824,6 +1830,13 @@ export default function Workbench({
                           }),
                       },
                     ]);
+                    const origin =
+                      document.querySelector<HTMLElement>(".project-switch");
+                    setMenu((current) =>
+                      current
+                        ? { ...current, origin: origin || undefined }
+                        : current,
+                    );
                   }}
                 >
                   <Check

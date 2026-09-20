@@ -132,6 +132,7 @@ export default function ProjectLauncher({
       </header>
       {page === "settings" ? (
         <SettingsView
+          workspaceSettings={false}
           preferences={prefs}
           onChange={(next) => setPrefs((p) => ({ ...p, ...next }))}
           appPreferences={snapshot.preferences}

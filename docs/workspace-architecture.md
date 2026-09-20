@@ -10,6 +10,14 @@
 
 `storage.ts` 分別驗證文件、設定與布局。舊工作區先留下 migration backup，舊 keys 保留；損毀資料另存救援副本。指令設定損毀不阻止讀取有效文件，空文件清單不以範例取代。
 
+## 工作區生命週期（0.9.0）
+
+`DesktopWorkspace` 區分 home、project、standalone，`ProjectLauncher` 只讀專案目錄資料。`project-catalog.ts` 保存不限數量的 catalog、recent 標記與啟動偏好；UI 將最近清單限制為 5 筆。`workspace-cache.ts` 按工作區延後載入草稿；profile 啟動不載入所有曾開啟專案的文本。
+
+主程序以視窗綁定建立 active 工作區集合，最後一窗離開才取消監看、寫入計時器並卸載文件。開啟、直接檔案、拖入、啟動參數都經過相同實際路徑／目錄邊界判定；最深層已知專案優先，未知檔案使用獨立作用域。既有工作區視窗優先聚焦。
+
+renderer 離開前完成交易與草稿、保存視圖、flush 指定工作區，成功後才能改畫面。主程序再次核對視窗工作區及切換授權，不接受無範圍 save。組字、衝突、目前工作區的歷史／草稿或共用 profile 寫入失敗留在原畫面；其他工作區的快取錯誤只阻擋其所屬視窗。
+
 ## 桌面儲存
 
 `desktop/workspace-service.ts` 管理所有專案與磁碟寫入，文件 request 依序處理。800ms debounce 只寫有路徑且未衝突的文件。寫入先建立同目錄暫存檔、flush，再核對磁碟內容雜湊後替換；寫入成功才更新 saved。
@@ -18,19 +26,27 @@
 
 Windows 的暫時性 EPERM／EBUSY／EACCES 最多重試三次，每次仍重新核對磁碟版本並使用暫存檔替換，不退回直接覆寫。持續失敗則保留錯誤與重試入口。profile 本身寫入失敗時，無路徑草稿標為失敗；關閉提示不宣稱草稿已保存。
 
-專案 `.yarn-workbench/project.json` 保存名稱、有效指令、相對路徑與文件 ID。profile 的 `workspace-v2.json` 保存專案工作集、草稿與快照，`windows-v2.json` 保存視窗／tab 狀態。開啟同一資料夾重用專案；複製專案目錄時避免與已開啟專案重用文件 ID。
+專案 `.yarn-workbench/project.json` 保存名稱、有效指令、相對路徑與文件 ID。profile 的 `workspace-v2.json` 保留舊無路徑草稿，`workspace-cache/` 按需保存每個工作區草稿；`project-catalog-v1.json` 保存專案紀錄與啟動偏好，`windows-v2.json` 保存各視窗綁定與布局，`project-views-v1.json` 保存專案重新開啟的視圖。開啟同一資料夾重用專案；複製專案目錄時避免與已開啟專案重用文件 ID。
 
-每分鐘對有變更內容建立快照，每文件保留 50 份；刪除前先持久化復原副本，再透過 Electron `shell.trashItem` 送入系統垃圾桶；失敗保留文件及錯誤，不回退永久刪除。最近刪除保留 30 天。復原遇到同名檔案使用新的 recovered 名稱，不覆蓋既有檔案。無路徑草稿與非法指令表單也保留在 profile。
+`recovery-store.ts` 管理 `.yarn-workbench/history/index.json` 與 `trash/<entry-id>/entry.json + payload`。單檔歷史使用 profile 的 `single-file-history/<identity>/`。只為活動工作區每分鐘建立快照，每文件／指令保留 50 份，垃圾桶保留 30 天。
+
+刪除先保存文件，再以 prepared → deleted 日誌移動完整目錄（含非 Yarn 檔）；復原以 restoring 日誌移回，碰撞使用 recovered 名稱。永久刪除以 purging 日誌刪 payload，索引持久化後才移除操作紀錄。索引寫入失敗保留日誌，重試／重啟可完成操作，不讓已刪除項目復活；符號連結不跟隨。全域 Windows 垃圾桶不參與新操作。
+
+專案首次開啟時匯入舊 profile 歷史；history 索引同時是遷移標記，存在後不重複匯入。還原沿用 DocumentId，衝突時重映射歷史；文件引擎重設已移除文件的交易日誌。
 
 ## 編輯面
 
 Monaco 保留純文字呈現。CodeMirror 使用來源範圍裝飾，不以 DOM 重新序列化劇本；未修改文字、註解、BOM 與換行保留。觸及的token與被選取範圍揭露原文，未知命令與未閉合區域回退來源。折疊與聚焦只影響閱讀；折疊使用正規化來源範圍、隨CM修改映射並在還原時驗證場景邊界。
+
+Monaco 非同步載入完成時，若已有浮層或其他輸入欄位取得焦點，不再搶回焦點。
 
 Monaco React 重用保留的 model 時不保證套用最新 value，因此在掛載及 model 切換後、恢復視圖前，以當前文件同步 model；程式同步不提交交易。
 
 兩個編輯器的 Undo／Redo 接到文件引擎；模式切換沒有文字交易。圖表布局歷史獨立保存於該 tab，跨模式保留。文字 undo stack 在本次 App 生命週期內共用，持久化快照負責重啟後內容恢復。
 
 ## 工作區與歷史介面
+
+`RecoveryViewState` 隨 session 保存分類、查詢、選取 ID、預覽／比較、列表及預覽捲動、比較基準。專案復原不提供返回編輯按鈕；成功復原垃圾桶項目後不導航並選取相鄰項目。指令版本還原仍保留該歷史。
 
 Workbench 組合 SettingsView、SearchOverlay、CommandManager、HistoryView 及 RecoveryView。設定／指令／復原使用 utility tab；搜尋使用失焦關閉的 popup。文件大綱只由工具列切換，按模式保存偏好。navigation.ts 管理每 tab 的前進／後退與按 DocumentId 區分的視圖快取；一般定位保留目前 TabId。
 
@@ -48,13 +64,13 @@ Workbench 組合 SettingsView、SearchOverlay、CommandManager、HistoryView 及
 
 0.2.1 的 portable 使用 ZIP、解壓提示與每次啟動獨立的 `$PLUGINSDIR/app`。目前 electron-builder 26.15.3 的實作需要 `unpackDirName: true` 才不指定共用暫存目錄，與該版型別註解的 boolean 說明不一致；升級打包工具時應重跑 `pnpm test:portable-launch`，以實際解壓路徑與關閉後資源仍可載入為準。安裝版與 portable 共用 ZIP 設定，避免 NSIS package helper 重用不同格式的壓縮包。
 
-所有啟動測試都使用隔離 profile。預設 profile 仍在 `%APPDATA%/Yarn Workbench`；這次修正不改變劇本、草稿或工作階段的保存位置。
+所有啟動測試都使用隔離 profile。預設 profile 仍在 `%APPDATA%/Yarn Workbench`；0.9.0 將正式專案歷史／垃圾桶遷至專案內，個人工作階段仍在 profile。
 
 指令的 `name` 仍是原始識別字，新增可選 `displayName`；參數新增可選 `displayName`／`description`。舊設定不需重寫，空顯示名回退識別字。純文字、閱讀與節點共用來源位置 tokenizer；虛擬提示不提交內容交易，未知／未完成或無法安全分辨的參數不猜測標籤。
 
-### 關閉握手（0.5.1）
+### 關閉握手（0.9.0）
 
-主程序攔截 close，以每次隨機 token 向該 renderer 請求 prepare-close。renderer 暫停操作，檢查組字並 flush 未同步交易、保存 session 後回覆。主程序核對 sender 與 token，再 flush 磁碟；重複 close 合併，15 秒未回覆保留視窗，錯誤可返回編輯。正常關閉不需要使用者確認；保存失敗沿用問題文件提示與草稿保護。
+主程序攔截 close，以每次隨機 token 向該 renderer 請求 prepare-close。renderer 暫停操作，檢查組字並 flush 未同步交易、保存 session 後回覆。主程序核對 sender、token 與原工作區綁定，再只 flush 該工作區；重複 close 合併，15 秒未回覆保留視窗，錯誤可返回編輯。正常關閉不需要使用者確認；保存失敗沿用問題文件提示與草稿保護。
 
 ### Spindle 品牌相容性（0.6.0）
 
@@ -77,7 +93,7 @@ emptyParameterHint 同時讀取游標兩側，內建語義位置與自訂位置�
 
 ### 工作區樹與輔助閱讀（0.7.0）
 
-FileTree 負責選取、折疊、命名入口和拖移命中；file-tree.ts 共用資料夾合法性、移動規劃、混合順序。Project.folders 保存空資料夾，treeOrder 保存文件 ID／資料夾路徑鍵的排列；舊資料缺欄位仍可還原。建立與移動透過具名 IPC，renderer 不取得任意 filesystem。單次資料夾移動先驗證來源／目的在 root 內、排除 symlink 和同名，完成磁碟 rename 後才映射全部子文件路徑及 metadata，文字、版本與 DocumentId 保持不變。資料夾移到系統垃圾桶前保留各 Yarn 文件快照；App 可逐檔復原，完整目錄及其他檔案可從系統垃圾桶復原。
+FileTree 負責選取、折疊、命名入口和拖移命中；file-tree.ts 共用資料夾合法性、移動規劃、混合順序。Project.folders 保存空資料夾，treeOrder 保存文件 ID／資料夾路徑鍵的排列；舊資料缺欄位仍可還原。建立與移動透過具名 IPC，renderer 不取得任意 filesystem。單次資料夾移動先驗證來源／目的在 root 內、排除 symlink 和同名，完成磁碟 rename 後才映射全部子文件路徑及 metadata，文字、版本與 DocumentId 保持不變。0.9.0 起資料夾刪除由專案垃圾桶保存完整目錄及文件識別；復原及永久刪除共用操作日誌，詳見上方「桌面儲存」。
 
 ReadingEditor 接受 goTo nonce 以區分外部定位與游標回報，解除覆蓋目標的折疊再捲動。DialogueReader 是唯讀、來源行對應的 React 畫面，不生成或回寫 Yarn；書本狀態屬於 tab。StatisticsPanel 僅聚合目前文件，沿用 document-side 寬度與窄窗規則。desktop:stage 更新 renderer、主程序服務與版本資訊後才供 UI 測試／打包使用；只清理驗證位於 dist-desktop/app 下的生成 renderer，避免過期 hash bundle 混入發行。
 

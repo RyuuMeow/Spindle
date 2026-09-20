@@ -524,7 +524,18 @@ export default function CodeEditor({
           editor.restoreViewState(
             viewStates.current[viewKey] || restoredView.current,
           );
-        editor.focus();
+        // Monaco may finish loading after the user has opened another surface.
+        const focused = document.activeElement;
+        const otherInput =
+          focused?.matches("input, textarea, [contenteditable=true]") &&
+          !editor.getDomNode()?.contains(focused);
+        if (
+          !otherInput &&
+          !document.querySelector(
+            '[role="menu"], [role="dialog"], [role="listbox"]',
+          )
+        )
+          editor.focus();
       }}
       options={{
         editContext: false,

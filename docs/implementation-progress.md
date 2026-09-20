@@ -1,6 +1,17 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.8.4**，2026-09-20。
+版本：Windows x64 **0.9.0**，2026-09-20。
+
+## 0.9.0 初始畫面、專案管理與復原
+
+- 獨立初始畫面、可搜尋完整專案列表、最近 5 筆、行內專案改名、建立同名子資料夾，以及預設關閉的上次專案重開設定已實作。初始畫面只提供全域設定；閱讀與行號屬於編輯工作區。
+- 已知根路徑使用實際路徑及目錄邊界辨識，最深層專案優先；未知 Yarn 檔案使用獨立自動保存視窗。只有活動工作區載入及監看，切換／關閉只保存所屬工作區，包含跨窗組字與工作區快取失敗保護。
+- 專案內歷史及垃圾桶保存完整資料夾與非 Yarn 資源，操作日誌支援中斷重試；復原不導航、同名避讓、單筆永久刪除與清空已實作。舊歷史單次遷移，舊草稿可預覽後轉存。
+- 復原頁分類、查詢、選取、比較與捲動隨視圖保存。Project 分隔線與資料夾箭頭幾何已修正；非同步載入編輯器不再關閉已開啟的選單。
+- [單元／服務回歸](../outputs/launcher-unit.log) **157／157**、[TypeScript](../outputs/launcher-tsc.log)、[全來源 lint](../outputs/launcher-lint.log)通過。lint 以 Git 列出的來源檔檢查，0 errors／0 warnings；既有異常目錄仍會產生 Git 目錄列舉警告。
+- [桌面互動](../outputs/project-launcher-ui/run-1789918970715/results.json)與最終 [0.9.0 Portable 實包驗收](../outputs/project-launcher-portable-0.9.0/run-1789919485878/results.json)各 **24 項**通過，包含新啟動、建立／開啟、三模式離線資源、垃圾桶及完整資料夾復原、切 tab 狀態、重啟、單檔冷啟動、多視窗、即時編輯後關閉、最近清單及失效路徑；記錄到的頁面錯誤為零。實際 Portable 版本確認為 0.9.0。
+- [Web build](../outputs/launcher-web-build.log)、[桌面 build](../outputs/launcher-stage.log)、[服務打包](../outputs/launcher-stage-service.log)與 [Setup／Portable 封裝](../outputs/launcher-package.log)通過；[SHA256、離線資源與服務一致性核對](../outputs/launcher-release-verification.json)。兩種產物位於 release/，未簽章。
+- 未實測：安裝精靈及 Windows Explorer 檔案關聯註冊、原生輸入法候選視窗、混合 DPI／多螢幕、真實斷電／滿磁碟／受限 ACL。組字保護使用 composition 事件驗證，檔案啟動使用實際啟動參數；磁碟失敗及操作中斷以注入錯誤驗證，不宣稱上述實機情境已完成。
 
 ## 0.8.4 同來源共用路段
 

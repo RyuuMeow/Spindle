@@ -467,3 +467,70 @@ test("legacy history migrates once, rescue drafts map document identities, and p
     f.dispose();
   }
 });
+
+test("copied project folders keep distinct project and document identities after reopening", async () => {
+  const f = fixture();
+  try {
+    const r = await f.service.request({
+      type: "createProject",
+      root: f.base,
+      name: "Original",
+    });
+    const original = f.service.engine.project(r.projectId);
+    await f.service.request({
+      type: "createDocument",
+      projectId: original.id,
+      name: "a.yarn",
+      text: "A",
+    });
+    f.service.setActiveProjects([]);
+    const copy = path.join(f.base, "Copy");
+    fs.cpSync(original.root, copy, { recursive: true });
+    const clone = f.service.openFolder(copy),
+      reopened = f.service.openFolder(original.root);
+    assert.notEqual(clone.id, reopened.id);
+    assert.notEqual(clone.documents[0].id, reopened.documents[0].id);
+    assert.equal(f.service.catalog.entries.length, 2);
+  } finally {
+    f.dispose();
+  }
+});
+
+test("workspace cache failures only block the owning workspace", async () => {
+  const f = fixture();
+  try {
+    const one = await f.service.request({
+      type: "createProject",
+      root: f.base,
+      name: "One",
+    });
+    const two = await f.service.request({
+      type: "createProject",
+      root: f.base,
+      name: "Two",
+    });
+    const save = f.service.cache.save.bind(f.service.cache);
+    f.service.cache.save = (project) => {
+      if (project.id === two.projectId) throw Error("injected cache failure");
+      save(project);
+    };
+    await f.service.request({ type: "closeProject", projectId: one.projectId });
+    assert.equal(f.service.profileError, "");
+    assert.match(
+      f.service.engine.project(two.projectId).persistenceError,
+      /cache failure/,
+    );
+    await assert.rejects(
+      f.service.request({ type: "closeProject", projectId: two.projectId }),
+      /cache failure/,
+    );
+    f.service.cache.save = save;
+    await f.service.request({ type: "closeProject", projectId: two.projectId });
+    assert.equal(
+      f.service.engine.project(two.projectId).persistenceError,
+      undefined,
+    );
+  } finally {
+    f.dispose();
+  }
+});

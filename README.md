@@ -13,7 +13,7 @@ pnpm desktop:start
 pnpm desktop:pack
 ```
 
-Windows x64 0.8.4 產物在 `release/`：`Spindle-0.8.4-Setup-x64.exe` 與 `Spindle-0.8.4-Portable-x64.exe`。打包包含離線 Monaco、CodeMirror、ELK Worker、libavoid WASM、引擎授權檔與主程序文件服務，不依賴編輯器 CDN。程式未簽章。
+Windows x64 0.9.0 產物在 `release/`：`Spindle-0.9.0-Setup-x64.exe` 與 `Spindle-0.9.0-Portable-x64.exe`。打包包含離線 Monaco、CodeMirror、ELK Worker、libavoid WASM、引擎授權檔與主程序文件服務，不依賴編輯器 CDN。程式未簽章。
 
 Spindle 為原 Yarn Workbench 的新名稱；沿用原 App profile、專案 `.yarn-workbench` 及安裝識別，保留既有資料。SVG 原檔在 `public/brand/`，桌面圖示由專案素材產生。
 
@@ -21,14 +21,16 @@ Portable 開啟時會先顯示「正在解壓並啟動」；0.2.1 改用 ZIP 與
 
 ## 保存與恢復
 
-- 在專案選單選擇「開啟專案資料夾」，遞迴載入 `.yarn`；子目錄同名檔案以相對路徑區分。
-- 停止輸入 800ms 後寫回原檔，中文組字期間暫停。Ctrl+S 立即保存；Ctrl+Shift+S 保存目前專案的待寫入文件。語法錯誤不阻止劇本保存。
-- 沒有磁碟路徑的文件是本機草稿。另存新檔會開啟並綁定新檔案；匯出只建立交付副本。
+- 預設啟動顯示獨立專案列表，可開啟資料夾或建立同名子資料夾專案；既有資料夾沒有設定檔時才建立 `.yarn-workbench/project.json`。損毀設定不會被靜默覆寫。
+- 完整專案列表不限數量，可搜尋、行內改名、從列表移除；Project 選單只列最近 5 個。移除紀錄不刪磁碟資料。設定可選擇啟動時開啟上次專案，預設關閉。
+- 直接開啟 `.yarn` 時，依已知專案最深層實際路徑辨識歸屬；否則開獨立單檔視窗，自動寫回原檔，不在所在資料夾建立專案。
+- 停止輸入 800ms 後寫回原檔，中文組字期間暫停。Ctrl+S 立即保存。桌面不再顯示日常「儲存全部／存成檔案」入口。語法錯誤不阻止劇本保存。
+- 舊無路徑草稿保留在初始畫面的「待移轉草稿」，預覽後可轉存為正式專案。匯出只建立交付副本；保存失敗時保留另存救援。
 - 偵測外部修改、刪除、唯讀或寫入失敗時保留內容。雙方都有修改時暫停該檔自動保存，提供比較、採用磁碟版本、覆寫或另存。
-- 劇本移到垃圾桶不再要求確認；磁碟檔案送入 Windows 資源回收筒，App「最近刪除」也可復原。移除入口統一為垃圾桶。更名與日常保存不顯示轉圈，失敗仍保留錯誤。
+- 劇本移到垃圾桶不再要求確認；完整檔案／資料夾（含非 Yarn 資源）移入專案 `.yarn-workbench/trash/`，不另送 Windows 資源回收筒；舊系統垃圾桶內容不操作。移除入口統一為垃圾桶。更名與日常保存不顯示轉圈，失敗仍保留錯誤。
 - 每分鐘對有變更文件留下快照，每份保留最近 50 份；最近刪除保留 30 天。指令設定另有復原快照，非法表單輸入保留為草稿。
-- 專案名稱、文件識別與有效指令定義寫入 `.yarn-workbench/project.json`；視窗、復原草稿與快照在 App profile。Windows 安裝版及 portable 預設皆使用 `%APPDATA%/Yarn Workbench`，portable 不把資料放在 exe 旁。
-- v1 專案備份仍可匯入。v2 備份包含相對路徑、指令定義與指令草稿；匯入會新增專案，保留原專案。
+- 專案名稱、文件識別與有效指令定義寫入 `.yarn-workbench/project.json`；專案歷史在 `.yarn-workbench/history/`，單檔歷史與視窗布局在 App profile。Windows 安裝版及 portable 預設皆使用 `%APPDATA%/Yarn Workbench`，portable 不把資料放在 exe 旁。
+- v1 專案備份仍可匯入。v2 備份包含相對路徑、指令定義與指令草稿；桌面匯入備份保留為待移轉草稿，再轉存正式專案；保留原專案。
 - 網頁資料存於該瀏覽器的 localStorage，與桌面 profile 分開；請用專案備份轉移。清除網站資料會移除網頁工作區。
 
 ## 編輯與操作
@@ -40,7 +42,7 @@ Portable 開啟時會先顯示「正在解壓並啟動」；0.2.1 改用 ZIP 與
 
 0.7.0 的全局搜尋是中央偏上的輕量浮層，結果出現在輸入框下方，選取、點外部或失焦即關閉。自訂指令與設定皆使用獨立工具 tab；指令與參數可設定顯示名稱及說明，閱讀顯示別名，純文字保留原始語法，兩者提供虛擬參數提示與懸浮說明。右側大綱只由工具列切換，左右面板及診斷區可調整尺寸。文件時鐘開啟版本時間線、唯讀預覽與差異比較。
 
-一般原檔自動保存，不再放常駐 Save 按鈕；本機草稿使用「存成檔案」。一般自動保存不顯示 tab 未保存圓點、檔案轉圈或常駐成功狀態；衝突與錯誤仍會提示。關閉視窗前先送完編輯交易，待保存時顯示小型進度面板，失敗則保留視窗供重試。閱讀編輯可選760／900px欄寬，字級會同步調整標題、命令與標籤，折疊跟隨分頁保存。
+桌面原檔自動保存，不再放常駐 Save 按鈕；Web 保留本機工作區及匯出方式。一般自動保存不顯示 tab 未保存圓點、檔案轉圈或常駐成功狀態；衝突與錯誤仍會提示。切換／關閉專案及關閉視窗共用保存流程，只檢查目前工作區；250ms 後仍待保存才顯示小型面板，失敗或組字未完成保留原畫面並可重試。閱讀編輯可選760／900px欄寬，字級會同步調整標題、命令與標籤，折疊跟隨分頁保存。
 
 純文字保留原有 Monaco 外觀與編輯習慣。閱讀或圖表修改後切回純文字即時更新，不必再次打字。三種編輯入口共用內建指令的語法、參數說明與範例；`set` 可補全專案中已定義的變數，條件與運算式輸入 `$` 也可查找。渲染是同一份來源文字的連續編輯面：灰色 tags、紫色變數標籤、平面條件區域與場景分隔。游標／選取觸及語法時揭露原文；複製取得原始 Yarn，右鍵另有「複製可讀文字」。渲染顯示所有分支，不執行條件。
 
@@ -65,19 +67,16 @@ Portable 開啟時會先顯示「正在解壓並啟動」；0.2.1 改用 ZIP 與
 
 ```sh
 pnpm test:unit
-pnpm test:graph-ui
-pnpm test:sync-language
-pnpm test:workspace-navigation
-pnpm test:hint-priority
-pnpm test:workspace-ui
-pnpm test:ui-redesign
-pnpm test:desktop-refinement
+pnpm exec tsc --noEmit
+pnpm lint
 pnpm build
+pnpm desktop:stage
+pnpm test:project-launcher
 ```
 
-桌面整合測試需要 Playwright（可透過 `PLAYWRIGHT_MODULE` 指定），每次建立隔離 profile 與測試專案。預設測試準備好的開發版；設定 `DESKTOP_EXECUTABLE` 可驗證打包版。結果與截圖在 `outputs/workspace-integration/`。
+桌面整合測試需要 Playwright（可透過 `PLAYWRIGHT_MODULE` 指定），每次建立隔離 profile 與測試專案。`test:project-launcher` 涵蓋初始畫面、專案清單、復原、單檔、多視窗保存及離線編輯器資源。
 
-直接測試 portable 啟動器時，另設定 `DESKTOP_PORTABLE_TEST=1`；測試驅動會以僅限本機的 inspector／CDP 連接解壓後的 App，並在結束時關閉連接。可用 `DESKTOP_TEST_OUTPUT` 分開指定結果目錄。現行打包驗證結果由[實作追蹤](docs/implementation-progress.md)集中列出。
+預設測試準備好的開發版；設定 `SPINDLE_PORTABLE=1` 使用 `release/` 下目前版本的實際 Portable。測試驅動以本機 inspector／CDP 連接解壓後的 App，結束時關閉連接。輸出於 `outputs/project-launcher-ui/`，可用 `DESKTOP_TEST_OUTPUT` 指定結果目錄。現行實包驗證結果由[實作追蹤](docs/implementation-progress.md)集中列出。
 
 目前完成狀態、測試證據與未驗證項目見 [實作追蹤](docs/implementation-progress.md)。設計規則見 [UI 規範](docs/ui-design.md)，保存與同步契約見 [架構說明](docs/workspace-architecture.md)，版本記錄見 [CHANGELOG](CHANGELOG.md)。早期審查與 39 組盤點保留為歷史取證。
 
