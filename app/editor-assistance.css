@@ -236,20 +236,183 @@
 }
 
 /* Tailwind's .contents utility must not unwrap Monaco's row container. */
-.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list .monaco-list-row {
+.monaco-editor[data-spindle-assisted]
+  .suggest-widget
+  .monaco-list
+  .monaco-list-row {
   padding-left: 12px;
   padding-right: 12px;
 }
-.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list .monaco-list-row > .contents {
+.monaco-editor[data-spindle-assisted]
+  .suggest-widget
+  .monaco-list
+  .monaco-list-row
+  > .contents {
   display: block;
   min-width: 0;
 }
-.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list .monaco-list-row > .contents > .main > .left {
+.monaco-editor[data-spindle-assisted]
+  .suggest-widget
+  .monaco-list
+  .monaco-list-row
+  > .contents
+  > .main
+  > .left {
   flex: 0 1 auto;
   min-width: 0;
 }
-.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list .monaco-list-row > .contents > .main > .right {
+.monaco-editor[data-spindle-assisted]
+  .suggest-widget
+  .monaco-list
+  .monaco-list-row
+  > .contents
+  > .main
+  > .right {
   flex: 1 1 auto;
   min-width: 0;
   max-width: none;
+}
+
+/* Diagnostic and quick-fix surfaces share the command-help geometry. */
+.monaco-editor .monaco-hover,
+.monaco-hover,
+.action-widget {
+  border-radius: 6px !important;
+  border: 1px solid #ffffff12 !important;
+  background: #282828 !important;
+  box-shadow: 0 8px 24px #0004 !important;
+  overflow: hidden;
+  font-family: var(--font-sans, "Segoe UI", sans-serif);
+}
+.monaco-hover .hover-row {
+  background: transparent;
+}
+.command-quick-fix button {
+  margin-top: 8px;
+  color: var(--focus);
+  padding: 0 8px;
+}
+
+/* Geometry tokens also reach Monaco's body-portaled hover/menu wrappers. */
+:root {
+  --vscode-cornerRadius-large: 6px;
+  --vscode-cornerRadius-medium: 4px;
+  --vscode-cornerRadius-small: 3px;
+  --vscode-shadow-lg: 0 8px 24px #0004;
+}
+.monaco-editor .monaco-resizable-hover,
+.monaco-editor .find-widget,
+.monaco-editor .rename-box,
+.monaco-editor .parameter-hints-widget,
+.monaco-menu .monaco-action-bar.vertical {
+  border: 1px solid #ffffff12 !important;
+  border-radius: 6px !important;
+  background: #282828 !important;
+  box-shadow: 0 8px 24px #0004 !important;
+  color: #d4d4d4;
+}
+.monaco-editor .monaco-resizable-hover > .monaco-hover {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.monaco-editor .monaco-hover .hover-row {
+  border-radius: 0;
+}
+.monaco-editor .monaco-hover .hover-row .actions {
+  background: #282828;
+  border-top: 1px solid #ffffff12;
+}
+.monaco-editor .monaco-hover a {
+  color: #a8c7e5;
+}
+.monaco-editor .find-widget .monaco-inputbox {
+  border: 1px solid #444 !important;
+  border-radius: 4px;
+  background: #202020 !important;
+}
+.monaco-editor .find-widget .monaco-inputbox.synthetic-focus {
+  outline: 1px solid #a8c7e5;
+  outline-offset: 0;
+}
+.monaco-editor .find-widget .button,
+.monaco-editor .find-widget .monaco-custom-toggle {
+  border-radius: 4px;
+}
+.monaco-editor .find-widget .button:hover {
+  background: #353535;
+}
+.monaco-editor .find-widget .monaco-custom-toggle.checked {
+  background: #383838 !important;
+  border-color: #777 !important;
+  color: #ddd !important;
+}
+.cm-editor .cm-panels:has(.cm-search) {
+  position: absolute;
+  top: 8px;
+  bottom: auto;
+  left: auto;
+  right: 12px;
+  width: min(560px, calc(100% - 24px));
+  z-index: 20;
+  background: #282828;
+  color: #d4d4d4;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0004;
+}
+.cm-editor .cm-panel.cm-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 32px 10px 12px;
+  font: 12px/1.5 var(--font-sans, "Segoe UI", sans-serif);
+}
+.cm-editor .cm-panel.cm-search .cm-textfield {
+  background: #202020;
+  color: #ddd;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 4px 8px;
+  height: 28px;
+  margin: 0;
+}
+.cm-editor .cm-panel.cm-search .cm-button {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 3px 8px;
+  min-height: 28px;
+  margin: 0;
+  font: inherit;
+}
+.cm-editor .cm-panel.cm-search .cm-button:hover {
+  background: #353535;
+}
+.cm-editor .cm-panel.cm-search label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+.cm-editor .cm-panel.cm-search input[type="checkbox"] {
+  accent-color: #a8c7e5;
+  width: 14px;
+  height: 14px;
+  min-height: 0;
+}
+.cm-editor .cm-panel.cm-search [name="close"] {
+  right: 4px;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  font-size: 16px;
+}
+
+.monaco-editor .monaco-hover .hover-row .marker,
+.monaco-editor .monaco-hover .hover-row .markdown-hover,
+.monaco-editor .monaco-hover .hover-row .actions {
+  font: 13px/1.6 var(--font-sans, "Segoe UI", sans-serif) !important;
 }
