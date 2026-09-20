@@ -22,8 +22,33 @@ export type RecoveryEntry = {
   at: number;
   reason: string;
   deleted?: boolean;
+  kind?: "file" | "folder";
+  files?: { id: string; name: string; text: string }[];
+};
+export type ProjectCatalogEntry = {
+  id: string;
+  name: string;
+  root: string;
+  lastOpenedAt: number;
+  recent: boolean;
+  unavailable?: string;
+};
+export type AppPreferences = {
+  reopenLastProject: boolean;
+  lastProjectId?: string;
+};
+export type RecoveryViewState = {
+  scope: "deleted" | "commands";
+  query: string;
+  selectedId?: string;
+  compare: "preview" | "diff";
+  scrollTop: number;
+  previewScrollTop?: number;
+  baseline?: { text: string; version?: number };
 };
 export type Project = {
+  persistenceError?: string;
+  kind?: "project" | "standalone" | "legacy";
   id: string;
   name: string;
   root?: string;
@@ -53,10 +78,22 @@ export type TabView = {
   past?: NavigationLocation[];
   future?: NavigationLocation[];
 };
-export type DocumentViewState = Pick<TabView, "mode" | "line" | "column" | "scrollTop" | "selection" | "folded" | "sourceView" | "graph">;
+export type DocumentViewState = Pick<
+  TabView,
+  | "mode"
+  | "line"
+  | "column"
+  | "scrollTop"
+  | "selection"
+  | "folded"
+  | "sourceView"
+  | "graph"
+>;
 export type NavigationLocation = DocumentViewState & { documentId: string };
 export type FileSortMode = "manual" | "name-asc" | "name-desc";
 export type WindowSession = {
+  screen?: "home" | "editor";
+  recovery?: RecoveryViewState;
   id: string;
   projectId: string;
   tabs: TabView[];
@@ -75,6 +112,8 @@ export type WindowSession = {
   zoom: number;
 };
 export type WorkspaceSnapshot = {
+  catalog?: ProjectCatalogEntry[];
+  preferences?: AppPreferences;
   projects: Project[];
   currentProjectId: string;
   notices: string[];
@@ -96,9 +135,28 @@ export type WorkspaceAction =
   | { type: "undo" | "redo"; projectId: string; documentId: string }
   | { type: "createProject"; name: string; root?: string }
   | { type: "renameProject"; projectId: string; name: string }
-  | { type: "createDocument"; projectId: string; name: string; text: string; firstInOrder?: string[] }
-  | { type: "createScene"; projectId: string; documentId: string; version: number; name: string }
-  | { type: "renameScene"; projectId: string; documentId: string; version: number; fromName: string; name: string }
+  | {
+      type: "createDocument";
+      projectId: string;
+      name: string;
+      text: string;
+      firstInOrder?: string[];
+    }
+  | {
+      type: "createScene";
+      projectId: string;
+      documentId: string;
+      version: number;
+      name: string;
+    }
+  | {
+      type: "renameScene";
+      projectId: string;
+      documentId: string;
+      version: number;
+      fromName: string;
+      name: string;
+    }
   | {
       type: "renameDocument";
       projectId: string;
@@ -127,7 +185,18 @@ export type WorkspaceAction =
     }
   | { type: "save"; projectId: string; documentId?: string }
   | { type: "saveAs"; projectId: string; documentId: string }
-  | { type: "openFolder" }
+  | { type: "openFolder"; root?: string }
+  | { type: "chooseProjectParent" }
+  | {
+      type: "catalog";
+      operation: "remove" | "removeRecent" | "rename" | "reveal";
+      id: string;
+      name?: string;
+    }
+  | { type: "preferences"; reopenLastProject: boolean }
+  | { type: "closeProject"; projectId: string }
+  | { type: "purgeTrash"; projectId: string; recoveryId?: string }
+  | { type: "migrateDraft"; projectId: string; name: string; root: string }
   | { type: "openFiles"; paths?: string[] }
   | {
       type: "resolve";
@@ -146,10 +215,18 @@ export type WorkspaceAction =
   | { type: "export"; projectId: string; documentId?: string }
   | { type: "import"; project: Project }
   | { type: "createFolder"; projectId: string; name: string }
-  | { type: "moveEntry"; projectId: string; entry: string; parent: string; name?: string; before?: string }
+  | {
+      type: "moveEntry";
+      projectId: string;
+      entry: string;
+      parent: string;
+      name?: string;
+      before?: string;
+    }
   | { type: "trashFolder"; projectId: string; name: string }
   | { type: "sortDocuments"; projectId: string; documentIds: string[] };
 export type ActionResult = {
+  path?: string;
   snapshot: WorkspaceSnapshot;
   updates?: WireUpdate[];
   projectId?: string;
@@ -165,6 +242,7 @@ export type DesktopBridge = {
   request: (action: WorkspaceAction) => Promise<ActionResult>;
   subscribe: (callback: () => void) => () => void;
   session: {
+    project: (projectId: string) => Promise<WindowSession | null>;
     load: () => Promise<WindowSession | null>;
     save: (session: WindowSession) => Promise<void>;
   };
