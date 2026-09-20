@@ -1,3 +1,4 @@
+import { moveObjects } from "./manual-routing";
 import {
   useCallback,
   useEffect,
@@ -12,7 +13,6 @@ import { buildGraphModel, stamp, type SourceAnchor } from "./model";
 import {
   cloneLayout,
   migrateLayout,
-  moveNodes,
   type GraphLayout,
   type GraphState,
   type GraphLayoutSnapshot,
@@ -295,7 +295,7 @@ export function useGraphLayout(settings: Settings) {
   const translate = useCallback(
     (positions: Record<string, Point>) => {
       if (cancelledGesture.current) return;
-      apply(moveNodes(current.current, positions));
+      apply(moveObjects(current.current, positions, latest.current.sizes));
     },
     [apply],
   );

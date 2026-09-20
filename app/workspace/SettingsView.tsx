@@ -389,7 +389,7 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.8.0：一次性圖表整理、整組分支、手動 pin 與線路、完整布局撤銷及重啟恢復。
+                    0.8.1：線上卡片可框選、整理與自由搬移；線路跟隨卡片與 pin，支援 pin 右鍵刪除。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

@@ -1,10 +1,11 @@
 import { useRef } from "react";
 import {
   BaseEdge,
-  EdgeLabelRenderer,
   ViewportPortal,
   type EdgeProps,
   type Edge,
+  type Node,
+  type NodeProps,
   useReactFlow,
 } from "@xyflow/react";
 import {
@@ -58,15 +59,6 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
   const { route, geometry, group, active, controls, muted, zoom } = data,
     item = group.items[0];
   const label = linkSummary(item);
-  const Icon = item.unresolved
-    ? AlertTriangle
-    : item.kind === "detour"
-      ? CornerUpLeft
-      : item.context?.some((p) => p.kind === "option")
-        ? CornerDownRight
-        : item.context?.length
-          ? GitBranch
-          : ArrowRight;
   function down(
     event: React.PointerEvent<SVGElement | HTMLButtonElement>,
     action: RouteAction,
@@ -217,6 +209,7 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
               <circle
                 key={pin.id}
                 data-pin-edge={id}
+                data-pin-id={pin.id}
                 className="flow-route-pin nodrag nopan"
                 cx={pin.x}
                 cy={pin.y}
@@ -237,58 +230,77 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
           </svg>
         </ViewportPortal>
       )}
-      {route.labelVisible && zoom >= 0.35 && (
-        <EdgeLabelRenderer>
-          <button
-            type="button"
-            data-route-id={id}
-            className={
-              "flow-edge-label nodrag nopan" +
-              (active ? " is-active" : "") +
-              (muted ? " is-muted" : "") +
-              (geometry.error ? " has-conflict" : "")
-            }
-            style={{
-              width: route.labelRect.width,
-              minHeight: route.labelRect.height,
-              transform:
-                "translate(-50%, -50%) translate(" +
-                route.labelPoint.x +
-                "px, " +
-                route.labelPoint.y +
-                "px)",
-            }}
-            title={
-              geometry.error ||
-              item.kind +
-                ": " +
-                (item.label || "無條件") +
-                " · 第 " +
-                item.line +
-                " 行"
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              data.open();
-            }}
-            onPointerDown={(e) => down(e, { kind: "card" })}
-            onPointerMove={move}
-            onPointerUp={end}
-            onLostPointerCapture={end}
-            onContextMenu={data.context}
-          >
-            <Icon size={14} />
-            <span className="flow-edge-text">
-              {parentSummary(item) && (
-                <small className="flow-edge-parent" title={parentSummary(item)}>
-                  {parentSummary(item)}
-                </small>
-              )}
-              <SemanticText text={label} />
-            </span>
-          </button>
-        </EdgeLabelRenderer>
-      )}
     </>
+  );
+}
+
+export type RouteCardNode = Node<
+  {
+    group: GraphTransition;
+    geometry: RouteGeometry;
+    muted: boolean;
+    select: (additive: boolean) => void;
+    context: (event: React.KeyboardEvent) => void;
+  },
+  "routeCard"
+>;
+export function RouteCard({ data, selected }: NodeProps<RouteCardNode>) {
+  const { group, geometry, muted } = data,
+    item = group.items[0];
+  const label = linkSummary(item);
+  const Icon = item.unresolved
+    ? AlertTriangle
+    : item.kind === "detour"
+      ? CornerUpLeft
+      : item.context?.some((p) => p.kind === "option")
+        ? CornerDownRight
+        : item.context?.length
+          ? GitBranch
+          : ArrowRight;
+
+  return (
+    <div
+      data-route-id={group.id}
+      role="button"
+      tabIndex={0}
+      aria-label={"轉場卡片，" + label}
+      aria-pressed={selected}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          data.select(e.shiftKey);
+        }
+        if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+          e.preventDefault();
+          e.stopPropagation();
+          data.context(e);
+        }
+      }}
+      className={
+        "flow-edge-label flow-route-card" +
+        (selected ? " is-active" : "") +
+        (muted ? " is-muted" : "") +
+        (geometry.error ? " has-conflict" : "")
+      }
+      style={{ width: geometry.card!.width, minHeight: geometry.card!.height }}
+      title={
+        geometry.error ||
+        item.kind +
+          ": " +
+          (item.label || "無條件") +
+          " · 第 " +
+          item.line +
+          " 行"
+      }
+    >
+      <Icon size={14} />
+      <span className="flow-edge-text">
+        {parentSummary(item) && (
+          <small className="flow-edge-parent">{parentSummary(item)}</small>
+        )}
+        <SemanticText text={label} />
+      </span>
+    </div>
   );
 }

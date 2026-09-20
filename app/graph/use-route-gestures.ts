@@ -1,11 +1,10 @@
 import { useCallback, useRef } from "react";
 import type { Point, GraphRect } from "../graph-layout";
-import { rectsOverlap } from "../graph-layout";
+import { previewRoutes } from "./manual-routing";
 import {
   cloneLayout,
   moveSegment,
   movePin,
-  projectCard,
   type GraphLayoutSnapshot,
 } from "./layout-state";
 import type { RouteAction } from "./RouteEditor";
@@ -32,40 +31,7 @@ export function useRouteGestures(
       const next = cloneLayout(origin),
         route = next.routes[id];
       if (!route) return;
-      if (action.kind === "card" && route.card) {
-        const wanted = { x: route.card.x + delta.x, y: route.card.y + delta.y };
-        const peers = Object.values(origin.routes)
-          .filter((r) => r.groupId === route.groupId && r.id !== id && r.card)
-          .map((r) => r.card!);
-        const candidate = projectCard(
-          route.points,
-          wanted,
-          route.card.width,
-          route.card.height,
-          peers,
-          route.card,
-        );
-        const box = {
-          id,
-          x: candidate.x - candidate.width / 2,
-          y: candidate.y - candidate.height / 2,
-          width: candidate.width,
-          height: candidate.height,
-        };
-        const blockers = [
-          ...geometry,
-          ...Object.values(origin.routes)
-            .filter((r) => r.id !== id && r.card)
-            .map((r) => ({
-              id: r.id,
-              x: r.card!.x - r.card!.width / 2,
-              y: r.card!.y - r.card!.height / 2,
-              width: r.card!.width,
-              height: r.card!.height,
-            })),
-        ];
-        if (!blockers.some((b) => rectsOverlap(box, b))) route.card = candidate;
-      } else if (action.kind === "pin") {
+      if (action.kind === "pin") {
         const pin = route.pins.find((p) => p.id === action.id);
         if (!pin) return;
         next.routes[id] = movePin(route, action.id, {
@@ -82,16 +48,15 @@ export function useRouteGestures(
           });
       }
       next.revision = layoutRef.current.revision + 1;
-      previewLayout(next);
+      previewLayout(
+        previewRoutes(next, Object.fromEntries(geometry.map((r) => [r.id, r]))),
+      );
     },
     [geometry, layoutRef, previewLayout],
   );
-  const endRoute = useCallback(
-    (action?: RouteAction) => {
-      routeDragRef.current = null;
-      commitLayout(action?.kind !== "card");
-    },
-    [commitLayout],
-  );
+  const endRoute = useCallback(() => {
+    routeDragRef.current = null;
+    commitLayout();
+  }, [commitLayout]);
   return { routeDragRef, beginRoute, editRoute, endRoute };
 }

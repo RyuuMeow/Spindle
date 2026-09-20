@@ -55,7 +55,6 @@ import { ChromeButton } from "@/components/ChromeButton";
 import {
   CARD_WIDTH,
   CARD_HEIGHT,
-  segmentHitsRect,
   type Point,
   type RoutedConnection,
 } from "./graph-layout";
@@ -66,13 +65,18 @@ import { useGraphModel, useGraphLayout } from "./graph/use-graph-layout";
 import { SemanticText, measureLabels } from "./graph/presentation";
 import { useRouteGestures } from "./graph/use-route-gestures";
 import TrunkEditor from "./graph/TrunkEditor";
-import { StoryConnection, type RouteEdge } from "./graph/RouteEditor";
+import {
+  StoryConnection,
+  RouteCard,
+  type RouteCardNode,
+  type RouteEdge,
+} from "./graph/RouteEditor";
 import {
   center,
   cloneLayout,
   pathData,
-  projectCard,
-  simplify,
+  freezeControlOrder,
+  removePin,
   type GraphState,
 } from "./graph/layout-state";
 import type {
@@ -90,6 +94,7 @@ type CardData = SceneRecord & {
   menu?: (event: React.KeyboardEvent) => void;
 };
 type SceneFlowNode = FlowNode<CardData, "scene">;
+type GraphFlowNode = SceneFlowNode | RouteCardNode;
 export type GraphProps = {
   file: string;
   allNodes: Node[];
@@ -239,7 +244,7 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
   );
 }
 
-const nodeTypes = { scene: SceneCard };
+const nodeTypes = { scene: SceneCard, routeCard: RouteCard };
 const edgeTypes = { route: StoryConnection };
 
 export default function Graph(props: GraphProps) {
@@ -272,9 +277,11 @@ function Canvas({
   onDocumentComposition,
   onRenameScene,
 }: GraphProps) {
-  const flow = useReactFlow<SceneFlowNode, RouteEdge>();
+  const flow = useReactFlow<GraphFlowNode, RouteEdge>();
   const [editing, setEditing] = useState<EditSession | null>(null);
   const canvasElement = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const leftDragStart = useRef<Point | null>(null);
   const [closeRequest, setCloseRequest] = useState(0);
   const [zoom, setZoom] = useState(graphState?.viewport?.zoom || 1);
   const [heights, setHeights] = useState<Record<string, number>>({});
@@ -301,6 +308,7 @@ function Canvas({
       x: number;
       y: number;
       edge?: string;
+      pin?: string;
     } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -687,6 +695,7 @@ function Canvas({
       routes.map((route) => {
         const group = groups.find((g) => g.id === route.id)!;
         const active =
+          nodeSelection.has(group.id) ||
           edgeSelection === group.id ||
           (!!groupSelection && group.groupId === groupSelection) ||
           (!edgeSelection &&
@@ -754,7 +763,13 @@ function Canvas({
                           Math.min(Math.max(a.y, b.y), point.y),
                         ),
                 };
+                freezeControlOrder(r);
+                Object.assign(pin, {
+                  axis: a.y === b.y ? "horizontal" : "vertical",
+                  direction: (a.y === b.y ? b.x - a.x : b.y - a.y) > 0 ? 1 : -1,
+                });
                 r.pins.push(pin);
+                freezeControlOrder(r);
                 r.points.splice(index + 1, 0, { x: pin.x, y: pin.y });
                 next.revision++;
                 setSelectedPin({ edge: group.id, pin: pin.id });
@@ -788,6 +803,43 @@ function Canvas({
       endRoute,
     ],
   );
+  const cardNodes: RouteCardNode[] = routes
+    .filter((r) => r.labelVisible && zoom >= 0.35)
+    .map((r) => ({
+      id: r.id,
+      type: "routeCard",
+      position: { x: r.labelRect.x, y: r.labelRect.y },
+      width: r.labelRect.width,
+      height: r.labelRect.height,
+      measured: { width: r.labelRect.width, height: r.labelRect.height },
+      selected: nodeSelection.has(r.id),
+      zIndex: 50,
+      draggable: !editing,
+      data: {
+        group: groups.find((g) => g.id === r.id)!,
+        geometry: layout.layout.routes[r.id],
+        muted: false,
+        select: (additive) => {
+          setNodeSelection((prior) => {
+            const next = additive ? new Set(prior) : new Set<string>();
+            if (additive && next.has(r.id)) next.delete(r.id);
+            else next.add(r.id);
+            return next;
+          });
+          setEdgeSelection(r.id);
+          setSelectedPin(null);
+          setGroupSelection("");
+        },
+        context: (event) => {
+          const b = event.currentTarget.getBoundingClientRect();
+          if (!nodeSelection.has(r.id)) setNodeSelection(new Set([r.id]));
+          setCanvasMenu({ x: b.left, y: b.bottom, edge: r.id });
+        },
+      },
+    }));
+  const selectionLabel = nodeSelection.size
+    ? "整理選取的 " + nodeSelection.size + " 個物件"
+    : "整理全部";
   const save = persistLayout;
   const fitAll = useCallback(
     (duration = 200) => {
@@ -917,7 +969,15 @@ function Canvas({
     if (editing) return;
     layout.request(
       nodeSelection.size
-        ? { kind: "selected", ids: [...nodeSelection] }
+        ? {
+            kind: "selected",
+            ids: [...nodeSelection].filter(
+              (id) => !!layout.layout.positions[id],
+            ),
+            cards: [...nodeSelection].filter(
+              (id) => !!layout.layout.routes[id]?.card,
+            ),
+          }
         : { kind: "all" },
       true,
     );
@@ -935,6 +995,7 @@ function Canvas({
     moved: boolean;
     node?: Node;
     edge?: string;
+    pin?: string;
   } | null>(null);
   function routeAction(action: "simplify" | "reset") {
     if (!canvasMenu?.edge) return;
@@ -944,64 +1005,54 @@ function Canvas({
       if (!r) return next;
       if (action === "reset") delete next.routes[id];
       else {
-        const a = r.points[0],
-          b = r.points.at(-1)!;
-        const blockers = [
-          ...geometry.filter(
-            (box) => box.id !== r.source && box.id !== r.target,
-          ),
-          ...Object.values(next.routes)
-            .filter((other) => other.id !== id && other.card)
-            .map((other) => ({
-              id: other.id,
-              x: other.card!.x - other.card!.width / 2,
-              y: other.card!.y - other.card!.height / 2,
-              width: other.card!.width,
-              height: other.card!.height,
-            })),
-        ];
-        const straight =
-          (a.x === b.x || a.y === b.y) &&
-          !blockers.some((box) => segmentHitsRect(a, b, box)) &&
-          r.pins.every((p) =>
-            a.x === b.x
-              ? p.x === a.x &&
-                p.y >= Math.min(a.y, b.y) &&
-                p.y <= Math.max(a.y, b.y)
-              : p.y === a.y &&
-                p.x >= Math.min(a.x, b.x) &&
-                p.x <= Math.max(a.x, b.x),
-          );
-        r.points = straight
-          ? simplify(
-              [
-                a,
-                ...r.pins
-                  .slice()
-                  .sort(
-                    (p, q) =>
-                      Math.hypot(p.x - a.x, p.y - a.y) -
-                      Math.hypot(q.x - a.x, q.y - a.y),
-                  ),
-                b,
-              ],
-              r.pins,
-            )
-          : simplify(r.points, r.pins);
+        freezeControlOrder(r);
         r.fixedSegments = [];
-        if (r.card)
-          r.card = projectCard(r.points, r.card, r.card.width, r.card.height);
+        r.controlOrder = r.controlOrder!.filter(
+          (k) => !k.startsWith("segment:"),
+        );
+        r.reroute = true;
       }
       next.revision++;
       return next;
     });
   }
+  function deletePin(edge: string, pin: string) {
+    layout.transaction((next) => {
+      if (next.routes[edge])
+        next.routes[edge] = removePin(next.routes[edge], pin);
+      next.revision++;
+      return next;
+    });
+    setSelectedPin(null);
+  }
   return (
     <div
-      className="story-canvas"
+      className={"story-canvas" + (dragging ? " is-dragging" : "")}
       ref={canvasElement}
       tabIndex={-1}
       onPointerDownCapture={(event) => {
+        const hit = event.target as Element;
+        if (
+          event.button === 0 &&
+          (hit.classList.contains("react-flow__pane") ||
+            hit.closest(".react-flow__node")) &&
+          !hit.closest(".flow-route-pin,.flow-route-hit,.flow-trunk-hit") &&
+          !hit.closest("input,textarea,[contenteditable=true]")
+        ) {
+          setSelectedPin(null);
+          setGroupSelection("");
+          setEdgeSelection("");
+        }
+        leftDragStart.current =
+          event.button === 0 &&
+          !!hit.closest(
+            ".react-flow__node,.flow-route-pin,.flow-route-hit,.flow-trunk-hit",
+          ) &&
+          !hit.closest(
+            "input,textarea,[contenteditable=true],.flow-scene-editor",
+          )
+            ? { x: event.clientX, y: event.clientY }
+            : null;
         if (event.button === 0)
           boxSelectionBase.current =
             event.shiftKey &&
@@ -1018,9 +1069,12 @@ function Canvas({
         const target = event.target as Element;
         const id = target.closest(".react-flow__node")?.getAttribute("data-id");
         const edge =
+          target.closest("[data-pin-edge]")?.getAttribute("data-pin-edge") ||
           target.closest("[data-route-id]")?.getAttribute("data-route-id") ||
           target.closest(".react-flow__edge")?.getAttribute("data-id") ||
           undefined;
+        if (id && layout.layout.routes[id]?.card && !nodeSelection.has(id))
+          setNodeSelection(new Set([id]));
         rightDrag.current = {
           x: event.clientX,
           y: event.clientY,
@@ -1028,18 +1082,29 @@ function Canvas({
           moved: false,
           node: records.find((r) => r.id === id)?.node,
           edge,
+          pin:
+            target.closest("[data-pin-id]")?.getAttribute("data-pin-id") ||
+            undefined,
         };
         event.currentTarget.setPointerCapture(event.pointerId);
         event.preventDefault();
         event.stopPropagation();
       }}
       onPointerMoveCapture={(event) => {
+        const left = leftDragStart.current;
+        if (
+          left &&
+          event.buttons === 1 &&
+          Math.hypot(event.clientX - left.x, event.clientY - left.y) > 3
+        )
+          setDragging(true);
         const right = rightDrag.current;
         if (!right) return;
         const dx = event.clientX - right.x,
           dy = event.clientY - right.y;
         if (!right.moved && Math.hypot(dx, dy) <= 5) return;
         right.moved = true;
+        setDragging(true);
         setCanvasMenu(null);
         void flow.setViewport({
           ...right.viewport,
@@ -1049,6 +1114,8 @@ function Canvas({
         event.stopPropagation();
       }}
       onPointerUpCapture={(event) => {
+        setDragging(false);
+        leftDragStart.current = null;
         const right = rightDrag.current;
         if (!right) return;
         rightDrag.current = null;
@@ -1063,7 +1130,15 @@ function Canvas({
             x: event.clientX,
             y: event.clientY,
             edge: right.edge,
+            pin: right.pin,
           });
+      }}
+      onPointerCancel={() => {
+        setDragging(false);
+        leftDragStart.current = null;
+        rightDrag.current = null;
+        routeDragRef.current = null;
+        layout.cancel();
       }}
       onContextMenuCapture={(event) => {
         if (
@@ -1083,6 +1158,8 @@ function Canvas({
         )
           return;
         if (e.key === "Escape") {
+          setDragging(false);
+          leftDragStart.current = null;
           routeDragRef.current = null;
           if (layout.cancel()) {
             e.preventDefault();
@@ -1094,16 +1171,7 @@ function Canvas({
         if ((e.key === "Delete" || e.key === "Backspace") && selectedPin) {
           e.preventDefault();
           e.stopPropagation();
-          layout.transaction((next) => {
-            const r = next.routes[selectedPin.edge];
-            if (r) {
-              r.pins = r.pins.filter((p) => p.id !== selectedPin.pin);
-              r.points = simplify(r.points, r.pins);
-              next.revision++;
-            }
-            return next;
-          });
-          setSelectedPin(null);
+          deletePin(selectedPin.edge, selectedPin.pin);
           return;
         }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
@@ -1231,8 +1299,8 @@ function Canvas({
         </div>
       )}
       {nodes.length ? (
-        <ReactFlow<SceneFlowNode, RouteEdge>
-          nodes={nodes}
+        <ReactFlow<GraphFlowNode, RouteEdge>
+          nodes={[...nodes, ...cardNodes]}
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -1242,7 +1310,8 @@ function Canvas({
           selectionKeyCode={null}
           multiSelectionKeyCode="Shift"
           panActivationKeyCode={null}
-          nodeDragThreshold={5}
+          nodeDragThreshold={0}
+          nodeClickDistance={5}
           nodesFocusable={false}
           nodesConnectable={false}
           edgesFocusable={false}
@@ -1273,11 +1342,22 @@ function Canvas({
               });
             const measured: Record<string, number> = {};
             for (const change of changes) {
-              if (change.type === "position" && change.position)
-                moved[change.id] = change.position;
+              if (change.type === "position" && change.position) {
+                const c = layout.current.current.routes[change.id]?.card;
+                const old =
+                  layout.current.current.positions[change.id] ||
+                  (c && { x: c.x - c.width / 2, y: c.y - c.height / 2 });
+                if (
+                  !old ||
+                  old.x !== change.position.x ||
+                  old.y !== change.position.y
+                )
+                  moved[change.id] = change.position;
+              }
               if (
                 change.type === "dimensions" &&
                 change.dimensions &&
+                records.some((r) => r.id === change.id) &&
                 heights[change.id] !== change.dimensions.height
               )
                 measured[change.id] = change.dimensions.height;
@@ -1298,6 +1378,13 @@ function Canvas({
             if (Object.keys(moved).length) layout.translate(moved);
           }}
           onNodeClick={(_, node) => {
+            if (node.type === "routeCard") {
+              setEdgeSelection(node.id);
+              setGroupSelection("");
+              setSelectedPin(null);
+              onSelect(null);
+              return;
+            }
             setGroupSelection("");
             setSelectedPin(null);
             setEdgeSelection("");
@@ -1635,7 +1722,7 @@ function Canvas({
               editing
                 ? "結束節點編輯後可整理"
                 : nodeSelection.size
-                  ? "整理選取的 " + nodeSelection.size + " 個節點"
+                  ? selectionLabel
                   : "整理全部"
             }
             aria-label="自動整理"
@@ -1694,44 +1781,60 @@ function Canvas({
           canvasMenu
             ? {
                 ...canvasMenu,
-                actions: canvasMenu.edge
-                  ? [
-                      { label: "簡化線路", run: () => routeAction("simplify") },
-                      {
-                        label: "恢復自動線路",
-                        run: () => routeAction("reset"),
-                      },
-                      {
-                        label: "查看來源",
-                        run: () => {
-                          const g = groups.find(
-                            (g) => g.id === canvasMenu.edge,
-                          );
-                          if (g) goToLink(g.items[0]);
+                actions:
+                  canvasMenu.pin && canvasMenu.edge
+                    ? [
+                        {
+                          label: "刪除 pin",
+                          run: () =>
+                            deletePin(canvasMenu.edge!, canvasMenu.pin!),
                         },
-                      },
-                    ]
-                  : [
-                      { label: "建立場景", run: onCreate },
-                      { label: "適應全部", run: () => fitAll() },
-                      { label: "回到 100%", run: () => void flow.zoomTo(1) },
-                      {
-                        label: nodeSelection.size
-                          ? "整理選取的 " + nodeSelection.size + " 個節點"
-                          : "整理全部",
-                        run: arrange,
-                      },
-                      {
-                        label: "復原布局",
-                        disabled: !previousLayout,
-                        run: undoLayout,
-                      },
-                      {
-                        label: "重做布局",
-                        disabled: !canRedo,
-                        run: redoLayout,
-                      },
-                    ],
+                      ]
+                    : canvasMenu.edge
+                      ? [
+                          { label: selectionLabel, run: arrange },
+                          {
+                            label: "簡化線路",
+                            run: () => routeAction("simplify"),
+                          },
+                          {
+                            label: "恢復自動線路",
+                            run: () => routeAction("reset"),
+                          },
+                          {
+                            label: "查看來源",
+                            run: () => {
+                              const g = groups.find(
+                                (g) => g.id === canvasMenu.edge,
+                              );
+                              if (g) goToLink(g.items[0]);
+                            },
+                          },
+                        ]
+                      : [
+                          { label: "建立場景", run: onCreate },
+                          { label: "適應全部", run: () => fitAll() },
+                          {
+                            label: "回到 100%",
+                            run: () => void flow.zoomTo(1),
+                          },
+                          {
+                            label: nodeSelection.size
+                              ? selectionLabel
+                              : "整理全部",
+                            run: arrange,
+                          },
+                          {
+                            label: "復原布局",
+                            disabled: !previousLayout,
+                            run: undoLayout,
+                          },
+                          {
+                            label: "重做布局",
+                            disabled: !canRedo,
+                            run: redoLayout,
+                          },
+                        ],
               }
             : null
         }

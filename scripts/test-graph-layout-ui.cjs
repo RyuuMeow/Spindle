@@ -194,6 +194,12 @@ const result = { errors: [], console: [], requests: [] };
     await page.mouse.move(600, 210);
     await page.mouse.down({ button: "right" });
     await page.mouse.move(660, 245, { steps: 8 });
+    assert.equal(
+      await page
+        .locator(".story-canvas")
+        .evaluate((e) => getComputedStyle(e).cursor),
+      "grabbing",
+    );
     await page.mouse.up({ button: "right" });
     await settle();
     assert.equal(
@@ -274,6 +280,12 @@ const result = { errors: [], console: [], requests: [] };
     await page.mouse.move(pinScreen.x, pinScreen.y);
     await page.mouse.down();
     await page.mouse.move(pinScreen.x + 20, pinScreen.y + 22, { steps: 6 });
+    assert.equal(
+      await page
+        .locator(".story-canvas")
+        .evaluate((e) => getComputedStyle(e).cursor),
+      "grabbing",
+    );
     await page.mouse.up();
     await page.waitForTimeout(700);
     const movedPin = (await state()).layout.routes[direct.id].pins[0];
@@ -294,24 +306,40 @@ const result = { errors: [], console: [], requests: [] };
       beforeCancel.layout.routes[direct.id].pins,
     );
     result.cancel = true;
-    // Card drag follows the existing route; it cannot trigger a reroute.
+    // Card follows the pointer freely; the route follows its new checkpoint.
     const label = page.locator(".flow-edge-label").first(),
       labelId = await label.getAttribute("data-route-id");
     const beforeCard = await state(),
       lb = await label.boundingBox();
     await page.mouse.move(lb.x + lb.width / 2, lb.y + lb.height / 2);
     await page.mouse.down();
-    await page.mouse.move(lb.x + lb.width / 2 + 18, lb.y + lb.height / 2 + 5, {
+    await page.mouse.move(lb.x + lb.width / 2 + 18, lb.y + lb.height / 2 - 75, {
       steps: 6,
     });
     await page.mouse.up();
     await settle();
     const afterCard = await state();
     assert.equal(afterCard.layout.routes[labelId].card.manual, true);
-    assert.deepEqual(
+    assert.notDeepEqual(
       afterCard.layout.routes[labelId].points,
       beforeCard.layout.routes[labelId].points,
     );
+    result.cardDrag = {
+      before: beforeCard.layout.routes[labelId].card,
+      after: afterCard.layout.routes[labelId].card,
+      viewportBefore: beforeCard.viewport,
+      viewportAfter: afterCard.viewport,
+      lb,
+    };
+    assert.ok(
+      Math.abs(
+        afterCard.layout.routes[labelId].card.y -
+          beforeCard.layout.routes[labelId].card.y +
+          75 / beforeCard.viewport.zoom,
+      ) < 2,
+      JSON.stringify(result.cardDrag),
+    );
+    assertRouteGeometry(afterCard);
     result.card = true;
     // Shared trunk drag is a single grouped edit.
     const trunk = Object.values(afterCard.layout.trunks)[0],
@@ -362,6 +390,54 @@ const result = { errors: [], console: [], requests: [] };
       deleteBefore.layout.routes[direct.id].pins,
     );
     result.deletePinUndo = true;
+    await directControl.focus();
+    await directControl.press("Enter");
+    await settle();
+    await page
+      .locator('[data-pin-edge="' + direct.id + '"]')
+      .click({ button: "right" });
+    await page.getByRole("menuitem", { name: "刪除 pin", exact: true }).click();
+    await settle();
+    assert.equal((await state()).layout.routes[direct.id].pins.length, 0);
+    await page.getByRole("button", { name: "復原布局", exact: true }).click();
+    await settle();
+    result.pinContextDelete = true;
+    // Card-only selection and arrange; no scene should move.
+    await page.mouse.click(600, 200);
+    const firstCards = page.locator(".react-flow__node-routeCard");
+    await firstCards.nth(0).click();
+    await page.keyboard.down("Shift");
+    await firstCards.nth(1).click();
+    await page.keyboard.up("Shift");
+    assert.equal(
+      await page.locator(".react-flow__node-routeCard.selected").count(),
+      2,
+    );
+    const beforeCardsArrange = await state();
+    await page.getByRole("button", { name: "自動整理", exact: true }).click();
+    await page.waitForTimeout(800);
+    assert.deepEqual(
+      (await state()).layout.positions,
+      beforeCardsArrange.layout.positions,
+    );
+    assertRouteGeometry(await state());
+    await page.getByRole("button", { name: "復原布局", exact: true }).click();
+    await settle();
+    assert.deepEqual(geometry(await state()), geometry(beforeCardsArrange));
+    result.cardSelectionArrange = true;
+    const keyboardCard = firstCards.nth(0).locator(".flow-route-card");
+    await keyboardCard.focus();
+    await keyboardCard.press("Enter");
+    assert.equal(
+      await page.locator(".react-flow__node-routeCard.selected").count(),
+      1,
+    );
+    await keyboardCard.press("Shift+F10");
+    await page
+      .getByRole("menuitem", { name: "簡化線路", exact: true })
+      .waitFor();
+    await page.keyboard.press("Escape");
+    result.cardKeyboard = true;
     const beforeSwitch = await state();
     await page.getByRole("radio", { name: "純文字", exact: true }).click();
     await settle();
@@ -521,6 +597,51 @@ const result = { errors: [], console: [], requests: [] };
       (await state()).layout.positions,
       beforeGroup.layout.positions,
     );
+    // A line card is box-selectable and moves with a scene in the same selection.
+    await page.mouse.click(500, 150);
+    const freeCard = page.locator(
+      '.react-flow__node-routeCard[data-id="' + labelId + '"]',
+    );
+    const cb = await freeCard.boundingBox();
+    await page.mouse.move(cb.x - 7, cb.y - 7);
+    await page.mouse.down();
+    await page.mouse.move(cb.x + cb.width + 7, cb.y + cb.height + 7, {
+      steps: 10,
+    });
+    await page.mouse.up();
+    await settle();
+    assert.equal(await page.locator(".react-flow__node.selected").count(), 1);
+    assert.equal(
+      await page.locator(".react-flow__node-routeCard.selected").count(),
+      1,
+    );
+    await boxSelect("Start", true);
+    assert.equal(await page.locator(".react-flow__node.selected").count(), 2);
+    const mixedBefore = await state(),
+      startId = await byName("Start").getAttribute("data-id");
+    const mb = await freeCard.boundingBox();
+    await page.mouse.move(mb.x + mb.width / 2, mb.y + mb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(mb.x + mb.width / 2 + 16, mb.y + mb.height / 2 - 20, {
+      steps: 8,
+    });
+    await page.mouse.up();
+    await settle();
+    const mixedAfter = await state();
+    for (const axis of ["x", "y"])
+      assert.ok(
+        Math.abs(
+          mixedAfter.layout.positions[startId][axis] -
+            mixedBefore.layout.positions[startId][axis] -
+            (mixedAfter.layout.routes[labelId].card[axis] -
+              mixedBefore.layout.routes[labelId].card[axis]),
+        ) < 0.01,
+      );
+    assertRouteGeometry(mixedAfter);
+    await page.getByRole("button", { name: "復原布局", exact: true }).click();
+    await settle();
+    assert.deepEqual(geometry(await state()), geometry(mixedBefore));
+    result.cardBoxAndMixedMove = true;
     // Fixed segment edit is local and reversible.
     const segmentBefore = await state(),
       manualRoute = segmentBefore.layout.routes[direct.id];

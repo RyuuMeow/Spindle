@@ -791,3 +791,23 @@
 .story-canvas .react-flow__edgelabel-renderer {
   z-index: 50;
 }
+
+/* Route cards participate in React Flow selection/dragging like scene nodes. */
+.story-canvas .flow-route-card {
+  position: relative;
+  inset: auto;
+}
+.story-canvas .react-flow__node-routeCard.selected .flow-route-card {
+  outline: 1px solid #9cb8ce;
+  outline-offset: 1px;
+}
+.story-canvas .react-flow__node-routeCard {
+  cursor: grab;
+}
+.story-canvas .flow-route-pin {
+  cursor: grab;
+}
+.story-canvas.is-dragging,
+.story-canvas.is-dragging * {
+  cursor: grabbing !important;
+}

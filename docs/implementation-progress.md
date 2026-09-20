@@ -1,6 +1,15 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.8.0**，2026-09-20。圖表改造、網頁／桌面打包及實際 Portable 驗收完成。
+版本：Windows x64 **0.8.1**，2026-09-20。
+
+## 0.8.1 自由卡片與控制點
+
+- 線上卡片參與完整包含框選、Shift 加選、混合場景搬移與選取範圍整理；卡片單獨整理保持場景及未選卡片原位。
+- 卡片／pin 位置決定路徑；控制點順序持久保存，拖動不保留多餘自動折線，保留明確手動線段。pin 右鍵刪除與 Delete 共用一筆可撤銷交易，拖曳顯示抓手游標。
+- [桌面互動](../outputs/free-route-ui/result.json)通過自由拖曳、pin 右鍵刪除、卡片框選／整理、場景與卡片混合搬移、完整撤銷、離線 Worker／WASM、切換模式與重啟恢復。
+- [單元／服務測試](../outputs/free-route-unit.log) **128／128** 通過；TypeScript 與 [18 檔變更範圍 lint](../outputs/free-route-lint.json)通過。全 repo lint 的既有異常目錄／基線問題延續 0.8.0 限制。
+- 網頁／桌面 build 與 Setup／Portable 打包通過。[0.8.1 實際 Portable 驗收](../outputs/free-route-portable-0.8.1/result.json)完成卡片鍵盤／框選／混合搬移、自由路由、pin 右鍵刪除、離線 Worker／WASM 與重啟恢復，沒有頁面錯誤。
+- [封裝與 SHA256](../outputs/free-route-archive.json)、[發行驗收摘要](../outputs/free-route-release-verification.json)。安裝精靈、混合 DPI、多螢幕未實測；不宣稱任意手動限制都能得到無交叉路線。
 
 ## 0.8.0 圖表排版與手動佈線
 
