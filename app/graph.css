@@ -138,20 +138,10 @@
   border-color: #8e846e;
   background: #2b2a25;
 }
-.flow-card.is-overview .flow-card-title {
-  font-size: var(--overview-title-size, 16px);
-  display: block;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
 .flow-card.is-overview .flow-card-summary,
 .flow-card.is-overview .flow-card-file {
-  display: none;
-}
-.flow-card.is-distant .flow-card-title {
-  display: block;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  /* Detail may fade at small zoom; measured ports and routes must stay fixed. */
+  visibility: hidden;
 }
 .flow-edge-label {
   box-sizing: border-box;
@@ -681,4 +671,123 @@
   min-height: 26px !important;
   padding: 3px 6px !important;
   font-size: 12px;
+}
+
+/* Persistent graph editing: controls appear only for the selected object. */
+.story-canvas:focus {
+  outline: none;
+}
+.story-canvas .react-flow__handle {
+  width: 6px;
+  height: 6px;
+  opacity: 0.65;
+  border: 1px solid #858b90;
+  background: #292c2e;
+  pointer-events: none;
+}
+.story-canvas .react-flow__handle-top,
+.story-canvas .react-flow__handle-bottom {
+  opacity: 0;
+}
+.story-canvas .react-flow__node.selected .react-flow__handle {
+  opacity: 1;
+}
+.story-canvas .react-flow__selection {
+  background: rgba(147, 175, 199, 0.1);
+  border: 1px solid #8ca9bf;
+}
+.story-canvas .flow-edge-label {
+  max-height: none;
+  height: auto;
+  padding: 7px 10px;
+  box-sizing: border-box;
+  align-items: flex-start;
+  cursor: grab;
+}
+.story-canvas .flow-edge-label:active {
+  cursor: grabbing;
+}
+.story-canvas .flow-edge-label svg {
+  margin-top: 2px;
+  flex: 0 0 14px;
+}
+.story-canvas .flow-edge-text {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: unset;
+  line-height: 18px;
+  max-height: none;
+}
+.flow-route-hit {
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+  fill: none;
+}
+.flow-route-hit.is-editable:hover {
+  stroke: rgba(176, 203, 225, 0.14);
+}
+.flow-route-pin {
+  fill: #252b30;
+  stroke: #b6cfe0;
+  stroke-width: 1.5;
+  cursor: move;
+}
+.flow-route-pin:focus {
+  fill: #d6e3ed;
+  outline: none;
+}
+.flow-trunk-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  pointer-events: stroke;
+  cursor: ew-resize;
+}
+.flow-trunk-hit:hover {
+  stroke: rgba(176, 203, 225, 0.14);
+}
+.flow-edge-label.has-conflict {
+  border-color: #ad7845;
+}
+.flow-layout-error {
+  position: absolute;
+  bottom: 66px;
+  left: 24px;
+  max-width: min(620px, 80%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #6b543d;
+  border-radius: 6px;
+  background: #302b25;
+  color: #dfc3a3;
+  font-size: 12px;
+  z-index: 120;
+}
+.flow-layout-error button {
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+.story-canvas .flow-route-pin {
+  pointer-events: all;
+}
+
+.flow-edge-parent {
+  display: block;
+  font-size: 10px;
+  line-height: 16px;
+  color: #92999f;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+/* Labels sit above routed strokes; pin controls use the next interaction layer. */
+.story-canvas .react-flow__edgelabel-renderer {
+  z-index: 50;
 }

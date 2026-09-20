@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import ActionMenu from "./workspace/ActionMenu";
@@ -21,14 +20,11 @@ import {
   Handle,
   Position,
   useReactFlow,
-  BaseEdge,
-  EdgeLabelRenderer,
   MarkerType,
+  SelectionMode,
   getViewportForBounds,
   type Node as FlowNode,
-  type Edge,
   type NodeProps,
-  type EdgeProps,
   type Viewport,
 } from "@xyflow/react";
 import {
@@ -48,7 +44,6 @@ import {
   GitBranch,
   Info,
   ArrowRight,
-  CornerDownRight,
   CornerUpLeft,
   ChevronLeft,
   ChevronRight,
@@ -60,35 +55,32 @@ import { ChromeButton } from "@/components/ChromeButton";
 import {
   CARD_WIDTH,
   CARD_HEIGHT,
-  layoutGraph,
-  createConnectionRouter,
+  segmentHitsRect,
   type Point,
   type RoutedConnection,
 } from "./graph-layout";
 import "@xyflow/react/dist/style.css";
 import "./graph.css";
 
-type GraphLayout = { positions?: Record<string, Point>; viewport?: Viewport };
-export type GraphState = GraphLayout & {
-  undo?: GraphLayout[];
-  redo?: GraphLayout[];
-  detailsOpen?: boolean;
-};
-type RecordKind = "scene" | "external" | "missing" | "dynamic";
-type SceneRecord = {
-  id: string;
-  node?: Node;
-  name: string;
-  kind: RecordKind;
-  reference?: Link;
-};
-type ConnectionGroup = {
-  id: string;
-  source: string;
-  target: string;
-  items: Link[];
-  label: boolean;
-};
+import { useGraphModel, useGraphLayout } from "./graph/use-graph-layout";
+import { SemanticText, measureLabels } from "./graph/presentation";
+import { useRouteGestures } from "./graph/use-route-gestures";
+import TrunkEditor from "./graph/TrunkEditor";
+import { StoryConnection, type RouteEdge } from "./graph/RouteEditor";
+import {
+  center,
+  cloneLayout,
+  pathData,
+  projectCard,
+  simplify,
+  type GraphState,
+} from "./graph/layout-state";
+import type {
+  GraphScene as SceneRecord,
+  GraphTransition as ConnectionGroup,
+} from "./graph/model";
+export type { GraphState } from "./graph/layout-state";
+type RecordKind = SceneRecord["kind"];
 type CardData = SceneRecord & {
   editor?: ReactNode;
   warning: boolean;
@@ -98,15 +90,6 @@ type CardData = SceneRecord & {
   menu?: (event: React.KeyboardEvent) => void;
 };
 type SceneFlowNode = FlowNode<CardData, "scene">;
-type RouteData = {
-  route: RoutedConnection;
-  group: ConnectionGroup;
-  active: boolean;
-  muted: boolean;
-  zoom: number;
-  open: () => void;
-};
-type RouteEdge = Edge<RouteData, "route">;
 export type GraphProps = {
   file: string;
   allNodes: Node[];
@@ -160,13 +143,9 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
       : data.kind === "external"
         ? "在節點內編輯"
         : "查看引用";
-  const overviewStyle = {
-    "--overview-title-size": `${Math.max(14, 11 / Math.max(data.zoom, 0.35))}px`,
-  } as CSSProperties;
   return (
     <div
       className={`flow-card flow-card--${data.kind}${selected ? " is-selected" : ""}${data.editor ? " is-editing" : data.compact ? " is-overview" : ""}${!data.editor && data.zoom < 0.35 ? " is-distant" : ""}`}
-      style={overviewStyle}
       tabIndex={data.editor ? -1 : 0}
       role={data.editor ? undefined : "button"}
       aria-label={`${data.name}，${kindLabel[data.kind]}。按 Enter ${action}`}
@@ -260,144 +239,6 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
   );
 }
 
-function SemanticText({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(/("(?:\\.|[^"\\])*"|\$[A-Za-z_]\w*)/g).map((part, index) =>
-        /^\$[A-Za-z_]\w*$/.test(part) ? (
-          <span className="flow-variable" key={index}>
-            {part.slice(1)}
-          </span>
-        ) : (
-          <Fragment key={index}>{part}</Fragment>
-        ),
-      )}
-    </>
-  );
-}
-
-function linkSummary(link: Link) {
-  if (link.unresolved) return "條件尚未解析完整";
-  const context = link.context || [];
-  const option = context.findLast((item) => item.kind === "option");
-  const branch = context.at(-1);
-  const base =
-    option?.text ||
-    (branch
-      ? branch.kind === "else"
-        ? "否則"
-        : branch.kind === "elseif"
-          ? `否則若 ${branch.text}`
-          : contextLabel(branch)
-      : link.label ||
-        (link.dynamic
-          ? "動態目標"
-          : link.kind === "detour"
-            ? "呼叫後返回"
-            : "直接轉場"));
-  return context.length > 1 ? `${base} · ${context.length} 項前提` : base;
-}
-
-function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
-  if (!data) return null;
-  const { route, group, active, muted, zoom } = data;
-  const multiple = group.items.length > 1,
-    item = group.items[0];
-  const label = multiple ? `${group.items.length} 個分支` : linkSummary(item);
-  const showLabel = route.labelVisible && zoom >= 0.65;
-  const Icon = group.items.some((link) => link.unresolved)
-    ? AlertTriangle
-    : item.kind === "detour"
-      ? CornerUpLeft
-      : item.context?.some((part) => part.kind === "option")
-        ? CornerDownRight
-        : item.context?.length
-          ? GitBranch
-          : ArrowRight;
-  return (
-    <>
-      <g
-        tabIndex={0}
-        role="button"
-        className="flow-edge-focus"
-        aria-label={`${group.items[0].kind === "detour" ? "呼叫後返回" : "轉場"}，${label}。按 Enter 選取連線；詳情由圖表詳情按鈕開啟`}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            event.stopPropagation();
-            data.open();
-          }
-        }}
-      >
-        <BaseEdge
-          id={id}
-          path={route.path}
-          markerEnd={markerEnd}
-          interactionWidth={22}
-          style={{
-            stroke: active ? "#d4dfeb" : muted ? "#555555" : "#999999",
-            strokeWidth: active ? 2.4 : 1.6,
-            strokeDasharray: item.dynamic
-              ? "6 5"
-              : item.kind === "detour"
-                ? "3 4"
-                : undefined,
-          }}
-        />
-      </g>
-      {showLabel && route.labelAnchor && (
-        <line
-          x1={route.labelAnchor.x}
-          y1={route.labelAnchor.y}
-          x2={Math.max(
-            route.labelRect.x,
-            Math.min(
-              route.labelRect.x + route.labelRect.width,
-              route.labelAnchor.x,
-            ),
-          )}
-          y2={Math.max(
-            route.labelRect.y,
-            Math.min(
-              route.labelRect.y + route.labelRect.height,
-              route.labelAnchor.y,
-            ),
-          )}
-          stroke={active ? "#d4dfeb" : "#777"}
-          strokeWidth={1}
-          pointerEvents="none"
-        />
-      )}
-      {showLabel && (
-        <EdgeLabelRenderer>
-          <button
-            type="button"
-            className={`flow-edge-label nodrag nopan${active ? " is-active" : ""}${muted ? " is-muted" : ""}`}
-            style={{
-              width: route.labelRect.width,
-              transform: `translate(-50%, -50%) translate(${route.labelPoint.x}px, ${route.labelPoint.y}px)`,
-            }}
-            title={group.items
-              .map(
-                (link) =>
-                  `${link.kind}: ${link.label || "無條件"} · 第 ${link.line} 行`,
-              )
-              .join("\n")}
-            onClick={(event) => {
-              event.stopPropagation();
-              data.open();
-            }}
-          >
-            <Icon size={14} />
-            <span className="flow-edge-text">
-              <SemanticText text={label} />
-            </span>
-          </button>
-        </EdgeLabelRenderer>
-      )}
-    </>
-  );
-}
 const nodeTypes = { scene: SceneCard };
 const edgeTypes = { route: StoryConnection };
 
@@ -434,9 +275,6 @@ function Canvas({
   const flow = useReactFlow<SceneFlowNode, RouteEdge>();
   const [editing, setEditing] = useState<EditSession | null>(null);
   const canvasElement = useRef<HTMLDivElement>(null);
-  const [positions, setPositions] = useState<Record<string, Point>>(
-    () => graphState?.positions || {},
-  );
   const [closeRequest, setCloseRequest] = useState(0);
   const [zoom, setZoom] = useState(graphState?.viewport?.zoom || 1);
   const [heights, setHeights] = useState<Record<string, number>>({});
@@ -451,17 +289,19 @@ function Canvas({
   );
   const [targetSelection, setTargetSelection] = useState(""),
     [edgeSelection, setEdgeSelection] = useState("");
-  const [previousLayout, setPreviousLayout] = useState<GraphLayout | null>(
-    graphState?.undo?.at(-1) || null,
-  );
-  const [canRedo, setCanRedo] = useState(!!graphState?.redo?.length);
-  const undoStack = useRef<GraphLayout[]>(graphState?.undo || []),
-    redoStack = useRef<GraphLayout[]>(graphState?.redo || []),
-    dragOrigin = useRef<GraphState | null>(null);
+  const [nodeSelection, setNodeSelection] = useState<Set<string>>(new Set());
+  const boxSelectionBase = useRef<Set<string> | null>(null);
+  const [selectedPin, setSelectedPin] = useState<{
+    edge: string;
+    pin: string;
+  } | null>(null);
+  const [groupSelection, setGroupSelection] = useState("");
   const [search, setSearch] = useState(""),
-    [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number } | null>(
-      null,
-    );
+    [canvasMenu, setCanvasMenu] = useState<{
+      x: number;
+      y: number;
+      edge?: string;
+    } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showDetails, setShowDetails] = useState(
@@ -484,49 +324,13 @@ function Canvas({
     () => links.filter((link) => own.some((node) => node.id === link.source)),
     [links, own],
   );
-  const currentGraph = useMemo(() => {
-    const records: SceneRecord[] = own.map((node) => ({
-      id: node.id,
-      node,
-      name: node.name,
-      kind: "scene",
-    }));
-    const groups: ConnectionGroup[] = [];
-    for (const link of out) {
-      const node = link.dynamic
-        ? undefined
-        : allNodes.find((node) => node.name === link.target);
-      const id = link.dynamic
-        ? `dynamic:${link.source}:${link.target}`
-        : node?.id || `missing:${link.target}`;
-      if (!records.some((record) => record.id === id))
-        records.push({
-          id,
-          node,
-          name: link.target,
-          kind: link.dynamic ? "dynamic" : node ? "external" : "missing",
-          reference: link,
-        });
-      const groupId = JSON.stringify([link.source, id, link.kind]);
-      const group = groups.find((group) => group.id === groupId);
-      if (group) {
-        group.items.push(link);
-        group.label = true;
-      } else
-        groups.push({
-          id: groupId,
-          source: link.source,
-          target: id,
-          items: [link],
-          label:
-            !!link.label ||
-            !!link.unresolved ||
-            link.kind === "detour" ||
-            link.source === id,
-        });
-    }
-    return { records, groups };
-  }, [own, out, allNodes]);
+  const currentGraph = useGraphModel(
+    file,
+    allNodes,
+    links,
+    documents,
+    graphState?.anchors,
+  );
   const { records, groups } = editing || currentGraph;
   const cardHeights = useMemo(
     () =>
@@ -545,16 +349,52 @@ function Canvas({
       ),
     [records, heights],
   );
+  const measuredLabels = useMemo(() => measureLabels(groups), [groups]);
+  const sizes = useMemo(
+    () =>
+      Object.fromEntries(
+        records.map((r) => [
+          r.id,
+          {
+            width: editing?.record.id === r.id ? EDIT_WIDTH : CARD_WIDTH,
+            height: cardHeights[r.id],
+          },
+        ]),
+      ),
+    [records, cardHeights, editing],
+  );
+  const fitAfterArrange = useRef<() => void>(() => {});
+  const layout = useGraphLayout({
+    model: currentGraph,
+    state: graphState,
+    sizes,
+    labels: measuredLabels,
+    suspended: !!editing,
+    ready: records.length > 0 && records.every((r) => heights[r.id] > 0),
+    onChange: onGraphState,
+    viewport: () => flow.getViewport(),
+    restoreViewport: (v) => {
+      void flow.setViewport(v);
+    },
+    onArrangeAll: () => fitAfterArrange.current(),
+  });
+  const positions = layout.layout.positions;
   const automatic = useMemo(
     () =>
-      layoutGraph(
-        records.map((record) => record.id),
-        groups,
-        cardHeights,
+      Object.fromEntries(
+        records.map((r, i) => [
+          r.id,
+          positions[r.id] || { x: (i % 3) * 360, y: Math.floor(i / 3) * 180 },
+        ]),
       ),
-    [records, groups, cardHeights],
+    [records, positions],
   );
-  const selectedId = selected || targetSelection;
+  const selectedId =
+    records.find((r) => r.node?.id === selected)?.id || targetSelection;
+  const previousLayout = layout.canUndo,
+    canRedo = layout.canRedo;
+  const setPositions = layout.translate;
+  const persistLayout = layout.persist;
   const goToLink = useCallback(
     (link: Link) => {
       const source = own.find((node) => node.id === link.source);
@@ -616,6 +456,7 @@ function Canvas({
       positions,
       automatic,
       flow,
+      setPositions,
     ],
   );
   const finishEdit = useCallback(
@@ -633,13 +474,7 @@ function Canvas({
       if (nextRecord && nextRecord.id !== editing.record.id)
         nextPositions[nextRecord.id] = positions[editing.record.id];
       setPositions(nextPositions);
-      onGraphState({
-        positions: nextPositions,
-        viewport: flow.getViewport(),
-        undo: undoStack.current.slice(-50),
-        redo: redoStack.current.slice(-50),
-        detailsOpen: showDetails,
-      });
+      persistLayout();
       if (nextRecord?.node) onSelect(nextRecord.node);
       setEditing(null);
       requestAnimationFrame(() =>
@@ -654,9 +489,8 @@ function Canvas({
       currentGraph,
       onSelect,
       positions,
-      onGraphState,
-      flow,
-      showDetails,
+      persistLayout,
+      setPositions,
     ],
   );
   const editorDocument =
@@ -722,7 +556,7 @@ function Canvas({
               height: heights[record.id],
             }
           : undefined,
-        selected: record.id === selectedId,
+        selected: nodeSelection.has(record.id),
         data: {
           ...record,
           editor: editing?.record.id === record.id ? nodeEditor : undefined,
@@ -746,7 +580,7 @@ function Canvas({
       records,
       positions,
       automatic,
-      selectedId,
+      nodeSelection,
       zoom,
       openRecord,
       issues,
@@ -766,75 +600,195 @@ function Canvas({
       })),
     [records, positions, automatic, cardHeights, editing],
   );
-  const routeConnections = useMemo(() => createConnectionRouter(), []);
-  const routes = useMemo(
+  const routes: RoutedConnection[] = useMemo(
     () =>
-      routeConnections(
-        geometry,
-        groups.map((group) => {
-          const label =
-            group.items.length > 1
-              ? group.items.length + " 個分支"
-              : linkSummary(group.items[0]);
-          const textWidth = [...label].reduce(
-            (sum, c) => sum + (c.charCodeAt(0) > 255 ? 12 : 7),
-            0,
-          );
-          return {
+      Object.values(layout.layout.routes).flatMap((route) => {
+        const group = groups.find((g) => g.id === route.id);
+        const sourceRect = geometry.find((r) => r.id === route.source),
+          targetRect = geometry.find((r) => r.id === route.target);
+        if (!group || !sourceRect || !targetRect) return [];
+        const points = route.points.map((p) => ({ ...p }));
+        const start = center(sourceRect, route.sourceSide),
+          end = center(targetRect, route.targetSide);
+        if (points.length >= 2) {
+          const old = points[0],
+            last = points.at(-1)!;
+          if (start.x !== old.x || start.y !== old.y) {
+            const next = points[1];
+            points.splice(
+              0,
+              1,
+              start,
+              route.sourceSide === "left" || route.sourceSide === "right"
+                ? { x: next.x, y: start.y }
+                : { x: start.x, y: next.y },
+            );
+          }
+          if (end.x !== last.x || end.y !== last.y) {
+            const previous = points.at(-2)!;
+            points.splice(
+              points.length - 1,
+              1,
+              route.targetSide === "left" || route.targetSide === "right"
+                ? { x: previous.x, y: end.y }
+                : { x: end.x, y: previous.y },
+              end,
+            );
+          }
+        }
+        const labelPoint =
+          route.card || points[Math.floor(points.length / 2)] || start;
+        return [
+          {
             ...group,
-            labelWidth: Math.max(96, Math.min(200, textWidth + 34)),
-          };
-        }),
-      ),
-    [geometry, groups, routeConnections],
+            points,
+            path: pathData(points),
+            sourceRect,
+            targetRect,
+            portSignature: "center",
+            sourceSide: route.sourceSide,
+            targetSide: route.targetSide,
+            sourceFraction: 0.5,
+            targetFraction: 0.5,
+            labelVisible: group.label && !!route.card,
+            labelPoint,
+            labelRect: {
+              id: route.id,
+              x: labelPoint.x - (route.card?.width || 160) / 2,
+              y: labelPoint.y - (route.card?.height || 32) / 2,
+              width: route.card?.width || 160,
+              height: route.card?.height || 32,
+            },
+          },
+        ];
+      }),
+    [layout.layout.routes, groups, geometry],
   );
-  const edges: RouteEdge[] = routes.map((route) => {
-    const group = groups.find((group) => group.id === route.id)!;
-    const active = edgeSelection
-      ? edgeSelection === group.id
-      : !!selectedId &&
-        (group.source === selectedId || group.target === selectedId);
-    return {
-      id: group.id,
-      source: group.source,
-      target: group.target,
-      type: "route",
-      sourceHandle: `out-${route.sourceSide}`,
-      targetHandle: `in-${route.targetSide}`,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: active ? "#d4dfeb" : "#999999",
-        width: 16,
-        height: 16,
-      },
-      data: {
-        route,
-        group,
-        active,
-        muted: (!!selectedId || !!edgeSelection) && !active,
-        zoom,
-        open: () => {
-          onSelect(null);
-          setTargetSelection("");
-          setEdgeSelection(group.id);
-        },
-      },
-    };
-  });
-  const save = useCallback(
-    (nextPositions?: Record<string, Point>, viewport?: Viewport) => {
-      onGraphState({
-        positions:
-          nextPositions ||
-          Object.fromEntries(nodes.map((node) => [node.id, node.position])),
-        viewport: viewport || flow.getViewport(),
-        undo: undoStack.current.slice(-50),
-        redo: redoStack.current.slice(-50),
-        detailsOpen: showDetails,
-      });
+  const selectEdge = useCallback(
+    (id: string) => {
+      onSelect(null);
+      setTargetSelection("");
+      setNodeSelection(new Set());
+      setGroupSelection("");
+      setEdgeSelection(id);
+      if (selectedPin?.edge !== id) setSelectedPin(null);
     },
-    [onGraphState, nodes, flow, showDetails],
+    [onSelect, selectedPin?.edge],
   );
+  useEffect(() => {
+    if (edgeSelection) canvasElement.current?.focus();
+  }, [edgeSelection]);
+  const { routeDragRef, beginRoute, editRoute, endRoute } = useRouteGestures(
+    layout,
+    geometry,
+  );
+  const edges: RouteEdge[] = useMemo(
+    () =>
+      routes.map((route) => {
+        const group = groups.find((g) => g.id === route.id)!;
+        const active =
+          edgeSelection === group.id ||
+          (!!groupSelection && group.groupId === groupSelection) ||
+          (!edgeSelection &&
+            !groupSelection &&
+            (nodeSelection.has(group.source) ||
+              nodeSelection.has(group.target)));
+        return {
+          id: group.id,
+          source: group.source,
+          target: group.target,
+          type: "route",
+          zIndex: edgeSelection === group.id ? 20 : active ? 10 : 0,
+          sourceHandle: "out-" + route.sourceSide,
+          targetHandle: "in-" + route.targetSide,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: active ? "#d4dfeb" : "#999",
+            width: 16,
+            height: 16,
+          },
+          data: {
+            route,
+            geometry: layout.layout.routes[route.id],
+            trunk: group.groupId
+              ? layout.layout.trunks[group.groupId]
+              : undefined,
+            group,
+            active,
+            controls: edgeSelection === route.id,
+            muted:
+              (!!edgeSelection || !!groupSelection || nodeSelection.size > 0) &&
+              !active,
+            zoom,
+            open: () => selectEdge(group.id),
+            selectPin: (pin) => setSelectedPin({ edge: group.id, pin }),
+            selectGroup: () => {
+              selectEdge("");
+              setGroupSelection(group.groupId || "");
+            },
+            begin: beginRoute,
+            move: (action, point, delta) =>
+              editRoute(group.id, action, point, delta),
+            end: endRoute,
+            addPin: (index, point) => {
+              selectEdge(group.id);
+              layout.transaction((next) => {
+                const r = next.routes[group.id],
+                  a = r.points[index],
+                  b = r.points[index + 1];
+                if (!a || !b) return next;
+                const pin = {
+                  id: crypto.randomUUID(),
+                  x:
+                    a.x === b.x
+                      ? a.x
+                      : Math.max(
+                          Math.min(a.x, b.x),
+                          Math.min(Math.max(a.x, b.x), point.x),
+                        ),
+                  y:
+                    a.y === b.y
+                      ? a.y
+                      : Math.max(
+                          Math.min(a.y, b.y),
+                          Math.min(Math.max(a.y, b.y), point.y),
+                        ),
+                };
+                r.pins.push(pin);
+                r.points.splice(index + 1, 0, { x: pin.x, y: pin.y });
+                next.revision++;
+                setSelectedPin({ edge: group.id, pin: pin.id });
+                return next;
+              });
+            },
+            context: (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              selectEdge(group.id);
+              setCanvasMenu({
+                x: event.clientX,
+                y: event.clientY,
+                edge: group.id,
+              });
+            },
+          },
+        };
+      }),
+    [
+      routes,
+      groups,
+      edgeSelection,
+      groupSelection,
+      nodeSelection,
+      zoom,
+      layout,
+      selectEdge,
+      beginRoute,
+      editRoute,
+      endRoute,
+    ],
+  );
+  const save = persistLayout;
   const fitAll = useCallback(
     (duration = 200) => {
       if (!nodes.length) return;
@@ -898,6 +852,9 @@ function Canvas({
     else fitAll(0);
   }, [flow, fitAll, records, heights]);
   useEffect(() => {
+    fitAfterArrange.current = () => fitAll();
+  }, [fitAll]);
+  useEffect(() => {
     if (needsFit.current) {
       needsFit.current = false;
       fitAll();
@@ -906,7 +863,7 @@ function Canvas({
   useEffect(() => {
     if (focus === previousFocus.current) return;
     previousFocus.current = focus;
-    const node = nodes.find((node) => node.id === selected);
+    const node = nodes.find((node) => node.data.node?.id === selected);
     if (node)
       void flow.setCenter(
         node.position.x + CARD_WIDTH / 2,
@@ -958,54 +915,166 @@ function Canvas({
   }
   function arrange() {
     if (editing) return;
-    undoStack.current.push({
-      positions: Object.fromEntries(nodes.map((n) => [n.id, n.position])),
-      viewport: flow.getViewport(),
-    });
-    redoStack.current = [];
-    setCanRedo(false);
-    setPreviousLayout({
-      positions: Object.fromEntries(
-        nodes.map((node) => [node.id, node.position]),
-      ),
-      viewport: flow.getViewport(),
-    });
-    needsFit.current = true;
-    setPositions({ ...automatic });
-    save(automatic);
+    layout.request(
+      nodeSelection.size
+        ? { kind: "selected", ids: [...nodeSelection] }
+        : { kind: "all" },
+      true,
+    );
   }
   function undoLayout() {
-    if (editing) return;
-    const previous = undoStack.current.pop();
-    if (!previous?.positions) return;
-    redoStack.current.push({
-      positions: Object.fromEntries(nodes.map((n) => [n.id, n.position])),
-      viewport: flow.getViewport(),
-    });
-    setCanRedo(true);
-    setPositions(previous.positions);
-    if (previous.viewport) void flow.setViewport(previous.viewport);
-    save(previous.positions, previous.viewport);
-    setPreviousLayout(undoStack.current.at(-1) || null);
+    layout.history();
   }
   function redoLayout() {
-    if (editing) return;
-    const next = redoStack.current.pop();
-    setCanRedo(redoStack.current.length > 0);
-    if (!next?.positions) return;
-    undoStack.current.push({
-      positions: Object.fromEntries(nodes.map((n) => [n.id, n.position])),
-      viewport: flow.getViewport(),
+    layout.history(true);
+  }
+  const rightDrag = useRef<{
+    x: number;
+    y: number;
+    viewport: Viewport;
+    moved: boolean;
+    node?: Node;
+    edge?: string;
+  } | null>(null);
+  function routeAction(action: "simplify" | "reset") {
+    if (!canvasMenu?.edge) return;
+    const id = canvasMenu.edge;
+    layout.transaction((next) => {
+      const r = next.routes[id];
+      if (!r) return next;
+      if (action === "reset") delete next.routes[id];
+      else {
+        const a = r.points[0],
+          b = r.points.at(-1)!;
+        const blockers = [
+          ...geometry.filter(
+            (box) => box.id !== r.source && box.id !== r.target,
+          ),
+          ...Object.values(next.routes)
+            .filter((other) => other.id !== id && other.card)
+            .map((other) => ({
+              id: other.id,
+              x: other.card!.x - other.card!.width / 2,
+              y: other.card!.y - other.card!.height / 2,
+              width: other.card!.width,
+              height: other.card!.height,
+            })),
+        ];
+        const straight =
+          (a.x === b.x || a.y === b.y) &&
+          !blockers.some((box) => segmentHitsRect(a, b, box)) &&
+          r.pins.every((p) =>
+            a.x === b.x
+              ? p.x === a.x &&
+                p.y >= Math.min(a.y, b.y) &&
+                p.y <= Math.max(a.y, b.y)
+              : p.y === a.y &&
+                p.x >= Math.min(a.x, b.x) &&
+                p.x <= Math.max(a.x, b.x),
+          );
+        r.points = straight
+          ? simplify(
+              [
+                a,
+                ...r.pins
+                  .slice()
+                  .sort(
+                    (p, q) =>
+                      Math.hypot(p.x - a.x, p.y - a.y) -
+                      Math.hypot(q.x - a.x, q.y - a.y),
+                  ),
+                b,
+              ],
+              r.pins,
+            )
+          : simplify(r.points, r.pins);
+        r.fixedSegments = [];
+        if (r.card)
+          r.card = projectCard(r.points, r.card, r.card.width, r.card.height);
+      }
+      next.revision++;
+      return next;
     });
-    setPositions(next.positions);
-    if (next.viewport) void flow.setViewport(next.viewport);
-    save(next.positions, next.viewport);
-    setPreviousLayout(undoStack.current.at(-1) || null);
   }
   return (
     <div
       className="story-canvas"
       ref={canvasElement}
+      tabIndex={-1}
+      onPointerDownCapture={(event) => {
+        if (event.button === 0)
+          boxSelectionBase.current =
+            event.shiftKey &&
+            (event.target as Element).classList.contains("react-flow__pane")
+              ? new Set(nodeSelection)
+              : null;
+        if (
+          event.button !== 2 ||
+          (event.target as Element).closest(
+            "input,textarea,[contenteditable=true],.flow-scene-editor,.flow-navigation,.action-menu",
+          )
+        )
+          return;
+        const target = event.target as Element;
+        const id = target.closest(".react-flow__node")?.getAttribute("data-id");
+        const edge =
+          target.closest("[data-route-id]")?.getAttribute("data-route-id") ||
+          target.closest(".react-flow__edge")?.getAttribute("data-id") ||
+          undefined;
+        rightDrag.current = {
+          x: event.clientX,
+          y: event.clientY,
+          viewport: flow.getViewport(),
+          moved: false,
+          node: records.find((r) => r.id === id)?.node,
+          edge,
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onPointerMoveCapture={(event) => {
+        const right = rightDrag.current;
+        if (!right) return;
+        const dx = event.clientX - right.x,
+          dy = event.clientY - right.y;
+        if (!right.moved && Math.hypot(dx, dy) <= 5) return;
+        right.moved = true;
+        setCanvasMenu(null);
+        void flow.setViewport({
+          ...right.viewport,
+          x: right.viewport.x + dx,
+          y: right.viewport.y + dy,
+        });
+        event.stopPropagation();
+      }}
+      onPointerUpCapture={(event) => {
+        const right = rightDrag.current;
+        if (!right) return;
+        rightDrag.current = null;
+        event.stopPropagation();
+        if (right.moved) {
+          layout.persist();
+          return;
+        }
+        if (right.node) onNodeMenu?.(right.node, event);
+        else
+          setCanvasMenu({
+            x: event.clientX,
+            y: event.clientY,
+            edge: right.edge,
+          });
+      }}
+      onContextMenuCapture={(event) => {
+        if (
+          (event.target as Element).closest(
+            "input,textarea,[contenteditable=true],.flow-scene-editor",
+          )
+        )
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       onKeyDown={(e) => {
         if (
           (e.target as HTMLElement).closest(
@@ -1013,6 +1082,30 @@ function Canvas({
           )
         )
           return;
+        if (e.key === "Escape") {
+          routeDragRef.current = null;
+          if (layout.cancel()) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          setCanvasMenu(null);
+          return;
+        }
+        if ((e.key === "Delete" || e.key === "Backspace") && selectedPin) {
+          e.preventDefault();
+          e.stopPropagation();
+          layout.transaction((next) => {
+            const r = next.routes[selectedPin.edge];
+            if (r) {
+              r.pins = r.pins.filter((p) => p.id !== selectedPin.pin);
+              r.points = simplify(r.points, r.pins);
+              next.revision++;
+            }
+            return next;
+          });
+          setSelectedPin(null);
+          return;
+        }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
           e.preventDefault();
           if (e.shiftKey) redoLayout();
@@ -1122,8 +1215,8 @@ function Canvas({
             </ChromeButton>
           </div>
           <p>
-            拖曳卡片只調整版面；雙擊或 Enter
-            編輯原文。空白處拖曳平移，滾輪縮放。
+            拖曳卡片只調整版面；雙擊或 Enter 編輯原文。左鍵框選，Shift
+            加選，右鍵拖曳平移，滾輪縮放。選線後拖動線段；雙擊支線新增 pin。
           </p>
           <p>
             {own.length} 個場景 · {out.length}{" "}
@@ -1143,6 +1236,13 @@ function Canvas({
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
+          panOnDrag={false}
+          selectionOnDrag={!editing}
+          selectionMode={SelectionMode.Full}
+          selectionKeyCode={null}
+          multiSelectionKeyCode="Shift"
+          panActivationKeyCode={null}
+          nodeDragThreshold={5}
           nodesFocusable={false}
           nodesConnectable={false}
           edgesFocusable={false}
@@ -1153,8 +1253,24 @@ function Canvas({
           zoomOnScroll={!editing}
           zoomOnPinch={!editing}
           colorMode="dark"
+          onSelectionEnd={() => {
+            boxSelectionBase.current = null;
+          }}
           onNodesChange={(changes) => {
+            const preserved = boxSelectionBase.current;
             const moved: Record<string, Point> = {};
+            const selections = changes.filter((c) => c.type === "select");
+            if (selections.length)
+              setNodeSelection((previous) => {
+                const next = new Set(previous);
+                for (const c of selections) {
+                  if (c.type === "select") {
+                    if (c.selected) next.add(c.id);
+                    else if (!preserved?.has(c.id)) next.delete(c.id);
+                  }
+                }
+                return next;
+              });
             const measured: Record<string, number> = {};
             for (const change of changes) {
               if (change.type === "position" && change.position)
@@ -1179,10 +1295,11 @@ function Canvas({
                   setHeights((previous) => ({ ...previous, ...next }));
                 });
             }
-            if (Object.keys(moved).length)
-              setPositions((previous) => ({ ...previous, ...moved }));
+            if (Object.keys(moved).length) layout.translate(moved);
           }}
           onNodeClick={(_, node) => {
+            setGroupSelection("");
+            setSelectedPin(null);
             setEdgeSelection("");
             if (node.data.node) {
               setTargetSelection("");
@@ -1192,58 +1309,86 @@ function Canvas({
               setTargetSelection(node.id);
             }
           }}
-          onNodeContextMenu={(event, node) => {
-            event.preventDefault();
-            if (node.data.node) onNodeMenu?.(node.data.node, event);
-          }}
-          onPaneContextMenu={(event) => {
-            event.preventDefault();
-            setCanvasMenu({ x: event.clientX, y: event.clientY });
-          }}
           onNodeDragStart={() => {
-            dragOrigin.current = {
-              positions: Object.fromEntries(
-                nodes.map((n) => [n.id, n.position]),
-              ),
-              viewport: flow.getViewport(),
-            };
+            canvasElement.current?.focus();
+            layout.begin();
           }}
+          onSelectionDragStart={() => {
+            canvasElement.current?.focus();
+            layout.begin();
+          }}
+          onSelectionDragStop={() => layout.commit()}
           onPaneClick={() => {
             if (editing) {
               setCloseRequest((request) => request + 1);
               return;
             }
             onSelect(null);
+            setNodeSelection(new Set());
+            setGroupSelection("");
+            setSelectedPin(null);
             setTargetSelection("");
             setEdgeSelection("");
             setCanvasMenu(null);
           }}
-          onEdgeClick={(_, edge) => {
-            onSelect(null);
-            setTargetSelection("");
-            setEdgeSelection(edge.id);
-          }}
-          onNodeDragStop={(_, moved) => {
-            if (dragOrigin.current) {
-              undoStack.current.push(dragOrigin.current);
-              redoStack.current = [];
-              setCanRedo(false);
-              setPreviousLayout(dragOrigin.current);
-              dragOrigin.current = null;
-            }
-            const next = {
-              ...Object.fromEntries(
-                nodes.map((node) => [node.id, node.position]),
-              ),
-              [moved.id]: moved.position,
-            };
-            setPositions(next);
-            save(next);
-          }}
+          onEdgeClick={(_, edge) => selectEdge(edge.id)}
+          onNodeDragStop={() => layout.commit()}
           onMove={(_, viewport) => setZoom(viewport.zoom)}
-          onMoveEnd={(_, viewport) => save(undefined, viewport)}
+          onMoveEnd={() => save()}
           defaultViewport={graphState?.viewport}
         >
+          {Object.values(layout.layout.trunks).map((trunk) => (
+            <TrunkEditor
+              key={trunk.id}
+              trunk={trunk}
+              ys={Object.values(layout.layout.routes)
+                .filter((r) => r.groupId === trunk.id && r.card)
+                .map((r) => r.card!.y)}
+              selected={groupSelection === trunk.id}
+              select={() => {
+                selectEdge("");
+                setGroupSelection(trunk.id);
+              }}
+              begin={beginRoute}
+              end={endRoute}
+              move={(delta) => {
+                const origin = routeDragRef.current;
+                if (!origin) return;
+                const next = cloneLayout(origin),
+                  t = next.trunks[trunk.id];
+                const split = t.points.at(-1)!;
+                const x = split.x + delta.x,
+                  oldX = split.x;
+                const members = Object.values(next.routes).filter(
+                  (r) => r.groupId === t.id,
+                );
+                const limit = Math.min(
+                  ...members
+                    .filter((r) => r.card)
+                    .map((r) => r.card!.x - r.card!.width / 2 - 16),
+                );
+                const source = geometry.find((r) => r.id === t.source)!;
+                const nx = Math.max(
+                  source.x + source.width + 16,
+                  Math.min(limit, x),
+                );
+                split.x = nx;
+                t.manual = true;
+                const prev = t.points.at(-2);
+                if (prev && prev.x === oldX) prev.x = nx;
+                for (const r of members) {
+                  for (let i = 1; i < r.points.length; i++) {
+                    const p = r.points[i];
+                    if (p.x === oldX) p.x = nx;
+                    else if (i >= t.points.length) break;
+                  }
+                  r.error = "等待修整";
+                }
+                next.revision = layout.current.current.revision + 1;
+                layout.preview(next);
+              }}
+            />
+          ))}
           <Background bgColor="#1f1f1f" color="#393939" gap={24} size={1} />
         </ReactFlow>
       ) : (
@@ -1486,9 +1631,15 @@ function Canvas({
           </ChromeButton>
           <span />
           <ChromeButton
-            title={editing ? "結束節點編輯後可整理" : "自動整理"}
+            title={
+              editing
+                ? "結束節點編輯後可整理"
+                : nodeSelection.size
+                  ? "整理選取的 " + nodeSelection.size + " 個節點"
+                  : "整理全部"
+            }
             aria-label="自動整理"
-            disabled={!!editing || !nodes.length}
+            disabled={!!editing || !nodes.length || layout.busy}
             onClick={arrange}
           >
             <LayoutGrid size={16} />
@@ -1528,24 +1679,59 @@ function Canvas({
           </ChromeButton>
         </div>
       )}
+      {layout.error && (
+        <div className="flow-layout-error" role="status">
+          <AlertTriangle size={14} />
+          <span>{layout.error}</span>
+          <button onClick={() => layout.request({ kind: "repair" })}>
+            重試
+          </button>
+        </div>
+      )}
       <ActionMenu
         onClose={() => setCanvasMenu(null)}
         menu={
           canvasMenu
             ? {
                 ...canvasMenu,
-                actions: [
-                  { label: "建立場景", run: onCreate },
-                  { label: "適應全部", run: () => fitAll() },
-                  { label: "回到 100%", run: () => void flow.zoomTo(1) },
-                  { label: "自動整理", run: arrange },
-                  {
-                    label: "復原布局",
-                    disabled: !previousLayout,
-                    run: undoLayout,
-                  },
-                  { label: "重做布局", disabled: !canRedo, run: redoLayout },
-                ],
+                actions: canvasMenu.edge
+                  ? [
+                      { label: "簡化線路", run: () => routeAction("simplify") },
+                      {
+                        label: "恢復自動線路",
+                        run: () => routeAction("reset"),
+                      },
+                      {
+                        label: "查看來源",
+                        run: () => {
+                          const g = groups.find(
+                            (g) => g.id === canvasMenu.edge,
+                          );
+                          if (g) goToLink(g.items[0]);
+                        },
+                      },
+                    ]
+                  : [
+                      { label: "建立場景", run: onCreate },
+                      { label: "適應全部", run: () => fitAll() },
+                      { label: "回到 100%", run: () => void flow.zoomTo(1) },
+                      {
+                        label: nodeSelection.size
+                          ? "整理選取的 " + nodeSelection.size + " 個節點"
+                          : "整理全部",
+                        run: arrange,
+                      },
+                      {
+                        label: "復原布局",
+                        disabled: !previousLayout,
+                        run: undoLayout,
+                      },
+                      {
+                        label: "重做布局",
+                        disabled: !canRedo,
+                        run: redoLayout,
+                      },
+                    ],
               }
             : null
         }

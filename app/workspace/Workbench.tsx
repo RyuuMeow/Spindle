@@ -66,6 +66,7 @@ import WorkspaceTabs from "../WorkspaceTabs";
 import CodeEditor from "../CodeEditor";
 import { collectVariables } from "../variable-completion";
 import Graph from "../Graph";
+import { mapSessionGraphSources } from "../graph/map-sources";
 import { type CommandActions } from "../CommandManager";
 import CommandManager from "../CommandManager";
 import { SearchOverlay } from "./SearchOverlay";
@@ -147,6 +148,9 @@ export default function Workbench({
       initialSession ||
       defaultSession(client.windowId, snapshot.currentProjectId),
   );
+  useEffect(()=>client.subscribeSourceChanges((id,transaction)=>{
+    setSession(s=>mapSessionGraphSources(s,id,transaction.changes,transaction.state.doc.toString(),transaction.startState.doc.toString()));
+  }),[client]);
   const [menu, setMenu] = useState<MenuState | null>(null),
     [prompt, setPrompt] = useState<Prompt | null>(null),
     [promptValue, setPromptValue] = useState(""),
@@ -2395,7 +2399,7 @@ export default function Workbench({
               )}
               {!active.dialogueOnly && mode === "graph" && (
                 <Graph
-                  key={active.id}
+                  key={active.id + ":" + doc.id}
                   file={doc.name}
                   documents={project.documents}
                   commands={project.commands}

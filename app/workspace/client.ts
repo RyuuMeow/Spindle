@@ -1,6 +1,6 @@
 import { addFolder, applyTreeMove, planTreeMove, projectFolders, withinFolder } from "./file-tree";
 import { appendedScene, renamedSceneByName } from "./authoring";
-import { EditorState, ChangeSet, Text } from "@codemirror/state";
+import { EditorState, ChangeSet, Text, type Transaction } from "@codemirror/state";
 import {
   collab,
   getSyncedVersion,
@@ -215,6 +215,15 @@ export class WorkspaceClient {
   private adapter: { request: (a: WorkspaceAction) => Promise<ActionResult> };
   private states = new Map<string, EditorState>();
   private listeners = new Set<() => void>();
+  private sourceListeners = new Set<(id:string, transaction:Transaction)=>void>();
+  subscribeSourceChanges = (listener:(id:string, transaction:Transaction)=>void) => {
+    this.sourceListeners.add(listener);
+    return () => { this.sourceListeners.delete(listener); };
+  };
+  private applyState(id:string,transaction:Transaction) {
+    this.states.set(id,transaction.state);
+    if(transaction.docChanged)for(const listener of this.sourceListeners)listener(id,transaction);
+  }
   private state: WorkspaceSnapshot = {
     projects: [],
     currentProjectId: "",
@@ -335,7 +344,7 @@ export class WorkspaceClient {
             });
             state = this.states.get(d.id)!;
             if (!this.composing.has(d.id) && updates?.length)
-              this.states.set(
+              this.applyState(
                 d.id,
                 state.update(
                   receiveUpdates(
@@ -345,7 +354,7 @@ export class WorkspaceClient {
                       changes: ChangeSet.fromJSON(u.changes),
                     })),
                   ),
-                ).state,
+                ),
               );
           }
         }
@@ -370,7 +379,7 @@ export class WorkspaceClient {
     const changes = normalizedCoordinates
       ? sourceEdits(state.doc.toString(), edits)
       : edits;
-    this.states.set(documentId, state.update({ changes }).state);
+    this.applyState(documentId, state.update({ changes }));
     this.error = "";
     this.emit();
     void this.flush().catch((error) => this.fail(error));
