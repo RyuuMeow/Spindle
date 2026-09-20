@@ -86,16 +86,16 @@ ReadingEditor 接受 goTo nonce 以區分外部定位與游標回報，解除覆
 createConnectionRouter 在每個 Canvas 內保留上一組路徑，核對端點尺寸、連線拓撲及新障礙；有效路徑直接沿用。routeConnections 的幾何與標籤分兩階段，標籤位置不作幾何障礙；短引線也檢查碰撞。快取不寫入劇本或跨窗共享歷史。useTreeDrag 使用 pointer capture 與來源鍵，依 elementFromPoint 命中現有樹列／層尾，放開再呼叫同一 moveEntry 驗證與磁碟服務；不產生 OS 檔案拖曳 payload。
 
 
-### 持久圖表布局（0.8.1）
+### 持久圖表布局（0.8.2）
 
 0.8.0 取代 Canvas 內的即時 createConnectionRouter。React Flow 負責畫布與量測；graph/model.ts 建立獨立場景、轉場、分支組。graph/layout-state.ts 的 schema 2 快照包含節點位置、中心接點面、線路、pin、固定線段、幹線與卡片錨點。舊 positions／viewport 原位遷移，不重新排列。
 
-graph/layout-engine.ts 接收全圖／所選／修線請求。ELK Layered 使用量測尺寸與具有原文順序的虛擬分支組；libavoid-js 只負責固定部分之間的避障候選，Spindle 管理幹線、卡片通道及手動限制。全圖整理清除限制並適應視窗；局部只重排選取的完整範圍，外部節點作固定障礙，外部 pin／卡片保留。repair 沿用有效線路，只修端部及新障礙；新節點尋找鄰近空位。
+graph/layout-engine.ts 接收全圖／所選／修線請求。ELK Layered 使用量測尺寸與具有原文順序的虛擬分支組；libavoid-js 只負責固定部分之間的避障候選，Spindle 管理幹線、卡片通道及手動限制。全圖整理清除限制並適應視窗；局部只重排選取的完整範圍，外部節點作固定障礙，外部 pin／卡片保留。repair 逐點保留無關有效線路；受影響線路由端點、卡片、pin 重建，不把舊自動折線當作限制；新節點尋找鄰近空位。
 
 use-graph-layout.ts 管理 Worker、文件／布局版本、50 筆完整布局 Undo／Redo 與保存。過期回應丟棄，失敗保留布局；30 秒逾時終止引擎，重試建立新 Worker。layout.worker.ts 使用獨立 ELK Worker 與離線 libavoid WASM；avoid.ts 封裝已驗證的 embind API 與原生物件生命週期，不假設 C++ 全部介面皆可用。public/legal/ 附 LGPL／EPL 與對應來源。
 
 map-sources.ts 訂閱 WorkspaceClient 每筆共享文件交易。即使圖表未掛載，也更新目前、快取、前後導航及已關閉 tab 的來源錨點；使用保留 CRLF／BOM 的原文座標。全物件替換／外部改寫只作唯一特徵匹配，歧義轉場不繼承舊幾何。文件以 DocumentId 識別，Graph 掛載 key 包含 TabId／DocumentId，避免同 tab 切稿套用別稿布局。
 
-線上卡片透過 React Flow routeCard 節點參與框選、選取與混合拖曳；量測尺寸必須隨受控節點保留。RouteEditor／TrunkEditor／use-route-gestures.ts 管理線、pin 及幹線手勢；文字仍使用 SceneEditor 文件交易。每次手勢一筆布局快照，Undo 不回寫 Yarn。縮放細節以 visibility 處理而不移除摘要，接點不因縮放移動。
+線上卡片透過 React Flow routeCard 節點參與框選、選取與混合拖曳；量測尺寸必須隨受控節點保留。RouteEditor／use-route-gestures.ts 管理 pin 拖曳；TrunkEditor 僅提供實際共用幹線的選取命中區；文字仍使用 SceneEditor 文件交易。每次手勢一筆布局快照，Undo 不回寫 Yarn。縮放細節以 visibility 處理而不移除摘要，接點不因縮放移動。
 
-0.8.1 在 schema 2 增加可選 controlOrder、pin 軸向與方向、手動線段識別。修改控制點前按舊路徑解析一次順序，之後不因位置改變而重排。manual-routing.ts 以控制點產生拖動預覽；Worker 只保留明確限制，不把自動舊折線再當手動限制。卡片只選整理以 scope.cards 傳遞，保持場景固定。reroute 為待修線旗標，成功後清除；舊資料仍可讀取，歧義不影響劇本文字。
+0.8.1 在 schema 2 增加 controlOrder；0.8.2 加入可選 routing="pins" 遷移標記。normalizeRouting 保留可見物件位置與控制順序，移除舊固定線段、pin 軸向／方向、幹線拖曳限制，當前快照與 Undo／Redo 均走相同遷移。修改控制點前按舊路徑解析一次順序，之後不因位置改變而重排。manual-routing.ts 以控制點產生拖動預覽；Worker 只保留明確限制，不把自動舊折線再當手動限制。卡片只選整理以 scope.cards 傳遞，保持場景固定。reroute 為待修線旗標，成功後清除。重疊物件或無可行避障時仍以短直角路徑連接控制點，保留內部 errors 供測試，不回退舊幾何或顯示路線衝突；引擎真正執行失敗仍維持原有錯誤處理。舊資料仍可讀取，歧義不影響劇本文字。

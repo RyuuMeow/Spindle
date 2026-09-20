@@ -1,6 +1,14 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.8.1**，2026-09-20。
+版本：Windows x64 **0.8.2**，2026-09-20。
+
+## 0.8.2 以可見控制點理線
+
+- 線段及幹線不可拖動，也不再產生隱藏固定線段；場景、卡片與 pin 決定路線，pin 可直接作為轉角。搬動來源時中心出口的短幹線隨之移動，不留在節點後方。
+- 舊快照與歷史中的固定線段、pin 軸向、幹線拖曳限制會遷移；保留節點、卡片、pin 位置。日常路線衝突橫幅與橙色標記已移除。
+- [單元／服務測試](../outputs/pin-only-unit.log) **131／131** 通過；TypeScript、[範圍 lint](../outputs/pin-only-lint.json)、[網頁 build](../outputs/pin-only-web-build.log)與[桌面 build](../outputs/pin-only-stage.log)通過。既有全庫 lint 基線未清零。
+- [桌面互動](../outputs/pin-only-ui/result.json)通過線段／幹線不可拖、卡片／pin 拖移、右鍵刪除、完整撤銷、跨模式與重啟恢復、舊版 Undo 快照即時遷移；離線 Worker／WASM 正常。
+- [0.8.2 Portable 實包驗收](../outputs/pin-only-portable-0.8.2/result.json)全部通過，包含舊版 Undo 還原；版本核對 0.8.2，頁面錯誤為零。[封裝核對](../outputs/pin-only-archive.json)確認兩種產物及離線資源。安裝精靈、混合 DPI 與多螢幕未實測。
 
 ## 0.8.1 自由卡片與控制點
 

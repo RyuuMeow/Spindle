@@ -389,7 +389,8 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.8.1：線上卡片可框選、整理與自由搬移；線路跟隨卡片與 pin，支援 pin 右鍵刪除。
+                    0.8.2：透過節點、卡片與 pin
+                    理線；取消線段拖曳，移除多餘繞線與路線衝突提示。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。
