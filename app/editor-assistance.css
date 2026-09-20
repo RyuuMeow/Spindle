@@ -179,7 +179,7 @@
   align-items: center;
   min-height: 29px;
   line-height: 29px;
-  padding: 0 6px;
+  padding: 0 12px;
   gap: 0;
 }
 .spindle-completions .command-completion-icon {
@@ -233,4 +233,23 @@
 .monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list {
   border-radius: 5px;
   overflow: hidden;
+}
+
+/* Tailwind's .contents utility must not unwrap Monaco's row container. */
+.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list .monaco-list-row {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list .monaco-list-row > .contents {
+  display: block;
+  min-width: 0;
+}
+.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list .monaco-list-row > .contents > .main > .left {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.monaco-editor[data-spindle-assisted] .suggest-widget .monaco-list .monaco-list-row > .contents > .main > .right {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
 }
