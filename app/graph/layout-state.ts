@@ -1,7 +1,11 @@
 import type { Point, Side, GraphRect } from "../graph-layout";
 import type { SourceAnchor, GraphModel } from "./model";
 
-export type Pin = Point & { id: string };
+export type Pin = Point & {
+  id: string;
+  axis?: "horizontal" | "vertical";
+  direction?: 1 | -1;
+};
 export type CardAnchor = Point & {
   width: number;
   height: number;
@@ -15,7 +19,9 @@ export type RouteGeometry = {
   targetSide: Side;
   points: Point[];
   pins: Pin[];
-  fixedSegments: { a: Point; b: Point }[];
+  fixedSegments: { id?: string; a: Point; b: Point }[];
+  controlOrder?: string[];
+  reroute?: boolean;
   card?: CardAnchor;
   groupId?: string;
   error?: string;
@@ -50,7 +56,9 @@ export type GraphLayoutRequest = {
   modelVersion: string;
   layoutVersion: number;
   scope:
-    { kind: "all" } | { kind: "selected"; ids: string[] } | { kind: "repair" };
+    | { kind: "all" }
+    | { kind: "selected"; ids: string[]; cards?: string[] }
+    | { kind: "repair" };
   model: GraphModel;
   snapshot: GraphLayoutSnapshot;
   sizes: Record<string, { width: number; height: number }>;
@@ -162,6 +170,7 @@ export function moveNodes(
       r.points = r.points.map((p) => ({ x: p.x + a.x, y: p.y + a.y }));
       r.pins = r.pins.map((p) => ({ ...p, x: p.x + a.x, y: p.y + a.y }));
       r.fixedSegments = r.fixedSegments.map((s) => ({
+        ...s,
         a: { x: s.a.x + a.x, y: s.a.y + a.y },
         b: { x: s.b.x + a.x, y: s.b.y + a.y },
       }));
@@ -188,42 +197,122 @@ export function moveNodes(
   next.revision++;
   return next;
 }
-/** Keep the two neighboring bends around a dragged pin, without a spur that doubles back. */
+/** Resolve legacy checkpoints once, then keep their source-to-target identity order. */
+export function orderedControls(route: RouteGeometry) {
+  const controls = [
+    ...(route.card
+      ? [
+          {
+            key: "card",
+            points: [
+              { x: route.card.x - route.card.width / 2 - 24, y: route.card.y },
+              { x: route.card.x + route.card.width / 2 + 24, y: route.card.y },
+            ],
+            center: route.card,
+          },
+        ]
+      : []),
+    ...route.pins.map((p) => {
+      const i = route.points
+        .slice(1)
+        .findIndex((b, i) => pointOnRoute(p, [route.points[i], b], 0.01));
+      const a = i >= 0 ? route.points[i] : undefined,
+        b = i >= 0 ? route.points[i + 1] : undefined;
+      const axis =
+          p.axis || (a && b && a.x === b.x ? "vertical" : "horizontal"),
+        d =
+          p.direction ||
+          (a && b && (axis === "horizontal" ? b.x - a.x : b.y - a.y) < 0
+            ? -1
+            : 1);
+      const offset =
+        axis === "horizontal" ? { x: 8 * d, y: 0 } : { x: 0, y: 8 * d };
+      return {
+        key: "pin:" + p.id,
+        center: p,
+        points: [
+          { x: p.x - offset.x, y: p.y - offset.y },
+          { x: p.x, y: p.y },
+          { x: p.x + offset.x, y: p.y + offset.y },
+        ],
+      };
+    }),
+    ...route.fixedSegments.map((s, i) => ({
+      key: "segment:" + (s.id || i),
+      center: s.a,
+      points: [s.a, s.b],
+    })),
+  ];
+  const rank = (p: Point) => {
+    let distance = 0;
+    for (let i = 1; i < route.points.length; i++) {
+      const a = route.points[i - 1],
+        b = route.points[i];
+      if (pointOnRoute(p, [a, b]))
+        return distance + Math.abs(p.x - a.x) + Math.abs(p.y - a.y);
+      distance += Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+    }
+    return (
+      distance +
+      Math.abs(p.x - route.points[0].x) +
+      Math.abs(p.y - route.points[0].y)
+    );
+  };
+  const order = (route.controlOrder || []).filter((k) =>
+    controls.some((c) => c.key === k),
+  );
+  for (const c of controls
+    .filter((c) => !order.includes(c.key))
+    .sort((a, b) => rank(a.center) - rank(b.center))) {
+    const i = order.findIndex(
+      (k) => rank(controls.find((c) => c.key === k)!.center) > rank(c.center),
+    );
+    order.splice(i < 0 ? order.length : i, 0, c.key);
+  }
+  return order.map((k) => controls.find((c) => c.key === k)!);
+}
+export function freezeControlOrder(route: RouteGeometry) {
+  for (const p of route.pins)
+    if (!p.axis || !p.direction) {
+      const i = route.points
+        .slice(1)
+        .findIndex((b, i) => pointOnRoute(p, [route.points[i], b], 0.01));
+      const a = i >= 0 ? route.points[i] : undefined,
+        b = i >= 0 ? route.points[i + 1] : undefined;
+      p.axis ||= a && b && a.x === b.x ? "vertical" : "horizontal";
+      p.direction ||=
+        a && b && (p.axis === "horizontal" ? b.x - a.x : b.y - a.y) < 0
+          ? -1
+          : 1;
+    }
+  route.controlOrder = orderedControls(route).map((c) => c.key);
+}
 export function movePin(
   route: RouteGeometry,
   id: string,
   point: Point,
 ): RouteGeometry {
   const next = structuredClone(route);
+  freezeControlOrder(next);
   const pin = next.pins.find((p) => p.id === id);
   if (!pin) return next;
-  const previous = { x: pin.x, y: pin.y };
-  const index = next.points.findIndex((p) => p.x === pin.x && p.y === pin.y);
   Object.assign(pin, point);
-  if (index > 0 && index < next.points.length - 1) {
-    const a = next.points[index - 1],
-      b = next.points[index + 1];
-    const incomingHorizontal = a.y === previous.y,
-      outgoingHorizontal = b.y === previous.y;
-    const sameAxis = incomingHorizontal === outgoingHorizontal;
-    const entry = sameAxis
-      ? incomingHorizontal
-        ? { x: a.x, y: pin.y }
-        : { x: pin.x, y: a.y }
-      : incomingHorizontal
-        ? { x: pin.x, y: a.y }
-        : { x: a.x, y: pin.y };
-    const exit = sameAxis
-      ? outgoingHorizontal
-        ? { x: b.x, y: pin.y }
-        : { x: pin.x, y: b.y }
-      : outgoingHorizontal
-        ? { x: pin.x, y: b.y }
-        : { x: b.x, y: pin.y };
-    next.points.splice(index, 1, entry, { x: pin.x, y: pin.y }, exit);
-    next.points = simplify(next.points, next.pins);
-  }
-  next.error = "等待修整";
+  next.reroute = true;
+  return next;
+}
+export function moveCard(route: RouteGeometry, point: Point): RouteGeometry {
+  const next = structuredClone(route);
+  freezeControlOrder(next);
+  if (next.card) Object.assign(next.card, point, { manual: true });
+  next.reroute = true;
+  return next;
+}
+export function removePin(route: RouteGeometry, id: string): RouteGeometry {
+  const next = structuredClone(route);
+  freezeControlOrder(next);
+  next.pins = next.pins.filter((p) => p.id !== id);
+  next.controlOrder = next.controlOrder!.filter((k) => k !== "pin:" + id);
+  next.reroute = true;
   return next;
 }
 export function cardOnRoute(card: CardAnchor, points: Point[]): boolean {
@@ -242,8 +331,9 @@ export function moveSegment(
   index: number,
   point: Point,
 ): RouteGeometry {
-  const next = structuredClone(route),
-    a = next.points[index],
+  const next = structuredClone(route);
+  freezeControlOrder(next);
+  const a = next.points[index],
     b = next.points[index + 1];
   if (!a || !b) return next;
   const horizontal = a.y === b.y;
@@ -258,8 +348,10 @@ export function moveSegment(
     ...next.fixedSegments.filter(
       (s) => !(pointOnRoute(s.a, [a, b]) && pointOnRoute(s.b, [a, b])),
     ),
-    { a: na, b: nb },
+    { id: crypto.randomUUID(), a: na, b: nb },
   ];
+  freezeControlOrder(next);
+  next.reroute = true;
   return next;
 }
 export function pointOnRoute(p: Point, points: Point[], tolerance = 1) {
@@ -301,7 +393,19 @@ export function validSnapshot(value: unknown): boolean {
         r.points.length >= 2 &&
         r.points.every(point) &&
         Array.isArray(r.pins) &&
-        r.pins.every((p) => point(p) && typeof p.id === "string") &&
+        r.pins.every(
+          (p) =>
+            point(p) &&
+            typeof p.id === "string" &&
+            (!p.axis || ["horizontal", "vertical"].includes(p.axis)) &&
+            (p.direction === undefined ||
+              p.direction === 1 ||
+              p.direction === -1),
+        ) &&
+        (r.controlOrder === undefined ||
+          (Array.isArray(r.controlOrder) &&
+            r.controlOrder.every((k) => typeof k === "string"))) &&
+        (r.reroute === undefined || typeof r.reroute === "boolean") &&
         Array.isArray(r.fixedSegments) &&
         r.fixedSegments.every((s) => point(s.a) && point(s.b)) &&
         (!r.card ||

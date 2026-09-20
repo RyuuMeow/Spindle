@@ -2,12 +2,14 @@ import type { ELK, ElkNode, ElkExtendedEdge } from "elkjs/lib/elk-api";
 import type { GraphRect, Point, Side } from "../graph-layout";
 import { segmentHitsRect, rectsOverlap } from "../graph-layout";
 import { avoidRoutes } from "./avoid";
+import { connectLeg, retraces } from "./manual-routing";
 import {
   center,
   cloneLayout,
   simplify,
   pointOnRoute,
   cardOnRoute,
+  orderedControls,
   type GraphLayoutRequest,
   type GraphLayoutResult,
   type RouteGeometry,
@@ -88,6 +90,9 @@ export async function computeLayout(
         ? request.scope.ids
         : [],
   );
+  const chosenCards = new Set(
+    request.scope.kind === "selected" ? request.scope.cards || [] : [],
+  );
   const rearrange = request.scope.kind !== "repair";
   const activeIds = new Set(model.records.map((r) => r.id));
   const edgeIds = new Set(model.groups.map((r) => r.id));
@@ -115,9 +120,10 @@ export async function computeLayout(
       .filter(
         (e) =>
           rearrange &&
-          chosen.has(e.source) &&
-          chosen.has(e.target) &&
-          (!e.groupId || branchComplete(e.groupId)),
+          (chosenCards.has(e.id) ||
+            (chosen.has(e.source) &&
+              chosen.has(e.target) &&
+              (!e.groupId || branchComplete(e.groupId)))),
       )
       .map((e) => e.id),
   );
@@ -300,6 +306,51 @@ export async function computeLayout(
       if (second.y === old.y) second.y = port.y;
       else if (second.x === old.x) second.x = port.x;
       trunk.points[0] = port;
+    }
+  }
+  // Explicit card-only arrangement never moves scene nodes or unselected cards.
+  const selectedGroups = new Map<string, typeof model.groups>();
+  for (const e of model.groups.filter((e) => chosenCards.has(e.id))) {
+    const key = e.groupId || e.source;
+    selectedGroups.set(key, [...(selectedGroups.get(key) || []), e]);
+  }
+  for (const members of selectedGroups.values()) {
+    const old = members
+      .map((e) => request.snapshot.routes[e.id]?.card)
+      .filter((c): c is CardAnchor => !!c);
+    if (!old.length) continue;
+    const width = Math.max(...members.map((e) => labels[e.id]?.width || 160));
+    const height =
+      members.reduce((n, e) => n + (labels[e.id]?.height || 32) + 24, 0) - 24;
+    const column = {
+      id: "selected-cards",
+      x: old.reduce((n, c) => n + c.x, 0) / old.length - width / 2,
+      y: Math.min(...old.map((c) => c.y - c.height / 2)),
+      width,
+      height,
+    };
+    const obstacles = [
+      ...boxes,
+      ...Object.values(state.routes)
+        .filter((r) => r.card)
+        .map((r) => boxOf(r.id, r.card!)),
+      ...Array.from(cardSlots, ([id, c]) => boxOf(id, c)),
+    ];
+    for (let i = 0; i <= obstacles.length; i++) {
+      const hit = obstacles.find((b) => rectsOverlap(expand(column, 16), b));
+      if (!hit) break;
+      column.y = hit.y + hit.height + 24;
+    }
+    let y = column.y;
+    for (const e of members.sort((a, b) => a.order - b.order)) {
+      const h = labels[e.id]?.height || 32;
+      cardSlots.set(e.id, {
+        x: column.x + width / 2,
+        y: y + h / 2,
+        width,
+        height: h,
+      });
+      y += h + 24;
     }
   }
   // Reserve complete group columns before routing. Group and source order are fixed.
@@ -496,9 +547,11 @@ export async function computeLayout(
       (!trunk || trunk.points.every((p) => pointOnRoute(p, points, 0.01)));
     if (
       old &&
+      !old.reroute &&
       same(old.points[0], start) &&
       same(old.points.at(-1)!, end) &&
       clear(old.points, blockers) &&
+      !retraces(old.points) &&
       old.pins.every((p) => pointOnRoute(p, old.points)) &&
       constraintsMatch(old.points) &&
       old.fixedSegments.every(
@@ -519,6 +572,7 @@ export async function computeLayout(
       points: [],
       pins: old?.pins || [],
       fixedSegments: old?.fixedSegments || [],
+      ...(old?.controlOrder ? { controlOrder: old.controlOrder } : {}),
       card,
     };
     let fixed: Point[][] = [[start, outside(start, sourceSide)]];
@@ -526,45 +580,38 @@ export async function computeLayout(
       const split = trunk.points.at(-1)!;
       fixed[0] = [
         ...trunk.points.map((p) => ({ ...p })),
-        { x: split.x, y: card?.y ?? split.y },
+        ...(!old?.controlOrder ? [{ x: split.x, y: card?.y ?? split.y }] : []),
       ];
     }
-    // Fixed checkpoints/segments are visited in their existing source-to-target order.
-    // The card corridor is also a fixed portion so moving a card never changes its route.
-    const waypoints: { at: number; points: Point[] }[] = [];
-    const rank = (p: Point) => {
-      const pts = old?.points || [];
-      let distance = 0;
-      for (let i = 1; i < pts.length; i++) {
-        const a = pts[i - 1],
-          b = pts[i],
-          len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
-        if (pointOnRoute(p, [a, b]))
-          return distance + Math.abs(p.x - a.x) + Math.abs(p.y - a.y);
-        distance += len;
-      }
-      return Math.abs(p.x - start.x) + Math.abs(p.y - start.y);
-    };
-    if (card)
-      waypoints.push({
-        at: rank(card),
-        points: [
-          { x: card.x - card.width / 2 - STUB, y: card.y },
-          { x: card.x + card.width / 2 + STUB, y: card.y },
-        ],
-      });
-    for (const pin of route.pins)
-      waypoints.push({ at: rank(pin), points: [{ x: pin.x, y: pin.y }] });
-    for (const segment of route.fixedSegments)
-      waypoints.push({ at: rank(segment.a), points: [segment.a, segment.b] });
-    waypoints.sort((a, b) => a.at - b.at);
-    fixed.push(...waypoints.map((p) => p.points), [
+    const controls = orderedControls({
+      ...route,
+      points: old?.points || [start, end],
+    });
+    fixed.push(...controls.map((c) => c.points), [
       outside(end, targetSide),
       end,
     ]);
+    const rank = (p: Point) => {
+      let distance = 0;
+      const pts = old?.points || [];
+      for (let i = 1; i < pts.length; i++) {
+        if (pointOnRoute(p, [pts[i - 1], pts[i]]))
+          return (
+            distance +
+            Math.abs(p.x - pts[i - 1].x) +
+            Math.abs(p.y - pts[i - 1].y)
+          );
+        distance +=
+          Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
+      }
+      return distance;
+    };
     if (
       old &&
       old.points.length > 2 &&
+      !old.reroute &&
+      !old.controlOrder &&
+      !retraces(old.points) &&
       !old.error &&
       constraintsMatch(old.points)
     ) {
@@ -622,7 +669,15 @@ export async function computeLayout(
     for (const plan of plans) {
       const points: Point[] = [];
       plan.fixed.forEach((part, i) => {
-        if (i) points.push(...(solved.get(plan.edge.id + ":" + (i - 1)) || []));
+        if (i) {
+          const manual = plan.old?.controlOrder;
+          const candidate = manual
+            ? connectLeg(plan.fixed[i - 1], part, obstacles)
+            : null;
+          points.push(
+            ...(candidate || solved.get(plan.edge.id + ":" + (i - 1)) || []),
+          );
+        }
         points.push(...part);
       });
       const route = plan.route;
@@ -635,6 +690,7 @@ export async function computeLayout(
       const result = simplify(points, route.pins);
       if (
         !clear(result, blockers) ||
+        retraces(result) ||
         !plan.matches(result) ||
         !route.pins.every((p) => pointOnRoute(p, result)) ||
         !route.fixedSegments.every(

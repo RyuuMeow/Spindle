@@ -8,6 +8,9 @@ import {
   migrateLayout,
   moveNodes,
   movePin,
+  moveCard,
+  freezeControlOrder,
+  removePin,
   cardOnRoute,
   pointOnRoute,
 } from "../app/graph/layout-state.ts";
@@ -466,4 +469,116 @@ test("moving a branch source keeps its card lanes and unrelated routes valid", a
     if (old.source !== source && old.target !== source)
       assert.deepEqual(repaired.snapshot.routes[id], old);
   }
+});
+
+test("freely moved card is an ordered route checkpoint, without dragging other cards or scenes", async () => {
+  const r = branching(),
+    first = await run(r),
+    before = structuredClone(first.snapshot);
+  const edge = Object.values(first.snapshot.routes).find((e) => e.card);
+  const target = { x: edge.card.x + 100, y: edge.card.y - 180 };
+  first.snapshot.routes[edge.id] = moveCard(edge, target);
+  const next = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: first.snapshot,
+  });
+  assertClear(next, r);
+  assert.equal(next.snapshot.routes[edge.id].card.x, target.x);
+  assert.equal(next.snapshot.routes[edge.id].card.y, target.y);
+  assert.deepEqual(next.snapshot.positions, before.positions);
+  for (const [id, old] of Object.entries(before.routes))
+    if (id !== edge.id) assert.deepEqual(next.snapshot.routes[id], old);
+});
+test("multiple reroute pins retain connection order through large moves and a moved card", async () => {
+  const r = branching(),
+    first = await run(r),
+    edge = Object.values(first.snapshot.routes).find((e) => e.card);
+  // Two checkpoints in the free space after a branch card, as in the reported screenshot.
+  freezeControlOrder(edge);
+  edge.pins.push(
+    {
+      id: "one",
+      x: edge.card.x + 180,
+      y: edge.card.y,
+      axis: "horizontal",
+      direction: 1,
+    },
+    {
+      id: "two",
+      x: edge.card.x + 400,
+      y: edge.card.y,
+      axis: "horizontal",
+      direction: 1,
+    },
+  );
+  edge.controlOrder = ["card", "pin:one", "pin:two"];
+  let edited = movePin(edge, "one", {
+    x: edge.card.x + 180,
+    y: edge.card.y - 240,
+  });
+  edited = movePin(edited, "two", {
+    x: edge.card.x + 440,
+    y: edge.card.y - 190,
+  });
+  first.snapshot.routes[edge.id] = edited;
+  const next = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: first.snapshot,
+  });
+  assertClear(next, r);
+  const actual = next.snapshot.routes[edge.id];
+  assert.deepEqual(actual.controlOrder, ["card", "pin:one", "pin:two"]);
+  for (const p of actual.pins) assert.ok(pointOnRoute(p, actual.points));
+  for (let i = 2; i < actual.points.length; i++) {
+    const a = actual.points[i - 2],
+      b = actual.points[i - 1],
+      c = actual.points[i];
+    assert.ok(
+      (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y) >= 0,
+      "pin must not be a spur",
+    );
+  }
+  const removed = removePin(actual, "one");
+  next.snapshot.routes[edge.id] = removed;
+  const result = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: next.snapshot,
+  });
+  assertClear(result, r);
+  assert.deepEqual(
+    result.snapshot.routes[edge.id].pins.map((p) => p.id),
+    ["two"],
+  );
+});
+test("card-only arrange resets selected routes and keeps all unselected geometry fixed", async () => {
+  const r = branching(),
+    first = await run(r),
+    selected = r.model.branches[0].transitions.slice(0, 2);
+  for (const [i, id] of selected.entries())
+    first.snapshot.routes[id] = moveCard(first.snapshot.routes[id], {
+      x: 500 + i * 100,
+      y: -300 - i * 70,
+    });
+  const before = structuredClone(first.snapshot);
+  const result = await run({
+    ...r,
+    scope: { kind: "selected", ids: [], cards: selected },
+    snapshot: first.snapshot,
+  });
+  assertClear(result, r);
+  assert.deepEqual(result.snapshot.positions, before.positions);
+  assert.equal(
+    new Set(selected.map((id) => result.snapshot.routes[id].card.x)).size,
+    1,
+  );
+  assert.ok(
+    result.snapshot.routes[selected[0]].card.y <
+      result.snapshot.routes[selected[1]].card.y,
+  );
+  for (const [id, old] of Object.entries(before.routes))
+    if (!selected.includes(id))
+      assert.deepEqual(result.snapshot.routes[id], old);
 });
