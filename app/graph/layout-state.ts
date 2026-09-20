@@ -35,7 +35,7 @@ export type TrunkGeometry = {
 export type GraphLayoutSnapshot = {
   schema: 2;
   routing?: "pins";
-  lanes?: 1;
+  lanes?: 1 | 2;
   revision: number;
   initialized: boolean;
   positions: Record<string, Point>;
@@ -336,9 +336,9 @@ export function normalizeRouting(
 ): GraphLayoutSnapshot {
   const next = cloneLayout(state);
   const legacy = next.routing !== "pins";
-  const updateLanes = next.lanes !== 1;
+  const updateLanes = next.lanes !== 2;
   next.routing = "pins";
-  next.lanes = 1;
+  next.lanes = 2;
   for (const route of Object.values(next.routes)) {
     if (updateLanes) route.reroute = true;
     if (

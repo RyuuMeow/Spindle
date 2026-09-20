@@ -476,7 +476,7 @@ export async function computeLayout(
       !c ||
       c.manual ||
       old?.pins.length ||
-      (old && request.snapshot.lanes === 1)
+      (old && request.snapshot.lanes !== undefined)
     )
       continue;
     const s = byId.get(e.source)!,

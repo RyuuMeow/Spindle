@@ -738,7 +738,7 @@ test("lane migration repairs overlap once without moving explicit controls", asy
     scope: { kind: "repair" },
     snapshot: old,
   });
-  assert.equal(repaired.snapshot.lanes, 1);
+  assert.equal(repaired.snapshot.lanes, 2);
   assert.deepEqual(repaired.snapshot.positions, old.positions);
   for (const [id, edge] of Object.entries(old.routes)) {
     assert.deepEqual(repaired.snapshot.routes[id].pins, edge.pins);
@@ -751,4 +751,97 @@ test("lane migration repairs overlap once without moving explicit controls", asy
     snapshot: repaired.snapshot,
   });
   assert.deepEqual(again.snapshot.routes, repaired.snapshot.routes);
+});
+
+test("shared departure with a pre-card pin stays direct in preview, worker and lane-v1 migration", async () => {
+  const r = fixture(
+    scene(
+      "A",
+      "-> One\n  <<jump B>>\n-> Two\n  <<jump C>>\n-> Three\n  <<jump D>>",
+    ) +
+      scene("B", "hello") +
+      scene("C", "hello") +
+      scene("D", "hello"),
+  );
+  const first = await run(r),
+    s = first.snapshot;
+  const [a, ...targets] = r.model.records.map((r) => r.id);
+  s.positions = {
+    [a]: { x: 0, y: 0 },
+    ...Object.fromEntries(
+      targets.map((id, i) => [id, { x: 1000, y: -180 + i * 100 }]),
+    ),
+  };
+  const routes = Object.values(s.routes);
+  for (const [i, edge] of routes.entries()) {
+    edge.card = {
+      x: 450,
+      y: -130 + i * 90,
+      width: 180,
+      height: 38,
+      manual: true,
+    };
+    edge.reroute = true;
+  }
+  const pinned = routes[1];
+  pinned.pins = [{ id: "turn", x: 300, y: pinned.card.y }];
+  pinned.controlOrder = ["pin:turn", "card"];
+  const preview = previewRoutes(structuredClone(s), r.sizes);
+  const repaired = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: preview,
+  });
+  assertClear(repaired, r);
+  const direct = repaired.snapshot.routes[pinned.id];
+  assert.deepEqual(direct.points, preview.routes[pinned.id].points);
+  const beforeCard = direct.points.slice(
+    0,
+    direct.points.findIndex(
+      (p) => p.x >= direct.card.x - direct.card.width / 2,
+    ),
+  );
+  assert.ok(beforeCard.length >= 3);
+  assert.ok(
+    beforeCard.every((p) => p.y <= 50 && p.y >= pinned.card.y),
+    "no opposite-direction dogleg between port and pin",
+  );
+  assert.deepEqual(direct.pins, pinned.pins);
+  assert.deepEqual(direct.card, pinned.card);
+
+  const legacy = structuredClone(repaired.snapshot);
+  legacy.lanes = 1;
+  const old = legacy.routes[pinned.id],
+    pin = old.pins[0];
+  const i = old.points.findIndex((p) => p.x === pin.x && p.y === pin.y);
+  assert.ok(i > 0);
+  old.points = [
+    old.points[0],
+    { x: 272, y: 50 },
+    { x: 272, y: 82 },
+    { x: 300, y: 82 },
+    ...old.points.slice(i),
+  ];
+  const migrated = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: legacy,
+  });
+  assertClear(migrated, r);
+  assert.deepEqual(migrated.snapshot.positions, legacy.positions);
+  assert.deepEqual(
+    migrated.snapshot.routes[pinned.id].points,
+    direct.points,
+    "retire the stored automatic dogleg",
+  );
+  for (const edge of Object.values(legacy.routes)) {
+    assert.deepEqual(migrated.snapshot.routes[edge.id].pins, edge.pins);
+    assert.deepEqual(migrated.snapshot.routes[edge.id].card, edge.card);
+  }
+  const again = await run({
+    ...r,
+    scope: { kind: "repair" },
+    snapshot: migrated.snapshot,
+  });
+  assert.deepEqual(again.snapshot.routes, migrated.snapshot.routes);
 });

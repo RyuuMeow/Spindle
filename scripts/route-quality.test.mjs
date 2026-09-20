@@ -241,3 +241,103 @@ test("vertical port snapping uses its transverse axis without shifting travel di
   };
   assert.deepEqual(snapObjects(s, { b: p(6, 405) }, sizes), { b: p(0, 405) });
 });
+
+test("same source shares the departure path beyond the fixed trunk, including pin corners", () => {
+  const a = route(
+    "a",
+    "s",
+    "t1",
+    [p(0, 0), p(40, 0), p(40, -180), p(600, -180)],
+    {
+      card: { x: 300, y: -180, width: 160, height: 32 },
+      groupId: "first",
+    },
+  );
+  const b = route(
+    "b",
+    "s",
+    "t2",
+    [p(0, 0), p(40, 0), p(40, -100), p(600, -100)],
+    {
+      card: { x: 300, y: -100, width: 160, height: 32 },
+      groupId: "second",
+      pins: [{ id: "corner", x: 40, y: -100 }],
+      controlOrder: ["pin:corner", "card"],
+    },
+  );
+  const s = state(a, b),
+    before = structuredClone(s);
+  assert.equal(
+    laneConflict(b, [a], s),
+    0,
+    "the common departure is not a conflict",
+  );
+  separateLanes(s, [], new Set(["b"]));
+  assert.deepEqual(
+    s,
+    before,
+    "do not add a dogleg to separate the shared prefix",
+  );
+});
+
+test("same-source sharing follows the actual split, independent of collinear pin vertices or port side", () => {
+  for (const vertical of [false, true]) {
+    const transform = (p) => (vertical ? { x: p.y, y: p.x } : p);
+    const a = route(
+      "a",
+      "s",
+      "t1",
+      [p(0, 0), p(120, 0), p(120, 160), p(600, 160)].map(transform),
+    );
+    const b = route(
+      "b",
+      "s",
+      "t2",
+      [p(0, 0), p(60, 0), p(120, 0), p(120, 320), p(700, 320)].map(transform),
+      {
+        pins: [{ id: "along", ...transform(p(60, 0)) }],
+        controlOrder: ["pin:along"],
+      },
+    );
+    if (vertical) a.sourceSide = b.sourceSide = "bottom";
+    const s = state(a, b),
+      before = structuredClone(s);
+    assert.equal(laneConflict(a, [b], s), 0);
+    assert.equal(laneConflict(b, [a], s), 0);
+    separateLanes(s, [], new Set(["a", "b"]));
+    assert.deepEqual(s, before);
+  }
+});
+
+test("same source does not allow unrelated ports, reverse travel, or rejoining after a split", () => {
+  const a = route("a", "s", "t1", [
+    p(0, 0),
+    p(200, 0),
+    p(200, 100),
+    p(600, 100),
+  ]);
+  const b = route("b", "s", "t2", [
+    p(0, 0),
+    p(80, 0),
+    p(80, 200),
+    p(300, 200),
+    p(300, 100),
+    p(700, 100),
+  ]);
+  assert.ok(
+    laneConflict(a, [b], state(a, b)) > 0,
+    "same-source routes cannot rejoin after splitting toward different targets",
+  );
+  const reverse = route("reverse", "s", "t3", [
+    p(0, 0),
+    p(40, 0),
+    p(40, -100),
+    p(200, -100),
+    p(200, 100),
+    p(100, 100),
+    p(100, 300),
+  ]);
+  assert.ok(laneConflict(a, [reverse], state(a, reverse)) > 0);
+  const anotherPort = { ...a, id: "port", target: "t4", sourceSide: "bottom" };
+  assert.ok(laneConflict(a, [anotherPort], state(a, anotherPort)) > 0);
+});

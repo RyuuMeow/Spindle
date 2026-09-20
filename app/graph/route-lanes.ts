@@ -65,14 +65,14 @@ function subtract(intervals: number[][], lo: number, hi: number) {
         ].filter(([a, b]) => b - a > EPS),
   );
 }
-/** Only the short departure trunk and a co-directed destination tail may be shared. */
+/** Share the continuous source prefix and a co-directed destination tail only. */
 function conflict(
   a: Segment,
   b: Segment,
   route: RouteGeometry,
   other: RouteGeometry,
-  state: GraphLayoutSnapshot,
-  tails?: [number, number],
+  shared: number,
+  tails: [number, number],
 ) {
   if (
     a.horizontal !== b.horizontal ||
@@ -88,8 +88,7 @@ function conflict(
     a.direction === b.direction &&
     Math.abs(a.axis - b.axis) < EPS
   ) {
-    const tailA = tails?.[0] ?? tailStart(route),
-      tailB = tails?.[1] ?? tailStart(other);
+    const [tailA, tailB] = tails;
     const at = (s: Segment, t: number) =>
       (s.horizontal ? s.a.x : s.a.y) +
       s.direction * Math.max(0, t - s.distance);
@@ -101,49 +100,104 @@ function conflict(
           ? subtract(remaining, Math.max(cutoffA, cutoffB), Infinity)
           : subtract(remaining, -Infinity, Math.min(cutoffA, cutoffB));
   }
-  if (route.source === other.source) {
-    const start = route.points[0],
-      next = route.points[1];
-    const stub = {
-      x: start.x + Math.sign(next.x - start.x) * 24,
-      y: start.y + Math.sign(next.y - start.y) * 24,
-    };
-    const shared =
-      route.groupId && route.groupId === other.groupId
-        ? state.trunks[route.groupId]?.points || [start, stub]
-        : [start, stub];
-    for (const s of segments(shared))
-      if (
-        s.horizontal === a.horizontal &&
-        Math.abs(s.axis - a.axis) < EPS &&
-        Math.abs(s.axis - b.axis) < EPS
-      )
-        remaining = subtract(remaining, s.lo, s.hi);
+  if (
+    shared > Math.max(a.distance, b.distance) + EPS &&
+    a.direction === b.direction &&
+    Math.abs(a.axis - b.axis) < EPS
+  ) {
+    const until = (s: Segment) =>
+      (s.horizontal ? s.a.x : s.a.y) + s.direction * (shared - s.distance);
+    remaining =
+      a.direction > 0
+        ? subtract(remaining, -Infinity, Math.min(until(a), until(b)))
+        : subtract(remaining, Math.max(until(a), until(b)), Infinity);
   }
   return (
     remaining.reduce((n, [a, b]) => n + b - a, 0) *
     (LANE_GAP - Math.abs(a.axis - b.axis))
   );
 }
-type RouteInfo = { segments: Segment[]; tail: number };
+type RouteInfo = {
+  segments: Segment[];
+  tail: number;
+  head: number;
+  prefixes: WeakMap<Point[], number>;
+};
 type RouteCache = WeakMap<Point[], RouteInfo>;
 function routeInfo(route: RouteGeometry, cache: RouteCache) {
   let value = cache.get(route.points);
   if (!value) {
-    value = { segments: segments(route.points), tail: tailStart(route) };
+    value = {
+      segments: segments(route.points),
+      tail: tailStart(route),
+      head: route.card
+        ? distanceAt(route, {
+            x: route.card.x - route.card.width / 2,
+            y: route.card.y,
+          })
+        : Infinity,
+      prefixes: new WeakMap(),
+    };
     cache.set(route.points, value);
   }
   return value;
 }
+/** Walk both polylines together, ignoring extra collinear vertices introduced by pins.
+ * A split (or the first card) ends source sharing; a later rejoin is a distinct lane.
+ */
+function sourcePrefix(
+  route: RouteGeometry,
+  other: RouteGeometry,
+  cache: RouteCache,
+) {
+  const own = routeInfo(route, cache),
+    info = routeInfo(other, cache);
+  const cached = own.prefixes.get(other.points);
+  if (cached !== undefined) return cached;
+  let distance = 0;
+  const from = route.points[0],
+    to = other.points[0];
+  if (
+    route.source === other.source &&
+    route.sourceSide === other.sourceSide &&
+    from &&
+    to &&
+    Math.abs(from.x - to.x) < EPS &&
+    Math.abs(from.y - to.y) < EPS
+  ) {
+    let i = 0,
+      j = 0;
+    while (i < own.segments.length && j < info.segments.length) {
+      const a = own.segments[i],
+        b = info.segments[j];
+      if (
+        a.horizontal !== b.horizontal ||
+        a.direction !== b.direction ||
+        Math.abs(a.axis - b.axis) >= EPS
+      )
+        break;
+      const endA = a.distance + a.hi - a.lo,
+        endB = b.distance + b.hi - b.lo;
+      distance = Math.min(endA, endB, own.head, info.head);
+      if (distance >= own.head - EPS || distance >= info.head - EPS) break;
+      if (endA <= distance + EPS) i++;
+      if (endB <= distance + EPS) j++;
+    }
+  }
+  own.prefixes.set(other.points, distance);
+  info.prefixes.set(route.points, distance);
+  return distance;
+}
 export function laneConflict(
   route: RouteGeometry,
   others: RouteGeometry[],
-  state: GraphLayoutSnapshot,
+  _state: GraphLayoutSnapshot,
   cache: RouteCache = new WeakMap(),
 ) {
   const own = routeInfo(route, cache);
   return others.reduce((n, other) => {
-    const info = routeInfo(other, cache);
+    const info = routeInfo(other, cache),
+      shared = sourcePrefix(route, other, cache);
     return (
       n +
       info.segments.reduce(
@@ -151,7 +205,7 @@ export function laneConflict(
           n +
           own.segments.reduce(
             (n, a) =>
-              n + conflict(a, b, route, other, state, [own.tail, info.tail]),
+              n + conflict(a, b, route, other, shared, [own.tail, info.tail]),
             0,
           ),
         0,
@@ -266,7 +320,7 @@ export function separateLanes(
         const conflicts = settled.flatMap((r) =>
           routeInfo(r, cache).segments.filter(
             (b) =>
-              conflict(s, b, route, r, state, [
+              conflict(s, b, route, r, sourcePrefix(route, r, cache), [
                 routeInfo(route, cache).tail,
                 routeInfo(r, cache).tail,
               ]) > EPS,
