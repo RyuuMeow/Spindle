@@ -827,6 +827,126 @@ const result = { errors: [], console: [], requests: [] };
       quality: 55,
     });
 
+    // Reopen a lane-v1 profile with the reported source-side dogleg and a pre-card pin.
+    const sourceFixture = await state();
+    const grouped = Object.values(sourceFixture.layout.routes).find(
+      (r) => r.groupId && r.card,
+    );
+    const siblings = Object.values(sourceFixture.layout.routes).filter(
+      (r) => r.groupId === grouped.groupId,
+    );
+    assert.ok(siblings.length >= 3);
+    const sourceNode = page.locator(
+      '.react-flow__node-scene[data-id="' + grouped.source + '"]',
+    );
+    const sourceBounds = await sourceNode.boundingBox();
+    const sourceSize = {
+      width: sourceBounds.width / sourceFixture.viewport.zoom,
+      height: sourceBounds.height / sourceFixture.viewport.zoom,
+    };
+    await app.close();
+    app = null;
+    const savedSource = JSON.parse(fs.readFileSync(sessionPath, "utf8"));
+    const sourceSession = Object.values(savedSource).find(
+      (v) => v.session?.tabs?.length,
+    ).session;
+    const sourceTab = sourceSession.tabs.find(
+      (t) => t.id === sourceSession.activeId,
+    );
+    const oldSource = sourceTab.graph.layout;
+    oldSource.lanes = 1;
+    let positionIndex = 0;
+    for (const id of Object.keys(oldSource.positions))
+      oldSource.positions[id] =
+        id === grouped.source
+          ? { x: 0, y: 0 }
+          : {
+              x: 1100 + (positionIndex % 2) * 500,
+              y: -240 + positionIndex++ * 240,
+            };
+    const sourceY = sourceSize.height / 2;
+    for (const [i, sibling] of siblings.entries()) {
+      const r = oldSource.routes[sibling.id];
+      r.card = { ...r.card, x: 550, y: sourceY - 200 + i * 100, manual: true };
+      r.pins = [];
+      r.controlOrder = ["card"];
+    }
+    const pinnedSource = oldSource.routes[siblings[1].id];
+    const turn = {
+      id: "shared-source-turn",
+      x: sourceSize.width + 68,
+      y: pinnedSource.card.y,
+    };
+    pinnedSource.pins = [turn];
+    pinnedSource.controlOrder = ["pin:" + turn.id, "card"];
+    pinnedSource.points = [
+      { x: sourceSize.width, y: sourceY },
+      { x: sourceSize.width + 40, y: sourceY },
+      { x: sourceSize.width + 40, y: sourceY + 32 },
+      { x: turn.x, y: sourceY + 32 },
+      { x: turn.x, y: turn.y },
+      { x: pinnedSource.card.x + pinnedSource.card.width / 2 + 24, y: turn.y },
+      pinnedSource.points.at(-1),
+    ];
+    sourceTab.graph.positions = oldSource.positions;
+    sourceTab.graph.viewport = { x: 40, y: 280, zoom: 1 };
+    sourceTab.graph.undo = [];
+    sourceTab.graph.redo = [];
+    fs.writeFileSync(sessionPath, JSON.stringify(savedSource));
+    app = await launch({
+      executablePath:
+        process.env.DESKTOP_EXECUTABLE ||
+        path.resolve("node_modules/electron/dist/electron.exe"),
+      args: [
+        ...(process.env.DESKTOP_EXECUTABLE
+          ? []
+          : [path.resolve("dist-desktop/app/desktop/main.cjs")]),
+        "--user-data-dir=" + profile,
+        "--force-device-scale-factor=1",
+      ],
+      timeout: 60000,
+    });
+    page = await app.firstWindow();
+    await page.context().setOffline(true);
+    page.on("pageerror", (e) => result.errors.push(e.message));
+    await (
+      await app.browserWindow(page)
+    ).evaluate((w) => {
+      w.setContentSize(1440, 960);
+      w.show();
+      w.focus();
+    });
+    await page.locator(".react-flow__edge").first().waitFor();
+    await page.waitForTimeout(1200);
+    const sharedAfter = await state(),
+      repairedSource = sharedAfter.layout.routes[pinnedSource.id];
+    assert.equal(sharedAfter.layout.lanes, 2);
+    assert.deepEqual(sharedAfter.layout.positions, oldSource.positions);
+    assert.deepEqual(repairedSource.pins, pinnedSource.pins);
+    assert.deepEqual(repairedSource.card, pinnedSource.card);
+    const pinIndex = repairedSource.points.findIndex(
+      (p) => p.x === turn.x && p.y === turn.y,
+    );
+    assert.ok(pinIndex > 0);
+    assert.ok(
+      repairedSource.points
+        .slice(0, pinIndex + 1)
+        .every((p) => p.y <= sourceY + 0.01 && p.y >= turn.y - 0.01),
+      "restored pin approaches directly without opposite-direction detour",
+    );
+    await page
+      .locator('.flow-edge-label[data-route-id="' + pinnedSource.id + '"]')
+      .click();
+    await settle();
+    await page.screenshot({ path: path.join(out, "shared-source.png") });
+    await page.screenshot({
+      path: path.join(out, "shared-source.jpg"),
+      type: "jpeg",
+      quality: 70,
+    });
+    result.sharedSourceMigration = true;
+    result.sharedSourcePoints = repairedSource.points;
+
     assert.equal(result.errors.length, 0);
   } catch (e) {
     if (page) await page.screenshot({ path: path.join(out, "failure.png") });

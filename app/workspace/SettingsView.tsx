@@ -389,7 +389,8 @@ export default function SettingsView({
                 <section className="settings-group">
                   <h3>版本記錄</h3>
                   <p>
-                    0.8.3：小幅錯位自動吸附對齊；不同去向使用平行間距，同目的地保留匯流。
+                    0.8.4：同來源共用路段不再強制錯開；保留 pin
+                    與分岔後的平行間距。
                   </p>
                   <p className="setting-help">
                     結構檢查協助找出劇本問題，不會執行遊戲命令。

@@ -1,6 +1,15 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.8.3**，2026-09-20。
+版本：Windows x64 **0.8.4**，2026-09-20。
+
+## 0.8.4 同來源共用路段
+
+- 修正只豁免短幹線、導致同來源線路被推成多餘折返的問題；以連續共用前綴辨認可重疊路段，涵蓋轉彎及 pin。分岔後不同去向、反向通行及重新交疊仍需分線。
+- 0.8.3 保存的自動折線原位修整；節點、手動卡片、pin 與視野不移動，文字無變更。
+- [單元／服務測試](../outputs/shared-source-unit.log) **146／146**；包含水平／垂直出口、不同分支組、共線 pin、實際分岔邊界、Worker／預覽一致與舊折返遷移。
+- [TypeScript](../outputs/shared-source-typecheck.log)與 [20 檔圖表範圍 lint](../outputs/shared-source-lint.json)通過；全庫 lint 既有基線未清零。
+- [0.8.4 Portable 實包驗收](../outputs/shared-source-portable-0.8.4/result.json)通過：重啟載入 lanes=1 的來源折返後恢復直接路徑，節點、卡片、pin 保留；另驗證手動操作、Undo、模式切換、文字歷史及離線 Worker／WASM，頁面錯誤為零。[實際畫面](../outputs/shared-source-portable-0.8.4/shared-source.png)。
+- [網頁 build](../outputs/shared-source-web-build.log)、[桌面 build](../outputs/shared-source-stage.log)及[Setup／Portable 封裝](../outputs/shared-source-package.log)通過；[SHA256／離線資源核對](../outputs/shared-source-release-verification.json)。安裝精靈、混合 DPI、多螢幕未實測。
 
 ## 0.8.3 吸附對齊與依目的地分線
 
