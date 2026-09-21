@@ -416,3 +416,34 @@
 .monaco-editor .monaco-hover .hover-row .actions {
   font: 13px/1.6 var(--font-sans, "Segoe UI", sans-serif) !important;
 }
+/* Find uses div buttons: keep their hit boxes identical under global border-box. */
+.monaco-editor .find-widget .button {
+  box-sizing: border-box;
+  width: 22px !important;
+  height: 22px !important;
+  padding: 0 !important;
+  align-items: center;
+  justify-content: center;
+}
+.monaco-editor .find-widget > .button.codicon-widget-close {
+  top: 5px !important;
+  right: 4px;
+  margin: 0;
+}
+/* Plain control tips must not steal hover/click from the control beneath them.
+   Diagnostic hovers and tips with links/actions remain interactive. */
+.workbench-hover-container:has(.workbench-hover.with-pointer):not(
+    :has(a, button, input, [role="button"])
+  ),
+.workbench-hover-container:has(.workbench-hover.with-pointer):not(
+    :has(a, button, input, [role="button"])
+  )
+  * {
+  pointer-events: none !important;
+}
+/* The close icon is self-explanatory; its framework hover can oscillate near
+   the top caption. Keep its accessible label, without a visual popup. */
+body:has(.find-widget > .codicon-widget-close:hover)
+  .workbench-hover-container:has(.with-pointer) {
+  display: none !important;
+}

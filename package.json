@@ -39,7 +39,8 @@
     "test:project-lifecycle": "node --test scripts/project-lifecycle.test.mjs",
     "test:project-launcher": "node scripts/test-project-launcher.cjs",
     "test:command-quick-fix": "node scripts/test-command-quick-fix.cjs",
-    "test:tab-lifecycle": "node scripts/test-tab-lifecycle.cjs"
+    "test:tab-lifecycle": "node scripts/test-tab-lifecycle.cjs",
+    "test:find-controls": "node scripts/test-find-controls.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
