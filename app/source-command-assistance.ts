@@ -1,4 +1,5 @@
 import type { editor, IDisposable } from "monaco-editor";
+import { sceneAt, type SceneLocation } from "./scene-link";
 import type { Command } from "./parser";
 import { findCommand } from "./command-catalog";
 import { variableAt } from "./variable-completion";
@@ -12,6 +13,7 @@ import {
   commandPopup,
   completionDescription,
   variablePopup,
+  scenePopup,
 } from "./command-popup";
 import "./editor-assistance.css";
 
@@ -49,6 +51,7 @@ export function sourceCommandAssistance(
   placement: typeof import("monaco-editor").editor.ContentWidgetPositionPreference,
   variables: () => YarnVariable[] = () => [],
   hasError: (line: number) => boolean = () => false,
+  scenes: () => SceneLocation[] = () => [],
 ): IDisposable {
   const host = editor.getDomNode()!;
   host.dataset.spindleAssisted = "";
@@ -242,12 +245,17 @@ export function sourceCommandAssistance(
         p.column - 1,
         variables(),
       );
+      const scene = sceneAt(
+        model.getLineContent(p.lineNumber),
+        p.column - 1,
+        scenes(),
+      );
       const hint = commandHover(
         model.getLineContent(p.lineNumber),
         p.column - 1,
         commands(),
       );
-      if (!hint && !variable) {
+      if (!hint && !variable && !scene) {
         hide();
         return;
       }
@@ -262,10 +270,12 @@ export function sourceCommandAssistance(
           return;
         show(
           p.lineNumber,
-          (variable?.from ?? hint!.from) + 1,
+          (variable?.from ?? scene?.from ?? hint!.from) + 1,
           variable
             ? variablePopup(variable.variable)
-            : commandPopup(hint!.command, hint!.parameterIndex),
+            : scene
+              ? scenePopup(scene.scene)
+              : commandPopup(hint!.command, hint!.parameterIndex),
         );
       }, 350);
     }),

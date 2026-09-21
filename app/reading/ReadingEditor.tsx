@@ -68,7 +68,7 @@ type Props = {
   onRegisterCommand?: (command: Command) => void;
   variables?: YarnVariable[];
   issues?: import("../parser").Issue[];
-  scenes?: { name: string; file: string }[];
+  scenes?: { name: string; file: string; start?: number }[];
   onEdit: (edits: TextEdit[]) => void;
   onUndo: (redo?: boolean) => void;
   onCursor: (line: number, column: number, scrollTop: number) => void;

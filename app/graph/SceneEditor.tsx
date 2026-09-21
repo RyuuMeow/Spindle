@@ -286,6 +286,7 @@ export default function SceneEditor(props: Props) {
                 [...d.text.matchAll(/^title:\s*(\w+)/gm)].map((m) => ({
                   name: m[1],
                   file: d.name,
+                  start: d.text.slice(0, m.index).split("\n").length,
                 })),
               ),
             () => [

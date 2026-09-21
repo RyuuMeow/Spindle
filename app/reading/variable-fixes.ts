@@ -5,12 +5,14 @@ import {
   hoverTooltip,
   closeHoverTooltips,
 } from "@codemirror/view";
+import type { Command } from "../parser";
 import type { YarnVariable } from "../variable-completion";
 import { collectVariables } from "../variable-completion";
 import { variableQuickFix } from "../variable-quick-fix";
 export function variableFixes(
   variables: () => YarnVariable[],
   errors: (line: number) => string[] = () => [],
+  commands: () => Command[] = () => [],
 ) {
   const known = (view: EditorView) => [
     ...variables(),
@@ -18,7 +20,12 @@ export function variableFixes(
   ];
   const fixAt = (view: EditorView, pos: number) => {
     const line = view.state.doc.lineAt(pos);
-    return variableQuickFix(line.text, pos - line.from, known(view));
+    return variableQuickFix(
+      line.text,
+      pos - line.from,
+      known(view),
+      commands(),
+    );
   };
   const apply = (view: EditorView, pos: number) => {
     if (view.composing || view.state.readOnly) return false;
@@ -39,10 +46,15 @@ export function variableFixes(
   return {
     at: (state: import("@codemirror/state").EditorState, pos: number) => {
       const line = state.doc.lineAt(pos);
-      return variableQuickFix(line.text, pos - line.from, [
-        ...variables(),
-        ...collectVariables([{ name: "", text: state.doc.toString() }]),
-      ]);
+      return variableQuickFix(
+        line.text,
+        pos - line.from,
+        [
+          ...variables(),
+          ...collectVariables([{ name: "", text: state.doc.toString() }]),
+        ],
+        commands(),
+      );
     },
     apply,
     extension: [
@@ -70,6 +82,7 @@ export function variableFixes(
                   line.text,
                   line.text.indexOf("<<") + 2,
                   vars,
+                  commands(),
                 );
               if (line.length && (fix || errors(line.number).length))
                 marks.push(
@@ -102,7 +115,9 @@ export function variableFixes(
               const message = document.createElement("div");
               message.textContent = messages.length
                 ? messages.join("\n")
-                : `變數「${fix!.name}」尚未宣告`;
+                : fix!.replace
+                  ? fix!.label
+                  : `變數「${fix!.name}」尚未宣告`;
               dom.appendChild(message);
               if (fix?.insert) {
                 const button = document.createElement("button");

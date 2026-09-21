@@ -426,7 +426,7 @@ test("declaration quick fix chooses literal defaults and does not guess unknown 
   );
   assert.equal(
     missingDeclaration("<<set $key = true>>", 10, [])?.insert,
-    "<<declare $key = false>>",
+    "<<declare $key = true>>",
   );
   assert.equal(
     missingDeclaration("<<set $v = unknown()>>", 10, [])?.insert,
@@ -558,11 +558,17 @@ test("quote fix replaces only bare assignment values", () => {
   const fix = variableQuickFix(line, 10, [
     { name: "$n", declared: true, type: "string" },
   ]);
-  for (const type of ["number", "boolean", "expression"])
+  for (const type of ["number", "boolean"])
     assert.equal(
-      variableQuickFix(line, 10, [{ name: "$n", declared: true, type }]),
-      null,
+      variableQuickFix(line, 10, [{ name: "$n", declared: true, type }]).insert,
+      type === "number" ? "0" : "true",
     );
+  assert.equal(
+    variableQuickFix(line, 10, [
+      { name: "$n", declared: true, type: "expression" },
+    ]),
+    null,
+  );
   assert.equal(
     line.slice(0, fix.from) + fix.insert + line.slice(fix.to),
     '  <<set $n = "hello world">> // note',
@@ -576,4 +582,78 @@ test("quote fix replaces only bare assignment values", () => {
     "// <<set $n = hello>>",
   ])
     assert.equal(variableQuickFix(text, 10, [])?.replace ?? false, false);
+});
+
+test("quick fixes repair missing variable prefixes, typed values and missing arguments", () => {
+  const { variableQuickFix } = createRequire(import.meta.url)(
+    path.resolve("outputs/tests/variable-fix.cjs"),
+  );
+  const vars = [
+    { name: "$n", type: "number", declared: true },
+    { name: "$flag", type: "boolean", declared: true },
+    { name: "$s", type: "string", declared: true },
+  ];
+  const repair = (line, commands = []) => {
+    const fix = variableQuickFix(line, 4, vars, commands);
+    assert(fix, line);
+    return line.slice(0, fix.from) + fix.insert + line.slice(fix.to);
+  };
+  assert.equal(repair("<<declare count = 0>>"), "<<declare $count = 0>>");
+  assert.equal(repair("<<set n = 2>>"), "<<set $n = 2>>");
+  assert.equal(repair("<<set $n = n + 1>>"), "<<set $n = $n + 1>>");
+  assert.equal(repair("<<if flag>>"), "<<if $flag>>");
+  assert.equal(repair("Narrator: {n}"), "Narrator: {$n}");
+  assert.equal(repair("<<set $n = hello>>"), "<<set $n = 0>>");
+  assert.equal(repair("<<set $s = 12>>"), '<<set $s = "">>');
+  assert.equal(repair("<<set $flag = 12>>"), "<<set $flag = true>>");
+  assert.equal(repair("<<set $n = >>"), "<<set $n = 0>>");
+  assert.equal(repair("<<declare $fresh>>"), "<<declare $fresh = 0>>");
+  const commands = [
+    {
+      name: "test",
+      params: [
+        { name: "duration", type: "number", required: true },
+        { name: "enabled", type: "boolean", required: true },
+      ],
+    },
+  ];
+  assert.equal(repair('<<test "bad" true>>', commands), "<<test 0 true>>");
+  assert.equal(repair("<<test>>", commands), "<<test 0 true>>");
+  assert.equal(repair("<<if>>"), "<<if true>>");
+  assert.equal(repair("<<elseif 12>>"), "<<elseif true>>");
+  assert.equal(repair("<<wait>>"), "<<wait 0>>");
+
+  const unknownVars = [
+    ...vars,
+    { name: "$computed", type: "expression", declared: true },
+  ];
+  assert.equal(
+    variableQuickFix("<<set $n = $computed>>", 4, unknownVars),
+    null,
+  );
+  assert.equal(
+    variableQuickFix("<<test $computed true>>", 4, unknownVars, commands),
+    null,
+  );
+
+  for (const text of [
+    "Narrator: n",
+    "<<jump n>>",
+    '<<set $s = "n">>',
+    "// <<set n = 2>>",
+  ])
+    assert.equal(variableQuickFix(text, 4, vars), null, text);
+  assert.deepEqual(
+    variableParser
+      .missingVariablePrefixes("<<if n > 1>>", ["$n"])
+      .map((h) => h.name),
+    ["n"],
+  );
+});
+test("scene hover resolves unique locations only", () => {
+  const { sceneAt } = createRequire(import.meta.url)(linkOutput);
+  const scenes = [{ name: "Village", file: "chapter.yarn", start: 15 }];
+  assert.equal(sceneAt("<<jump Village>>", 9, scenes).scene.start, 15);
+  assert.equal(sceneAt("<<jump Village>>", 9, [...scenes, ...scenes]), null);
+  assert.equal(sceneAt("Narrator: Village", 10, scenes), null);
 });

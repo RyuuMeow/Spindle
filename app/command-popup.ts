@@ -103,3 +103,22 @@ export function variablePopup(
   }
   return dom;
 }
+
+export function scenePopup(scene: import("./scene-link").SceneLocation) {
+  const dom = document.createElement("div");
+  dom.className = "reading-command-tooltip scene-tooltip";
+  for (const [className, text] of [
+    ["command-tip-heading", scene.name],
+    [
+      "command-tip-caption",
+      (scene.file || "") + (scene.start ? ":" + scene.start : ""),
+    ],
+    ["command-tip-description", "Ctrl＋點擊前往場景"],
+  ]) {
+    const row = document.createElement("div");
+    row.className = className;
+    row.textContent = text;
+    dom.appendChild(row);
+  }
+  return dom;
+}

@@ -446,3 +446,8 @@
 body:has(.find-widget:hover) .workbench-hover-container:has(.with-pointer) {
   display: none !important;
 }
+
+/* Keep selection geometry intact; trim only its painted area per visual line. */
+.monaco-editor .selected-text {
+  clip-path: inset(var(--spindle-selection-inset, 0px) 0);
+}

@@ -1,3 +1,4 @@
+import { sceneAt } from "../scene-link";
 import { readingVariableAt } from "./variable-reference";
 import { variableFixes } from "./variable-fixes";
 import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
@@ -39,6 +40,7 @@ import {
   commandPopup,
   completionDescription,
   variablePopup,
+  scenePopup,
 } from "../command-popup";
 import { commandTooltips } from "./command-tooltips";
 import { readingIcon } from "./icons";
@@ -47,13 +49,13 @@ import "../editor-assistance.css";
 /** Same input contract for the continuous reader and the graph scene editor. */
 export function commandEditing(
   commands: () => Command[],
-  scenes: () => { name: string; file?: string }[] = () => [],
+  scenes: () => { name: string; file?: string; start?: number }[] = () => [],
   characters: () => string[] = () => [],
   variables: () => YarnVariable[] = () => [],
   register?: (command: Command) => void,
   errors: (line: number) => string[] = () => [],
 ) {
-  const declarations = variableFixes(variables, errors);
+  const declarations = variableFixes(variables, errors, commands);
   const dismiss = StateEffect.define<boolean>();
   const focusChanged = StateEffect.define<boolean>();
   const compositionChanged = StateEffect.define<boolean>();
@@ -163,6 +165,7 @@ export function commandEditing(
         options: [
           ...commandCatalog(commands()).map((c) => ({
             label: c.name,
+            apply: c.name === "declare" ? "declare $" : c.name,
             type: c.builtin ? "keyword" : "function",
             detail: c.params
               .map(
@@ -239,6 +242,7 @@ export function commandEditing(
           errors(line.number).length
         )
           return null;
+        const scene = sceneAt(line.text, pos - line.from, scenes());
         const hit = readingVariableAt(view, pos, variables());
         return hit
           ? {
@@ -247,7 +251,14 @@ export function commandEditing(
               above: true,
               create: () => ({ dom: variablePopup(hit.variable) }),
             }
-          : null;
+          : scene
+            ? {
+                pos: line.from + scene.from,
+                end: line.from + scene.to,
+                above: true,
+                create: () => ({ dom: scenePopup(scene.scene) }),
+              }
+            : null;
       },
       { hoverTime: 350, hideOnChange: true },
     ),
@@ -261,7 +272,12 @@ export function commandEditing(
       (state, pos, view) =>
         errors(state.doc.lineAt(pos).number).length > 0 ||
         !!declarations.at(state, pos) ||
-        !!readingVariableAt(view, pos, variables()),
+        !!readingVariableAt(view, pos, variables()) ||
+        !!sceneAt(
+          state.doc.lineAt(pos).text,
+          pos - state.doc.lineAt(pos).from,
+          scenes(),
+        ),
     ),
     EditorView.domEventHandlers({
       mousemove: (event, view) => {

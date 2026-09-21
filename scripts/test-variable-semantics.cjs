@@ -152,6 +152,89 @@ fs.writeFileSync(path.join(root, "sample.yarn"), source);
       };
     });
     assert.equal(caret.height, caret.font + 2);
+
+    const replaceLine = async (text, column = 4) => {
+      await page.evaluate(
+        async ({ text, column }) => {
+          const m = await new Promise((resolve) =>
+            window.require(["vs/editor/editor.main"], resolve),
+          );
+          const e = m.editor
+            .getEditors()
+            .find((e) => e.getDomNode()?.offsetParent);
+          e.executeEdits("test", [
+            {
+              range: new m.Range(3, 1, 3, e.getModel().getLineMaxColumn(3)),
+              text,
+            },
+          ]);
+          e.setPosition({ lineNumber: 3, column });
+          e.focus();
+        },
+        { text, column },
+      );
+    };
+    for (const [before, after] of [
+      ["<<set shared = 2>>", "<<set $shared = 2>>"],
+      ["<<set $shared = wrong>>", "<<set $shared = 0>>"],
+      ["<<set $label = 12>>", '<<set $label = "">>'],
+      ["<<set $shared = >>", "<<set $shared = 0>>"],
+    ]) {
+      await replaceLine(before);
+      await page.keyboard.press("Alt+Enter");
+      assert((await activeSource()).text.includes(after), before);
+    }
+    await replaceLine("<<decl>>", 7);
+    await page.keyboard.press("Control+Space");
+    await page.locator(".suggest-widget.visible").waitFor();
+    await page.keyboard.press("Tab");
+    assert(
+      (await activeSource()).text.includes("<<declare $>>"),
+      "declare completion includes variable prefix",
+    );
+    await replaceLine("<<jump Definitions>>", 1);
+    await page.keyboard.press("Escape");
+    await page
+      .locator(".monaco-editor .view-line")
+      .filter({ hasText: "jump Definitions" })
+      .hover();
+    const scenePoint = await page
+      .locator(".monaco-editor .view-line")
+      .filter({ hasText: "jump Definitions" })
+      .evaluate((el) => {
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) {
+          const i = node.textContent.indexOf("Definitions");
+          if (i < 0) continue;
+          const range = document.createRange();
+          range.setStart(node, i + 2);
+          range.setEnd(node, i + 3);
+          const r = range.getBoundingClientRect();
+          return { x: r.left + 1, y: r.top + r.height / 2 };
+        }
+      });
+    await page.mouse.move(scenePoint.x, scenePoint.y);
+    await page.locator(".scene-tooltip:visible").waitFor();
+    assert(
+      (await page.locator(".scene-tooltip:visible").innerText()).includes(
+        "definitions.yarn:1",
+      ),
+    );
+    await replaceLine("<<set $shared = true>>");
+    await page.evaluate(async () => {
+      const m = await new Promise((resolve) =>
+        window.require(["vs/editor/editor.main"], resolve),
+      );
+      const e = m.editor.getEditors().find((e) => e.getDomNode()?.offsetParent);
+      e.setSelection(new m.Range(3, 1, 4, 5));
+    });
+    const paint = await page
+      .locator(".monaco-editor .selected-text")
+      .first()
+      .evaluate((el) => getComputedStyle(el).clipPath);
+    assert(paint.startsWith("inset(") && paint !== "inset(0px 0px)", paint);
+    await page.screenshot({ path: path.join(base, "selection-source.png") });
     for (const mode of ["source", "reading", "graph"]) {
       await page
         .getByRole("button", { name: "sample.yarn", exact: true })
@@ -204,6 +287,26 @@ fs.writeFileSync(path.join(root, "sample.yarn"), source);
           .filter({ hasText: /shared.*2/ })
           .last();
         await line.click();
+        await page.keyboard.press("Home");
+        await page.keyboard.press("Shift+End");
+        const selectionPaint = await page
+          .locator(host + " .cm-selectionBackground")
+          .first()
+          .evaluate((el) => getComputedStyle(el).maskImage);
+        assert(selectionPaint.includes("linear-gradient"), selectionPaint);
+        await page.screenshot({
+          path: path.join(base, "selection-" + mode + ".png"),
+        });
+        await page.keyboard.insertText("<<set $shared = wrong>>");
+        await page.keyboard.press("Alt+Enter");
+        await page
+          .locator(host + " .cm-line")
+          .filter({ hasText: /shared.*0/ })
+          .last()
+          .waitFor();
+        await page.keyboard.press("Home");
+        await page.keyboard.press("Shift+End");
+        await page.keyboard.insertText("<<set $shared = 2>>");
         // Editing exposes source text even in reading mode.
         point = await line.evaluate((el) => {
           const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -240,7 +343,7 @@ fs.writeFileSync(path.join(root, "sample.yarn"), source);
     }
     assert.deepEqual(pageErrors, []);
     console.log(
-      "PASS variable types, metadata and cross-file Ctrl navigation in source, reading and graph",
+      "PASS quick fixes, declare completion, scene hover, selection paint and variable navigation in source, reading and graph",
     );
   } finally {
     if (app)

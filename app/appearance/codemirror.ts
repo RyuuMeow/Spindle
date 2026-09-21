@@ -24,6 +24,10 @@ function theme(s: Typography, declarations: string[]) {
       ".cm-cursor": { borderLeftColor: s.cursor },
       "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
         backgroundColor: s.selection + " !important",
+        maskImage: `linear-gradient(to bottom, transparent ${Math.max(0, (s.fontSize * s.lineHeight - s.fontSize - 2) / 2)}px, black ${Math.max(0, (s.fontSize * s.lineHeight - s.fontSize - 2) / 2)}px, black ${s.fontSize * s.lineHeight - Math.max(0, (s.fontSize * s.lineHeight - s.fontSize - 2) / 2)}px, transparent ${s.fontSize * s.lineHeight - Math.max(0, (s.fontSize * s.lineHeight - s.fontSize - 2) / 2)}px)`,
+        maskSize: `100% ${s.fontSize * s.lineHeight}px`,
+        maskPosition: "center",
+        maskRepeat: "repeat-y",
       },
       ".cm-symbolMatch":
         s.symbolStyle === "background"

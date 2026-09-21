@@ -74,6 +74,14 @@ export default function CodeEditor({
   onNavigate?: (file: string, line: number) => void;
 }) {
   const { appearance, style } = useAppearance("source");
+  const selectionInset =
+    Math.max(0, (style.fontSize * style.lineHeight - style.fontSize - 2) / 2) +
+    "px";
+  useLayoutEffect(() => {
+    editorRef.current
+      ?.getDomNode()
+      ?.style.setProperty("--spindle-selection-inset", selectionInset);
+  }, [selectionInset, editorRef]);
   const highlightStyle = useRef(style);
   const highlights = useRef<ReturnType<typeof sourceHighlights> | null>(null);
   useLayoutEffect(() => {
@@ -338,7 +346,7 @@ export default function CodeEditor({
                   ...commandCatalog(latest.current.commands).map((c) => ({
                     label: c.name,
                     kind: c.builtin ? 14 : 1,
-                    insertText: c.name,
+                    insertText: c.name === "declare" ? "declare $" : c.name,
                     detail: c.params
                       .map(
                         (p) =>
@@ -429,6 +437,7 @@ export default function CodeEditor({
                 i.line === line &&
                 i.severity === "error",
             ),
+          () => latest.current.nodes,
         );
         editor.onDidDispose(() => assistance.dispose());
         const register = editor.addCommand(
@@ -444,14 +453,15 @@ export default function CodeEditor({
               latest.current.onRegisterCommand?.(candidate.command);
           },
         );
-        const applyVariableFix = (lineNumber: number) => {
+        const applyVariableFix = (lineNumber: number, offset?: number) => {
           const model = editor.getModel();
           if (!model || composing.current) return;
           const line = model.getLineContent(lineNumber);
           const fix = variableQuickFix(
             line,
-            line.indexOf("<<") + 2,
+            offset ?? line.indexOf("<<") + 2,
             latest.current.variables,
+            latest.current.commands,
           );
           if (!fix?.insert) return;
           editor.pushUndoStop();
@@ -470,9 +480,9 @@ export default function CodeEditor({
         };
         const variableFixCommand = editor.addCommand(
           0,
-          (_ctx, lineNumber: number, expected: string) => {
+          (_ctx, lineNumber: number, expected: string, offset?: number) => {
             if (editor.getModel()?.getLineContent(lineNumber) === expected)
-              applyVariableFix(lineNumber);
+              applyVariableFix(lineNumber, offset);
           },
         );
         const fixes = m.languages.registerCodeActionProvider("yarn", {
@@ -491,6 +501,7 @@ export default function CodeEditor({
               line,
               range.startColumn - 1,
               latest.current.variables,
+              latest.current.commands,
             );
             if (declaration?.insert && variableFixCommand)
               return {
@@ -502,7 +513,11 @@ export default function CodeEditor({
                     command: {
                       id: variableFixCommand,
                       title: "新增宣告",
-                      arguments: [range.startLineNumber, line],
+                      arguments: [
+                        range.startLineNumber,
+                        line,
+                        range.startColumn - 1,
+                      ],
                     },
                   },
                 ],
@@ -552,9 +567,10 @@ export default function CodeEditor({
                 model.getLineContent(position.lineNumber),
                 position.column - 1,
                 latest.current.variables,
+                latest.current.commands,
               )?.insert
             ) {
-              applyVariableFix(position.lineNumber);
+              applyVariableFix(position.lineNumber, position.column - 1);
               return;
             }
             const candidate =
@@ -583,6 +599,7 @@ export default function CodeEditor({
               line,
               position.column - 1,
               latest.current.variables,
+              latest.current.commands,
             );
             if (declaration?.insert && variableFixCommand)
               return {
@@ -601,7 +618,11 @@ export default function CodeEditor({
                       variableFixCommand +
                       "?" +
                       encodeURIComponent(
-                        JSON.stringify([position.lineNumber, line]),
+                        JSON.stringify([
+                          position.lineNumber,
+                          line,
+                          position.column - 1,
+                        ]),
                       ) +
                       ") · Alt+Enter",
                     isTrusted: { enabledCommands: [variableFixCommand] },
@@ -643,6 +664,9 @@ export default function CodeEditor({
           quickHover.dispose();
         });
         editorRef.current = editor;
+        editor
+          .getDomNode()
+          ?.style.setProperty("--spindle-selection-inset", selectionInset);
         api.current = m;
         for (const model of m.editor.getModels()) {
           if (

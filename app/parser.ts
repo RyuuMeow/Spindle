@@ -176,6 +176,48 @@ export function bareAssignmentText(value: string) {
     !/\b(?:and|or|xor|not|eq|neq|lt|gt|lte|gte)\b/.test(value)
   );
 }
+
+/** Only variable-required slots and known names inside expressions qualify. */
+export function missingVariablePrefixes(line: string, names: Iterable<string>) {
+  const known = new Set([...names].map((n) => n.replace(/^\$/, "")));
+  const hits: { from: number; to: number; name: string }[] = [];
+  const clean = line.replace(/"(?:\\.|[^"\\])*"|\/\/.*$/g, (m) =>
+    " ".repeat(m.length),
+  );
+  const target = /^\s*<<\s*(?:declare|set)\s+([A-Za-z_]\w*)\b/.exec(clean);
+  if (target) {
+    const from = target[0].lastIndexOf(target[1]);
+    hits.push({ from, to: from + target[1].length, name: target[1] });
+  }
+  const regions: { text: string; from: number }[] = [];
+  const call = /^\s*<<\s*(?:set|declare|if|elseif|once)\b/.exec(clean);
+  if (call)
+    regions.push({
+      text: clean.slice(
+        call[0].length,
+        clean.indexOf(">>") < 0 ? undefined : clean.indexOf(">>"),
+      ),
+      from: call[0].length,
+    });
+  for (const m of clean.matchAll(/\{([^{}]*)\}/g))
+    regions.push({ text: m[1], from: m.index! + 1 });
+  for (const region of regions)
+    for (const m of region.text.matchAll(/[A-Za-z_]\w*/g)) {
+      const from = region.from + m.index!;
+      if (
+        known.has(m[0]) &&
+        clean[from - 1] !== "$" &&
+        !/^\s*\(/.test(clean.slice(from + m[0].length)) &&
+        !/^(true|false|and|or|not|xor|as|number|string|boolean|to)$/.test(
+          m[0],
+        ) &&
+        !hits.some((h) => h.from === from)
+      )
+        hits.push({ from, to: from + m[0].length, name: m[0] });
+    }
+  return hits;
+}
+
 export function assignmentTypeError(
   args: string,
   types: ReadonlyMap<string, string>,
@@ -530,6 +572,17 @@ export function parse(docs: Doc[], commands: Command[]) {
     }
     if (!changed) break;
   }
+  for (const doc of docs)
+    doc.text.split(/\r?\n/).forEach((line, index) => {
+      for (const hit of missingVariablePrefixes(line, declarations.keys()))
+        issue(
+          doc.name,
+          index + 1,
+          "變數「" + hit.name + "」缺少 $ 前綴",
+          "error",
+          hit.from + 1,
+        );
+    });
   for (const n of nodes)
     for (const call of n.calls) {
       if (
@@ -544,6 +597,46 @@ export function parse(docs: Doc[], commands: Command[]) {
           "error",
           call.column,
         );
+      if (["if", "elseif", "wait"].includes(call.name)) {
+        const expected = call.name === "wait" ? "number" : "boolean";
+        const actual = expressionType(call.args.join(" "), declarations);
+        if (call.name === "wait" && !call.args.length)
+          issue(
+            n.file,
+            call.line,
+            "wait 缺少秒數 (number)",
+            "error",
+            call.column,
+          );
+        else if (actual && actual !== "expression" && actual !== expected)
+          issue(
+            n.file,
+            call.line,
+            call.name + " 預期 " + expected + "，收到 " + actual,
+            "error",
+            call.column,
+          );
+      }
+      const custom = commands.find((c) => c.name === call.name);
+      custom?.params.forEach((param, index) => {
+        const arg = call.args[index];
+        if (!arg || !(arg.startsWith("$") || arg.startsWith("{"))) return;
+        const type = expressionType(arg, declarations);
+        if (type && type !== "expression" && type !== param.type)
+          issue(
+            n.file,
+            call.line,
+            call.name +
+              "." +
+              param.name +
+              " 預期 " +
+              param.type +
+              "，收到 " +
+              type,
+            "error",
+            call.column,
+          );
+      });
       if (call.name === "set") {
         const error = assignmentTypeError(call.args.join(" "), declarations);
         if (error) issue(n.file, call.line, error, "error", call.column);
