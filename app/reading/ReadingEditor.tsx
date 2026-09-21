@@ -1,4 +1,5 @@
 "use client";
+import { copyText } from "@/app/clipboard";
 import { useEditorContext, captureCodeMirror } from "../mcp/editor-context";
 import { useCodeMirrorAppearance } from "../appearance/codemirror";
 import { appearanceVariables } from "../appearance/context";
@@ -486,7 +487,7 @@ export default function ReadingEditor(props: Props) {
       find: () => openSearchPanel(view),
       copyReadable: async () => {
         const s = view.state.selection.main;
-        await navigator.clipboard.writeText(
+        await copyText(
           readableText(
             s.empty
               ? view.state.doc.toString()

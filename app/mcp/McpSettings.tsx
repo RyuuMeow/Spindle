@@ -1,4 +1,5 @@
 "use client";
+import { copyText } from "@/app/clipboard";
 import { useEffect, useState } from "react";
 import { Copy, RefreshCw, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,13 +52,14 @@ export default function McpSettings() {
     if (!bridge) return;
     try {
       const value = await bridge.connection();
-      await navigator.clipboard.writeText(
+      await copyText(
         JSON.stringify(
           { mcpServers: { spindle: { type: "http", ...value } } },
           null,
           2,
         ),
       );
+      setError("");
       setMessage("已複製連線資料，包含此電腦的存取憑證。");
     } catch (error) {
       setError(String(error));

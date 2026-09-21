@@ -1,6 +1,7 @@
 const {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   net,
@@ -652,6 +653,11 @@ else {
       mcpRuntime = require("./mcp-runtime.cjs").createMcpRuntime(profile, service, agentHost);
       ipcMain.handle("agent:settings", event => { owner(event); return mcpRuntime.settings(); });
       ipcMain.handle("agent:configure", (event, patch) => { owner(event); return mcpRuntime.configure(patch).then(value => { broadcast(); return value; }); });
+      ipcMain.handle("workspace:copy-text", (event, text) => {
+        owner(event);
+        if (typeof text !== "string") throw new Error("Invalid clipboard text");
+        clipboard.writeText(text);
+      });
       ipcMain.handle("agent:connection", event => { owner(event); return mcpRuntime.connection(); });
       await mcpRuntime.start();
       wire();

@@ -1,4 +1,5 @@
 "use client";
+import { copyText } from "@/app/clipboard";
 import { useAgentContext } from "../mcp/use-agent-context";
 import { lineOffset } from "./authoring";
 import { EditorView } from "@codemirror/view";
@@ -1282,8 +1283,7 @@ function WorkbenchContent({
               label: "複製路徑",
               disabled: !d.path,
               run: () =>
-                void navigator.clipboard
-                  .writeText(d.path || "")
+                void copyText(d.path || "")
                   .catch((e) => notify(String(e))),
             },
           ]

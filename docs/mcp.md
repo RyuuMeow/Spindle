@@ -108,3 +108,5 @@ editorSessionId 只在本次 App 執行、同一視窗工作區綁定內有效�
 `pnpm test:mcp` 驗證服務、官方 SDK client、版本保護、唯讀／憑證撤銷、埠衝突、跨檔交易、歧義及分頁。`pnpm test:mcp-ui` 使用隔離 profile 啟動實際桌面 build，測試多視窗、讀取與修改、純文字／閱讀／圖表映射、草稿、合成組字事件及重啟；需先 `pnpm desktop:stage`，使用本機 Playwright runtime。
 
 本輪不修改圖表布局／pin，不提供 Resources、Prompts、通知、遠端連線或自動修改 client 設定。原生中文 IME、混合 DPI／多螢幕、每種第三方 client 設定 UI 及安裝版未逐一實測。驗證與實際交付狀態見[實作追蹤](implementation-progress.md)。
+
+桌面版的複製連線資料透過受信任視窗的原生剪貼簿介面寫入，不依賴瀏覽器剪貼簿權限；憑證不會寫入操作日誌。

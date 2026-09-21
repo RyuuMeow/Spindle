@@ -97,6 +97,21 @@ async function monaco(page, operation) {
       .click();
     await home.getByRole("radio", { name: "允許修改", exact: true }).click();
     await home.getByText("執行中", { exact: true }).waitFor();
+    const previousClipboard = await app.evaluate(({ clipboard }) => clipboard.readText());
+    try {
+      await home.getByRole("button", { name: "複製 MCP 連線資料", exact: true }).click();
+      await home.getByRole("status").filter({ hasText: "已複製連線資料" }).waitFor();
+      const config = JSON.parse(fs.readFileSync(path.join(profile, "mcp-v1.json"), "utf8"));
+      const matches = await app.evaluate(({ clipboard }, config) => {
+        const value = JSON.parse(clipboard.readText()).mcpServers.spindle;
+        return value.url === `http://127.0.0.1:${config.port}/mcp` && value.headers.Authorization === `Bearer ${config.token}`;
+      }, config);
+      assert.equal(matches, true);
+      assert.equal(await home.getByRole("alert").count(), 0);
+      console.log("PASS native clipboard connection copy");
+    } finally {
+      await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), previousClipboard);
+    }
     await home.screenshot({ path: path.join(base, "settings.png") });
     console.log("PASS MCP configured through settings");
     const connection = await home.evaluate(() =>

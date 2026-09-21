@@ -235,6 +235,7 @@ export type ActionResult = {
   cancelled?: boolean;
 };
 export type DesktopBridge = {
+  copyText: (text: string) => Promise<void>;
   agent: import("../mcp/types").AgentBridge;
   fonts: () => Promise<string[]>;
   ready: () => Promise<void>;

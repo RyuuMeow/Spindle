@@ -1,4 +1,5 @@
 "use client";
+import { copyText } from "@/app/clipboard";
 import { useEditorContext, captureCodeMirror } from "../mcp/editor-context";
 import { useCodeMirrorAppearance } from "../appearance/codemirror";
 import { appearanceVariables } from "../appearance/context";
@@ -585,8 +586,7 @@ export default function SceneEditor(props: Props) {
           <span>{problem}</span>
           <button
             onClick={() => {
-              void navigator.clipboard
-                .writeText(viewRef.current?.state.doc.toString() || "")
+              void copyText(viewRef.current?.state.doc.toString() || "")
                 .catch(() =>
                   setProblem(problem + " 複製失敗，仍可選取文字後複製。"),
                 );

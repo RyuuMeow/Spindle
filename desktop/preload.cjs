@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("yarnDesktop", {
     configure: (patch) => ipcRenderer.invoke("agent:configure", patch),
     connection: () => ipcRenderer.invoke("agent:connection"),
   },
+  copyText: (text) => ipcRenderer.invoke("workspace:copy-text", text),
   fonts: () => ipcRenderer.invoke("workspace:fonts"),
   ready: () => ipcRenderer.invoke("workspace:ready"),
   subscribe: (callback) => subscribe("workspace:changed", callback),
