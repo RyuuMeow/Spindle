@@ -7,7 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { AgentApplication, type AgentHost } from "./application";
 import { boundedResult } from "./bounded-result";
-import { schemas, descriptions } from "./schemas";
+import { schemas, descriptions, fileWriteTools } from "./schemas";
 import { atomicWrite } from "../disk-io";
 import type { WorkspaceService } from "../workspace-service";
 import type { McpSettings } from "../../app/mcp/types";
@@ -208,6 +208,7 @@ export class McpRuntime {
     const server = new McpServer({ name: "spindle", version: "1.0.0" });
     for (const name of Object.keys(schemas) as (keyof typeof schemas)[]) {
       const writes = [
+        ...fileWriteTools,
         "apply_changes",
         "apply_quick_fixes",
         "update_commands",

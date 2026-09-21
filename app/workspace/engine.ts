@@ -406,6 +406,7 @@ export class DocumentEngine {
     name: string,
     value: string,
     firstInOrder?: string[],
+    identity?: string,
   ) {
     const p = this.project(projectId);
     name = name.replace(/\\/g, "/");
@@ -415,6 +416,7 @@ export class DocumentEngine {
     )
       throw Error("檔名無效或已存在");
     const d = makeDocument(name, value);
+    if (identity) d.id = identity;
     if (firstInOrder) {
       const rank = new Map(firstInOrder.map((id, index) => [id, index]));
       const ordered = [...p.documents].sort(

@@ -1,3 +1,5 @@
+import { EntryJournal, projectMetadata } from "./entry-journal";
+import { planProjectEntry, entryActions } from "./project-entries";
 import { patchAppearance } from "../app/appearance/model";
 import { findCommand } from "../app/command-catalog";
 import {
@@ -77,6 +79,7 @@ type Services = {
 };
 
 export class WorkspaceService {
+  readonly entryJournal = new EntryJournal();
   engine: DocumentEngine;
   catalog: ProjectCatalog;
   recoveryStore: RecoveryStore;
@@ -179,26 +182,13 @@ export class WorkspaceService {
     const dir = path.join(p.root, ".spindle");
     if (fs.existsSync(dir) && fs.lstatSync(dir).isSymbolicLink())
       throw Error("專案設定目錄不可為符號連結");
+    this.entryJournal.metadata(p);
     atomicWrite(
       projectConfig(p.root),
-      JSON.stringify(
-        {
-          version: 2,
-          id: p.id,
-          name: p.name,
-          commands: p.commands,
-          files: p.documents
-            .filter((d) => d.path)
-            .map((d) => ({ id: d.id, name: d.name })),
-          excluded: p.excluded,
-          folders: p.folders,
-          treeOrder: p.treeOrder,
-        },
-        null,
-        2,
-      ),
+      JSON.stringify(projectMetadata(p), null, 2),
     );
   }
+
   private changed() {
     for (const p of this.engine.projects.filter((p) => this.active.has(p.id))) {
       try {
@@ -236,11 +226,41 @@ export class WorkspaceService {
   async request(action: WorkspaceAction): Promise<ActionResult> {
     return this.requestChecked(action, () => {});
   }
-  async requestChecked(action: WorkspaceAction, check: () => void, onFailure?: () => void): Promise<ActionResult> {
+  async requestChecked(
+    action: WorkspaceAction,
+    check: () => void,
+    onFailure?: () => void,
+  ): Promise<ActionResult> {
     const task = this.queue.then(async () => {
+      this.entryJournal.lastApplied = false;
       check();
-      try { return await this.execute(action); }
-      catch (error) { onFailure?.(); throw error; }
+      if (entryActions.includes(action.type) && "projectId" in action)
+        planProjectEntry(this.engine.project(action.projectId), action);
+      if (entryActions.includes(action.type) && "projectId" in action)
+        this.entryJournal.begin(this.engine.project(action.projectId), action);
+      try {
+        const result = await this.execute(action);
+        if (this.entryJournal.active) {
+          const p = this.engine.project(
+            (action as { projectId: string }).projectId,
+          );
+          if (
+            p.documents.some(
+              (d) =>
+                d.id === this.entryJournal.active?.record.createdId &&
+                d.status === "error",
+            ) ||
+            p.persistenceError
+          )
+            throw Error(p.persistenceError || "文件尚未保存");
+          this.entryJournal.finish();
+        }
+        return result;
+      } catch (error) {
+        onFailure?.();
+        this.entryJournal.fail();
+        throw error;
+      }
     });
     this.queue = task.catch(() => undefined);
     return task;
@@ -513,6 +533,7 @@ export class WorkspaceService {
         p.kind !== "standalone" && p.root?.toLowerCase() === root.toLowerCase(),
     );
 
+    this.entryJournal.recover(root);
     const configFile = projectConfig(root);
     let metadata: {
       id?: string;
@@ -582,8 +603,34 @@ export class WorkspaceService {
     if (existing) {
       existing.kind = "project";
       if (metadata.name) existing.name = metadata.name;
+      // A recovered filesystem operation may have updated paths while the cached
+      // workspace still holds the pre-operation names. Match by persisted identity.
+      for (const d of existing.documents) {
+        const file = metadata.files?.find((f) => f.id === d.id);
+        if (
+          file &&
+          file.name !== d.name &&
+          fs.existsSync(withinRoot(root, file.name))
+        ) {
+          d.name = file.name;
+          d.path = withinRoot(root, file.name);
+        }
+      }
       this.recoveryStore.load(existing);
       this.scan(existing);
+      for (const d of existing.documents) {
+        const file = metadata.files?.find((f) => f.name === d.name);
+        if (
+          file &&
+          file.id !== d.id &&
+          !this.engine.projects.some((p) =>
+            p.documents.some((other) => other.id === file.id),
+          )
+        ) {
+          this.engine.resetDocument(d.id);
+          d.id = file.id;
+        }
+      }
       this.metadata(existing);
       this.currentProjectId = existing.id;
       this.active.add(existing.id);
@@ -773,8 +820,16 @@ export class WorkspaceService {
       } else this.catalog.remove(a.id, a.operation === "removeRecent");
     } else if (a.type === "appearance") {
       const previous = this.catalog.preferences.editorAppearance;
-      this.catalog.preferences.editorAppearance = patchAppearance(previous, a.patch);
-      try { this.catalog.persist(); } catch (error) { this.catalog.preferences.editorAppearance = previous; throw error; }
+      this.catalog.preferences.editorAppearance = patchAppearance(
+        previous,
+        a.patch,
+      );
+      try {
+        this.catalog.persist();
+      } catch (error) {
+        this.catalog.preferences.editorAppearance = previous;
+        throw error;
+      }
     } else if (a.type === "preferences") {
       this.catalog.preferences.reopenLastProject = a.reopenLastProject;
       this.catalog.persist();
@@ -880,7 +935,12 @@ export class WorkspaceService {
         this.metadata(p);
         this.catalog.opened(p);
       } else if (a.type === "commands" || a.type === "registerCommand") {
-        if (a.type === "commands" && a.expectedCommands !== undefined && a.expectedCommands !== JSON.stringify(p.commands)) throw Error("指令定義已變更，請重新載入後套用；草稿已保留。");
+        if (
+          a.type === "commands" &&
+          a.expectedCommands !== undefined &&
+          a.expectedCommands !== JSON.stringify(p.commands)
+        )
+          throw Error("指令定義已變更，請重新載入後套用；草稿已保留。");
         if (
           a.type === "registerCommand" &&
           findCommand(a.command.name, p.commands)
@@ -916,7 +976,13 @@ export class WorkspaceService {
           throw error;
         }
       } else if (a.type === "createDocument") {
-        const d = this.engine.create(p.id, a.name, a.text, a.firstInOrder);
+        const d = this.engine.create(
+          p.id,
+          a.name,
+          a.text,
+          a.firstInOrder,
+          this.entryJournal.active?.record.createdId,
+        );
         documentId = d.id;
         if (p.root) {
           let createdFile: string | undefined;
@@ -1051,8 +1117,10 @@ export class WorkspaceService {
           if (fs.existsSync(to) && from.toLowerCase() !== to.toLowerCase())
             throw Error("目的位置已存在");
           // Both paths are verified inside the project, including symlink ancestors.
-          if (plan.folder || plan.documents.some((d) => d.path))
+          if (plan.folder || plan.documents.some((d) => d.path)) {
+            this.entryJournal.sourceReady();
             fs.renameSync(from, to);
+          }
           for (const d of plan.documents)
             if (d.path) d.path = withinRoot(p.root, plan.mapPath(d.name));
         }
@@ -1091,6 +1159,7 @@ export class WorkspaceService {
           )
             throw Error("目的檔案已存在");
           fs.mkdirSync(path.dirname(target), { recursive: true });
+          this.entryJournal.sourceReady();
           fs.renameSync(d.path, target);
           d.path = target;
         }

@@ -448,7 +448,7 @@ test("official MCP client, authentication, readonly, revocation and stable port 
     }),
   );
   t.after(() => client.close());
-  assert.equal((await client.listTools()).tools.length, 13);
+  assert.equal((await client.listTools()).tools.length, 20);
   const context = (
     await client.callTool({
       name: "get_editor_context",
@@ -669,4 +669,62 @@ test("failed MCP configuration writes preserve the active mode and credential", 
   await assert.rejects(runtime.configure({ mode: "write", resetToken: true }));
   assert.equal(runtime.settings().mode, "disabled");
   assert.deepEqual(runtime.connection(), before);
+});
+
+async function entryCall(f, name, args = {}) {
+ const c = await f.app.execute("list_project_entries", { editorSessionId: "session-0" });
+ return f.app.execute(name, { editorSessionId: "session-0", snapshotId: c.snapshotId, operationId: "entry-" + Math.random(), ...args });
+}
+test("MCP project entries preview, create, move, trash and restore preserve identity and assets", async t => {
+ const f = await fixture(t), p = f.projects[0];
+ const preview = await entryCall(f, "create_folder", { name: "Scenes", preview: true });
+ assert.equal(preview.applied, false); assert.equal(fs.existsSync(path.join(p.root, "Scenes")), false);
+ await entryCall(f, "create_folder", { name: "Scenes" });
+ const created = await entryCall(f, "create_document", { parent: "Scenes", name: "new.yarn", text: "title: New\n---\nHi\n===" });
+ const id = created.entries[0].id;
+ fs.writeFileSync(path.join(p.root, "Scenes/asset.bin"), Buffer.from([1, 2, 3]));
+ const moved = await entryCall(f, "move_entry", { entry: "folder:Scenes", parent: "", name: "Renamed" });
+ assert.equal(moved.plan.otherFiles, 1); assert.equal(p.documents.find(d => d.id === id).name, "Renamed/new.yarn");
+ const removed = await entryCall(f, "trash_entry", { entry: "folder:Renamed" });
+ assert.equal(p.documents.some(d => d.id === id), false); assert.equal(removed.trashIds.length, 1);
+ const listed = await f.app.execute("list_trash", { editorSessionId: "session-0" }); assert(listed.items.some(e => e.id === removed.trashIds[0]));
+ const restored = await entryCall(f, "restore_trash", { recoveryId: removed.trashIds[0] });
+ assert(restored.entries.some(d => d.id === id)); assert.deepEqual(fs.readFileSync(path.join(p.root, "Renamed/asset.bin")), Buffer.from([1, 2, 3]));
+ assert.equal(p.recovery.some(e => e.id === removed.trashIds[0]), false);
+ assert.equal(f.projects[1].documents.length, 1);
+});
+test("MCP rejects stale empty-folder snapshots, invalid paths and recursive moves", async t => {
+ const f = await fixture(t); const c = await f.ctx();
+ await entryCall(f, "create_folder", { name: "Empty" });
+ await assert.rejects(f.app.execute("create_folder", { editorSessionId: "session-0", snapshotId: c.snapshotId, operationId: "stale-folder", name: "Later" }), /VERSION_CONFLICT/);
+ for (const name of ["../outside", ".spindle", "CON", "nested/name"]) await assert.rejects(entryCall(f, "create_folder", { name }));
+ await assert.rejects(entryCall(f, "create_document", { parent: "Missing", name: "new.yarn" }), /PARENT_NOT_FOUND/);
+ await assert.rejects(entryCall(f, "move_entry", { entry: "folder:Empty", parent: "Empty" }));
+ await assert.rejects(entryCall(f, "create_folder", { name: "empty" }));
+});
+test("MCP retries deduplicate creation and pending input protects move/delete", async t => {
+ const f = await fixture(t), c = await f.ctx(); const args = { editorSessionId: "session-0", snapshotId: c.snapshotId, operationId: "same-create", name: "once.yarn" };
+ const first = await f.app.execute("create_document", args), again = await f.app.execute("create_document", args);
+ assert.deepEqual(again, first); assert.equal(f.projects[0].documents.filter(d => d.name === "once.yarn").length, 1);
+ const d = f.projects[0].documents[0]; f.state.pending = [d.id];
+ await assert.rejects(entryCall(f, "trash_entry", { entry: "file:" + d.id }), /INPUT_PENDING/);
+});
+test("trash restore conflict uses a recovered name and cannot restore command history", async t => {
+ const f = await fixture(t); const c = await entryCall(f, "create_document", { name: "copy.yarn", text: "original" });
+ const removed = await entryCall(f, "trash_entry", { entry: "file:" + c.entries[0].id });
+ await entryCall(f, "create_document", { name: "copy.yarn", text: "replacement" });
+ const result = await entryCall(f, "restore_trash", { recoveryId: removed.trashIds[0] });
+ assert.notEqual(result.entries[0].name, "copy.yarn"); assert.equal(fs.readFileSync(path.join(f.projects[0].root, "copy.yarn"), "utf8"), "replacement");
+ await assert.rejects(entryCall(f, "restore_trash", { recoveryId: "@commands" }), /TRASH_ENTRY_NOT_FOUND/);
+});
+test("entry journal preserves document ID when filesystem move succeeds before metadata failure", async t => {
+ const f = await fixture(t), p = f.projects[0], d = p.documents[0], original = fs.renameSync;
+ let failed = false;
+ fs.renameSync = (from, to) => { original(from, to); if (!failed && String(to).endsWith("renamed.yarn")) { failed = true; throw Error("simulated crash after rename"); } };
+ let result;
+ try { result = await entryCall(f, "move_entry", { entry: "file:" + d.id, parent: "", name: "renamed.yarn" }); } finally { fs.renameSync = original; }
+ assert.equal(result.applied, true); assert.match(result.persistenceError, /simulated/);
+ f.service.entryJournal.recover(p.root);
+ const metadata = JSON.parse(fs.readFileSync(path.join(p.root, ".spindle/project.json"), "utf8"));
+ assert(metadata.files.some(file => file.id === d.id && file.name === "renamed.yarn"));
 });

@@ -1,7 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import type { z } from "zod";
-import { schemas } from "./schemas";
+import { treeEntries, projectFolders } from "../../app/workspace/file-tree";
+import { planProjectEntry } from "../project-entries";
+import { fileWriteTools, schemas } from "./schemas";
 import { semantics, projectQuery, statistics, type Fix } from "./semantics";
 import { applyTextEdits, validateCommands } from "../../app/workspace/engine";
 import {
@@ -44,6 +46,9 @@ export const projectStamp = (p: Project) =>
   digest([
     p.id,
     p.commands,
+    p.folders,
+    p.treeOrder,
+    p.recovery.filter((e) => e.deleted),
     p.documents.map((d) => [d.id, d.name, d.version, d.text]),
   ]);
 function page<T>(values: T[], start = 0, limit = 100) {
@@ -165,7 +170,12 @@ export class AgentApplication {
     // Validate again at the application boundary, including direct integration tests.
     const parsed = schemas[name].parse(input);
     if (
-      ["apply_changes", "update_commands", "apply_quick_fixes"].includes(name)
+      [
+        "apply_changes",
+        "update_commands",
+        "apply_quick_fixes",
+        ...fileWriteTools,
+      ].includes(name)
     ) {
       const a = parsed as Input<"apply_changes">;
       this.session(a.editorSessionId);
@@ -248,6 +258,12 @@ export class AgentApplication {
         surroundingLines: 10,
       });
     }
+    if (
+      fileWriteTools.includes(name) ||
+      name === "list_project_entries" ||
+      name === "list_trash"
+    )
+      return this.entries(name, input);
     if (name === "get_editor_context")
       return this.context(input as Input<"get_editor_context">);
     if (name === "apply_changes")
@@ -464,7 +480,9 @@ export class AgentApplication {
           }
         },
         () => {
-          appliedOnFailure = projectStamp(p) !== before;
+          appliedOnFailure =
+            this.service.entryJournal.wasApplied() ||
+            projectStamp(p) !== before;
         },
       );
       applied = true;
@@ -477,6 +495,7 @@ export class AgentApplication {
         commandVersion: digest(p.commands),
         diagnostics: this.analyze(p).issues,
         persistenceError: String(error),
+        recoveryRequired: !!this.service.entryJournal.wasApplied(),
         documents: p.documents
           .filter((d) => touched.includes(d.id))
           .map((d) => ({ id: d.id, version: d.version, status: d.status })),
@@ -496,6 +515,114 @@ export class AgentApplication {
         .map((d) => ({ id: d.id, version: d.version, status: d.status })),
       persistenceError:
         p.persistenceError || this.service.profileError || undefined,
+    };
+  }
+  private async entries(name: string, input: unknown) {
+    const a = input as Input<"move_entry"> &
+      Input<"create_document"> &
+      Input<"restore_trash"> &
+      Input<"list_project_entries">;
+    const { p } = await this.synchronized(a.editorSessionId);
+    if (!p.root || p.kind === "standalone") throw Error("PROJECT_REQUIRED");
+    if (name === "list_project_entries" || name === "list_trash") {
+      if (
+        name === "list_project_entries" &&
+        a.parent &&
+        !projectFolders(p).includes(a.parent)
+      )
+        throw Error("PARENT_NOT_FOUND");
+      const values =
+        name === "list_project_entries"
+          ? treeEntries(p, a.parent).map((e, order) => ({ ...e, order }))
+          : p.recovery
+              .filter((e) => e.deleted)
+              .map((e) => ({
+                id: e.id,
+                name: e.name,
+                kind: e.kind || "file",
+                at: e.at,
+                documentId: e.documentId,
+                files: e.files?.map((f) => ({ id: f.id, name: f.name })),
+              }));
+      return {
+        editorSessionId: a.editorSessionId,
+        projectId: p.id,
+        snapshotId: this.snapshot(a.editorSessionId, p).id,
+        ...page(values as unknown[], a.offset, a.limit),
+      };
+    }
+    let action: WorkspaceAction;
+    if (name === "create_document" || name === "create_folder") {
+      if (/[\\/]/.test(a.name || "")) throw Error("INVALID_LEAF_NAME");
+      const full = (a.parent ? a.parent + "/" : "") + a.name;
+      action =
+        name === "create_document"
+          ? {
+              type: "createDocument",
+              projectId: p.id,
+              name: full,
+              text: a.text,
+            }
+          : { type: "createFolder", projectId: p.id, name: full };
+    } else if (name === "move_entry")
+      action = {
+        type: "moveEntry",
+        projectId: p.id,
+        entry: a.entry,
+        parent: a.parent,
+        name: a.name,
+      };
+    else if (name === "trash_entry") {
+      if (a.entry.startsWith("folder:"))
+        action = {
+          type: "trashFolder",
+          projectId: p.id,
+          name: a.entry.slice(7),
+        };
+      else if (a.entry.startsWith("file:"))
+        action = {
+          type: "removeDocument",
+          projectId: p.id,
+          documentId: a.entry.slice(5),
+          deleteDisk: true,
+        };
+      else throw Error("INVALID_ENTRY");
+    } else
+      action = { type: "recover", projectId: p.id, recoveryId: a.recoveryId };
+    const entry =
+      action.type === "recover"
+        ? p.recovery.find((e) => e.id === a.recoveryId && e.deleted)
+        : undefined;
+    if (action.type === "recover" && !entry)
+      throw Error("TRASH_ENTRY_NOT_FOUND");
+    const plan = entry
+      ? this.service.recoveryStore.previewRestore(p, entry)
+      : planProjectEntry(p, action);
+    const touched = plan.documents.map((d) => d.id);
+    await this.prepare(a.editorSessionId, a.snapshotId, touched);
+    if (a.preview) return { applied: false, preview: plan };
+    const beforeIds = new Set(p.documents.map((d) => d.id));
+    const beforeTrash = new Set(p.recovery.map((e) => e.id));
+    const result = await this.commit(
+      a.editorSessionId,
+      a.snapshotId,
+      action,
+      touched,
+    );
+    return {
+      ...result,
+      plan,
+      entries: p.documents
+        .filter((d) => !beforeIds.has(d.id) || touched.includes(d.id))
+        .map((d) => ({
+          id: d.id,
+          name: d.name,
+          version: d.version,
+          status: d.status,
+        })),
+      trashIds: p.recovery
+        .filter((e) => e.deleted && !beforeTrash.has(e.id))
+        .map((e) => e.id),
     };
   }
   private async changes(a: Input<"apply_changes">) {

@@ -319,6 +319,38 @@ export class RecoveryStore {
     }
     p.folders = [...new Set([...(p.folders || []), ...r.folders.map(map)])];
   }
+  previewRestore(p: Project, entry: RecoveryEntry) {
+    if (!p.root || !entry.deleted) throw Error("TRASH_ENTRY_NOT_FOUND");
+    const payload = this.payload(p, entry.id);
+    let files = 0,
+      otherFiles = 0;
+    const walk = (file: string) => {
+      const stat = fs.lstatSync(file);
+      if (stat.isSymbolicLink()) throw Error("SYMLINK_NOT_ALLOWED");
+      if (stat.isDirectory())
+        for (const leaf of fs.readdirSync(file)) walk(path.join(file, leaf));
+      else {
+        files++;
+        if (!/\.yarn$/i.test(file) && file !== payload) otherFiles++;
+      }
+    };
+    if (fs.existsSync(payload)) walk(payload);
+    const manifest = this.recordFile(p, entry.id);
+    const record = fs.existsSync(manifest)
+      ? (JSON.parse(fs.readFileSync(manifest, "utf8")) as TrashRecord)
+      : undefined;
+    return {
+      source: entry.name,
+      destination: this.uniqueName(p, entry.name),
+      files,
+      otherFiles,
+      documents: (record?.documents || []).map((d) => ({
+        id: d.id,
+        name: d.name,
+        version: d.version,
+      })),
+    };
+  }
   restore(p: Project, entry: RecoveryEntry) {
     if (!p.root) throw Error("請先開啟專案");
     const manifest = this.recordFile(p, entry.id);

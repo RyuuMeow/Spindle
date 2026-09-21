@@ -32,7 +32,45 @@ const command = z
       .max(100),
   })
   .strict();
+const mutation = {
+  ...target,
+  snapshotId: id,
+  operationId: id.optional(),
+  preview: z.boolean().default(false),
+};
+export const fileWriteTools = [
+  "create_document",
+  "create_folder",
+  "move_entry",
+  "trash_entry",
+  "restore_trash",
+];
 export const schemas = {
+  list_project_entries: z
+    .object({ ...target, parent: z.string().max(1000).default(""), ...paging })
+    .strict(),
+  list_trash: z.object({ ...target, ...paging }).strict(),
+  create_document: z
+    .object({
+      ...mutation,
+      parent: z.string().max(1000).default(""),
+      name: id,
+      text: z.string().max(200000).default(""),
+    })
+    .strict(),
+  create_folder: z
+    .object({ ...mutation, parent: z.string().max(1000).default(""), name: id })
+    .strict(),
+  move_entry: z
+    .object({
+      ...mutation,
+      entry: z.string().max(1000),
+      parent: z.string().max(1000),
+      name: id.optional(),
+    })
+    .strict(),
+  trash_entry: z.object({ ...mutation, entry: z.string().max(1000) }).strict(),
+  restore_trash: z.object({ ...mutation, recoveryId: id }).strict(),
   list_editor_sessions: z.object({}).strict(),
   list_projects: z
     .object({ query: z.string().max(500).optional(), ...paging })
@@ -166,6 +204,20 @@ export const schemas = {
     .strict(),
 };
 export const descriptions: Record<keyof typeof schemas, string> = {
+  list_project_entries:
+    "List immediate project children, including empty folders, stable file IDs and manual tree order. Parent is a project-relative path; root is empty string.",
+  list_trash:
+    "List deleted entries in this project's Spindle trash. Excludes document and command version history.",
+  create_document:
+    "Create a .yarn file in an existing parent folder. Name is a leaf including .yarn. Does not open a tab. Supports preview; writes require operationId.",
+  create_folder:
+    "Create one folder in an existing parent. Name is a leaf. Does not select it. Supports preview; writes require operationId.",
+  move_entry:
+    "Move or rename a file:<DocumentId> or folder:<relative path> returned by list_project_entries. Same parent plus name renames. Preserves document identity; never overwrites. Supports preview.",
+  trash_entry:
+    "Move one file or complete folder to recoverable Spindle trash, including non-Yarn files. No permanent delete. Supports preview; writes require operationId.",
+  restore_trash:
+    "Restore one trash ID to its original path or unique recovered name. Does not open a tab. Supports preview; returns actual destination and IDs.",
   list_editor_sessions:
     "List live editor windows and explicit session IDs. No global active project is assumed.",
   list_projects:

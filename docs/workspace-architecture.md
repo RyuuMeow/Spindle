@@ -146,3 +146,11 @@ map-sources.ts 訂閱 WorkspaceClient 每筆共享文件交易。即使圖表未
 `workspace:fonts` 為具名唯讀 IPC，檢查視窗身分後，以固定 PowerShell 腳本列出 Windows 字型，隱藏程序視窗、限制逾時並快取。renderer 無法傳入腳本；失敗時仍可輸入字型。模組包含於 desktop stage。
 
 風格 Context 提供共用有效值；Monaco 使用 options/theme，CodeMirror 使用獨立 Compartment，在組字結束後套用重配置，保留文件及 Undo。閱讀畫面使用 CSS 變數；React Flow 節點及轉場卡以 DOM 高度與字型量測更新 repair 請求，保存位置、pin、手動卡片中心和布局歷史，不重新整理全圖。介面提示維持 UI 字型與既有浮層樣式。
+
+## 0.9.1 診斷呈現與專案物件操作
+
+`DiagnosticPresentation` 在 renderer 將即時語義分析與可見診斷分開；以 DocumentId、原文差異及來源行追蹤 800ms 暫緩範圍。Monaco／CodeMirror 使用同一可見性判斷，工具列／問題清單／圖表標記使用完整發布結果。此狀態不寫入 profile，也不延遲文件交易或 MCP 檢查。
+
+`project-entries` 共用 UI 與 MCP 的檔案操作規劃、路径與完整子樹驗證。`EntryJournal` 連接磁碟新增／移動與 project.json 身分資料；開始前保存意圖，保存來源後重新記錄檔案身分，metadata 成功後才清除紀錄。開啟時以設定摘要與磁碟證據恢復；不明狀態保留，拒絕默默覆寫。`RecoveryStore` 繼續負責完整垃圾桶資料與復原日誌。
+
+正式產品不再引用示範工作區；The Last Light 僅存於 scripts/fixtures。封裝白名單涵蓋 MCP runtime、視窗模組、系統字型查詢與 licenses，並以實際 Portable 驗證。

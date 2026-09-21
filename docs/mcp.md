@@ -110,3 +110,25 @@ editorSessionId 只在本次 App 執行、同一視窗工作區綁定內有效�
 本輪不修改圖表布局／pin，不提供 Resources、Prompts、通知、遠端連線或自動修改 client 設定。原生中文 IME、混合 DPI／多螢幕、每種第三方 client 設定 UI 及安裝版未逐一實測。驗證與實際交付狀態見[實作追蹤](implementation-progress.md)。
 
 桌面版的複製連線資料透過受信任視窗的原生剪貼簿介面寫入，不依賴瀏覽器剪貼簿權限；憑證不會寫入操作日誌。
+
+## 專案文件管理（0.9.1）
+
+新增七個工具，均明確指定 `editorSessionId`，限正式專案：
+
+| 工具 | 主要參數 |
+| --- | --- |
+| `list_project_entries` | `parent`（根為空字串）、`offset`、`limit`；回傳空資料夾、文件 ID、key 與順序 |
+| `create_document` | `parent`、包含 `.yarn` 的葉名稱 `name`、可省略的 `text` |
+| `create_folder` | `parent`、葉名稱 `name`；上層必須存在 |
+| `move_entry` | `entry`、`parent`、可省略的 `name`；同一上層改名 |
+| `trash_entry` | `entry`；完整物件移入 Spindle 垃圾桶 |
+| `list_trash` | `offset`、`limit`；只列垃圾桶，排除歷史版本 |
+| `restore_trash` | `recoveryId`；同名時使用唯一 recovered 名稱 |
+
+`entry` 使用清單回傳的 `file:<DocumentId>` 或 `folder:<專案相對路徑>`。五個寫入工具另接受 `snapshotId`、`operationId`、`preview`，與文字工具相同的版本／去重規則。可先 `list_project_entries` 取得快照，再以 `preview:true` 檢查受影響文件、來源／目的地與非 Yarn 檔案數量。預覽不寫入磁碟。每次只處理一個物件；完整資料夾包含全部子項。
+
+正式提交再檢查上層、同名、專案邊界、符號連結與共享視窗未完成輸入。文件 ID 保留，改檔名不改場景 title；新增與復原不開 tab、不改選取、不搶焦點。刪除透過垃圾桶復原，改名／移動可反向操作，並非文字 Undo。沒有永久刪除或任意檔案系統工具。
+
+快照包含文件、指令、空資料夾、樹狀順序及垃圾桶。檔案操作在 `.spindle/operations/` 保存持久意圖，與既有垃圾桶操作紀錄分工；重新開啟專案時核对磁碟結果與設定版本，恢復文件識別。若回傳 `applied:true` 且有 `persistenceError`／`recoveryRequired`，不要用新 operationId 重做；修正磁碟問題後重開專案，原紀錄與資料會保留。
+
+UI 的 800ms 診斷呈現延遲不影響 `validate_project`：工具檢查目前已同步版本，回報組字／未同步狀態。
