@@ -77,6 +77,12 @@ for (const input of Object.keys(mcpBuild.metafile.inputs).filter(p => p.includes
 }
 await mkdir(new URL("licenses/", destination), { recursive: true });
 await writeFile(new URL("licenses/mcp-dependencies.txt", destination), [...notices.values()].join("\n\n---\n\n"));
+for (const name of ["elkjs", "libavoid-js", "monaco-editor", "react", "react-dom", "@xyflow/react"]) {
+  const directory = new URL("node_modules/" + name + "/", root);
+  const files = (await readdir(directory)).filter(file => /^(license|licence|copying|notice|thirdpartynotices)(\.|$)/i.test(file));
+  const texts = await Promise.all(files.map(file => readFile(new URL(file, directory), "utf8")));
+  await writeFile(new URL("licenses/" + name.replaceAll("/", "-").replace("@", "") + ".txt", destination), name + "\n" + texts.join("\n\n"));
+}
 const stagedRenderer = new URL("dist-desktop/renderer/", destination);
 const relativeStage = path.relative(
   fileURLToPath(destination),

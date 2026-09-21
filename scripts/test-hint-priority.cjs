@@ -13,7 +13,7 @@ const out = path.resolve(
 );
 fs.mkdirSync(out, { recursive: true });
 buildSync({
-  entryPoints: ["app/sample.ts"],
+  entryPoints: ["scripts/fixtures/sample.ts"],
   outfile: path.join(out, "sample.cjs"),
   bundle: true,
   platform: "node",
@@ -138,6 +138,7 @@ const tips = () => page.locator(".reading-command-tooltip:visible, .source-comma
     page = await app.firstWindow();
     page.setDefaultTimeout(10000);
     page.on("pageerror", (e) => result.errors.push(e.message));
+    page.on("console", message => { if (message.type() === "error") console.log("BROWSER", message.text()); });
     const win = await app.browserWindow(page);
     await win.evaluate((w) => {
       w.setContentSize(1440, 960);
@@ -158,6 +159,25 @@ const tips = () => page.locator(".reading-command-tooltip:visible, .source-comma
       assert.equal(await page.locator(".command-parameter-popup:visible").count(), 1, mode + ": custom required argument diagnostic does not suppress cursor help");
       assert.match(await page.locator(".command-parameter-popup:visible").innerText(), /duration/);
       await caret("<<fade_in 1>>", "<<fade_in 1".length);
+      const lineDiagnostics = () => page.evaluate(() => {
+        const cm = document.querySelector(".cm-content")?.cmTile?.root?.view;
+        if (cm) {
+          const line = cm.state.doc.lineAt(cm.state.selection.main.head);
+          const blocks = [...cm.contentDOM.querySelectorAll(".cm-line")];
+          return blocks.filter(el => el.textContent.includes(line.text) && el.querySelector(".cm-undeclared-variable")).length;
+        }
+        const ed = window.monaco.editor.getEditors().find(e => e.getDomNode()?.isConnected);
+        return window.monaco.editor.getModelMarkers({ resource: ed.getModel().uri }).filter(m => m.startLineNumber === ed.getPosition().lineNumber).length;
+      });
+      await page.keyboard.press("Backspace");
+      await page.waitForTimeout(120);
+      assert.equal(await lineDiagnostics(), 0, mode + ": no diagnostic while typing");
+      await page.waitForTimeout(950);
+      assert((await lineDiagnostics()) > 0, mode + ": diagnostic after pause");
+      await page.keyboard.type("1");
+      await page.waitForTimeout(120);
+      assert.equal(await lineDiagnostics(), 0, mode + ": resume hides old diagnostic");
+      await page.waitForTimeout(850);
       assert.equal(
         await tips().count(),
         0,

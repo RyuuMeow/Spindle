@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -14,6 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "desktop:build": "node node_modules/vite/bin/vite.js build --config desktop/vite.config.ts",
     "desktop:start": "pnpm desktop:stage && node node_modules/electron/cli.js dist-desktop/app/desktop/main.cjs",
+    "desktop:pack:portable": "pnpm desktop:stage && node scripts/package-desktop.mjs --portable-only",
     "desktop:pack": "pnpm desktop:stage && node scripts/package-desktop.mjs",
     "test:desktop-ui": "node scripts/test-desktop-ui.cjs",
     "test:graph": "node --test scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs",
@@ -30,7 +31,7 @@
     "test:command-context-ui": "node scripts/test-command-context-ui.cjs",
     "test:editor-assistance": "node scripts/test-editor-assistance.cjs",
     "test:sync-language": "node scripts/test-sync-and-language.cjs",
-    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs scripts/project-lifecycle.test.mjs scripts/appearance.test.mjs",
+    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs scripts/project-lifecycle.test.mjs scripts/appearance.test.mjs scripts/diagnostic-presentation.test.mjs",
     "test:hint-priority": "node scripts/test-hint-priority.cjs",
     "desktop:stage": "pnpm desktop:build && node scripts/prepare-desktop.mjs",
     "test:workspace-navigation": "node scripts/test-workspace-navigation.cjs",

@@ -13,7 +13,7 @@ const out = path.resolve(
 );
 fs.mkdirSync(out, { recursive: true });
 buildSync({
-  entryPoints: ["app/sample.ts"],
+  entryPoints: ["scripts/fixtures/sample.ts"],
   outfile: path.join(out, "sample.cjs"),
   bundle: true,
   platform: "node",

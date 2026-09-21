@@ -26,7 +26,7 @@ import React, {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import Graph from '@/app/Graph';
 import {parse} from '@/app/parser';
-import {initialDocs,initialCommands} from '@/app/sample';
+import {initialDocs,initialCommands} from '@/scripts/fixtures/sample';
 import '@/app/globals.css';
 const analysis=parse(initialDocs,initialCommands);
 function App(){const [selected,setSelected]=useState('');const [graphState,setGraphState]=useState(()=>location.search.includes('saved')?{viewport:{x:73,y:49,zoom:.85}}:{});return React.createElement('div',{style:{display:'flex',height:'100vh',width:'100vw'}},React.createElement(Graph,{file:'Chapter_01.yarn',allNodes:analysis.nodes,links:analysis.links,issues:analysis.issues,selected,onSelect:n=>setSelected(n?.id||''),onOpen:n=>window.lastSource={file:n.file,line:n.body},onCreate:()=>{},onGoTo:(file,line)=>window.lastSource={file,line},focus:0,graphState,onGraphState:next=>{setGraphState(next);window.graphState=next}}))}

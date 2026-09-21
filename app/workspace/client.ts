@@ -36,7 +36,6 @@ import {
   restoreSession,
   storageKeys,
 } from "./storage";
-import { initialDocs, initialCommands } from "../sample";
 import {
   type WorkspaceAction,
   type WorkspaceSnapshot,
@@ -397,8 +396,7 @@ export class WorkspaceClient {
     for (const listener of this.listeners) listener();
   }
   async initialize() {
-    const legacy = readLegacy(localStorage),
-      pristine = !legacy.exists;
+    const legacy = readLegacy(localStorage);
     if (
       legacy.exists &&
       !localStorage.getItem("yarn-workbench.migration-backup.v1")
@@ -420,11 +418,6 @@ export class WorkspaceClient {
       documents: legacy.documents || [],
       commands: legacy.config?.commands || [],
     };
-    if (pristine && !window.yarnDesktop) {
-      input.name = "The Last Light";
-      input.documents = initialDocs;
-      input.commands = initialCommands;
-    }
     const result = await this.adapter.request({
       type: "bootstrap",
       legacy: input,
