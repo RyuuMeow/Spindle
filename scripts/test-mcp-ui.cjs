@@ -37,6 +37,10 @@ fs.writeFileSync(
     preferences: { reopenLastProject: false },
   }),
 );
+const portable = process.env.SPINDLE_PORTABLE === "1";
+const launchDesktop = () => portable
+  ? require("./portable-test-driver.cjs").launch(pw, { executablePath: path.resolve(`release/Spindle-${require("../package.json").version}-Portable-x64.exe`), args: ["--user-data-dir=" + profile], timeout: 60000 })
+  : pw._electron.launch({ executablePath: require("electron"), args: ["dist-desktop/app/desktop/main.cjs", "--user-data-dir=" + profile] });
 let app, client;
 const errors = [];
 async function call(name, args = {}) {
@@ -84,10 +88,7 @@ async function monaco(page, operation) {
 }
 (async () => {
   try {
-    app = await pw._electron.launch({
-      executablePath: require("electron"),
-      args: ["dist-desktop/app/desktop/main.cjs", "--user-data-dir=" + profile],
-    });
+    app = await launchDesktop();
     console.log("PASS desktop launched");
     const home = await app.firstWindow();
     home.on("pageerror", (error) => errors.push(error.message));
@@ -406,6 +407,26 @@ async function monaco(page, operation) {
     console.log(
       "PASS diagnostics, quick fixes, command registration and multiple views of one project",
     );
+    let operation = 0;
+    async function fileTool(name, args) {
+      const snap = await call("list_project_entries", target);
+      return call(name, { ...target, snapshotId: snap.snapshotId, operationId: "ui-file-" + ++operation, ...args });
+    }
+    const tabBeforeFiles = (await call("get_editor_context", target)).tabId;
+    await fileTool("create_folder", { name: "AgentScenes" });
+    const added = await fileTool("create_document", { parent: "AgentScenes", name: "Extra.yarn", text: "title: Extra\n---\nMira: Test\n===" });
+    const addedId = added.entries[0].id;
+    fs.writeFileSync(path.join(entries[0].root, "AgentScenes/asset.bin"), Buffer.from([2, 4, 6]));
+    await fileTool("move_entry", { entry: "file:" + addedId, parent: "AgentScenes", name: "Renamed.yarn" });
+    await fileTool("move_entry", { entry: "folder:AgentScenes", parent: "", name: "AgentArchive" });
+    const deleted = await fileTool("trash_entry", { entry: "folder:AgentArchive" });
+    assert.equal(fs.existsSync(path.join(entries[0].root, "AgentArchive")), false);
+    const restored = await fileTool("restore_trash", { recoveryId: deleted.trashIds[0] });
+    assert(restored.entries.some(d => d.id === addedId && d.name === "AgentArchive/Renamed.yarn"));
+    assert.deepEqual(fs.readFileSync(path.join(entries[0].root, "AgentArchive/asset.bin")), Buffer.from([2, 4, 6]));
+    assert.equal((await call("get_editor_context", target)).tabId, tabBeforeFiles);
+    assert.equal((await call("list_trash", target)).total, 0);
+    console.log("PASS MCP file/folder lifecycle, identity, assets and no navigation");
     const bPage = await pageFor(b);
     await bPage.close();
     const expired = await client.callTool({
@@ -418,10 +439,7 @@ async function monaco(page, operation) {
     client = null;
     await app.evaluate(({ app }) => app.exit(0));
     app = null;
-    app = await pw._electron.launch({
-      executablePath: require("electron"),
-      args: ["dist-desktop/app/desktop/main.cjs", "--user-data-dir=" + profile],
-    });
+    app = await launchDesktop();
     const restarted = await app.firstWindow();
     await restarted
       .getByRole("button", { name: "開啟專案資料夾", exact: true })
@@ -453,6 +471,10 @@ async function monaco(page, operation) {
         })
       ).items.length,
     );
+    const reopened = await call("list_project_entries", { editorSessionId: next.editorSessionId, parent: "AgentArchive" });
+    assert(reopened.items.some(d => d.documentId === addedId && d.path === "AgentArchive/Renamed.yarn"));
+    assert.equal((await call("list_trash", { editorSessionId: next.editorSessionId })).total, 0);
+    console.log("PASS restored file identity and empty trash persist after restart");
     console.log(
       "PASS composition protection, live context timing and restart identity invalidation",
     );
@@ -461,6 +483,8 @@ async function monaco(page, operation) {
       JSON.stringify(
         {
           passed: true,
+          portable,
+          version: require("../package.json").version,
           errors,
           tests: [
             "sessions",
@@ -470,6 +494,9 @@ async function monaco(page, operation) {
             "transactions",
             "commands",
             "closed-session",
+            "native-clipboard",
+            "file-folder-lifecycle",
+            "file-identity-restart",
           ],
         },
         null,

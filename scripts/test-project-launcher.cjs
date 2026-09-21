@@ -98,6 +98,7 @@ function done(s) {
     await page.screenshot({ path: path.join(base, "01-home.png") });
     done("fresh start shows launcher without sample projects");
     await page.getByRole("button", { name: "設定", exact: true }).click();
+    await page.getByRole("button", { name: "編輯與保存", exact: true }).click();
     await page.getByRole("checkbox", { name: "啟動時開啟上次專案" }).waitFor();
     assert.equal(
       await page

@@ -10,10 +10,10 @@
 pnpm install
 pnpm dev
 pnpm desktop:start
-pnpm desktop:pack
+pnpm desktop:pack:portable
 ```
 
-Windows x64 0.9.0 產物在 `release/`：`Spindle-0.9.0-Setup-x64.exe` 與 `Spindle-0.9.0-Portable-x64.exe`。打包包含離線 Monaco、CodeMirror、ELK Worker、libavoid WASM、引擎授權檔與主程序文件服務，不依賴編輯器 CDN。程式未簽章。
+Windows x64 **0.9.1 Portable**：`release/Spindle-0.9.1-Portable-x64.exe`，SHA-256 見同目錄 `.exe.sha256`。本輪不產出 Setup。打包包含離線 Monaco、CodeMirror、ELK Worker、libavoid WASM、MCP runtime、字型服務與授權檔，不依賴編輯器 CDN。正式 bundle 不含示範劇本；新專案及新 Web 工作區保持空白，不刪除使用者既有資料。程式未簽章。
 
 Spindle 為原 Yarn Workbench 的新名稱；沿用原 App profile、專案 `.spindle` 及安裝識別，保留既有資料。SVG 原檔在 `public/brand/`，桌面圖示由專案素材產生。
 
@@ -21,7 +21,9 @@ Portable 開啟時會先顯示「正在解壓並啟動」；0.2.1 改用 ZIP 與
 
 ## 本機 Agent 整合
 
-桌面設定的「MCP／Agent 整合」可啟用唯讀或修改存取，提供多視窗目標、即時游標／選取、語義查詢、診斷、統計及版本化修改。預設停用；接入方式與完整工具契約見 [Spindle MCP v1](docs/mcp.md)。本輪為原始碼與 build 更新，既有安裝包尚未包含此功能。
+桌面設定的「MCP／Agent 整合」可啟用唯讀或修改存取，提供多視窗目標、即時游標／選取、語義查詢、診斷、統計及版本化修改。預設停用；接入方式與完整工具契約見 [Spindle MCP v1](docs/mcp.md)。0.9.1 Portable 已包含此功能，共 20 個工具；文件／資料夾查詢、新增、移動、移入垃圾桶及復原皆使用工作區服務與版本保護，永久刪除保留 UI 確認。
+
+輸入會立即暫緩正在編輯範圍的診斷，停止 800ms 或離開該行後顯示；組字期間繼續暫緩。補全與空白參數提示保持即時，手動檢查及 MCP 驗證不受自動提示時機限制。
 
 ## 保存與恢復
 
