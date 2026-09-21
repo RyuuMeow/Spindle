@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
 import { Compartment } from "@codemirror/state";
-import { EditorView, highlightActiveLine } from "@codemirror/view";
-import { highlightSelectionMatches } from "@codemirror/search";
+import {
+  EditorView,
+  highlightActiveLine,
+  ViewPlugin,
+  Decoration,
+  type DecorationSet,
+} from "@codemirror/view";
+import { searchPanelOpen, getSearchQuery } from "@codemirror/search";
+import { highlightRanges } from "./highlights";
 import { useAppearance } from "./context";
 import { fontStack, type AppearanceMode, type Typography } from "./model";
 function theme(s: Typography) {
@@ -18,6 +25,7 @@ function theme(s: Typography) {
       "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
         backgroundColor: s.selection + " !important",
       },
+      ".cm-symbolMatch": { boxShadow: `inset 0 -1px ${s.symbols}` },
       ".cm-selectionMatch": { backgroundColor: s.matches },
       ".cm-searchMatch": { backgroundColor: s.search },
       ".cm-searchMatch.cm-searchMatch-selected": {
@@ -30,7 +38,46 @@ function theme(s: Typography) {
         lineHeight: "1.5",
       },
     }),
-    highlightSelectionMatches(),
+    ViewPlugin.fromClass(
+      class {
+        decorations: DecorationSet;
+        constructor(view: EditorView) {
+          this.decorations = this.build(view);
+        }
+        update(update: import("@codemirror/view").ViewUpdate) {
+          if (
+            update.docChanged ||
+            update.selectionSet ||
+            update.transactions.length
+          )
+            this.decorations = this.build(update.view);
+        }
+        build(view: EditorView) {
+          const { state } = view,
+            selection = state.selection.main;
+          const ranges =
+            state.selection.ranges.length === 1
+              ? highlightRanges(
+                  state.doc.toString(),
+                  selection.from,
+                  selection.to,
+                  searchPanelOpen(state) && !!getSearchQuery(state).search,
+                  s,
+                )
+              : [];
+          return Decoration.set(
+            ranges.map((r) =>
+              Decoration.mark({
+                class:
+                  r.kind === "match" ? "cm-selectionMatch" : "cm-symbolMatch",
+              }).range(r.from, r.to),
+            ),
+            true,
+          );
+        }
+      },
+      { decorations: (plugin) => plugin.decorations },
+    ),
     ...(s.highlightLine ? [highlightActiveLine()] : []),
   ];
 }

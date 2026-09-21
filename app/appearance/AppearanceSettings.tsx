@@ -25,7 +25,10 @@ const labels: Record<keyof Typography, string> = {
   foreground: "文字顏色",
   background: "背景顏色",
   selection: "文字選取底色",
-  matches: "相同文字高亮",
+  matches: "選取文字的其他相符處",
+  symbols: "游標符號關聯顏色",
+  highlightMatches: "高亮選取文字的其他相符處",
+  highlightSymbols: "高亮游標符號關聯",
   search: "其他搜尋結果",
   searchCurrent: "目前搜尋結果",
   cursor: "游標顏色",
@@ -187,6 +190,91 @@ function FontInput({
     </div>
   );
 }
+function OpacityInput({
+  value,
+  disabled,
+  label,
+  onChange,
+}: {
+  value: string;
+  disabled?: boolean;
+  label: string;
+  onChange: (v: string) => void;
+}) {
+  const percent = Math.round(
+    ((value.length === 9 ? parseInt(value.slice(7), 16) : 255) / 255) * 100,
+  );
+  const [draft, setDraft] = useState<string | null>(null);
+  const invalid =
+    draft !== null &&
+    (!draft.trim() ||
+      !Number.isInteger(Number(draft)) ||
+      Number(draft) < 0 ||
+      Number(draft) > 100);
+  const change = (n: number) =>
+    onChange(
+      value.slice(0, 7) +
+        Math.round((n * 255) / 100)
+          .toString(16)
+          .padStart(2, "0"),
+    );
+  const commit = () => {
+    if (draft !== null && !invalid) {
+      change(Number(draft));
+      setDraft(null);
+    }
+  };
+  return (
+    <div className="appearance-opacity">
+      <span>不透明度</span>
+      <div className="appearance-opacity-controls">
+        <div className="appearance-opacity-track">
+          <div
+            className="appearance-opacity-paint"
+            style={{
+              backgroundImage: `linear-gradient(to right, ${value.slice(0, 7)}00, ${value.slice(0, 7)})`,
+            }}
+          />
+          <input
+            type="range"
+            aria-label={label + "不透明度"}
+            min={0}
+            max={100}
+            step={1}
+            value={percent}
+            disabled={disabled}
+            onChange={(e) => {
+              change(Number(e.target.value));
+              setDraft(null);
+            }}
+          />
+        </div>
+        <input
+          type="number"
+          aria-label={label + "不透明度百分比"}
+          min={0}
+          max={100}
+          step={1}
+          value={draft ?? percent}
+          disabled={disabled}
+          aria-invalid={invalid}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+            if (e.key === "Escape") setDraft(null);
+          }}
+        />
+        <span>%</span>
+      </div>
+      {invalid && <small role="alert">請輸入 0–100 的整數。</small>}
+    </div>
+  );
+}
+
 function ValueInput({
   id,
   field,
@@ -213,7 +301,7 @@ function ValueInput({
         onChange={onCommit}
       />
     );
-  if (field === "highlightLine")
+  if (["highlightLine", "highlightMatches", "highlightSymbols"].includes(field))
     return (
       <Checkbox
         id={id}
@@ -225,18 +313,20 @@ function ValueInput({
   const numeric = field === "fontSize" || field === "lineHeight";
   const commit = () => {
     if (draft === null) return;
-    const next = numeric ? Number(draft) : draft;
+    const next = numeric
+      ? Number(draft)
+      : draft + (syntax ? "" : String(value).slice(7));
     if (
       !draft.trim() ||
       !validStyle(field, next) ||
-      (syntax && !/^#[0-9a-f]{6}$/i.test(draft))
+      (!numeric && !/^#[0-9a-f]{6}$/i.test(draft))
     ) {
       setError(
         numeric
           ? field === "fontSize"
             ? "請輸入 10–40 的整數。"
             : "請輸入 1.0–2.5。"
-          : "請輸入 #RRGGBB" + (syntax ? "。" : " 或 #RRGGBBAA。"),
+          : "請輸入 #RRGGBB。",
       );
       return;
     }
@@ -248,24 +338,36 @@ function ValueInput({
     <div className="appearance-value">
       <div className="appearance-input-row">
         {!numeric && (
-          <input
-            className="appearance-swatch"
-            type="color"
-            aria-label={labels[field] + "色票"}
-            disabled={disabled}
-            value={String(value).slice(0, 7)}
-            onChange={(e) => {
-              onCommit(e.target.value + String(value).slice(7));
-              setDraft(null);
-              setError("");
-            }}
-          />
+          <span className="appearance-color-preview">
+            <span
+              className="appearance-color-paint"
+              style={{ backgroundColor: String(value) }}
+            />
+            <input
+              className="appearance-swatch"
+              type="color"
+              aria-label={labels[field] + "色票"}
+              disabled={disabled}
+              value={String(value).slice(0, 7)}
+              onChange={(e) => {
+                onCommit(e.target.value + String(value).slice(7));
+                setDraft(null);
+                setError("");
+              }}
+            />
+          </span>
         )}
         <input
           id={id}
           type={numeric ? "number" : "text"}
           disabled={disabled}
-          value={disabled ? String(value) : (draft ?? String(value))}
+          value={
+            disabled
+              ? numeric
+                ? String(value)
+                : String(value).slice(0, 7)
+              : (draft ?? (numeric ? String(value) : String(value).slice(0, 7)))
+          }
           min={field === "fontSize" ? 10 : 1}
           max={field === "fontSize" ? 40 : 2.5}
           step={field === "fontSize" ? 1 : 0.05}
@@ -290,28 +392,12 @@ function ValueInput({
         {numeric && <span>{field === "fontSize" ? "px" : "倍"}</span>}
       </div>
       {!numeric && !syntax && (
-        <label className="appearance-alpha">
-          透明度
-          <input
-            aria-label={labels[field] + "透明度"}
-            type="range"
-            min={0}
-            max={255}
-            disabled={disabled}
-            value={
-              String(value).length === 9
-                ? parseInt(String(value).slice(7), 16)
-                : 255
-            }
-            onChange={(e) => {
-              onCommit(
-                String(value).slice(0, 7) +
-                  Number(e.target.value).toString(16).padStart(2, "0"),
-              );
-              setDraft(null);
-            }}
-          />
-        </label>
+        <OpacityInput
+          value={String(value)}
+          disabled={disabled}
+          label={labels[field]}
+          onChange={onCommit}
+        />
       )}
       {error && !disabled && (
         <small id={id + "-error"} role="alert" className="setting-error">
@@ -343,6 +429,9 @@ function StyleFields({
               "activeLine",
               "highlightLine",
               "matches",
+              "symbols",
+              "highlightMatches",
+              "highlightSymbols",
               "search",
               "searchCurrent",
             ].includes(key),
@@ -454,7 +543,7 @@ function Preview({
                   fontStyle: "italic",
                 }}
               >
-                // 燈塔的風聲
+                {"// 燈塔的風聲"}
               </p>
               <p>
                 <span style={{ color: appearance.syntax.keyword }}>

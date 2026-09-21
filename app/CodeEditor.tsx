@@ -1,4 +1,5 @@
 "use client";
+import { sourceHighlights } from "./appearance/monaco-highlights";
 import { unregisteredCommand } from "./command-quick-fix";
 import { sourceCommandAssistance } from "./source-command-assistance";
 import { sceneLink } from "./scene-link";
@@ -71,6 +72,12 @@ export default function CodeEditor({
   onNavigate?: (file: string, line: number) => void;
 }) {
   const { appearance, style } = useAppearance("source");
+  const highlightStyle = useRef(style);
+  const highlights = useRef<ReturnType<typeof sourceHighlights> | null>(null);
+  useLayoutEffect(() => {
+    highlightStyle.current = style;
+    highlights.current?.refresh();
+  }, [style]);
   const themeApi = useRef<typeof import("monaco-editor") | null>(null);
   useEffect(() => {
     themeApi.current?.editor.defineTheme(
@@ -397,6 +404,11 @@ export default function CodeEditor({
           }
         };
         syncModel();
+        highlights.current = sourceHighlights(
+          editor,
+          () => highlightStyle.current,
+        );
+        editor.onDidDispose(() => highlights.current?.dispose());
         editor.onDidChangeModel(syncModel);
         const assistance = sourceCommandAssistance(
           editor,
@@ -678,6 +690,8 @@ export default function CodeEditor({
       }}
       options={{
         editContext: false,
+        occurrencesHighlight: "off",
+        selectionHighlight: false,
         fontFamily: fontStack(style.fontFamily),
         fontSize: style.fontSize,
         lineHeight: style.fontSize * style.lineHeight,

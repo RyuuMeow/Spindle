@@ -1,3 +1,4 @@
+import { resolveAppearance } from "./appearance/model";
 import type { editor } from "monaco-editor";
 
 /** Monaco renders popups outside the editor surface, so use its public theme API. */
@@ -74,7 +75,7 @@ export const yarnEditorTheme: editor.IStandaloneThemeData = {
 export function appearanceTheme(
   appearance: import("./appearance/model").EditorAppearance,
 ): editor.IStandaloneThemeData {
-  const s = { ...appearance.global, ...appearance.modes.source };
+  const s = resolveAppearance(appearance, "source");
   return {
     ...yarnEditorTheme,
     rules: yarnEditorTheme.rules.map((rule) => ({
@@ -91,8 +92,8 @@ export function appearanceTheme(
       "editor.selectionBackground": s.selection,
       "editor.inactiveSelectionBackground": s.selection,
       "editor.selectionHighlightBackground": s.matches,
-      "editor.wordHighlightBackground": s.matches,
-      "editor.wordHighlightStrongBackground": s.matches,
+      "editor.wordHighlightBackground": "#00000000",
+      "editor.wordHighlightStrongBackground": "#00000000",
       "editor.findMatchBackground": s.searchCurrent,
       "editor.findMatchHighlightBackground": s.search,
       "editorCursor.foreground": s.cursor,

@@ -23,11 +23,7 @@ import {
   placeholder,
 } from "@codemirror/view";
 import { defaultKeymap, indentWithTab } from "@codemirror/commands";
-import {
-  searchKeymap,
-  highlightSelectionMatches,
-  openSearchPanel,
-} from "@codemirror/search";
+import { searchKeymap, openSearchPanel } from "@codemirror/search";
 import {
   foldGutter,
   foldKeymap,
@@ -177,7 +173,6 @@ export default function ReadingEditor(props: Props) {
         ]),
         EditorView.lineWrapping,
         drawSelection(),
-        highlightSelectionMatches(),
         placeholder("在這裡開始撰寫 Yarn 劇本"),
         gutterLineClass.compute([structure], (state) => {
           const lines = state.field(structure);

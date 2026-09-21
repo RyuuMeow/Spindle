@@ -8,6 +8,9 @@ export type Typography = {
   background: string;
   selection: string;
   matches: string;
+  symbols: string;
+  highlightMatches: boolean;
+  highlightSymbols: boolean;
   search: string;
   searchCurrent: string;
   cursor: string;
@@ -22,6 +25,9 @@ export const globalDefaults: Typography = {
   background: "#1c1c1c",
   selection: "#464646",
   matches: "#65758c55",
+  symbols: "#8eaac9aa",
+  highlightMatches: true,
+  highlightSymbols: true,
   search: "#bba65b44",
   searchCurrent: "#bba65b88",
   cursor: "#cccccc",
@@ -107,7 +113,8 @@ export function validStyle(key: string, value: unknown): boolean {
       value >= 1 &&
       value <= 2.5
     );
-  if (key === "highlightLine") return typeof value === "boolean";
+  if (["highlightLine", "highlightMatches", "highlightSymbols"].includes(key))
+    return typeof value === "boolean";
   return (
     Object.hasOwn(globalDefaults, key) &&
     typeof value === "string" &&
