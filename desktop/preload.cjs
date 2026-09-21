@@ -14,6 +14,14 @@ contextBridge.exposeInMainWorld("yarnDesktop", {
     .find((a) => a.startsWith("--yarn-version="))
     ?.split("=")[1],
   request: (action) => ipcRenderer.invoke("workspace:request", action),
+  agent: {
+    onRequest: (callback) => subscribe("agent:request", callback),
+    respond: (token, context, error) => ipcRenderer.send("agent:response", { token, context, error }),
+    summary: (value) => ipcRenderer.send("agent:summary", value),
+    settings: () => ipcRenderer.invoke("agent:settings"),
+    configure: (patch) => ipcRenderer.invoke("agent:configure", patch),
+    connection: () => ipcRenderer.invoke("agent:connection"),
+  },
   fonts: () => ipcRenderer.invoke("workspace:fonts"),
   ready: () => ipcRenderer.invoke("workspace:ready"),
   subscribe: (callback) => subscribe("workspace:changed", callback),

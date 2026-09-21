@@ -1,4 +1,5 @@
 "use client";
+import { useEditorContext, captureCodeMirror } from "../mcp/editor-context";
 import { useCodeMirrorAppearance } from "../appearance/codemirror";
 import { appearanceVariables } from "../appearance/context";
 import type { YarnVariable } from "../variable-completion";
@@ -95,6 +96,7 @@ export default function ReadingEditor(props: Props) {
     viewRef = useRef<EditorView | null>(null),
     readOnlyConfig = useRef(new Compartment()),
     latest = useRef(props);
+  useEditorContext("rendered", () => captureCodeMirror(viewRef.current, props.doc.name, props.doc.text));
   const appearanceConfig = useCodeMirrorAppearance(
     viewRef,
     "rendered",

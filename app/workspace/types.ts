@@ -170,7 +170,7 @@ export type WorkspaceAction =
       deleteDisk: boolean;
     }
   | { type: "registerCommand"; projectId: string; command: Command }
-  | { type: "commands"; projectId: string; commands: Command[] }
+  | { type: "commands"; projectId: string; commands: Command[]; expectedCommands?: string }
   | {
       type: "transaction";
       projectId: string;
@@ -235,6 +235,7 @@ export type ActionResult = {
   cancelled?: boolean;
 };
 export type DesktopBridge = {
+  agent: import("../mcp/types").AgentBridge;
   fonts: () => Promise<string[]>;
   ready: () => Promise<void>;
   platform: string;

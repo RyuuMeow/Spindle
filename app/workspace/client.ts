@@ -192,6 +192,7 @@ class BrowserService {
         p.documents = p.documents.filter((x) => x.id !== temporary.id);
         d.name = a.name;
       } else if (a.type === "commands" || a.type === "registerCommand") {
+        if (a.type === "commands" && a.expectedCommands !== undefined && a.expectedCommands !== JSON.stringify(p.commands)) throw Error("指令定義已變更，請重新載入後套用；草稿已保留。");
         if (
           a.type === "registerCommand" &&
           findCommand(a.command.name, p.commands)
@@ -519,6 +520,11 @@ export class WorkspaceClient {
     this.error = "";
     this.emit();
     void this.flush(projectId).catch((error) => this.fail(error));
+  }
+  pendingInputIds(projectId: string) {
+    return this.state.projects.filter(p => p.id === projectId).flatMap(p => p.documents)
+      .filter(d => this.composing.has(d.id) || (this.states.has(d.id) && sendableUpdates(this.states.get(d.id)!).length > 0))
+      .map(d => d.id);
   }
   hasPendingWritesIn(projectId?: string) {
     return this.state.projects

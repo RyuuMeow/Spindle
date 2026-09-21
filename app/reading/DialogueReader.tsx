@@ -1,4 +1,8 @@
 "use client";
+import { useEditorContext } from "../mcp/editor-context";
+import { readerRuns, readerSelection } from "../mcp/reader-context";
+import { sourceOffset } from "../workspace/engine";
+import type { SourceSelection } from "../mcp/types";
 import { useAppearance, appearanceVariables } from "../appearance/context";
 import { useEffect, useMemo, useRef } from "react";
 import { CornerDownRight } from "lucide-react";
@@ -23,6 +27,22 @@ export default function DialogueReader({
   const { style, appearance } = useAppearance("reader");
   const host = useRef<HTMLDivElement>(null);
   const initialLine = useRef(line);
+  const selection = useRef<SourceSelection | null>(null);
+  useEffect(() => {
+    selection.current = null;
+    const update = () => { if (host.current) selection.current = readerSelection(host.current) || selection.current; };
+    document.addEventListener("selectionchange", update);
+    return () => document.removeEventListener("selectionchange", update);
+  }, [name, text]);
+  useEditorContext("reader", () => {
+    if (!host.current) return null;
+    const bounds = host.current.getBoundingClientRect();
+    const visible = [...host.current.querySelectorAll<HTMLElement>("[data-source-from]")].filter(el => {
+      const r = el.getBoundingClientRect(); return r.bottom >= bounds.top && r.top <= bounds.bottom;
+    });
+    return { documentName: name, source: text, selections: selection.current ? [selection.current] : [],
+      visibleRanges: visible.map(el => ({ from: Number(el.dataset.sourceFrom), to: Number(el.dataset.sourceTo) })) };
+  });
   const lines = useMemo(
     () => readingStructure(text.replace(/\r\n/g, "\n")),
     [text],
@@ -57,40 +77,15 @@ export default function DialogueReader({
     >
       <article>
         {content.map((l) => {
-          const value = l.text
-            .trim()
-            .replace(/<<[^>]*>>/g, "")
-            .replace(/\s+#\S+/g, "")
-            .trim();
-          if (l.kind === "title")
-            return (
-              <h2 key={l.line} data-line={l.line}>
-                {value.replace(/^title\s*:\s*/, "")}
-              </h2>
-            );
-          if (l.kind === "blank")
-            return (
-              <div key={l.line} className="reader-blank" aria-hidden="true" />
-            );
-          if (l.kind === "option")
-            return (
-              <p key={l.line} data-line={l.line} className="reader-option">
-                <CornerDownRight size={16} />
-                <span>{value.replace(/^->\s*/, "")}</span>
-              </p>
-            );
-          const role = value.match(/^([^:<>]+):\s*(.*)$/);
-          return (
-            <p key={l.line} data-line={l.line}>
-              {role ? (
-                <>
-                  <strong>{role[1]}:</strong> {role[2]}
-                </>
-              ) : (
-                value
-              )}
-            </p>
-          );
+          const spans = readerRuns(l.text, l.kind).map(run => {
+            const Tag = run.strong ? "strong" : "span";
+            return <Tag key={run.from} data-source-from={sourceOffset(text, l.from + run.from)} data-source-to={sourceOffset(text, l.from + run.to)}>{run.text}</Tag>;
+          });
+          if (l.kind === "title") return <h2 key={l.line} data-line={l.line}>{spans}</h2>;
+          if (l.kind === "blank") return <div key={l.line} className="reader-blank" aria-hidden="true" />;
+          return <p key={l.line} data-line={l.line} className={l.kind === "option" ? "reader-option" : undefined}>
+            {l.kind === "option" && <CornerDownRight size={16} />}<span>{spans}</span>
+          </p>;
         })}
       </article>
     </div>

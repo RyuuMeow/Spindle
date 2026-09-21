@@ -1,4 +1,5 @@
 "use client";
+import { useEditorContext } from "./mcp/editor-context";
 import { useAppearance, appearanceVariables } from "./appearance/context";
 
 import {
@@ -401,6 +402,17 @@ function Canvas({
     },
     onArrangeAll: () => fitAfterArrange.current(),
   });
+  useEditorContext("graph", () => ({
+    documentName: file, source: documents?.find(d => d.name === file)?.text || "",
+    selections: [], visibleRanges: [],
+    graph: {
+      nodes: records.filter(r => nodeSelection.has(r.id) || r.id === targetSelection || r.node?.id === selected).map(r => ({ id: r.id, name: r.name, kind: r.kind, file: r.node?.file, line: r.node?.start })),
+      cards: groups.filter(g => nodeSelection.has(g.id)).map(g => ({ id: g.id, source: g.source, target: g.target, links: g.items })),
+      edge: edgeSelection || undefined, pin: selectedPin, group: groupSelection || undefined,
+      connections: groups.filter(g => g.id === edgeSelection || g.id === selectedPin?.edge || g.id === groupSelection).map(g => ({ id: g.id, source: g.source, target: g.target, links: g.items })),
+      viewport: flow.getViewport(),
+    },
+  }));
   const positions = layout.layout.positions;
   const automatic = useMemo(
     () =>
