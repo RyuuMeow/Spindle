@@ -1,3 +1,4 @@
+import { normalizeAppearance, migrateAppearance } from "../app/appearance/model";
 import fs from "node:fs";
 import path from "node:path";
 import type {
@@ -63,6 +64,7 @@ export class ProjectCatalog {
       this.preferences = {
         reopenLastProject: value.preferences?.reopenLastProject === true,
         lastProjectId: value.preferences?.lastProjectId,
+        editorAppearance: value.preferences?.editorAppearance ? normalizeAppearance(value.preferences.editorAppearance) : undefined,
       };
     } else {
       this.entries = legacy
@@ -76,6 +78,19 @@ export class ProjectCatalog {
         }));
       this.persist();
     }
+  }
+  initializeAppearance(profile: string) {
+    if (this.preferences.editorAppearance) return;
+    let legacy;
+    const file = path.join(profile, "windows-v2.json");
+    if (fs.existsSync(file)) {
+      try {
+        const entries = Object.values(JSON.parse(fs.readFileSync(file, "utf8"))) as { session?: Parameters<typeof migrateAppearance>[0] }[];
+        legacy = entries.reverse().find(e => e?.session)?.session;
+      } catch (error) { console.warn("Unable to migrate appearance from legacy session", error); }
+    }
+    this.preferences.editorAppearance = migrateAppearance(legacy);
+    this.persist();
   }
   persist() {
     atomicWrite(

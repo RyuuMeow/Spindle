@@ -34,6 +34,7 @@ export type ProjectCatalogEntry = {
   unavailable?: string;
 };
 export type AppPreferences = {
+  editorAppearance?: import("../appearance/model").EditorAppearance;
   reopenLastProject: boolean;
   lastProjectId?: string;
 };
@@ -192,6 +193,7 @@ export type WorkspaceAction =
       id: string;
       name?: string;
     }
+  | { type: "appearance"; patch: import("../appearance/model").AppearancePatch }
   | { type: "preferences"; reopenLastProject: boolean }
   | { type: "closeProject"; projectId: string }
   | { type: "purgeTrash"; projectId: string; recoveryId?: string }
@@ -233,6 +235,7 @@ export type ActionResult = {
   cancelled?: boolean;
 };
 export type DesktopBridge = {
+  fonts: () => Promise<string[]>;
   ready: () => Promise<void>;
   platform: string;
   titleBarOverlay: boolean;

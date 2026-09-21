@@ -1,3 +1,4 @@
+import { patchAppearance } from "../app/appearance/model";
 import { findCommand } from "../app/command-catalog";
 import {
   addFolder,
@@ -122,6 +123,7 @@ export class WorkspaceService {
       }
     this.engine = new DocumentEngine(projects);
     this.catalog = new ProjectCatalog(profile, projects);
+    this.catalog.initializeAppearance(profile);
     this.recoveryStore = new RecoveryStore(profile);
     this.cache = new WorkspaceCache(profile);
     for (const p of projects) {
@@ -762,6 +764,10 @@ export class WorkspaceService {
         const loaded = this.engine.projects.find((p) => p.id === a.id);
         if (loaded) loaded.name = a.name!.trim();
       } else this.catalog.remove(a.id, a.operation === "removeRecent");
+    } else if (a.type === "appearance") {
+      const previous = this.catalog.preferences.editorAppearance;
+      this.catalog.preferences.editorAppearance = patchAppearance(previous, a.patch);
+      try { this.catalog.persist(); } catch (error) { this.catalog.preferences.editorAppearance = previous; throw error; }
     } else if (a.type === "preferences") {
       this.catalog.preferences.reopenLastProject = a.reopenLastProject;
       this.catalog.persist();

@@ -1,3 +1,4 @@
+import { migrateAppearance, normalizeAppearance, patchAppearance } from "../appearance/model";
 import { findCommand } from "../command-catalog";
 import {
   addFolder,
@@ -44,15 +45,23 @@ import {
 } from "./types";
 
 class BrowserService {
+  preferences: import("./types").AppPreferences = { reopenLastProject: false };
   engine: DocumentEngine;
   notices: string[] = [];
   constructor() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("spindle.preferences.v1") || "null");
+      this.preferences = { reopenLastProject: raw?.reopenLastProject === true,
+        editorAppearance: raw?.editorAppearance ? normalizeAppearance(raw.editorAppearance) : migrateAppearance(JSON.parse(localStorage.getItem("yarn-workbench.session.v2") || "null") || undefined) };
+      localStorage.setItem("spindle.preferences.v1", JSON.stringify(this.preferences));
+    } catch (error) { this.notices.push("風格設定無法讀取：" + String(error)); }
     const restored = readWorkspace(localStorage);
     if (restored.error) this.notices.push(restored.error);
     this.engine = new DocumentEngine(restored.value || []);
   }
   snapshot(): WorkspaceSnapshot {
     return structuredClone({
+      preferences: this.preferences,
       projects: this.engine.projects,
       currentProjectId: this.engine.projects[0]?.id || "",
       notices: this.notices,
@@ -75,6 +84,10 @@ class BrowserService {
         );
         this.engine.projects.push(p);
       }
+    } else if (a.type === "appearance") {
+      const next = { ...this.preferences, editorAppearance: patchAppearance(this.preferences.editorAppearance, a.patch) };
+      localStorage.setItem("spindle.preferences.v1", JSON.stringify(next));
+      this.preferences = next;
     } else if (a.type === "createProject") {
       const p = makeProject(a.name);
       this.engine.projects.push(p);
