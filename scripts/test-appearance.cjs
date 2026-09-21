@@ -130,6 +130,23 @@ fs.writeFileSync(
     await setSourceSelection("Start", false);
     await page.locator(".spindle-symbol-match").first().waitFor();
     assert.equal(await page.locator(".spindle-selection-match").count(), 0);
+    assert.notEqual(
+      await page
+        .locator(".spindle-symbol-match")
+        .first()
+        .evaluate((e) => getComputedStyle(e).boxShadow),
+      "none",
+    );
+    await patch({ global: { symbolStyle: "background" } });
+    await page.waitForFunction(() => {
+      const el = document.querySelector(".spindle-symbol-match");
+      return (
+        el &&
+        getComputedStyle(el).boxShadow === "none" &&
+        getComputedStyle(el).backgroundColor !== "rgba(0, 0, 0, 0)"
+      );
+    });
+    await patch({ global: { symbolStyle: "underline" } });
     await setSourceSelection("Lighthouse", false);
     await page.waitForFunction(
       () =>

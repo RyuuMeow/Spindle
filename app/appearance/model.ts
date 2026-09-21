@@ -9,6 +9,7 @@ export type Typography = {
   selection: string;
   matches: string;
   symbols: string;
+  symbolStyle: "underline" | "background";
   highlightMatches: boolean;
   highlightSymbols: boolean;
   search: string;
@@ -26,6 +27,7 @@ export const globalDefaults: Typography = {
   selection: "#464646",
   matches: "#65758c55",
   symbols: "#8eaac9aa",
+  symbolStyle: "underline",
   highlightMatches: true,
   highlightSymbols: true,
   search: "#bba65b44",
@@ -95,6 +97,8 @@ export function defaultAppearance(): EditorAppearance {
   };
 }
 export function validStyle(key: string, value: unknown): boolean {
+  if (key === "symbolStyle")
+    return value === "underline" || value === "background";
   if (key === "fontFamily")
     return (
       typeof value === "string" &&

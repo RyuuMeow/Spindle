@@ -138,3 +138,21 @@ test("cursor highlights only known syntactic symbols, not dialogue or strings", 
     [],
   );
 });
+
+test("symbol style validates, inherits and can be overridden independently", () => {
+  let a = patchAppearance(defaultAppearance(), {
+    global: { symbolStyle: "background" },
+    modes: { rendered: { symbolStyle: "underline" } },
+  });
+  assert.equal(resolveAppearance(a, "source").symbolStyle, "background");
+  assert.equal(resolveAppearance(a, "rendered").symbolStyle, "underline");
+  a = patchAppearance(a, { modes: { rendered: { symbolStyle: null } } });
+  assert.equal(resolveAppearance(a, "rendered").symbolStyle, "background");
+  assert.throws(() =>
+    patchAppearance(a, { global: { symbolStyle: "invalid" } }),
+  );
+  assert.equal(
+    normalizeAppearance({ version: 1 }).global.symbolStyle,
+    "underline",
+  );
+});

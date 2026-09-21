@@ -25,7 +25,10 @@ function theme(s: Typography) {
       "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
         backgroundColor: s.selection + " !important",
       },
-      ".cm-symbolMatch": { boxShadow: `inset 0 -1px ${s.symbols}` },
+      ".cm-symbolMatch":
+        s.symbolStyle === "background"
+          ? { backgroundColor: s.symbols }
+          : { boxShadow: `inset 0 -1px ${s.symbols}` },
       ".cm-selectionMatch": { backgroundColor: s.matches },
       ".cm-searchMatch": { backgroundColor: s.search },
       ".cm-searchMatch.cm-searchMatch-selected": {

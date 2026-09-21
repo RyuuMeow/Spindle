@@ -16,7 +16,7 @@ export function sourceHighlights(
     const model = editor.getModel(),
       selection = editor.getSelection();
     const s = style();
-    sheet.textContent = `${scope} .spindle-selection-match { background-color: ${s.matches}; } ${scope} .spindle-symbol-match { box-shadow: inset 0 -1px ${s.symbols}; }`;
+    sheet.textContent = `${scope} .spindle-selection-match { background-color: ${s.matches}; } ${scope} .spindle-symbol-match { ${s.symbolStyle === "background" ? `background-color: ${s.symbols}` : `box-shadow: inset 0 -1px ${s.symbols}`}; }`;
     if (!model || !selection) {
       decorations.clear();
       return;

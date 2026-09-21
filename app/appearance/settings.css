@@ -305,3 +305,80 @@
 .appearance-opacity-track:has(input:disabled) {
   opacity: 0.5;
 }
+
+/* Multi-control preferences have their own header and bounded content region. */
+.appearance-field--group {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff02;
+  padding: 14px 16px;
+  margin: 5px 0;
+  gap: 14px 20px;
+}
+.appearance-field--group > label {
+  grid-row: 1;
+  grid-column: 1;
+  font-weight: 600;
+}
+.appearance-field--group .appearance-controls {
+  display: contents;
+}
+.appearance-field--group .appearance-controls > .compact-select {
+  grid-row: 1;
+  grid-column: 2;
+  justify-self: end;
+}
+.appearance-field--group .appearance-controls > .appearance-value {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.appearance-field--group .appearance-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px 205px;
+  gap: 7px;
+}
+.appearance-field--group .appearance-input-row input:not([type="color"]) {
+  width: 100%;
+}
+.appearance-color-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.appearance-field--group .appearance-opacity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  align-items: center;
+  gap: 10px;
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.appearance-field--group .appearance-opacity-controls {
+  margin: 0;
+}
+.appearance-field--group .appearance-opacity > small {
+  grid-column: 2;
+}
+@media (max-width: 850px) {
+  .appearance-field--group {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+@media (max-width: 520px) {
+  .appearance-field--group .appearance-input-row {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .appearance-color-label {
+    grid-column: 1 / -1;
+  }
+  .appearance-field--group .appearance-opacity {
+    grid-template-columns: 1fr;
+  }
+  .appearance-field--group .appearance-opacity > small {
+    grid-column: 1;
+  }
+}

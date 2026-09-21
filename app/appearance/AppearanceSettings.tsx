@@ -27,6 +27,7 @@ const labels: Record<keyof Typography, string> = {
   selection: "文字選取底色",
   matches: "選取文字的其他相符處",
   symbols: "游標符號關聯顏色",
+  symbolStyle: "游標符號關聯樣式",
   highlightMatches: "高亮選取文字的其他相符處",
   highlightSymbols: "高亮游標符號關聯",
   search: "其他搜尋結果",
@@ -292,6 +293,20 @@ function ValueInput({
 }) {
   const [draft, setDraft] = useState<string | null>(null),
     [error, setError] = useState("");
+  if (field === "symbolStyle")
+    return (
+      <CompactSelect
+        id={id}
+        label={labels[field]}
+        value={String(value)}
+        disabled={disabled}
+        options={[
+          { value: "underline", label: "底線" },
+          { value: "background", label: "背景高亮" },
+        ]}
+        onChange={onCommit}
+      />
+    );
   if (field === "fontFamily")
     return (
       <FontInput
@@ -337,6 +352,9 @@ function ValueInput({
   return (
     <div className="appearance-value">
       <div className="appearance-input-row">
+        {!numeric && !syntax && (
+          <span className="appearance-color-label">顏色</span>
+        )}
         {!numeric && (
           <span className="appearance-color-preview">
             <span
@@ -430,6 +448,7 @@ function StyleFields({
               "highlightLine",
               "matches",
               "symbols",
+              "symbolStyle",
               "highlightMatches",
               "highlightSymbols",
               "search",
@@ -439,7 +458,15 @@ function StyleFields({
         .map((key) => {
           const inherited = !!mode && appearance.modes[mode][key] === undefined;
           return (
-            <div className="appearance-field" key={key}>
+            <div
+              className={
+                "appearance-field" +
+                (String(style[key]).startsWith("#")
+                  ? " appearance-field--group"
+                  : "")
+              }
+              key={key}
+            >
               <label htmlFor={prefix + key}>
                 {labels[key]}
                 {key === "lineHeight" && (
