@@ -421,8 +421,12 @@ export class AgentApplication {
         ? data.issues.filter((i) => i.file === d?.name && i.line === line)
         : [],
       symbol: line
-        ? variableAt(lineText, column! - 1, data.variables)?.variable ||
-          sceneAt(lineText, column! - 1, data.nodes) ||
+        ? variableAt(
+            lineText,
+            cursor! - lineOffset(d!.text, line),
+            data.variables,
+          )?.variable ||
+          sceneAt(lineText, cursor! - lineOffset(d!.text, line), data.nodes) ||
           (commandName && findCommand(commandName, p.commands)) ||
           null
         : null,

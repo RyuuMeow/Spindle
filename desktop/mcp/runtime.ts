@@ -78,7 +78,7 @@ export class McpRuntime {
     const task = this.queue.then(async () => {
       const previousPort = this.config.port;
       const mode = patch.mode ?? this.config.mode;
-      this.config = {
+      const next = {
         mode,
         port: patch.port ?? this.config.port,
         token:
@@ -87,7 +87,8 @@ export class McpRuntime {
             ? randomBytes(32).toString("hex")
             : this.config.token,
       };
-      atomicWrite(this.file, JSON.stringify(this.config));
+      atomicWrite(this.file, JSON.stringify(next));
+      this.config = next;
       if (
         !this.server?.listening ||
         mode === "disabled" ||

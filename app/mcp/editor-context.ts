@@ -43,11 +43,9 @@ export function useEditorContext(
   }, [kind]);
 }
 export function captureEditor(kind: string) {
-  return (
-    (kind === "graph" ? providers.get("graph-editor")?.() : null) ??
-    providers.get(kind)?.() ??
-    null
-  );
+  const base = providers.get(kind)?.() ?? null;
+  const editor = kind === "graph" ? providers.get("graph-editor")?.() : null;
+  return editor ? { ...editor, graph: base?.graph } : base;
 }
 export function captureCodeMirror(
   view: EditorView | null,

@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile, rm, readdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
@@ -49,11 +49,34 @@ await build({
   ).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
   target: "node22",
 });
-await build({
+const mcpBuild = await build({
+  metafile: true,
   entryPoints: [fileURLToPath(new URL("desktop/mcp/runtime.ts", root))],
   bundle: true, platform: "node", format: "cjs", target: "node22",
   outfile: fileURLToPath(new URL("desktop/mcp-runtime.cjs", destination)),
 });
+// Bundle the license notices of dependencies actually included in the MCP runtime.
+const notices = new Map();
+for (const input of Object.keys(mcpBuild.metafile.inputs).filter(p => p.includes("node_modules/"))) {
+  let folder = path.dirname(path.resolve(input));
+  while (folder.includes("node_modules")) {
+    try {
+      const metadata = JSON.parse(await readFile(path.join(folder, "package.json"), "utf8"));
+      if (metadata.name && metadata.version) {
+        const key = metadata.name + "@" + metadata.version;
+        if (!notices.has(key)) {
+          const files = (await readdir(folder)).filter(name => /^(license|licence|copying|notice)(\.|$)/i.test(name));
+          const texts = await Promise.all(files.map(name => readFile(path.join(folder, name), "utf8")));
+          notices.set(key, key + " (" + (metadata.license || "see package") + ")\n" + texts.join("\n"));
+        }
+        break;
+      }
+    } catch (error) { if (error.code !== "ENOENT") throw error; }
+    folder = path.dirname(folder);
+  }
+}
+await mkdir(new URL("licenses/", destination), { recursive: true });
+await writeFile(new URL("licenses/mcp-dependencies.txt", destination), [...notices.values()].join("\n\n---\n\n"));
 const stagedRenderer = new URL("dist-desktop/renderer/", destination);
 const relativeStage = path.relative(
   fileURLToPath(destination),

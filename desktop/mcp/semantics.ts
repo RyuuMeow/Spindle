@@ -152,13 +152,39 @@ export function projectQuery(
     }));
   if (kind === "commands") return commandCatalog(p.commands);
   if (kind === "calls") return data.calls;
-  if (kind === "unknown_commands")
-    return data.calls
+  if (kind === "unknown_commands") {
+    const usages = data.calls
       .filter((c) => !c.registered)
-      .map((c) => ({
-        ...c,
-        inference: "usage-only; not a confirmed parameter definition",
-      }));
+      .map((c) => {
+        const d = source(c.file)!;
+        const from = lineOffset(d.text, c.line);
+        const example = d.text.slice(from).split(/\r?\n/, 1)[0];
+        const inferred = unregisteredCommand(
+          example,
+          Math.max(0, c.column - 1),
+          p.commands,
+        );
+        return {
+          ...c,
+          example,
+          range: { from, to: from + example.length },
+          inferredParameters: inferred?.command.params ?? null,
+        };
+      });
+    const variants = new Map<string, Set<string>>();
+    for (const usage of usages) {
+      const set = variants.get(usage.name) || new Set<string>();
+      set.add(JSON.stringify(usage.inferredParameters));
+      variants.set(usage.name, set);
+    }
+    return usages.map((usage) => ({
+      ...usage,
+      inference: {
+        confirmed: false,
+        ambiguous: variants.get(usage.name)!.size > 1,
+      },
+    }));
+  }
   const references: unknown[] = [];
   for (const d of p.documents) {
     let from = 0;

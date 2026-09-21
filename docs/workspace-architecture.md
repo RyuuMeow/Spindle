@@ -18,6 +18,14 @@
 
 renderer 離開前完成交易與草稿、保存視圖、flush 指定工作區，成功後才能改畫面。主程序再次核對視窗工作區及切換授權，不接受無範圍 save。組字、衝突、目前工作區的歷史／草稿或共用 profile 寫入失敗留在原畫面；其他工作區的快取錯誤只阻擋其所屬視窗。
 
+## MCP 與即時工作階段
+
+`desktop/mcp-windows.cjs` 管理執行期間的 editorSessionId、焦點、已知專案開啟合併與 renderer 請求。與保存的 WindowSession ID 分離，改綁或關閉即失效。renderer 的 `app/mcp/use-agent-context.ts` 協調同步與導航，各編輯器透過 `editor-context.ts` 提供即時選取及來源映射；摘要只在 tab／模式變更合併傳送，不為每次打字傳送整份情境。
+
+`desktop/mcp/application.ts` 管理快照、版本保護、去重與操作；`semantics.ts` 使用 UI 共用 parser、變數／快速修正 helper 及抽出的 `workspace/statistics.ts`。相同內容的語義結果快取，不建立另一套 Yarn 規則。主程序 `requestChecked` 在既有工作區佇列內重新核對授權與版本，失敗回呼只包住實際執行，以區分提交前拒絕與提交後保存失敗。
+
+`desktop/mcp/runtime.ts` 只處理官方 SDK Streamable HTTP、schema、loopback 憑證檢查與有界輸出；預設停用。設定／憑證保存於 profile，業務修改仍經文件引擎及歷史。SDK 與實際包含依賴的授權通知隨 desktop staging 打包；主程序 CJS 亦在 staging 階段進行語法檢查。工具與座標契約見 [MCP 接入](mcp.md)。
+
 ## 桌面儲存
 
 `desktop/workspace-service.ts` 管理所有專案與磁碟寫入，文件 request 依序處理。800ms debounce 只寫有路徑且未衝突的文件。寫入先建立同目錄暫存檔、flush，再核對磁碟內容雜湊後替換；寫入成功才更新 saved。
