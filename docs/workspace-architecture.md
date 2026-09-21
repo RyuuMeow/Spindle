@@ -127,3 +127,14 @@ map-sources.ts 訂閱 WorkspaceClient 每筆共享文件交易。即使圖表未
 ### Utility tab 生命週期
 
 設定與指令頁的 React instance 隨開啟 tab 存活，切換以 hidden 隱藏，關閉時卸載。指令草稿只存在該 instance，不提供工作區 commandDraft action，不包含於 profile、備份或遷移；讀取舊資料時移除殘留欄位。已套用定義照常保存及建立版本歷史。文件 tab 與復原頁繼續使用既有視圖快取／RecoveryViewState。
+
+
+## App 編輯器風格
+
+`AppPreferences.editorAppearance` 是版本化的全局值、四模式部分覆寫、純文字編輯選項／語法色與閱讀寬度。`app/appearance/model.ts` 集中預設、欄位驗證、逐欄 patch 和 effective style 解析；缺少覆寫欄位代表繼承，null patch 取消覆寫。未知或不合法的持久化欄位回退，無效寫入 patch 整筆拒絕。
+
+桌面 `appearance` action 經既有序列佇列合併最新資料、原子寫入 App profile 並廣播，不修改 `.spindle` 專案資料。保存失敗恢復記憶體舊值。首次初始化從最近工作階段匯入閱讀值與行號；以已存在的版本化設定為遷移完成標記，不再讀 session 覆蓋。Web 使用獨立 localStorage 偏好、storage 通知及可用的 Web Lock 序列化跨 tab 更新。
+
+`workspace:fonts` 為具名唯讀 IPC，檢查視窗身分後，以固定 PowerShell 腳本列出 Windows 字型，隱藏程序視窗、限制逾時並快取。renderer 無法傳入腳本；失敗時仍可輸入字型。模組包含於 desktop stage。
+
+風格 Context 提供共用有效值；Monaco 使用 options/theme，CodeMirror 使用獨立 Compartment，在組字結束後套用重配置，保留文件及 Undo。閱讀畫面使用 CSS 變數；React Flow 節點及轉場卡以 DOM 高度與字型量測更新 repair 請求，保存位置、pin、手動卡片中心和布局歷史，不重新整理全圖。介面提示維持 UI 字型與既有浮層樣式。

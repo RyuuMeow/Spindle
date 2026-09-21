@@ -845,3 +845,28 @@ test("shared departure with a pre-card pin stays direct in preview, worker and l
   });
   assert.deepEqual(again.snapshot.routes, migrated.snapshot.routes);
 });
+
+test("appearance size repairs preserve positions, manual cards and pins", async () => {
+  const request = fixture(
+    scene("A", "-> Travel\n  <<jump B>>") + scene("B", "Hello"),
+  );
+  const initial = (await run(request)).snapshot;
+  const route = Object.values(initial.routes)[0];
+  assert.ok(route.card);
+  route.card.manual = true;
+  route.pins = [
+    { id: "manual-pin", x: route.card.x + 180, y: route.card.y - 100 },
+  ];
+  const positions = structuredClone(initial.positions),
+    card = { ...route.card };
+  request.snapshot = initial;
+  request.scope = { kind: "repair" };
+  for (const size of Object.values(request.sizes)) size.height = 150;
+  request.labels[route.id] = { text: "choice", width: 230, height: 80 };
+  const result = (await run(request)).snapshot;
+  assert.deepEqual(result.positions, positions);
+  assert.deepEqual(result.routes[route.id].pins, route.pins);
+  assert.equal(result.routes[route.id].card.x, card.x);
+  assert.equal(result.routes[route.id].card.y, card.y);
+  assert.equal(result.routes[route.id].card.height, 80);
+});

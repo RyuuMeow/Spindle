@@ -52,12 +52,12 @@ fs.writeFileSync(
     await native.evaluate((w) => w.setContentSize(1100, 650));
     await menu("設定…");
     await page.getByRole("button", { name: "快捷鍵", exact: true }).click();
-    await page.locator(".settings-scroll").evaluate((e) => {
+    await page.locator(".settings-scroll:visible").evaluate((e) => {
       e.scrollTop = 80;
       e.dataset.retained = "yes";
     });
     const scroll = await page
-      .locator(".settings-scroll")
+      .locator(".settings-scroll:visible")
       .evaluate((e) => e.scrollTop);
     await tab("sample.yarn").click();
     await tab("設定").click();
@@ -68,11 +68,15 @@ fs.writeFileSync(
       "快捷鍵",
     );
     assert.equal(
-      await page.locator(".settings-scroll").getAttribute("data-retained"),
+      await page
+        .locator(".settings-scroll:visible")
+        .getAttribute("data-retained"),
       "yes",
     );
     assert.equal(
-      await page.locator(".settings-scroll").evaluate((e) => e.scrollTop),
+      await page
+        .locator(".settings-scroll:visible")
+        .evaluate((e) => e.scrollTop),
       scroll,
     );
     await menu("自訂指令");

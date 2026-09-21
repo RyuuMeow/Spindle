@@ -30,7 +30,7 @@
     "test:command-context-ui": "node scripts/test-command-context-ui.cjs",
     "test:editor-assistance": "node scripts/test-editor-assistance.cjs",
     "test:sync-language": "node scripts/test-sync-and-language.cjs",
-    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs scripts/project-lifecycle.test.mjs",
+    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs scripts/project-lifecycle.test.mjs scripts/appearance.test.mjs",
     "test:hint-priority": "node scripts/test-hint-priority.cjs",
     "desktop:stage": "pnpm desktop:build && node scripts/prepare-desktop.mjs",
     "test:workspace-navigation": "node scripts/test-workspace-navigation.cjs",
@@ -40,7 +40,8 @@
     "test:project-launcher": "node scripts/test-project-launcher.cjs",
     "test:command-quick-fix": "node scripts/test-command-quick-fix.cjs",
     "test:tab-lifecycle": "node scripts/test-tab-lifecycle.cjs",
-    "test:find-controls": "node scripts/test-find-controls.cjs"
+    "test:find-controls": "node scripts/test-find-controls.cjs",
+    "test:appearance": "node scripts/test-appearance.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

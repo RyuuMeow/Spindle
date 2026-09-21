@@ -571,3 +571,36 @@ test("quick registration is atomic, deduplicated and survives reopening", async 
     f.dispose();
   }
 });
+
+test("appearance patches persist globally and do not reimport old sessions", async () => {
+  const f = fixture();
+  try {
+    await Promise.all([
+      f.service.request({
+        type: "appearance",
+        patch: { global: { fontSize: 22 } },
+      }),
+      f.service.request({
+        type: "appearance",
+        patch: { modes: { reader: { lineHeight: 2.1 } } },
+      }),
+    ]);
+    await assert.rejects(
+      f.service.request({
+        type: "appearance",
+        patch: { global: { fontSize: -1 } },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(f.base, "profile", "windows-v2.json"),
+      JSON.stringify({ old: { session: { readingSize: 28 } } }),
+    );
+    f.restart();
+    const a = f.service.snapshot().preferences.editorAppearance;
+    assert.equal(a.global.fontSize, 22);
+    assert.equal(a.modes.reader.lineHeight, 2.1);
+    assert.equal(a.modes.reader.fontSize, undefined);
+  } finally {
+    f.dispose();
+  }
+});

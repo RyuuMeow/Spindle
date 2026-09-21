@@ -81,3 +81,5 @@ pnpm test:project-launcher
 目前完成狀態、測試證據與未驗證項目見 [實作追蹤](docs/implementation-progress.md)。設計規則見 [UI 規範](docs/ui-design.md)，保存與同步契約見 [架構說明](docs/workspace-architecture.md)，版本記錄見 [CHANGELOG](CHANGELOG.md)。早期審查與 39 組盤點保留為歷史取證。
 
 本專案只支援 Yarn 結構解析與作者工具；不是官方編譯器，沒有執行引擎、Unity 連接、雲端協作、外掛系統或圖上拉線改寫。未知／未完成語法保留原文。更新來源尚未設定，沒有無效的自動更新按鈕。
+
+編輯器風格支援全局預設及四模式逐欄覆寫，所有專案與單檔共用。
