@@ -21,8 +21,10 @@ buildSync({
 });
 const { initialCommands } = require(path.join(out, "sample.cjs"));
 const profile = fs.mkdtempSync(path.join(out, "profile-"));
+const root = path.join(out, "project-" + Date.now());
+fs.mkdirSync(path.join(root, ".spindle"), { recursive: true });
 const source =
-  'title: Help\n---\n<<fade_in 1>>\n<<play_sound "wind" 0.5>>\n<<wait >>\n===';
+  'title: Help\n---\n<<fade_in 1>>\n<<play_sound "wind" 0.5>>\n<<wait >>\n<<fade_in >>\n===';
 fs.writeFileSync(
   path.join(profile, "workspace-v2.json"),
   JSON.stringify({
@@ -30,6 +32,7 @@ fs.writeFileSync(
       {
         id: "hint-test",
         name: "Hint rules",
+        root,
         commands: initialCommands,
         documents: [
           {
@@ -42,13 +45,15 @@ fs.writeFileSync(
           },
         ],
         excluded: [],
-        recovery: [],
+        recovery: [1, 2].map((i) => ({ id: "version-" + i, documentId: "hints", name: "Hints.yarn", text: source.replace("fade_in 1", "fade_in " + (i + 1)), at: Date.now() - i * 1000, reason: "fixture " + i })),
       },
     ],
     currentProjectId: "hint-test",
     notices: [],
   }),
 );
+fs.writeFileSync(path.join(root, "Hints.yarn"), source);
+fs.writeFileSync(path.join(root, ".spindle/project.json"), JSON.stringify({ id: "hint-test", name: "Hint rules", commands: initialCommands, files: [{ id: "hints", name: "Hints.yarn" }], excluded: [] }));
 const result = { errors: [] };
 let app, page;
 async function settle() {
@@ -109,7 +114,7 @@ async function hover(lineText, offset) {
   await page.mouse.move(point.x, point.y);
   await settle();
 }
-const tips = () => page.locator(".reading-command-tooltip:visible");
+const tips = () => page.locator(".reading-command-tooltip:visible, .source-command-popup:visible .reading-command-tooltip");
 (async () => {
   try {
     const launch =
@@ -139,6 +144,8 @@ const tips = () => page.locator(".reading-command-tooltip:visible");
       w.show();
       w.focus();
     });
+    await app.evaluate(({ dialog }, root) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [root] }); }, root);
+    await page.getByRole("button", { name: "開啟專案資料夾", exact: true }).click();
     await page.getByRole("button", { name: "Hints.yarn", exact: true }).click();
     for (const mode of ["閱讀編輯", "純文字", "流程圖"]) {
       await page.getByRole("radio", { name: mode, exact: true }).click();
@@ -147,6 +154,9 @@ const tips = () => page.locator(".reading-command-tooltip:visible");
           .locator(".flow-card-title")
           .filter({ hasText: /^Help$/ })
           .dblclick();
+      await caret("<<fade_in >>", "<<fade_in ".length);
+      assert.equal(await page.locator(".command-parameter-popup:visible").count(), 1, mode + ": custom required argument diagnostic does not suppress cursor help");
+      assert.match(await page.locator(".command-parameter-popup:visible").innerText(), /duration/);
       await caret("<<fade_in 1>>", "<<fade_in 1".length);
       assert.equal(
         await tips().count(),
@@ -231,6 +241,16 @@ const tips = () => page.locator(".reading-command-tooltip:visible");
           .getByRole("button", { name: "結束節點編輯", exact: true })
           .click();
     }
+    await page.getByRole("radio", { name: "純文字", exact: true }).click();
+    await page.getByRole("button", { name: "版本歷史", exact: true }).click();
+    const entries = page.locator(".history-entries button");
+    assert((await entries.count()) >= 2);
+    await entries.nth(0).click();
+    await page.getByRole("radio", { name: "比較", exact: true }).click();
+    await entries.nth(1).click();
+    assert.equal(await page.getByRole("radio", { name: "比較", exact: true }).getAttribute("aria-checked"), "true");
+    await page.locator(".monaco-diff-editor").waitFor();
+    result.historyComparePreserved = true;
     assert.deepEqual(result.errors, []);
     result.passed = true;
   } catch (e) {

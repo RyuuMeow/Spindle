@@ -194,6 +194,7 @@ function WorkbenchContent({
   const [selected, setSelected] = useState(""),
     [focus, setFocus] = useState(0),
     [historyOpen, setHistoryOpen] = useState(false),
+    [historyCompare, setHistoryCompare] = useState<"preview" | "diff">("preview"),
     [statisticsOpen, setStatisticsOpen] = useState(false),
     [historySelection, setHistorySelection] = useState<{
       entry: RecoveryEntry;
@@ -2716,6 +2717,8 @@ function WorkbenchContent({
           {doc && historySelection && (
             <HistoryPreview
               key={historySelection.entry.id}
+              compareMode={historyCompare}
+              onCompare={setHistoryCompare}
               toolbarTarget={historyToolbar}
               line={active.line}
               entry={historySelection.entry}

@@ -106,7 +106,7 @@ export function sourceCommandAssistance(
     const pos = editor.getPosition(),
       model = editor.getModel(),
       selection = editor.getSelection();
-    if (!pos || !model || !selection?.isEmpty() || hasError(pos.lineNumber)) {
+    if (!pos || !model || !selection?.isEmpty()) {
       hide();
       return;
     }

@@ -109,7 +109,6 @@ export function commandEditing(
       )
         return null;
       const line = tr.state.doc.lineAt(selection.head);
-      if (errors(line.number).length) return null;
       const hint = emptyParameterHint(
         line.text,
         selection.head - line.from,
