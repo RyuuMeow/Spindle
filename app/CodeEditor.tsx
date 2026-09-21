@@ -1,5 +1,5 @@
 "use client";
-import { missingDeclaration } from "./variable-quick-fix";
+import { variableQuickFix } from "./variable-quick-fix";
 import { sourceHighlights } from "./appearance/monaco-highlights";
 import { unregisteredCommand } from "./command-quick-fix";
 import { sourceCommandAssistance } from "./source-command-assistance";
@@ -444,11 +444,11 @@ export default function CodeEditor({
               latest.current.onRegisterCommand?.(candidate.command);
           },
         );
-        const addDeclaration = (lineNumber: number) => {
+        const applyVariableFix = (lineNumber: number) => {
           const model = editor.getModel();
           if (!model || composing.current) return;
           const line = model.getLineContent(lineNumber);
-          const fix = missingDeclaration(
+          const fix = variableQuickFix(
             line,
             line.indexOf("<<") + 2,
             latest.current.variables,
@@ -457,17 +457,22 @@ export default function CodeEditor({
           editor.pushUndoStop();
           editor.executeEdits("declare-variable", [
             {
-              range: new m.Range(lineNumber, 1, lineNumber, 1),
-              text: fix.insert + model.getEOL(),
+              range: new m.Range(
+                lineNumber,
+                fix.replace ? fix.from + 1 : 1,
+                lineNumber,
+                fix.replace ? fix.to + 1 : 1,
+              ),
+              text: fix.replace ? fix.insert : fix.insert + model.getEOL(),
             },
           ]);
           editor.pushUndoStop();
         };
-        const declareCommand = editor.addCommand(
+        const variableFixCommand = editor.addCommand(
           0,
           (_ctx, lineNumber: number, expected: string) => {
             if (editor.getModel()?.getLineContent(lineNumber) === expected)
-              addDeclaration(lineNumber);
+              applyVariableFix(lineNumber);
           },
         );
         const fixes = m.languages.registerCodeActionProvider("yarn", {
@@ -482,20 +487,20 @@ export default function CodeEditor({
             )
               return { actions: [], dispose() {} };
             const line = model.getLineContent(range.startLineNumber);
-            const declaration = missingDeclaration(
+            const declaration = variableQuickFix(
               line,
               range.startColumn - 1,
               latest.current.variables,
             );
-            if (declaration?.insert && declareCommand)
+            if (declaration?.insert && variableFixCommand)
               return {
                 actions: [
                   {
-                    title: "新增宣告「" + declaration.name + "」",
+                    title: declaration.label,
                     kind: "quickfix",
                     isPreferred: true,
                     command: {
-                      id: declareCommand,
+                      id: variableFixCommand,
                       title: "新增宣告",
                       arguments: [range.startLineNumber, line],
                     },
@@ -543,13 +548,13 @@ export default function CodeEditor({
             if (
               model &&
               position &&
-              missingDeclaration(
+              variableQuickFix(
                 model.getLineContent(position.lineNumber),
                 position.column - 1,
                 latest.current.variables,
               )?.insert
             ) {
-              addDeclaration(position.lineNumber);
+              applyVariableFix(position.lineNumber);
               return;
             }
             const candidate =
@@ -574,12 +579,12 @@ export default function CodeEditor({
             )
               return null;
             const line = model.getLineContent(position.lineNumber);
-            const declaration = missingDeclaration(
+            const declaration = variableQuickFix(
               line,
               position.column - 1,
               latest.current.variables,
             );
-            if (declaration?.insert && declareCommand)
+            if (declaration?.insert && variableFixCommand)
               return {
                 range: new m.Range(
                   position.lineNumber,
@@ -590,14 +595,16 @@ export default function CodeEditor({
                 contents: [
                   {
                     value:
-                      "[新增宣告](command:" +
-                      declareCommand +
+                      "[" +
+                      declaration.label +
+                      "](command:" +
+                      variableFixCommand +
                       "?" +
                       encodeURIComponent(
                         JSON.stringify([position.lineNumber, line]),
                       ) +
                       ") · Alt+Enter",
-                    isTrusted: { enabledCommands: [declareCommand] },
+                    isTrusted: { enabledCommands: [variableFixCommand] },
                   },
                 ],
               };
@@ -813,6 +820,7 @@ export default function CodeEditor({
         selectionHighlight: false,
         fontFamily: fontStack(style.fontFamily),
         fontSize: style.fontSize,
+        cursorHeight: style.fontSize + 2,
         lineHeight: style.fontSize * style.lineHeight,
         padding: { top: 16, bottom: 40 },
         minimap: { enabled: false },

@@ -169,12 +169,27 @@ export function expressionType(
   const result = parse(0);
   return index === tokens.length ? result : null;
 }
+export function bareAssignmentText(value: string) {
+  return (
+    /^[\p{L}_][\p{L}\p{N}_ ]*$/u.test(value.trim()) &&
+    !/^(true|false)$/.test(value.trim()) &&
+    !/\b(?:and|or|xor|not|eq|neq|lt|gt|lte|gte)\b/.test(value)
+  );
+}
 export function assignmentTypeError(
   args: string,
   types: ReadonlyMap<string, string>,
 ): string | null {
   const match = /^(\$[A-Za-z_]\w*)\s*(=|to\b|[+*/%\-]=)\s*(.+)$/.exec(args);
   if (!match) return null;
+  if (bareAssignmentText(match[3]))
+    return (
+      "無效的指派值「" +
+      match[3].trim() +
+      '」；字串請使用雙引號，例如 "' +
+      match[3].trim() +
+      '"。'
+    );
   const expected = types.get(match[1]),
     actual = expressionType(match[3], types);
   if (!expected || !actual || expected === "expression") return null;

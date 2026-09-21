@@ -7,7 +7,7 @@ import {
 } from "@codemirror/view";
 import type { YarnVariable } from "../variable-completion";
 import { collectVariables } from "../variable-completion";
-import { missingDeclaration } from "../variable-quick-fix";
+import { variableQuickFix } from "../variable-quick-fix";
 export function variableFixes(
   variables: () => YarnVariable[],
   errors: (line: number) => string[] = () => [],
@@ -18,7 +18,7 @@ export function variableFixes(
   ];
   const fixAt = (view: EditorView, pos: number) => {
     const line = view.state.doc.lineAt(pos);
-    return missingDeclaration(line.text, pos - line.from, known(view));
+    return variableQuickFix(line.text, pos - line.from, known(view));
   };
   const apply = (view: EditorView, pos: number) => {
     if (view.composing || view.state.readOnly) return false;
@@ -26,7 +26,11 @@ export function variableFixes(
       fix = fixAt(view, pos);
     if (!fix?.insert) return false;
     view.dispatch({
-      changes: { from: line.from, insert: fix.insert + "\n" },
+      changes: {
+        from: line.from + (fix.replace ? fix.from : 0),
+        to: line.from + (fix.replace ? fix.to : 0),
+        insert: fix.replace ? fix.insert : fix.insert + "\n",
+      },
       effects: closeHoverTooltips,
       userEvent: "input.declaration",
     });
@@ -35,7 +39,7 @@ export function variableFixes(
   return {
     at: (state: import("@codemirror/state").EditorState, pos: number) => {
       const line = state.doc.lineAt(pos);
-      return missingDeclaration(line.text, pos - line.from, [
+      return variableQuickFix(line.text, pos - line.from, [
         ...variables(),
         ...collectVariables([{ name: "", text: state.doc.toString() }]),
       ]);
@@ -62,7 +66,7 @@ export function variableFixes(
               marks = [];
             for (let i = 1; i <= view.state.doc.lines; i++) {
               const line = view.state.doc.line(i),
-                fix = missingDeclaration(
+                fix = variableQuickFix(
                   line.text,
                   line.text.indexOf("<<") + 2,
                   vars,
@@ -102,7 +106,7 @@ export function variableFixes(
               dom.appendChild(message);
               if (fix?.insert) {
                 const button = document.createElement("button");
-                button.textContent = "新增宣告";
+                button.textContent = fix.label;
                 button.onmousedown = (e) => e.preventDefault();
                 button.onclick = () => apply(view, pos);
                 dom.appendChild(button);

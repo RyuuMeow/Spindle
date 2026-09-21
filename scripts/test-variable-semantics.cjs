@@ -95,6 +95,64 @@ fs.writeFileSync(path.join(root, "sample.yarn"), source);
       }
       throw Error("declaration navigation failed");
     };
+
+    await page.evaluate(async () => {
+      const m = await new Promise((resolve) =>
+        window.require(["vs/editor/editor.main"], resolve),
+      );
+      const e = m.editor.getEditors().find((e) => e.getDomNode()?.offsetParent);
+      e.setSelection(new m.Range(3, 7, 3, 14));
+      e.focus();
+    });
+    await page.keyboard.press("Control+Shift+f");
+    await page.getByLabel("搜尋全專案文字", { exact: true }).waitFor();
+    assert.equal(
+      await page.getByLabel("搜尋全專案文字", { exact: true }).inputValue(),
+      "$shared",
+    );
+    await page.keyboard.press("Escape");
+    await page.evaluate(async () => {
+      const m = await new Promise((resolve) =>
+        window.require(["vs/editor/editor.main"], resolve),
+      );
+      const e = m.editor.getEditors().find((e) => e.getDomNode()?.offsetParent);
+      e.executeEdits("test", [
+        { range: new m.Range(3, 17, 3, 21), text: "hello" },
+      ]);
+      e.setPosition({ lineNumber: 3, column: 20 });
+      e.focus();
+    });
+    // Let the normal typing history group close before invoking the fix.
+    await page.waitForTimeout(600);
+    await page.keyboard.press("Alt+Enter");
+    assert((await activeSource()).text.includes('<<set $shared = "hello">>'));
+    await page.keyboard.press("Control+z");
+    for (
+      let i = 0;
+      i < 30 &&
+      !(await activeSource()).text.includes("<<set $shared = hello>>");
+      i++
+    )
+      await page.waitForTimeout(100);
+    assert((await activeSource()).text.includes("<<set $shared = hello>>"));
+    await page.keyboard.press("Control+z");
+    for (
+      let i = 0;
+      i < 30 && !(await activeSource()).text.includes("<<set $shared = true>>");
+      i++
+    )
+      await page.waitForTimeout(100);
+    const caret = await page.evaluate(async () => {
+      const m = await new Promise((resolve) =>
+        window.require(["vs/editor/editor.main"], resolve),
+      );
+      const e = m.editor.getEditors().find((e) => e.getDomNode()?.offsetParent);
+      return {
+        height: e.getOption(m.editor.EditorOption.cursorHeight),
+        font: e.getOption(m.editor.EditorOption.fontSize),
+      };
+    });
+    assert.equal(caret.height, caret.font + 2);
     for (const mode of ["source", "reading", "graph"]) {
       await page
         .getByRole("button", { name: "sample.yarn", exact: true })

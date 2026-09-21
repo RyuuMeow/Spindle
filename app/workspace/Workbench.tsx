@@ -1,4 +1,5 @@
 "use client";
+import { EditorView } from "@codemirror/view";
 import { AppearanceProvider } from "../appearance/context";
 import {
   useEffect,
@@ -268,6 +269,19 @@ function WorkbenchContent({
     setStatisticsOpen(false);
   }
   function showSearch() {
+    const cmHost = document.activeElement?.closest(".cm-editor"),
+      cm = cmHost ? EditorView.findFromDOM(cmHost as HTMLElement) : null,
+      editor = mode === "source" ? editorRef.current : null,
+      selection = editor?.getSelection(),
+      selected = cm
+        ? cm.state.sliceDoc(
+            cm.state.selection.main.from,
+            cm.state.selection.main.to,
+          )
+        : selection
+          ? editor?.getModel()?.getValueInRange(selection)
+          : window.getSelection()?.toString();
+    if (selected) setSearchQuery(selected);
     setQuickNewTab(false);
     setSearchScope("content");
     setSearchOpen(true);
@@ -1580,8 +1594,24 @@ function WorkbenchContent({
   });
   useEffect(() => {
     const handler = (event: globalThis.KeyboardEvent) => keyboard(event);
+    // Monaco consumes this key before a bubbling workspace listener can see it.
+    const searchCapture = (event: globalThis.KeyboardEvent) => {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === "f" &&
+        !event.isComposing
+      ) {
+        keyboard(event);
+        if (event.defaultPrevented) event.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", searchCapture, true);
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", searchCapture, true);
+      window.removeEventListener("keydown", handler);
+    };
   }, []);
   const onOpened = useEffectEvent((result: ActionResult) => {
     void adopt(result);
