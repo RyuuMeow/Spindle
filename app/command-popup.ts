@@ -61,7 +61,11 @@ export function commandPopup(
         "預設值：" + String(p.defaultValue),
       );
   });
-  if (command.example && command.example !== command.syntax && parameterIndex < 0) {
+  if (
+    command.example &&
+    command.example !== command.syntax &&
+    parameterIndex < 0
+  ) {
     add(dom, "div", "command-tip-caption", "範例");
     add(dom, "code", "command-tip-example", command.example);
   }
@@ -74,5 +78,28 @@ export function completionDescription(text: string) {
   const dom = document.createElement("div");
   dom.className = "command-completion-description";
   dom.textContent = text;
+  return dom;
+}
+
+export function variablePopup(
+  variable: import("./variable-completion").YarnVariable,
+) {
+  const dom = document.createElement("div");
+  dom.className = "reading-command-tooltip variable-tooltip";
+  for (const [className, text] of [
+    ["command-tip-heading", variable.name + " · " + variable.type],
+    ["command-tip-example", "初始值：" + (variable.initialValue ?? "未知")],
+    ["command-tip-description", variable.description],
+    [
+      "command-tip-caption",
+      variable.file + ":" + variable.line + " · Ctrl＋點擊前往宣告",
+    ],
+  ]) {
+    if (!text) continue;
+    const row = document.createElement("div");
+    row.className = className;
+    row.textContent = text;
+    dom.appendChild(row);
+  }
   return dom;
 }

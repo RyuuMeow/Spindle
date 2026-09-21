@@ -42,6 +42,7 @@
     "test:tab-lifecycle": "node scripts/test-tab-lifecycle.cjs",
     "test:find-controls": "node scripts/test-find-controls.cjs",
     "test:appearance": "node scripts/test-appearance.cjs",
+    "test:variable-semantics": "node scripts/test-variable-semantics.cjs",
     "test:variable-quick-fix": "node scripts/test-variable-quick-fix.cjs"
   },
   "dependencies": {

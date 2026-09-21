@@ -80,6 +80,7 @@ type Props = {
   selection?: { anchor: number; head: number };
   onSelection?: (selection: { anchor: number; head: number }) => void;
   onNavigate?: (target: string) => void;
+  onVariableNavigate?: (file: string, line: number) => void;
   canNavigate?: (target: string) => boolean;
   fontSize?: number;
   lineHeight?: number;
@@ -169,6 +170,8 @@ export default function ReadingEditor(props: Props) {
         sceneLinks(
           (name) => !!latest.current.canNavigate?.(name),
           (name) => latest.current.onNavigate?.(name),
+          () => latest.current.variables || [],
+          (file, line) => latest.current.onVariableNavigate?.(file, line),
         ),
         structure,
         decorations,
@@ -568,7 +571,7 @@ export default function ReadingEditor(props: Props) {
     const view = viewRef.current;
     if (view && !view.composing)
       view.dispatch({ effects: refreshDecorations.of(null) });
-  }, [props.commands]);
+  }, [props.commands, props.issues, props.variables]);
   return (
     <div
       ref={host}

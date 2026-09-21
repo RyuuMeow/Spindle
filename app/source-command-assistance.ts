@@ -1,13 +1,18 @@
 import type { editor, IDisposable } from "monaco-editor";
 import type { Command } from "./parser";
 import { findCommand } from "./command-catalog";
+import { variableAt } from "./variable-completion";
 import type { YarnVariable } from "./variable-completion";
 import {
   commandHover,
   emptyParameterHint,
   atCommandCloser,
 } from "./command-hints";
-import { commandPopup, completionDescription } from "./command-popup";
+import {
+  commandPopup,
+  completionDescription,
+  variablePopup,
+} from "./command-popup";
 import "./editor-assistance.css";
 
 function place(
@@ -232,12 +237,17 @@ export function sourceCommandAssistance(
         hide();
         return;
       }
+      const variable = variableAt(
+        model.getLineContent(p.lineNumber),
+        p.column - 1,
+        variables(),
+      );
       const hint = commandHover(
         model.getLineContent(p.lineNumber),
         p.column - 1,
         commands(),
       );
-      if (!hint) {
+      if (!hint && !variable) {
         hide();
         return;
       }
@@ -252,8 +262,10 @@ export function sourceCommandAssistance(
           return;
         show(
           p.lineNumber,
-          hint.from + 1,
-          commandPopup(hint.command, hint.parameterIndex),
+          (variable?.from ?? hint!.from) + 1,
+          variable
+            ? variablePopup(variable.variable)
+            : commandPopup(hint!.command, hint!.parameterIndex),
         );
       }, 350);
     }),

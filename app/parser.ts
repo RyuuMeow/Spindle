@@ -95,6 +95,108 @@ export function literalType(s: string) {
   if (/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(s)) return "number";
   return "string";
 }
+/** Conservative typing: unknown calls are never guessed. */
+export function expressionType(
+  source: string,
+  variables: ReadonlyMap<string, string> = new Map(),
+): string | null {
+  const tokens =
+    source.match(
+      /"(?:\\.|[^"\\])*"|\$[A-Za-z_]\w*|(?:\d+(?:\.\d*)?|\.\d+)|[A-Za-z_]\w*|==|!=|<=|>=|&&|\|\||[^\s]/g,
+    ) || [];
+  let index = 0;
+  const precedence: Record<string, number> = {
+    or: 1,
+    "||": 1,
+    xor: 1,
+    and: 2,
+    "&&": 2,
+    "==": 3,
+    "!=": 3,
+    eq: 3,
+    neq: 3,
+    "<": 4,
+    ">": 4,
+    "<=": 4,
+    ">=": 4,
+    lt: 4,
+    gt: 4,
+    lte: 4,
+    gte: 4,
+    "+": 5,
+    "-": 5,
+    "*": 6,
+    "/": 6,
+    "%": 6,
+  };
+  const atom = (): string | null => {
+    const token = tokens[index++];
+    if (!token) return null;
+    if (token === "(" || token === "{") {
+      const value = parse(0);
+      return tokens[index++] === (token === "(" ? ")" : "}") ? value : null;
+    }
+    if (["-", "+", "!", "not"].includes(token)) {
+      const value = atom();
+      return value === (token === "!" || token === "not" ? "boolean" : "number")
+        ? value
+        : null;
+    }
+    if (/^"/.test(token)) return "string";
+    if (/^(true|false)$/.test(token)) return "boolean";
+    if (/^(?:\d|\.\d)/.test(token)) return "number";
+    if (token.startsWith("$")) return variables.get(token) || null;
+    return null;
+  };
+  const parse = (minimum: number): string | null => {
+    let left = atom();
+    while (
+      index < tokens.length &&
+      (precedence[tokens[index]] ?? -1) >= minimum
+    ) {
+      const op = tokens[index++],
+        right = parse(precedence[op] + 1);
+      if (!left || !right) left = null;
+      else if (precedence[op] <= 2)
+        left = left === "boolean" && right === "boolean" ? "boolean" : null;
+      else if (precedence[op] <= 4) left = left === right ? "boolean" : null;
+      else if (op === "+" && left === "string" && right === "string")
+        left = "string";
+      else left = left === "number" && right === "number" ? "number" : null;
+    }
+    return left;
+  };
+  const result = parse(0);
+  return index === tokens.length ? result : null;
+}
+export function assignmentTypeError(
+  args: string,
+  types: ReadonlyMap<string, string>,
+): string | null {
+  const match = /^(\$[A-Za-z_]\w*)\s*(=|to\b|[+*/%\-]=)\s*(.+)$/.exec(args);
+  if (!match) return null;
+  const expected = types.get(match[1]),
+    actual = expressionType(match[3], types);
+  if (!expected || !actual || expected === "expression") return null;
+  const compound = match[2] !== "=" && match[2] !== "to";
+  if (
+    expected !== actual ||
+    (compound &&
+      expected !== "number" &&
+      !(match[2] === "+=" && expected === "string"))
+  )
+    return (
+      "變數「" +
+      match[1] +
+      "」宣告為 " +
+      expected +
+      "，不能以 " +
+      match[2] +
+      " 指派 " +
+      actual
+    );
+  return null;
+}
 function uncomment(s: string) {
   let quote = false;
   for (let i = 0; i < s.length - 1; i++) {
@@ -386,17 +488,32 @@ export function parse(docs: Doc[], commands: Command[]) {
     });
     finish(lines.length, false);
   }
-  const declarations = new Set(
-    nodes.flatMap((n) =>
-      n.calls
-        .filter(
-          (c) =>
-            c.name === "declare" &&
-            /^\$[A-Za-z_]\w*\s*(?:=|to\b)\s*.+/.test(c.args.join(" ")),
-        )
-        .map((c) => c.args[0]),
-    ),
-  );
+  const declarations = new Map<string, string>();
+  const definitions = nodes
+    .flatMap((n) => n.calls)
+    .filter((c) => c.name === "declare");
+  for (let pass = 0; pass <= definitions.length; pass++) {
+    let changed = false;
+    for (const call of definitions) {
+      const match =
+        /^(\$[A-Za-z_]\w*)\s*(?:=|to\b)\s*(.+?)(?:\s+as\s+(number|string|bool(?:ean)?))?$/.exec(
+          call.args.join(" "),
+        );
+      if (!match) continue;
+      const type =
+        match[3]?.replace(/^bool$/, "boolean") ||
+        expressionType(match[2], declarations) ||
+        "expression";
+      if (
+        !declarations.has(match[1]) ||
+        (declarations.get(match[1]) === "expression" && type !== "expression")
+      ) {
+        declarations.set(match[1], type);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
   for (const n of nodes)
     for (const call of n.calls) {
       if (
@@ -411,6 +528,10 @@ export function parse(docs: Doc[], commands: Command[]) {
           "error",
           call.column,
         );
+      if (call.name === "set") {
+        const error = assignmentTypeError(call.args.join(" "), declarations);
+        if (error) issue(n.file, call.line, error, "error", call.column);
+      }
     }
   const names = new Map<string, Node[]>();
   for (const n of nodes) names.set(n.name, [...(names.get(n.name) || []), n]);

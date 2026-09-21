@@ -1,3 +1,4 @@
+import { expressionType } from "./parser";
 import { commandEnd } from "./reading/tokens";
 export type YarnVariable = {
   name: string;
@@ -7,6 +8,7 @@ export type YarnVariable = {
   description: string;
   readOnly: boolean;
   declared?: boolean;
+  initialValue?: string;
 };
 /** Index definitions, not every $word in prose, comments or string literals. */
 export function collectVariables(
@@ -59,8 +61,27 @@ export function collectVariables(
           description: note,
           readOnly: declared && !literalType,
           declared,
+          initialValue: declared ? literal : undefined,
         });
       });
+  }
+  for (let pass = 0; pass < variables.size; pass++) {
+    let changed = false;
+    const types = new Map(
+      [...variables.values()]
+        .filter((v) => v.declared && v.type !== "expression")
+        .map((v) => [v.name, v.type]),
+    );
+    for (const variable of variables.values()) {
+      if (variable.declared && variable.type === "expression") {
+        const type = expressionType(variable.initialValue || "", types);
+        if (type) {
+          variable.type = type;
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
   }
   return [...variables.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -126,4 +147,25 @@ export function variableCompletionContext(
   );
   if (!tail) return null;
   return { from: tail.index, assignment };
+}
+
+/** Only syntactic references expose metadata or navigation. */
+export function variableAt(
+  line: string,
+  offset: number,
+  variables: readonly YarnVariable[],
+) {
+  for (const match of line.matchAll(/\$[A-Za-z_]\w*/g)) {
+    if (offset < match.index || offset >= match.index + match[0].length)
+      continue;
+    const prefix = line
+      .slice(0, match.index + match[0].length)
+      .replace(/^(\s*<<)declare\b/, "$1set");
+    if (!variableCompletionContext(prefix)) return null;
+    const variable = variables.find((v) => v.declared && v.name === match[0]);
+    return variable
+      ? { from: match.index, to: match.index + match[0].length, variable }
+      : null;
+  }
+  return null;
 }

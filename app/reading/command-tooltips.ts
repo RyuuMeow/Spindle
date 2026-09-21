@@ -1,5 +1,5 @@
 import type { EditorState } from "@codemirror/state";
-import { hoverTooltip } from "@codemirror/view";
+import { hoverTooltip, type EditorView } from "@codemirror/view";
 import type { Command } from "../parser";
 import { unregisteredCommand } from "../command-quick-fix";
 import { closeHoverTooltips } from "@codemirror/view";
@@ -9,11 +9,19 @@ export const commandTooltips = (
   commands: () => Command[],
   blocked: (state: EditorState) => boolean,
   register?: (command: Command) => void,
-  errorAt: (state: EditorState, pos: number) => boolean = () => false,
+  errorAt: (
+    state: EditorState,
+    pos: number,
+    view: EditorView,
+  ) => boolean = () => false,
 ) =>
   hoverTooltip(
     (view, pos) => {
-      if (view.composing || blocked(view.state) || errorAt(view.state, pos))
+      if (
+        view.composing ||
+        blocked(view.state) ||
+        errorAt(view.state, pos, view)
+      )
         return null;
       const line = view.state.doc.lineAt(pos);
       const hint = commandHover(line.text, pos - line.from, commands());

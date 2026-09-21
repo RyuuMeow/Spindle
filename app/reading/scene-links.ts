@@ -5,11 +5,15 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
+import { readingVariableAt } from "./variable-reference";
+import { type YarnVariable } from "../variable-completion";
 import { sceneLink } from "../scene-link";
 /** Same source-range hit test drives both link feedback and navigation. */
 export function sceneLinks(
   canFollow: (name: string) => boolean,
   follow: (name: string) => void,
+  variables: () => YarnVariable[] = () => [],
+  followVariable?: (file: string, line: number) => void,
 ) {
   return ViewPlugin.fromClass(
     class {
@@ -17,6 +21,7 @@ export function sceneLinks(
       point: { x: number; y: number } | null = null;
       modifier = false;
       destroyed = false;
+      badge: HTMLElement | null = null;
       active: { from: number; to: number } | null = null;
       constructor(readonly view: EditorView) {
         window.addEventListener("keydown", this.key, true);
@@ -27,17 +32,35 @@ export function sceneLinks(
         if (!this.point) return null;
         const pos = this.view.posAtCoords(this.point, false);
         if (pos === null) return null;
-        const line = this.view.state.doc.lineAt(pos),
-          link = sceneLink(line.text);
+        const line = this.view.state.doc.lineAt(pos);
+        const variable = readingVariableAt(this.view, pos, variables());
+        if (variable && followVariable)
+          return {
+            from: line.from + variable.from,
+            to: line.from + variable.to,
+            follow: () =>
+              followVariable(variable.variable.file, variable.variable.line),
+          };
+        const link = sceneLink(line.text);
         return link &&
           pos >= line.from + link.from &&
           pos < line.from + link.to &&
           canFollow(link.name)
-          ? { ...link, from: line.from + link.from, to: line.from + link.to }
+          ? {
+              ...link,
+              from: line.from + link.from,
+              to: line.from + link.to,
+              follow: () => follow(link.name),
+            }
           : null;
       }
       refresh = () => {
         const next = this.modifier ? this.hit() : null;
+        this.badge?.classList.remove("spindle-source-link");
+        this.badge = next
+          ? this.view.dom.querySelector<HTMLElement>(".reading-variable:hover")
+          : null;
+        this.badge?.classList.add("spindle-source-link");
         if (next?.from === this.active?.from && next?.to === this.active?.to)
           return;
         this.active = next;
@@ -81,6 +104,7 @@ export function sceneLinks(
       }
       destroy() {
         this.destroyed = true;
+        this.badge?.classList.remove("spindle-source-link");
         window.removeEventListener("keydown", this.key, true);
         window.removeEventListener("keyup", this.key, true);
         window.removeEventListener("blur", this.blur);
@@ -105,7 +129,7 @@ export function sceneLinks(
           const link = this.hit();
           if (!link) return false;
           event.preventDefault();
-          follow(link.name);
+          link.follow();
           return true;
         },
       },

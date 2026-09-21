@@ -70,6 +70,7 @@ type Props = SceneEditorBindings & {
   closeRequest?: number;
   canNavigate?: (name: string) => boolean;
   onNavigate?: (name: string) => void;
+  onVariableNavigate?: (file: string, line: number) => void;
 };
 function bodyStructure(text: string) {
   return readingStructure("---\n" + text + "\n===")
@@ -212,6 +213,11 @@ export default function SceneEditor(props: Props) {
               !blockedRef.current &&
               !!latest.current.canNavigate?.(name),
             (name) => latest.current.onNavigate?.(name),
+            () =>
+              composing.current || closeGuard.current || blockedRef.current
+                ? []
+                : collectVariables(latest.current.documents),
+            (file, line) => latest.current.onVariableNavigate?.(file, line),
           ),
           decorations,
           editable.of([
@@ -422,6 +428,10 @@ export default function SceneEditor(props: Props) {
   useEffect(() => {
     reconcile();
   });
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view && !view.composing) view.dispatch({});
+  }, [props.issues, props.documents]);
   const titleEditing = title !== null;
   useEffect(() => {
     if (titleEditing) {

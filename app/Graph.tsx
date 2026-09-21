@@ -527,6 +527,7 @@ function Canvas({
       onDocumentUndo &&
       onDocumentComposition ? (
         <SceneEditor
+          onVariableNavigate={onGoTo}
           issues={issues}
           documents={documents || []}
           key={editing.documentId + editing.record.id}

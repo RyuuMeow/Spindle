@@ -67,11 +67,12 @@ export function variableFixes(
                   line.text.indexOf("<<") + 2,
                   vars,
                 );
-              if (fix)
+              if (line.length && (fix || errors(line.number).length))
                 marks.push(
                   Decoration.mark({ class: "cm-undeclared-variable" }).range(
-                    line.from + fix.from,
-                    line.from + fix.to,
+                    line.from +
+                      (fix?.from ?? Math.max(0, line.text.indexOf("<<"))),
+                    line.from + (fix?.to ?? line.length),
                   ),
                 );
             }

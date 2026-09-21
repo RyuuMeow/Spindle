@@ -438,3 +438,79 @@ test("declaration quick fix chooses literal defaults and does not guess unknown 
     null,
   );
 });
+
+test("assignments use declared types across files, including expressions and compound assignments", () => {
+  const doc = (name, text) => ({
+    name,
+    text: "title: " + name + "\n---\n" + text + "\n===",
+    saved: "",
+  });
+  const definitions = doc(
+    "Definitions",
+    '<<declare $n = 0>>\n<<declare $b = true>>\n<<declare $s = "hello">>\n<<declare $derived = $n + 2>>',
+  );
+  for (const value of ['"wrong"', "true", "$b", "($n > 1)"]) {
+    const issues = variableParser.parse(
+      [doc("Use", "<<set $n = " + value + ">>"), definitions],
+      [],
+    ).issues;
+    assert(
+      issues.some((i) => i.severity === "error" && i.message.includes("指派")),
+      value,
+    );
+  }
+  for (const body of [
+    "<<set $n = -2.5>>",
+    "<<set $n += $derived * 2>>",
+    "<<set $b = $n > 2>>",
+    '<<set $s += " world">>',
+    "<<set $n = unknown()>>",
+  ]) {
+    assert(
+      !variableParser
+        .parse([doc("Use", body), definitions], [])
+        .issues.some((i) => i.message.includes("指派")),
+      body,
+    );
+  }
+  assert(
+    variableParser
+      .parse([definitions, doc("Use", "<<set $b += false>>")], [])
+      .issues.some((i) => i.message.includes("指派")),
+  );
+});
+test("variable metadata stays tied to declaration; reference hit test excludes prose, strings and comments", () => {
+  const { variableAt } = createRequire(import.meta.url)(variableOutput);
+  const vars = collectVariables([
+    { name: "Use.yarn", text: '<<set $value = "wrong">>' },
+    { name: "Defs.yarn", text: "<<declare $value = 12>>" },
+  ]);
+  assert.equal(vars[0].type, "number");
+  assert.equal(vars[0].initialValue, "12");
+  assert.equal(vars[0].file, "Defs.yarn");
+  for (const text of [
+    "<<set $value = 2>>",
+    "Text: {$value}",
+    "<<declare $value = 12>>",
+    "<<if $value > 1>>",
+  ]) {
+    assert.equal(
+      variableAt(text, text.indexOf("$value") + 2, vars)?.variable.file,
+      "Defs.yarn",
+      text,
+    );
+  }
+  for (const text of [
+    "Text: $value",
+    "// <<set $value = 2>>",
+    '<<set $s = "$value">>',
+    'Text: {"$value"}',
+    "title: $value",
+  ]) {
+    assert.equal(
+      variableAt(text, text.indexOf("$value") + 2, vars),
+      null,
+      text,
+    );
+  }
+});

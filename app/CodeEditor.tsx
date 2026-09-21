@@ -19,6 +19,7 @@ import type { Command, Doc, Issue, Node } from "./parser";
 import { commandCatalog } from "./command-catalog";
 import {
   variableCompletionContext,
+  variableAt,
   type YarnVariable,
 } from "./variable-completion";
 import { commandCall, parameterLabel, commandInput } from "./command-hints";
@@ -655,6 +656,20 @@ export default function CodeEditor({
         const linkAt = (position: import("monaco-editor").Position | null) => {
           const model = editor.getModel();
           if (!position || !model) return null;
+          const variable = variableAt(
+            model.getLineContent(position.lineNumber),
+            position.column - 1,
+            latest.current.variables,
+          );
+          if (variable)
+            return {
+              ...variable,
+              node: {
+                file: variable.variable.file,
+                body: variable.variable.line,
+              },
+              line: position.lineNumber,
+            };
           const link = sceneLink(model.getLineContent(position.lineNumber));
           if (
             !link ||
@@ -673,6 +688,11 @@ export default function CodeEditor({
           const position = editor.getPosition(),
             model = editor.getModel();
           if (!position || !model) return;
+          const direct = linkAt(position);
+          if (direct) {
+            navigationCallback.current?.(direct.node.file, direct.node.body);
+            return;
+          }
           const link = sceneLink(model.getLineContent(position.lineNumber));
           const target =
             link && linkAt(new m.Position(position.lineNumber, link.from + 1));

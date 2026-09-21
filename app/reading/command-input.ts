@@ -1,9 +1,11 @@
+import { readingVariableAt } from "./variable-reference";
 import { variableFixes } from "./variable-fixes";
 import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import {
   EditorView,
   keymap,
   showTooltip,
+  hoverTooltip,
   tooltips,
   closeHoverTooltips,
   hasHoverTooltips,
@@ -33,7 +35,11 @@ import {
   parameterLabel,
   atCommandCloser,
 } from "../command-hints";
-import { commandPopup, completionDescription } from "../command-popup";
+import {
+  commandPopup,
+  completionDescription,
+  variablePopup,
+} from "../command-popup";
 import { commandTooltips } from "./command-tooltips";
 import { readingIcon } from "./icons";
 import "../editor-assistance.css";
@@ -223,6 +229,28 @@ export function commandEditing(
     composing,
     dismissed,
     hints,
+    hoverTooltip(
+      (view, pos) => {
+        const line = view.state.doc.lineAt(pos);
+        if (
+          view.composing ||
+          view.state.field(hints) ||
+          completionStatus(view.state) !== null ||
+          errors(line.number).length
+        )
+          return null;
+        const hit = readingVariableAt(view, pos, variables());
+        return hit
+          ? {
+              pos: line.from + hit.from,
+              end: line.from + hit.to,
+              above: true,
+              create: () => ({ dom: variablePopup(hit.variable) }),
+            }
+          : null;
+      },
+      { hoverTime: 350, hideOnChange: true },
+    ),
     commandTooltips(
       commands,
       (state) =>
@@ -230,9 +258,10 @@ export function commandEditing(
         state.field(composing) ||
         completionStatus(state) !== null,
       register,
-      (state, pos) =>
+      (state, pos, view) =>
         errors(state.doc.lineAt(pos).number).length > 0 ||
-        !!declarations.at(state, pos),
+        !!declarations.at(state, pos) ||
+        !!readingVariableAt(view, pos, variables()),
     ),
     EditorView.domEventHandlers({
       mousemove: (event, view) => {
