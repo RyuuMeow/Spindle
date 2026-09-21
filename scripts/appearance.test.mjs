@@ -156,3 +156,16 @@ test("symbol style validates, inherits and can be overridden independently", () 
     "underline",
   );
 });
+
+test("project declarations enable symbol references in document and scene editors", () => {
+  const text = "<<set $shared = 2>>";
+  assert.equal(
+    highlightRanges(text, 9, 9, false, defaultAppearance().global).length,
+    0,
+  );
+  assert.equal(
+    highlightRanges(text, 9, 9, false, defaultAppearance().global, ["$shared"])
+      .length,
+    1,
+  );
+});

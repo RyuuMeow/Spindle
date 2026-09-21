@@ -1,4 +1,5 @@
 "use client";
+import { missingDeclaration } from "./variable-quick-fix";
 import { sourceHighlights } from "./appearance/monaco-highlights";
 import { unregisteredCommand } from "./command-quick-fix";
 import { sourceCommandAssistance } from "./source-command-assistance";
@@ -118,12 +119,13 @@ export default function CodeEditor({
 
   const api = useRef<typeof import("monaco-editor") | null>(null),
     providers = useRef<IDisposable[]>([]),
-    latest = useRef({ commands, nodes, variables, onRegisterCommand });
+    latest = useRef({ commands, nodes, variables, onRegisterCommand, issues });
   useLayoutEffect(() => {
     cursorCallback.current = onCursor;
     undoCallback.current = onUndo;
     compositionCallback.current = onComposition;
-    latest.current = { commands, nodes, variables, onRegisterCommand };
+    latest.current = { commands, nodes, variables, onRegisterCommand, issues };
+    highlights.current?.refresh();
   });
   const hintChanges = useRef<import("monaco-editor").Emitter<void> | null>(
     null,
@@ -407,6 +409,10 @@ export default function CodeEditor({
         highlights.current = sourceHighlights(
           editor,
           () => highlightStyle.current,
+          () =>
+            latest.current.variables
+              .filter((v) => v.declared)
+              .map((v) => v.name),
         );
         editor.onDidDispose(() => highlights.current?.dispose());
         editor.onDidChangeModel(syncModel);
@@ -415,6 +421,13 @@ export default function CodeEditor({
           () => latest.current.commands,
           m.editor.ContentWidgetPositionPreference,
           () => latest.current.variables,
+          (line) =>
+            latest.current.issues.some(
+              (i) =>
+                i.file === currentDoc.current.name &&
+                i.line === line &&
+                i.severity === "error",
+            ),
         );
         editor.onDidDispose(() => assistance.dispose());
         const register = editor.addCommand(
@@ -430,6 +443,32 @@ export default function CodeEditor({
               latest.current.onRegisterCommand?.(candidate.command);
           },
         );
+        const addDeclaration = (lineNumber: number) => {
+          const model = editor.getModel();
+          if (!model || composing.current) return;
+          const line = model.getLineContent(lineNumber);
+          const fix = missingDeclaration(
+            line,
+            line.indexOf("<<") + 2,
+            latest.current.variables,
+          );
+          if (!fix?.insert) return;
+          editor.pushUndoStop();
+          editor.executeEdits("declare-variable", [
+            {
+              range: new m.Range(lineNumber, 1, lineNumber, 1),
+              text: fix.insert + model.getEOL(),
+            },
+          ]);
+          editor.pushUndoStop();
+        };
+        const declareCommand = editor.addCommand(
+          0,
+          (_ctx, lineNumber: number, expected: string) => {
+            if (editor.getModel()?.getLineContent(lineNumber) === expected)
+              addDeclaration(lineNumber);
+          },
+        );
         const fixes = m.languages.registerCodeActionProvider("yarn", {
           providedCodeActionKinds: ["quickfix"],
           provideCodeActions(
@@ -442,6 +481,27 @@ export default function CodeEditor({
             )
               return { actions: [], dispose() {} };
             const line = model.getLineContent(range.startLineNumber);
+            const declaration = missingDeclaration(
+              line,
+              range.startColumn - 1,
+              latest.current.variables,
+            );
+            if (declaration?.insert && declareCommand)
+              return {
+                actions: [
+                  {
+                    title: "新增宣告「" + declaration.name + "」",
+                    kind: "quickfix",
+                    isPreferred: true,
+                    command: {
+                      id: declareCommand,
+                      title: "新增宣告",
+                      arguments: [range.startLineNumber, line],
+                    },
+                  },
+                ],
+                dispose() {},
+              };
             const candidate = unregisteredCommand(
               line,
               range.startColumn - 1,
@@ -479,6 +539,18 @@ export default function CodeEditor({
             if (composing.current) return;
             const model = editor.getModel(),
               position = editor.getPosition();
+            if (
+              model &&
+              position &&
+              missingDeclaration(
+                model.getLineContent(position.lineNumber),
+                position.column - 1,
+                latest.current.variables,
+              )?.insert
+            ) {
+              addDeclaration(position.lineNumber);
+              return;
+            }
             const candidate =
               model &&
               position &&
@@ -501,6 +573,33 @@ export default function CodeEditor({
             )
               return null;
             const line = model.getLineContent(position.lineNumber);
+            const declaration = missingDeclaration(
+              line,
+              position.column - 1,
+              latest.current.variables,
+            );
+            if (declaration?.insert && declareCommand)
+              return {
+                range: new m.Range(
+                  position.lineNumber,
+                  declaration.from + 1,
+                  position.lineNumber,
+                  declaration.to + 1,
+                ),
+                contents: [
+                  {
+                    value:
+                      "[新增宣告](command:" +
+                      declareCommand +
+                      "?" +
+                      encodeURIComponent(
+                        JSON.stringify([position.lineNumber, line]),
+                      ) +
+                      ") · Alt+Enter",
+                    isTrusted: { enabledCommands: [declareCommand] },
+                  },
+                ],
+              };
             const candidate = unregisteredCommand(
               line,
               position.column - 1,

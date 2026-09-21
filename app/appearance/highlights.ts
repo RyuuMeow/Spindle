@@ -5,13 +5,14 @@ export type HighlightRange = {
   kind: "match" | "symbol";
 };
 /** Only syntactic variable references with a declaration and uniquely named scene references qualify. */
-function symbols(text: string) {
+function symbols(text: string, projectDeclarations: readonly string[]) {
   const declarations = new Set(
     Array.from(
       text.matchAll(/<<declare\s+(\$[\p{L}_][\p{L}\p{N}_]*)/gu),
       (m) => m[1],
     ),
   );
+  for (const name of projectDeclarations) declarations.add(name);
   const titles = new Map<string, number>();
   for (const m of text.matchAll(/^title:[ \t]*(\S+)[ \t]*$/gm))
     titles.set(m[1], (titles.get(m[1]) || 0) + 1);
@@ -52,6 +53,7 @@ export function highlightRanges(
   to: number,
   searching: boolean,
   style: Pick<Typography, "highlightMatches" | "highlightSymbols">,
+  projectDeclarations: readonly string[] = [],
 ): HighlightRange[] {
   if (searching) return [];
   if (from !== to) {
@@ -69,7 +71,7 @@ export function highlightRanges(
     return result;
   }
   if (!style.highlightSymbols) return [];
-  const references = symbols(text),
+  const references = symbols(text, projectDeclarations),
     active = references.find((r) => r.from <= from && r.to >= from);
   return active
     ? references

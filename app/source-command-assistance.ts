@@ -43,6 +43,7 @@ export function sourceCommandAssistance(
   commands: () => Command[],
   placement: typeof import("monaco-editor").editor.ContentWidgetPositionPreference,
   variables: () => YarnVariable[] = () => [],
+  hasError: (line: number) => boolean = () => false,
 ): IDisposable {
   const host = editor.getDomNode()!;
   host.dataset.spindleAssisted = "";
@@ -97,7 +98,7 @@ export function sourceCommandAssistance(
     const pos = editor.getPosition(),
       model = editor.getModel(),
       selection = editor.getSelection();
-    if (!pos || !model || !selection?.isEmpty()) {
+    if (!pos || !model || !selection?.isEmpty() || hasError(pos.lineNumber)) {
       hide();
       return;
     }
@@ -217,6 +218,10 @@ export function sourceCommandAssistance(
     editor.onMouseMove((e) => {
       if (e.target.element && popup.contains(e.target.element)) {
         clearTimeout(hoverTimer);
+        return;
+      }
+      if (e.target.position && hasError(e.target.position.lineNumber)) {
+        hide();
         return;
       }
       if (signature || composing || suggesting) return;

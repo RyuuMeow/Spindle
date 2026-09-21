@@ -9,10 +9,12 @@ export const commandTooltips = (
   commands: () => Command[],
   blocked: (state: EditorState) => boolean,
   register?: (command: Command) => void,
+  errorAt: (state: EditorState, pos: number) => boolean = () => false,
 ) =>
   hoverTooltip(
     (view, pos) => {
-      if (view.composing || blocked(view.state)) return null;
+      if (view.composing || blocked(view.state) || errorAt(view.state, pos))
+        return null;
       const line = view.state.doc.lineAt(pos);
       const hint = commandHover(line.text, pos - line.from, commands());
       if (!hint) {

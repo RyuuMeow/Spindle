@@ -4,6 +4,7 @@ import { highlightRanges } from "./highlights";
 export function sourceHighlights(
   editor: editor.IStandaloneCodeEditor,
   style: () => Typography,
+  declarations: () => string[] = () => [],
 ) {
   const decorations = editor.createDecorationsCollection();
   const root = editor.getDomNode();
@@ -35,6 +36,7 @@ export function sourceHighlights(
             model.getOffsetAt(selection.getEndPosition()),
             searching,
             s,
+            declarations(),
           )
         : [];
     decorations.set(

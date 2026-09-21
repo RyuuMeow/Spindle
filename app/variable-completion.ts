@@ -6,6 +6,7 @@ export type YarnVariable = {
   line: number;
   description: string;
   readOnly: boolean;
+  declared?: boolean;
 };
 /** Index definitions, not every $word in prose, comments or string literals. */
 export function collectVariables(

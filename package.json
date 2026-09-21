@@ -41,7 +41,8 @@
     "test:command-quick-fix": "node scripts/test-command-quick-fix.cjs",
     "test:tab-lifecycle": "node scripts/test-tab-lifecycle.cjs",
     "test:find-controls": "node scripts/test-find-controls.cjs",
-    "test:appearance": "node scripts/test-appearance.cjs"
+    "test:appearance": "node scripts/test-appearance.cjs",
+    "test:variable-quick-fix": "node scripts/test-variable-quick-fix.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

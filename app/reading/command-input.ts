@@ -1,3 +1,4 @@
+import { variableFixes } from "./variable-fixes";
 import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import {
   EditorView,
@@ -44,7 +45,9 @@ export function commandEditing(
   characters: () => string[] = () => [],
   variables: () => YarnVariable[] = () => [],
   register?: (command: Command) => void,
+  errors: (line: number) => string[] = () => [],
 ) {
+  const declarations = variableFixes(variables, errors);
   const dismiss = StateEffect.define<boolean>();
   const focusChanged = StateEffect.define<boolean>();
   const compositionChanged = StateEffect.define<boolean>();
@@ -98,6 +101,7 @@ export function commandEditing(
       )
         return null;
       const line = tr.state.doc.lineAt(selection.head);
+      if (errors(line.number).length) return null;
       const hint = emptyParameterHint(
         line.text,
         selection.head - line.from,
@@ -174,6 +178,7 @@ export function commandEditing(
     };
   };
   return [
+    declarations.extension,
     EditorState.phrases.of({
       Find: "尋找",
       Replace: "取代",
@@ -196,7 +201,10 @@ export function commandEditing(
       {
         key: "Alt-Enter",
         run: (view) => {
-          if (!register || view.composing || view.state.readOnly) return false;
+          if (view.composing || view.state.readOnly) return false;
+          if (declarations.apply(view, view.state.selection.main.head))
+            return true;
+          if (!register) return false;
           const pos = view.state.selection.main.head,
             line = view.state.doc.lineAt(pos);
           const candidate = unregisteredCommand(
@@ -222,8 +230,21 @@ export function commandEditing(
         state.field(composing) ||
         completionStatus(state) !== null,
       register,
+      (state, pos) =>
+        errors(state.doc.lineAt(pos).number).length > 0 ||
+        !!declarations.at(state, pos),
     ),
     EditorView.domEventHandlers({
+      mousemove: (event, view) => {
+        if (!view.state.field(hints)) return;
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (
+          pos !== null &&
+          (errors(view.state.doc.lineAt(pos).number).length ||
+            declarations.at(view.state, pos))
+        )
+          view.dispatch({ effects: dismiss.of(true) });
+      },
       focus: (_event, view) => {
         view.dispatch({ effects: focusChanged.of(true) });
       },

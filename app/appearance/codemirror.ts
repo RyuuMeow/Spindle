@@ -11,7 +11,7 @@ import { searchPanelOpen, getSearchQuery } from "@codemirror/search";
 import { highlightRanges } from "./highlights";
 import { useAppearance } from "./context";
 import { fontStack, type AppearanceMode, type Typography } from "./model";
-function theme(s: Typography) {
+function theme(s: Typography, declarations: string[]) {
   return [
     EditorView.theme({
       "&": { backgroundColor: s.background, color: s.foreground },
@@ -66,6 +66,7 @@ function theme(s: Typography) {
                   selection.to,
                   searchPanelOpen(state) && !!getSearchQuery(state).search,
                   s,
+                  declarations,
                 )
               : [];
           return Decoration.set(
@@ -87,10 +88,20 @@ function theme(s: Typography) {
 export function useCodeMirrorAppearance(
   ref: RefObject<EditorView | null>,
   mode: AppearanceMode,
+  variables: readonly import("../variable-completion").YarnVariable[] = [],
 ) {
   const { style, appearance } = useAppearance(mode),
     [compartment] = useState(() => new Compartment());
-  const extension = useMemo(() => theme(style), [style]);
+  const declared = JSON.stringify(
+    variables
+      .filter((v) => v.declared)
+      .map((v) => v.name)
+      .sort(),
+  );
+  const extension = useMemo(
+    () => theme(style, JSON.parse(declared)),
+    [style, declared],
+  );
   useEffect(() => {
     const view = ref.current;
     if (!view) return;

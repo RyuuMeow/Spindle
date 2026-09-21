@@ -63,6 +63,7 @@ export type SceneEditorBindings = {
   ) => Promise<boolean>;
 };
 type Props = SceneEditorBindings & {
+  issues?: import("../parser").Issue[];
   doc: DocumentRecord;
   node: Node;
   onClose: (scope: SceneScope) => void;
@@ -85,7 +86,11 @@ export default function SceneEditor(props: Props) {
   const latest = useRef(props),
     host = useRef<HTMLDivElement>(null),
     viewRef = useRef<EditorView | null>(null);
-  const appearanceConfig = useCodeMirrorAppearance(viewRef, "graph");
+  const appearanceConfig = useCodeMirrorAppearance(
+    viewRef,
+    "graph",
+    collectVariables(props.documents),
+  );
   latest.current = props;
   const [recovered] = useState(() =>
     loadSceneDraft(props.doc.id, props.node.name),
@@ -290,6 +295,19 @@ export default function SceneEditor(props: Props) {
             ],
             () => collectVariables(latest.current.documents),
             (command) => latest.current.onRegisterCommand?.(command),
+            (line) => {
+              const offset =
+                source.current.slice(0, scope.current.from).split("\n").length -
+                1;
+              return (latest.current.issues || [])
+                .filter(
+                  (i) =>
+                    i.file === latest.current.doc.name &&
+                    i.line === line + offset &&
+                    i.severity === "error",
+                )
+                .map((i) => i.message);
+            },
           ),
           EditorView.updateListener.of((update) => {
             if (

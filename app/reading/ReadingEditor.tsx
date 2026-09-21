@@ -67,6 +67,7 @@ type Props = {
   commands: Command[];
   onRegisterCommand?: (command: Command) => void;
   variables?: YarnVariable[];
+  issues?: import("../parser").Issue[];
   scenes?: { name: string; file: string }[];
   onEdit: (edits: TextEdit[]) => void;
   onUndo: (redo?: boolean) => void;
@@ -93,7 +94,11 @@ export default function ReadingEditor(props: Props) {
     viewRef = useRef<EditorView | null>(null),
     readOnlyConfig = useRef(new Compartment()),
     latest = useRef(props);
-  const appearanceConfig = useCodeMirrorAppearance(viewRef, "rendered");
+  const appearanceConfig = useCodeMirrorAppearance(
+    viewRef,
+    "rendered",
+    props.variables,
+  );
   useEffect(() => {
     latest.current = props;
   });
@@ -319,6 +324,15 @@ export default function ReadingEditor(props: Props) {
           () => [],
           () => latest.current.variables || [],
           (command) => latest.current.onRegisterCommand?.(command),
+          (line) =>
+            (latest.current.issues || [])
+              .filter(
+                (i) =>
+                  i.file === latest.current.doc.name &&
+                  i.line === line &&
+                  i.severity === "error",
+              )
+              .map((i) => i.message),
         ),
         EditorView.updateListener.of((update) => {
           reportFolded(update.state);

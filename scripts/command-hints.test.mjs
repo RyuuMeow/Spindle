@@ -368,3 +368,73 @@ test("quick registration rejects builtins, comments, incomplete calls and unrela
     0,
   );
 });
+
+buildSync({
+  entryPoints: ["app/variable-quick-fix.ts"],
+  outfile: "outputs/tests/variable-fix.cjs",
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+});
+const { missingDeclaration } = createRequire(import.meta.url)(
+  path.resolve("outputs/tests/variable-fix.cjs"),
+);
+buildSync({
+  entryPoints: ["app/parser.ts"],
+  outfile: "outputs/tests/variable-parser.cjs",
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+});
+const variableParser = createRequire(import.meta.url)(
+  path.resolve("outputs/tests/variable-parser.cjs"),
+);
+test("set requires declare across the entire project, independent of file order", () => {
+  const doc = (name, body) => ({
+    name,
+    text: `title: ${name}\n---\n${body}\n===`,
+    saved: "",
+  });
+  const use = doc("Use", "<<set $score = 12>>");
+  assert(
+    variableParser
+      .parse([use], [])
+      .issues.some(
+        (i) => i.severity === "error" && i.message.includes("尚未宣告"),
+      ),
+  );
+  const definition = doc("Definitions", "<<declare $score = 0>>");
+  assert(
+    !variableParser
+      .parse([use, definition], [])
+      .issues.some((i) => i.message.includes("尚未宣告")),
+  );
+  assert(
+    !variableParser
+      .parse([definition, use], [])
+      .issues.some((i) => i.message.includes("尚未宣告")),
+  );
+});
+test("declaration quick fix chooses literal defaults and does not guess unknown expressions", () => {
+  assert.equal(
+    missingDeclaration("  <<set $score += 2>>", 10, [])?.insert,
+    "  <<declare $score = 0>>",
+  );
+  assert.equal(
+    missingDeclaration('<<set $name = "Mira">>', 10, [])?.insert,
+    '<<declare $name = "">>',
+  );
+  assert.equal(
+    missingDeclaration("<<set $key = true>>", 10, [])?.insert,
+    "<<declare $key = false>>",
+  );
+  assert.equal(
+    missingDeclaration("<<set $v = unknown()>>", 10, [])?.insert,
+    null,
+  );
+  assert.equal(missingDeclaration("// <<set $x = 2>>", 10, []), null);
+  assert.equal(
+    missingDeclaration("<<set $x = 2>>", 5, [{ name: "$x", declared: true }]),
+    null,
+  );
+});

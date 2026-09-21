@@ -2503,6 +2503,7 @@ function WorkbenchContent({
               )}
               {!active.dialogueOnly && mode === "rendered" && (
                 <ReadingEditor
+                  issues={analysis.issues}
                   onRegisterCommand={registerCommand}
                   goTo={goto}
                   scenes={analysis.nodes}

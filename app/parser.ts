@@ -386,6 +386,32 @@ export function parse(docs: Doc[], commands: Command[]) {
     });
     finish(lines.length, false);
   }
+  const declarations = new Set(
+    nodes.flatMap((n) =>
+      n.calls
+        .filter(
+          (c) =>
+            c.name === "declare" &&
+            /^\$[A-Za-z_]\w*\s*(?:=|to\b)\s*.+/.test(c.args.join(" ")),
+        )
+        .map((c) => c.args[0]),
+    ),
+  );
+  for (const n of nodes)
+    for (const call of n.calls) {
+      if (
+        call.name === "set" &&
+        /^\$[A-Za-z_]\w*$/.test(call.args[0] || "") &&
+        !declarations.has(call.args[0])
+      )
+        issue(
+          n.file,
+          call.line,
+          `變數「${call.args[0]}」尚未宣告；請先新增 declare`,
+          "error",
+          call.column,
+        );
+    }
   const names = new Map<string, Node[]>();
   for (const n of nodes) names.set(n.name, [...(names.get(n.name) || []), n]);
   for (const [name, group] of names)
