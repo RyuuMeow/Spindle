@@ -1,4 +1,8 @@
 "use client";
+import {
+  quietDiagnostic,
+  diagnosticCursor,
+} from "../diagnostics/use-diagnostics";
 import { copyText } from "@/app/clipboard";
 import { useEditorContext, captureCodeMirror } from "../mcp/editor-context";
 import { useCodeMirrorAppearance } from "../appearance/codemirror";
@@ -97,7 +101,9 @@ export default function ReadingEditor(props: Props) {
     viewRef = useRef<EditorView | null>(null),
     readOnlyConfig = useRef(new Compartment()),
     latest = useRef(props);
-  useEditorContext("rendered", () => captureCodeMirror(viewRef.current, props.doc.name, props.doc.text));
+  useEditorContext("rendered", () =>
+    captureCodeMirror(viewRef.current, props.doc.name, props.doc.text),
+  );
   const appearanceConfig = useCodeMirrorAppearance(
     viewRef,
     "rendered",
@@ -339,6 +345,8 @@ export default function ReadingEditor(props: Props) {
                   i.severity === "error",
               )
               .map((i) => i.message),
+          (line) => quietDiagnostic(latest.current.doc.name, line),
+          (line) => diagnosticCursor(latest.current.doc.name, line),
         ),
         EditorView.updateListener.of((update) => {
           reportFolded(update.state);

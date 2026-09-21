@@ -13,6 +13,7 @@ export function variableFixes(
   variables: () => YarnVariable[],
   errors: (line: number) => string[] = () => [],
   commands: () => Command[] = () => [],
+  quiet: (line: number) => boolean = () => false,
 ) {
   const known = (view: EditorView) => [
     ...variables(),
@@ -46,6 +47,7 @@ export function variableFixes(
   return {
     at: (state: import("@codemirror/state").EditorState, pos: number) => {
       const line = state.doc.lineAt(pos);
+      if (quiet(state.doc.lineAt(pos).number)) return null;
       return variableQuickFix(
         line.text,
         pos - line.from,
@@ -77,6 +79,7 @@ export function variableFixes(
             const vars = known(view),
               marks = [];
             for (let i = 1; i <= view.state.doc.lines; i++) {
+              if (quiet(i)) continue;
               const line = view.state.doc.line(i),
                 fix = variableQuickFix(
                   line.text,
@@ -88,8 +91,11 @@ export function variableFixes(
                 marks.push(
                   Decoration.mark({ class: "cm-undeclared-variable" }).range(
                     line.from +
-                      (fix?.from ?? Math.max(0, line.text.indexOf("<<"))),
-                    line.from + (fix?.to ?? line.length),
+                      (fix && fix.to > fix.from
+                        ? fix.from
+                        : Math.max(0, line.text.indexOf("<<"))),
+                    line.from +
+                      (fix && fix.to > fix.from ? fix.to : line.length),
                   ),
                 );
             }
@@ -101,13 +107,14 @@ export function variableFixes(
       hoverTooltip(
         (view, pos) => {
           if (view.composing || view.state.readOnly) return null;
+          if (quiet(view.state.doc.lineAt(pos).number)) return null;
           const fix = fixAt(view, pos);
           const line = view.state.doc.lineAt(pos);
           const messages = errors(line.number);
           if (!fix && !messages.length) return null;
           return {
             pos: line.from + (fix?.from ?? 0),
-            end: line.from + (fix?.to ?? line.length),
+            end: line.from + (fix && fix.to > fix.from ? fix.to : line.length),
             above: true,
             create() {
               const dom = document.createElement("div");

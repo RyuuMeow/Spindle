@@ -1,4 +1,8 @@
 "use client";
+import {
+  quietDiagnostic,
+  diagnosticCursor,
+} from "../diagnostics/use-diagnostics";
 import { copyText } from "@/app/clipboard";
 import { useEditorContext, captureCodeMirror } from "../mcp/editor-context";
 import { useCodeMirrorAppearance } from "../appearance/codemirror";
@@ -105,7 +109,15 @@ export default function SceneEditor(props: Props) {
     scope = useRef(recovered?.scope || sceneScope(props.doc.text, props.node));
   const blockedRef = useRef(recoveredMessage),
     composing = useRef(false);
-  useEditorContext("graph-editor", () => captureCodeMirror(viewRef.current, props.doc.name, source.current, scope.current, !!blockedRef.current || composing.current || closeGuard.current));
+  useEditorContext("graph-editor", () =>
+    captureCodeMirror(
+      viewRef.current,
+      props.doc.name,
+      source.current,
+      scope.current,
+      !!blockedRef.current || composing.current || closeGuard.current,
+    ),
+  );
   const [problem, setProblem] = useState(recoveredMessage),
     [title, setTitle] = useState<string | null>(null),
     [renaming, setRenaming] = useState(false),
@@ -318,6 +330,22 @@ export default function SceneEditor(props: Props) {
                 )
                 .map((i) => i.message);
             },
+            (line) =>
+              quietDiagnostic(
+                latest.current.doc.name,
+                line +
+                  source.current.slice(0, scope.current.from).split("\n")
+                    .length -
+                  1,
+              ),
+            (line) =>
+              diagnosticCursor(
+                latest.current.doc.name,
+                line +
+                  source.current.slice(0, scope.current.from).split("\n")
+                    .length -
+                  1,
+              ),
           ),
           EditorView.updateListener.of((update) => {
             if (
@@ -586,10 +614,9 @@ export default function SceneEditor(props: Props) {
           <span>{problem}</span>
           <button
             onClick={() => {
-              void copyText(viewRef.current?.state.doc.toString() || "")
-                .catch(() =>
-                  setProblem(problem + " 複製失敗，仍可選取文字後複製。"),
-                );
+              void copyText(viewRef.current?.state.doc.toString() || "").catch(
+                () => setProblem(problem + " 複製失敗，仍可選取文字後複製。"),
+              );
             }}
           >
             <Copy size={14} />

@@ -1,4 +1,5 @@
 "use client";
+import { quietDiagnostic } from "./diagnostics/use-diagnostics";
 import { useEditorContext } from "./mcp/editor-context";
 import { offsetAt, positionAt } from "./mcp/coordinates";
 import { variableQuickFix } from "./variable-quick-fix";
@@ -75,22 +76,48 @@ export default function CodeEditor({
   onRegisterCommand?: (command: Command) => void;
   onNavigate?: (file: string, line: number) => void;
 }) {
-  useEditorContext("source", () => {
-    const e = editorRef.current, model = e?.getModel();
-    if (!e || !model || !e.getDomNode()?.isConnected) return null;
-    const map = (p: { lineNumber: number; column: number }) => offsetAt(doc.text, p);
-    return { documentName: doc.name, source: doc.text, composing: composing.current,
-      selections: (e.getSelections() || []).map(r => ({ anchor: map(r.getSelectionStart()), head: map(r.getPosition()) })),
-      visibleRanges: e.getVisibleRanges().map(r => ({ from: map(r.getStartPosition()), to: map(r.getEndPosition()) })),
-      blocked: model.getValue(undefined, true).replace(/\r\n/g, "\n") !== doc.text.replace(/\r\n/g, "\n"),
-    };
-  }, (from, to) => {
-    const e = editorRef.current, model = e?.getModel();
-    if (!e || !model) return;
-    const start = positionAt(doc.text, from), end = positionAt(doc.text, to);
-    e.setSelection({ startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column });
-    e.revealLineInCenter(start.lineNumber);
-  });
+  useEditorContext(
+    "source",
+    () => {
+      const e = editorRef.current,
+        model = e?.getModel();
+      if (!e || !model || !e.getDomNode()?.isConnected) return null;
+      const map = (p: { lineNumber: number; column: number }) =>
+        offsetAt(doc.text, p);
+      return {
+        documentName: doc.name,
+        source: doc.text,
+        composing: composing.current,
+        selections: (e.getSelections() || []).map((r) => ({
+          anchor: map(r.getSelectionStart()),
+          head: map(r.getPosition()),
+        })),
+        visibleRanges: e
+          .getVisibleRanges()
+          .map((r) => ({
+            from: map(r.getStartPosition()),
+            to: map(r.getEndPosition()),
+          })),
+        blocked:
+          model.getValue(undefined, true).replace(/\r\n/g, "\n") !==
+          doc.text.replace(/\r\n/g, "\n"),
+      };
+    },
+    (from, to) => {
+      const e = editorRef.current,
+        model = e?.getModel();
+      if (!e || !model) return;
+      const start = positionAt(doc.text, from),
+        end = positionAt(doc.text, to);
+      e.setSelection({
+        startLineNumber: start.lineNumber,
+        startColumn: start.column,
+        endLineNumber: end.lineNumber,
+        endColumn: end.column,
+      });
+      e.revealLineInCenter(start.lineNumber);
+    },
+  );
   const { appearance, style } = useAppearance("source");
   const selectionInset =
     Math.max(0, (style.fontSize * style.lineHeight - style.fontSize - 2) / 2) +
@@ -170,6 +197,16 @@ export default function CodeEditor({
   );
   const markers = useCallback(() => {
     if (!api.current) return;
+    const position = editorRef.current?.getPosition();
+    editorRef.current?.updateOptions({
+      lightbulb: {
+        enabled:
+          position &&
+          quietDiagnostic(currentDoc.current.name, position.lineNumber)
+            ? api.current.editor.ShowLightbulbIconMode.Off
+            : api.current.editor.ShowLightbulbIconMode.OnCode,
+      },
+    });
     for (const m of api.current.editor.getModels()) {
       const filename = decodeURIComponent(m.uri.path.slice(1));
       api.current.editor.setModelMarkers(
@@ -190,7 +227,7 @@ export default function CodeEditor({
           })),
       );
     }
-  }, [issues]);
+  }, [issues, editorRef]);
   useEffect(markers, [markers, doc.name]);
   const restoreCurrentView = useEffectEvent(() => {
     const e = editorRef.current;
@@ -514,6 +551,8 @@ export default function CodeEditor({
               !latest.current.onRegisterCommand
             )
               return { actions: [], dispose() {} };
+            if (quietDiagnostic(currentDoc.current.name, range.startLineNumber))
+              return { actions: [], dispose() {} };
             const line = model.getLineContent(range.startLineNumber);
             const declaration = variableQuickFix(
               line,
@@ -606,6 +645,8 @@ export default function CodeEditor({
         });
         const quickHover = m.languages.registerHoverProvider("yarn", {
           provideHover(model: editor.ITextModel, position: Position) {
+            if (quietDiagnostic(currentDoc.current.name, position.lineNumber))
+              return null;
             if (
               model !== editor.getModel() ||
               !register ||

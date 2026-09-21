@@ -54,8 +54,10 @@ export function commandEditing(
   variables: () => YarnVariable[] = () => [],
   register?: (command: Command) => void,
   errors: (line: number) => string[] = () => [],
+  quiet: (line: number) => boolean = () => false,
+  caret: (line: number) => void = () => {},
 ) {
-  const declarations = variableFixes(variables, errors, commands);
+  const declarations = variableFixes(variables, errors, commands, quiet);
   const dismiss = StateEffect.define<boolean>();
   const focusChanged = StateEffect.define<boolean>();
   const compositionChanged = StateEffect.define<boolean>();
@@ -187,6 +189,10 @@ export function commandEditing(
   };
   return [
     declarations.extension,
+    EditorView.updateListener.of((update) => {
+      if (update.selectionSet && !update.docChanged && !update.view.composing)
+        caret(update.state.doc.lineAt(update.state.selection.main.head).number);
+    }),
     EditorState.phrases.of({
       Find: "尋找",
       Replace: "取代",
@@ -269,6 +275,7 @@ export function commandEditing(
         completionStatus(state) !== null,
       register,
       (state, pos, view) =>
+        quiet(state.doc.lineAt(pos).number) ||
         errors(state.doc.lineAt(pos).number).length > 0 ||
         !!declarations.at(state, pos) ||
         !!readingVariableAt(view, pos, variables()) ||

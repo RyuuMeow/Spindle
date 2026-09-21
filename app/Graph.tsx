@@ -101,6 +101,7 @@ export type GraphProps = {
   allNodes: Node[];
   links: Link[];
   issues: Issue[];
+  editorIssues?: Issue[];
   selected: string;
   onSelect: (node: Node | null) => void;
   onOpen: (node: Node) => void;
@@ -261,6 +262,7 @@ function Canvas({
   allNodes,
   links,
   issues,
+  editorIssues,
   selected,
   onSelect,
   onOpen,
@@ -403,14 +405,46 @@ function Canvas({
     onArrangeAll: () => fitAfterArrange.current(),
   });
   useEditorContext("graph", () => ({
-    documentName: file, source: documents?.find(d => d.name === file)?.text || "",
-    selections: [], visibleRanges: [],
+    documentName: file,
+    source: documents?.find((d) => d.name === file)?.text || "",
+    selections: [],
+    visibleRanges: [],
     graph: {
-      nodes: records.filter(r => nodeSelection.has(r.id)).map(r => ({ id: r.id, name: r.name, kind: r.kind, file: r.node?.file, documentId: documents?.find(d => d.name === r.node?.file)?.id, line: r.node?.start })),
-      cards: groups.filter(g => nodeSelection.has(g.id)).map(g => ({ id: g.id, source: g.source, target: g.target, links: g.items })),
+      nodes: records
+        .filter((r) => nodeSelection.has(r.id))
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          kind: r.kind,
+          file: r.node?.file,
+          documentId: documents?.find((d) => d.name === r.node?.file)?.id,
+          line: r.node?.start,
+        })),
+      cards: groups
+        .filter((g) => nodeSelection.has(g.id))
+        .map((g) => ({
+          id: g.id,
+          source: g.source,
+          target: g.target,
+          links: g.items,
+        })),
       focusedSceneId: selected || undefined,
-      edge: edgeSelection || undefined, pin: selectedPin, group: groupSelection || undefined,
-      connections: groups.filter(g => g.id === edgeSelection || g.id === selectedPin?.edge || (!!groupSelection && g.groupId === groupSelection)).map(g => ({ id: g.id, source: g.source, target: g.target, links: g.items })),
+      edge: edgeSelection || undefined,
+      pin: selectedPin,
+      group: groupSelection || undefined,
+      connections: groups
+        .filter(
+          (g) =>
+            g.id === edgeSelection ||
+            g.id === selectedPin?.edge ||
+            (!!groupSelection && g.groupId === groupSelection),
+        )
+        .map((g) => ({
+          id: g.id,
+          source: g.source,
+          target: g.target,
+          links: g.items,
+        })),
       viewport: flow.getViewport(),
     },
   }));
@@ -541,7 +575,7 @@ function Canvas({
       onDocumentComposition ? (
         <SceneEditor
           onVariableNavigate={onGoTo}
-          issues={issues}
+          issues={editorIssues || issues}
           documents={documents || []}
           key={editing.documentId + editing.record.id}
           doc={editorDocument}
@@ -568,6 +602,7 @@ function Canvas({
       editing,
       editorDocument,
       issues,
+      editorIssues,
       documents,
       onDocumentEdit,
       onDocumentUndo,

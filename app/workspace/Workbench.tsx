@@ -1,4 +1,5 @@
 "use client";
+import { useDiagnostics, requestDiagnostics } from "../diagnostics/use-diagnostics";
 import { copyText } from "@/app/clipboard";
 import { useAgentContext } from "../mcp/use-agent-context";
 import { lineOffset } from "./authoring";
@@ -242,6 +243,7 @@ function WorkbenchContent({
         : { nodes: [], issues: [], links: [] },
     [project],
   );
+  const diagnostics = useDiagnostics(project, analysis.issues, doc?.id, active?.line);
   const variables = useMemo(
     () => collectVariables(project?.documents || []),
     [project?.documents],
@@ -359,8 +361,8 @@ function WorkbenchContent({
     });
   }
   const nodes = analysis.nodes.filter((n) => n.file === doc?.name),
-    errorCount = analysis.issues.filter((i) => i.severity === "error").length,
-    warningCount = analysis.issues.filter(
+    errorCount = diagnostics.published.filter((i) => i.severity === "error").length,
+    warningCount = diagnostics.published.filter(
       (i) => i.severity === "warning",
     ).length;
   useEffect(() => {
@@ -1724,7 +1726,7 @@ function WorkbenchContent({
     window.addEventListener("yarn-editor-menu", handler);
     return () => window.removeEventListener("yarn-editor-menu", handler);
   }, []);
-  const currentIssues = analysis.issues.filter(
+  const currentIssues = diagnostics.published.filter(
     (i) =>
       (issueScope === "all" || i.file === doc?.name) &&
       (issueSeverity === "all" || i.severity === issueSeverity),
@@ -2150,7 +2152,7 @@ function WorkbenchContent({
                       aria-label="結構檢查"
                       aria-pressed={problems}
                       className="check-button"
-                      onClick={() => setProblems((v) => !v)}
+                      onClick={() => { requestDiagnostics(); setProblems((v) => !v); }}
                     >
                       {errorCount > 0 && (
                         <span className="diagnostic-count error">
@@ -2507,7 +2509,7 @@ function WorkbenchContent({
                     commands={project.commands}
                     variables={variables}
                     nodes={analysis.nodes}
-                    issues={analysis.issues}
+                    issues={diagnostics.visible}
                     onChange={(value, event) => {
                       const source = client
                         .getSnapshot()
@@ -2551,7 +2553,7 @@ function WorkbenchContent({
               {!active.dialogueOnly && mode === "rendered" && (
                 <ReadingEditor
                   onVariableNavigate={go}
-                  issues={analysis.issues}
+                  issues={diagnostics.visible}
                   onRegisterCommand={registerCommand}
                   goTo={goto}
                   scenes={analysis.nodes}
@@ -2667,7 +2669,8 @@ function WorkbenchContent({
                   }}
                   allNodes={analysis.nodes}
                   links={analysis.links}
-                  issues={analysis.issues}
+                  issues={diagnostics.published}
+                  editorIssues={diagnostics.visible}
                   selected={selected}
                   onSelect={(n) => setSelected(n?.id || "")}
                   onOpen={(n) => go(n.file, n.body)}
