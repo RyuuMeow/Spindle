@@ -62,16 +62,22 @@ export function variableQuickFix(
   if (start >= 0 && end >= 0 && column >= start && column <= start + end + 2) {
     const body = line.slice(start, start + end);
     const match =
-      /^<<\s*set\s+\$[A-Za-z_]\w*\s*(?:=|to\b|[+*/%\-]=)\s*([\p{L}_][\p{L}\p{N}_ ]*?)\s*$/u.exec(
+      /^<<\s*set\s+(\$[A-Za-z_]\w*)\s*(?:=|to\b|\+=)\s*([\p{L}_][\p{L}\p{N}_ ]*?)\s*$/u.exec(
         body,
       );
-    if (match && bareAssignmentText(match[1])) {
-      const from = start + body.lastIndexOf(match[1]);
+    if (
+      match &&
+      bareAssignmentText(match[2]) &&
+      variables.some(
+        (v) => v.name === match[1] && v.declared && v.type === "string",
+      )
+    ) {
+      const from = start + body.lastIndexOf(match[2]);
       return {
         name: "",
         from,
-        to: from + match[1].length,
-        insert: JSON.stringify(match[1]),
+        to: from + match[2].length,
+        insert: JSON.stringify(match[2]),
         replace: true,
         label: "補上雙引號",
       };

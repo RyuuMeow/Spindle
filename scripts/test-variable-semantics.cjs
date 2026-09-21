@@ -14,7 +14,7 @@ const source =
   "title: Start\n---\n<<set $shared = true>>\n<<set $reader_count = 4>>\n<<set $graph_count = 5>>\n<<set $shared = 2>>\n===\n";
 fs.writeFileSync(
   path.join(root, "definitions.yarn"),
-  "title: Definitions\n---\n<<declare $shared = 0>>\n===\n",
+  'title: Definitions\n---\n<<declare $shared = 0>>\n<<declare $label = "" >>\n===\n',
 );
 fs.writeFileSync(path.join(root, "sample.yarn"), source);
 (async () => {
@@ -117,7 +117,7 @@ fs.writeFileSync(path.join(root, "sample.yarn"), source);
       );
       const e = m.editor.getEditors().find((e) => e.getDomNode()?.offsetParent);
       e.executeEdits("test", [
-        { range: new m.Range(3, 17, 3, 21), text: "hello" },
+        { range: new m.Range(3, 1, 3, 23), text: "<<set $label = hello>>" },
       ]);
       e.setPosition({ lineNumber: 3, column: 20 });
       e.focus();
@@ -125,16 +125,15 @@ fs.writeFileSync(path.join(root, "sample.yarn"), source);
     // Let the normal typing history group close before invoking the fix.
     await page.waitForTimeout(600);
     await page.keyboard.press("Alt+Enter");
-    assert((await activeSource()).text.includes('<<set $shared = "hello">>'));
+    assert((await activeSource()).text.includes('<<set $label = "hello">>'));
     await page.keyboard.press("Control+z");
     for (
       let i = 0;
-      i < 30 &&
-      !(await activeSource()).text.includes("<<set $shared = hello>>");
+      i < 30 && !(await activeSource()).text.includes("<<set $label = hello>>");
       i++
     )
       await page.waitForTimeout(100);
-    assert((await activeSource()).text.includes("<<set $shared = hello>>"));
+    assert((await activeSource()).text.includes("<<set $label = hello>>"));
     await page.keyboard.press("Control+z");
     for (
       let i = 0;

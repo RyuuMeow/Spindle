@@ -516,13 +516,29 @@ test("variable metadata stays tied to declaration; reference hit test excludes p
 });
 
 test("bare assignment text reports invalid string syntax without guessing function types", () => {
-  const types = new Map([["$n", "number"]]);
+  const types = new Map([
+    ["$n", "number"],
+    ["$b", "boolean"],
+    ["$s", "string"],
+  ]);
   for (const value of ["hi", "hello", "hello world", "你好"]) {
     assert.match(
       variableParser.assignmentTypeError("$n = " + value, types),
-      /雙引號/,
+      /宣告為 number.*指派 string/,
     );
   }
+  assert.match(
+    variableParser.assignmentTypeError("$s = hello", types),
+    /雙引號/,
+  );
+  assert.match(
+    variableParser.assignmentTypeError("$b = hello", types),
+    /宣告為 boolean.*指派 string/,
+  );
+  assert.equal(
+    variableParser.assignmentTypeError("$unknown = hello", types),
+    null,
+  );
   assert.match(
     variableParser.assignmentTypeError('$n = "hello"', types),
     /指派 string/,
@@ -539,7 +555,14 @@ test("quote fix replaces only bare assignment values", () => {
     path.resolve("outputs/tests/variable-fix.cjs"),
   );
   const line = "  <<set $n = hello world>> // note";
-  const fix = variableQuickFix(line, 10, []);
+  const fix = variableQuickFix(line, 10, [
+    { name: "$n", declared: true, type: "string" },
+  ]);
+  for (const type of ["number", "boolean", "expression"])
+    assert.equal(
+      variableQuickFix(line, 10, [{ name: "$n", declared: true, type }]),
+      null,
+    );
   assert.equal(
     line.slice(0, fix.from) + fix.insert + line.slice(fix.to),
     '  <<set $n = "hello world">> // note',

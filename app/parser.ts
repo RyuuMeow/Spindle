@@ -182,16 +182,9 @@ export function assignmentTypeError(
 ): string | null {
   const match = /^(\$[A-Za-z_]\w*)\s*(=|to\b|[+*/%\-]=)\s*(.+)$/.exec(args);
   if (!match) return null;
-  if (bareAssignmentText(match[3]))
-    return (
-      "無效的指派值「" +
-      match[3].trim() +
-      '」；字串請使用雙引號，例如 "' +
-      match[3].trim() +
-      '"。'
-    );
   const expected = types.get(match[1]),
-    actual = expressionType(match[3], types);
+    bare = bareAssignmentText(match[3]),
+    actual = bare ? "string" : expressionType(match[3], types);
   if (!expected || !actual || expected === "expression") return null;
   const compound = match[2] !== "=" && match[2] !== "to";
   if (
@@ -209,6 +202,14 @@ export function assignmentTypeError(
       match[2] +
       " 指派 " +
       actual
+    );
+  if (bare && expected === "string")
+    return (
+      "無效的指派值「" +
+      match[3].trim() +
+      '」；字串請使用雙引號，例如 "' +
+      match[3].trim() +
+      '"。'
     );
   return null;
 }
