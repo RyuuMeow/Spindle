@@ -1,4 +1,5 @@
 import { cp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -6,6 +7,8 @@ import path from "node:path";
 await import("./prepare-brand-assets.mjs");
 
 const root = new URL("../", import.meta.url);
+for (const file of ["main.cjs", "preload.cjs", "mcp-windows.cjs", "window-lifecycle.cjs"])
+  execFileSync(process.execPath, ["--check", fileURLToPath(new URL("desktop/" + file, root))]);
 const destination = new URL("dist-desktop/app/", root);
 const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
 await mkdir(new URL("desktop/", destination), { recursive: true });
@@ -21,6 +24,7 @@ await cp(
   new URL("desktop/system-fonts.cjs", root),
   new URL("desktop/system-fonts.cjs", destination),
 );
+await cp(new URL("desktop/mcp-windows.cjs", root), new URL("desktop/mcp-windows.cjs", destination));
 await cp(
   new URL("desktop/preload.cjs", root),
   new URL("desktop/preload.cjs", destination),
@@ -44,6 +48,11 @@ await build({
     destination,
   ).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
   target: "node22",
+});
+await build({
+  entryPoints: [fileURLToPath(new URL("desktop/mcp/runtime.ts", root))],
+  bundle: true, platform: "node", format: "cjs", target: "node22",
+  outfile: fileURLToPath(new URL("desktop/mcp-runtime.cjs", destination)),
 });
 const stagedRenderer = new URL("dist-desktop/renderer/", destination);
 const relativeStage = path.relative(

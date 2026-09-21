@@ -38,6 +38,7 @@ const {
 } = require("./window-lifecycle.cjs");
 const origin = "workbench://app";
 const windows = new Map();
+let agentHost, mcpRuntime;
 let service,
   sessionFile,
   sessions = {},
@@ -65,7 +66,7 @@ function owner(event) {
 function openExternal(url) {
   if (url.startsWith("https://")) shell.openExternal(url).catch(console.error);
 }
-function createWindow(id = randomUUID(), initial) {
+function createWindow(id = randomUUID(), initial, foreground = true) {
   const remembered = sessions[id],
     bounds = remembered?.bounds;
   const display = screen.getDisplayMatching(
@@ -128,6 +129,7 @@ function createWindow(id = randomUUID(), initial) {
     signalReady,
     projectId: binding?.screen === "home" ? "" : binding?.projectId || "",
   });
+  agentHost?.created(windows.get(id));
   if (initial) sessions[id] = { ...sessions[id], session: initial };
   synchronizeBindings(service, windows);
   window.removeMenu();
@@ -136,7 +138,8 @@ function createWindow(id = randomUUID(), initial) {
     if (shown || window.isDestroyed()) return;
     shown = true;
     if (remembered?.maximized) window.maximize();
-    window.show();
+    if (foreground) window.show();
+    else window.showInactive();
   }
   window.once("ready-to-show", showInitialWindow);
   // A hidden secondary process can finish its workspace without a first paint.
@@ -456,6 +459,7 @@ function wire() {
     if (item.pendingProjectId === nextProjectId) delete item.pendingProjectId;
     windows.get(id).projectId = value.screen === "home" ? "" : value.projectId;
     saveSessions();
+    agentHost?.rebound(windows.get(id));
     synchronizeBindings(service, windows);
   });
   ipcMain.handle("workspace:windows", (event) => {
@@ -532,7 +536,7 @@ else {
   });
   app
     .whenReady()
-    .then(() => {
+    .then(async () => {
       app.setAppUserModelId("com.yarnworkbench.desktop");
       const profile = app.getPath("userData");
       sessionFile = path.join(profile, "windows-v2.json");
@@ -644,6 +648,12 @@ else {
         callback(false),
       );
       session.defaultSession.setPermissionCheckHandler(() => false);
+      agentHost = require("./mcp-windows.cjs")({ windows, sessions: () => sessions, service, ipcMain, owner, createWindow, sessionForResult });
+      mcpRuntime = require("./mcp-runtime.cjs").createMcpRuntime(profile, service, agentHost);
+      ipcMain.handle("agent:settings", event => { owner(event); return mcpRuntime.settings(); });
+      ipcMain.handle("agent:configure", (event, patch) => { owner(event); return mcpRuntime.configure(patch).then(value => { broadcast(); return value; }); });
+      ipcMain.handle("agent:connection", event => { owner(event); return mcpRuntime.connection(); });
+      await mcpRuntime.start();
       wire();
       const files = process.argv.filter(
         (a) => !a.startsWith("-") && a.toLowerCase().endsWith(".yarn"),
@@ -693,6 +703,7 @@ else {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("will-quit", () => {
+    void mcpRuntime?.stop();
     quitting = true;
     service?.dispose();
   });

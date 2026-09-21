@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { WindowSession, AppPreferences } from "./types";
 import "./settings.css";
+import McpSettings from "../mcp/McpSettings";
+import { Plug } from "lucide-react";
 import AppearanceSettings from "../appearance/AppearanceSettings";
 import type { AppearancePatch } from "../appearance/model";
 
@@ -24,12 +26,13 @@ export type WorkspacePreferences = Pick<
 > & {
   readingWidth?: "standard" | "wide";
 };
-export type SettingsSection = "reading" | "saving" | "shortcuts" | "about";
+export type SettingsSection = "reading" | "saving" | "shortcuts" | "about" | "mcp";
 
 const sections = [
   { id: "reading", label: "編輯器風格", icon: BookOpen },
   { id: "saving", label: "編輯與保存", icon: Save },
   { id: "shortcuts", label: "快捷鍵", icon: Keyboard },
+  { id: "mcp", label: "MCP／Agent 整合", icon: Plug },
   { id: "about", label: "關於", icon: Info },
 ] as const;
 
@@ -191,6 +194,7 @@ export default function SettingsView({
                   </Button>
                 )}
               </div>
+              {category === "mcp" && <McpSettings />}
               {category === "reading" && (
                 <>
                   {onAppearance && (
