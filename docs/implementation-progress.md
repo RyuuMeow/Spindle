@@ -162,7 +162,7 @@
 
 已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪分支 `feat/graph-layout-editing`，前版基線 `v0.7.1`；四階段提交語義保存、引擎、互動歷史與交付，發行標記為 `v0.8.0`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
 
-### 待打包：Find 關閉鍵（2026-09-21）
+### 待打包：Find／Replace 控制項（2026-09-21）
 
-- 統一 Find 操作按鈕尺寸，修正 X 垂直偏移；移除 X 的視覺 hover，避免反覆重建與擋住操作。
+- 統一 Find 操作按鈕尺寸，修正 X 垂直偏移；移除整個 Find／Replace 面板按鈕的視覺 hover，避免反覆重建與擋住操作。
 - 桌面 build 與隔離 profile 實測通過：按鈕中心差不超過 1px、持續 hover 無浮窗、直接點擊可關閉，頁面錯誤為零。尚未重新打包。

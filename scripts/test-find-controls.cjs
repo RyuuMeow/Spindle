@@ -55,26 +55,49 @@ fs.writeFileSync(path.join(root, "sample.yarn"), source);
       Math.abs(c.y + c.height / 2 - n.y - n.height / 2) <= 1,
       JSON.stringify({ c, n }),
     );
-    await close.hover();
-    await page.waitForTimeout(900);
-    await page.waitForTimeout(800);
-    assert.equal(
-      await page.locator(".workbench-hover.with-pointer:visible").count(),
-      0,
+    await page.locator(".find-widget .toggle.left").click();
+    const controls = page.locator(
+      '.find-widget [role="button"]:visible, .find-widget [role="checkbox"]:visible',
     );
-    assert(
-      await close.evaluate((e) => {
-        const r = e.getBoundingClientRect();
-        return e.contains(
-          document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2),
+    const checked = [];
+    for (const control of await controls.all()) {
+      const label = await control.getAttribute("aria-label");
+      const box = await control.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      const disabled = (await control.getAttribute("aria-disabled")) === "true";
+      for (let sample = 0; sample < 8; sample++) {
+        await page.waitForTimeout(250);
+        assert.equal(
+          await page.locator(".workbench-hover.with-pointer:visible").count(),
+          0,
+          label,
         );
-      }),
-    );
+        if (!disabled)
+          assert(
+            await control.evaluate((e) => {
+              const r = e.getBoundingClientRect();
+              return e.contains(
+                document.elementFromPoint(
+                  r.x + r.width / 2,
+                  r.y + r.height / 2,
+                ),
+              );
+            }),
+            label,
+          );
+      }
+      checked.push(label);
+    }
+    assert(checked.length >= 9, JSON.stringify(checked));
+    console.log("Checked controls:", checked);
+    await close.hover();
     await page.screenshot({ path: path.join(base, "find-hover.png") });
     await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2);
     await page.locator(".find-widget.visible").waitFor({ state: "hidden" });
     assert.deepEqual(pageErrors, []);
-    console.log("PASS Find alignment, stable hover and unobstructed close");
+    console.log(
+      "PASS Find/Replace controls: alignment, no obstructing hover and working close",
+    );
   } finally {
     await app?.evaluate(({ app }) => app.exit(0));
   }

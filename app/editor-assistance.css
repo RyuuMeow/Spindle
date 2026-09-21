@@ -441,9 +441,8 @@
   * {
   pointer-events: none !important;
 }
-/* The close icon is self-explanatory; its framework hover can oscillate near
-   the top caption. Keep its accessible label, without a visual popup. */
-body:has(.find-widget > .codicon-widget-close:hover)
-  .workbench-hover-container:has(.with-pointer) {
+/* Find/Replace control hovers can oscillate against the top caption.
+   Suppress their visual popups throughout the panel, retaining accessible labels. */
+body:has(.find-widget:hover) .workbench-hover-container:has(.with-pointer) {
   display: none !important;
 }
