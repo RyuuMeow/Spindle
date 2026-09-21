@@ -1,4 +1,5 @@
 "use client";
+import { AppearanceProvider } from "../appearance/context";
 import {
   useEffect,
   useEffectEvent,
@@ -132,7 +133,7 @@ const saveLabels = {
   error: "寫入失敗",
 };
 
-export default function Workbench({
+function WorkbenchContent({
   client,
   initialSession,
   onNavigate,
@@ -2204,7 +2205,10 @@ export default function Workbench({
                     }
                     onContextMenu={(e) =>
                       showMenu(e, [
-                        { label: "手動排序", run: () => setFileSort("manual") },
+                        {
+                          label: "手動排序",
+                          run: () => setFileSort("manual"),
+                        },
                         {
                           label: "名稱升冪",
                           run: () => setFileSort("name-asc"),
@@ -2217,7 +2221,10 @@ export default function Workbench({
                     }
                     onKeyDown={(e) =>
                       menuKeys(e, [
-                        { label: "手動排序", run: () => setFileSort("manual") },
+                        {
+                          label: "手動排序",
+                          run: () => setFileSort("manual"),
+                        },
                         {
                           label: "名稱升冪",
                           run: () => setFileSort("name-asc"),
@@ -2348,6 +2355,9 @@ export default function Workbench({
                 initialSection={settingsSection}
                 focusOnMount={false}
                 appPreferences={snapshot.preferences}
+                onAppearance={(patch) =>
+                  void perform({ type: "appearance", patch })
+                }
                 onAppPreferences={
                   onNavigate
                     ? (value) =>
@@ -2418,9 +2428,6 @@ export default function Workbench({
                   name={doc.name}
                   line={active.line}
                   goTo={goto}
-                  fontSize={session.readingSize}
-                  lineHeight={session.readingLineHeight}
-                  width={session.readingWidth}
                 />
               )}
               {!active.dialogueOnly && mode === "source" && (
@@ -2484,7 +2491,6 @@ export default function Workbench({
                     viewKey={active.id + ":" + doc.id}
                     viewStates={editorViews}
                     goTo={goto}
-                    lineNumbers={session.lineNumbers}
                     onUndo={(redo) =>
                       void perform({
                         type: redo ? "redo" : "undo",
@@ -2532,9 +2538,6 @@ export default function Workbench({
                   folded={active.folded}
                   onFoldedChange={(folded) => tabPatch({ folded })}
                   onSelection={(selection) => tabPatch({ selection })}
-                  fontSize={session.readingSize}
-                  lineHeight={session.readingLineHeight}
-                  readingWidth={session.readingWidth}
                   onEdit={(edits) => client.edit(project.id, doc.id, edits)}
                   onUndo={(redo) =>
                     void perform({
@@ -3085,5 +3088,20 @@ export default function Workbench({
         </div>
       )}
     </main>
+  );
+}
+
+export default function Workbench(
+  props: Parameters<typeof WorkbenchContent>[0],
+) {
+  const snapshot = useSyncExternalStore(
+    props.client.subscribe,
+    props.client.getSnapshot,
+    props.client.getSnapshot,
+  );
+  return (
+    <AppearanceProvider value={snapshot.preferences?.editorAppearance}>
+      <WorkbenchContent {...props} />
+    </AppearanceProvider>
   );
 }

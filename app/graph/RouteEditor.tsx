@@ -217,6 +217,7 @@ export type RouteCardNode = Node<
     group: GraphTransition;
     geometry: RouteGeometry;
     muted: boolean;
+    onMeasure: (height: number) => void;
     select: (additive: boolean) => void;
     context: (event: React.KeyboardEvent) => void;
   },
@@ -238,6 +239,14 @@ export function RouteCard({ data, selected }: NodeProps<RouteCardNode>) {
 
   return (
     <div
+      ref={(element) => {
+        if (!element) return;
+        const observer = new ResizeObserver(() =>
+          data.onMeasure(Math.ceil(element.offsetHeight)),
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+      }}
       data-route-id={group.id}
       role="button"
       tabIndex={0}
@@ -260,7 +269,7 @@ export function RouteCard({ data, selected }: NodeProps<RouteCardNode>) {
         (selected ? " is-active" : "") +
         (muted ? " is-muted" : "")
       }
-      style={{ width: geometry.card!.width, minHeight: geometry.card!.height }}
+      style={{ width: geometry.card!.width, minHeight: 32 }}
       title={
         item.kind +
         ": " +

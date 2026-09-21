@@ -245,3 +245,7 @@
     gap: 5px;
   }
 }
+
+.settings-scroll[hidden] {
+  display: none;
+}

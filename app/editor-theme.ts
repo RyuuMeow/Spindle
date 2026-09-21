@@ -70,3 +70,33 @@ export const yarnEditorTheme: editor.IStandaloneThemeData = {
     "quickInputList.focusForeground": "#f0f0f0",
   },
 };
+
+export function appearanceTheme(
+  appearance: import("./appearance/model").EditorAppearance,
+): editor.IStandaloneThemeData {
+  const s = { ...appearance.global, ...appearance.modes.source };
+  return {
+    ...yarnEditorTheme,
+    rules: yarnEditorTheme.rules.map((rule) => ({
+      ...rule,
+      foreground: (
+        appearance.syntax[rule.token as keyof typeof appearance.syntax] ||
+        "#" + rule.foreground
+      ).slice(1),
+    })),
+    colors: {
+      ...yarnEditorTheme.colors,
+      "editor.background": s.background,
+      "editor.foreground": s.foreground,
+      "editor.selectionBackground": s.selection,
+      "editor.inactiveSelectionBackground": s.selection,
+      "editor.selectionHighlightBackground": s.matches,
+      "editor.wordHighlightBackground": s.matches,
+      "editor.wordHighlightStrongBackground": s.matches,
+      "editor.findMatchBackground": s.searchCurrent,
+      "editor.findMatchHighlightBackground": s.search,
+      "editorCursor.foreground": s.cursor,
+      "editor.lineHighlightBackground": s.activeLine,
+    },
+  };
+}

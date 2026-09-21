@@ -1,4 +1,5 @@
 "use client";
+import { useAppearance, appearanceVariables } from "./appearance/context";
 
 import {
   Fragment,
@@ -277,6 +278,15 @@ function Canvas({
   onDocumentComposition,
   onRenameScene,
 }: GraphProps) {
+  const { style: graphStyle } = useAppearance("graph");
+  const fontKey = JSON.stringify([
+    graphStyle.fontFamily,
+    graphStyle.fontSize,
+    graphStyle.lineHeight,
+  ]);
+  const [routeHeights, setRouteHeights] = useState<
+    Record<string, { key: string; height: number }>
+  >({});
   const flow = useReactFlow<GraphFlowNode, RouteEdge>();
   const [editing, setEditing] = useState<EditSession | null>(null);
   const canvasElement = useRef<HTMLDivElement>(null);
@@ -357,7 +367,12 @@ function Canvas({
       ),
     [records, heights],
   );
-  const measuredLabels = useMemo(() => measureLabels(groups), [groups]);
+  const measuredLabels = useMemo(() => {
+    const labels = measureLabels(groups, graphStyle);
+    for (const [id, size] of Object.entries(routeHeights))
+      if (size.key === fontKey && labels[id]) labels[id].height = size.height;
+    return labels;
+  }, [groups, graphStyle, routeHeights, fontKey]);
   const sizes = useMemo(
     () =>
       Object.fromEntries(
@@ -816,6 +831,12 @@ function Canvas({
       data: {
         group: groups.find((g) => g.id === r.id)!,
         geometry: layout.layout.routes[r.id],
+        onMeasure: (height: number) =>
+          setRouteHeights((previous) =>
+            previous[r.id]?.key === fontKey && previous[r.id]?.height === height
+              ? previous
+              : { ...previous, [r.id]: { key: fontKey, height } },
+          ),
         muted: false,
         select: (additive) => {
           setNodeSelection((prior) => {
@@ -1025,6 +1046,7 @@ function Canvas({
   }
   return (
     <div
+      style={appearanceVariables(graphStyle)}
       className={"story-canvas" + (dragging ? " is-dragging" : "")}
       ref={canvasElement}
       tabIndex={-1}

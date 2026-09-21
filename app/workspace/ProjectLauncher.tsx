@@ -136,6 +136,7 @@ export default function ProjectLauncher({
           preferences={prefs}
           onChange={(next) => setPrefs((p) => ({ ...p, ...next }))}
           appPreferences={snapshot.preferences}
+          onAppearance={(patch) => void run({ type: "appearance", patch })}
           onAppPreferences={(value) =>
             void run({ type: "preferences", reopenLastProject: value })
           }

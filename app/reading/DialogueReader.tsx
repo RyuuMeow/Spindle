@@ -1,4 +1,5 @@
 "use client";
+import { useAppearance, appearanceVariables } from "../appearance/context";
 import { useEffect, useMemo, useRef } from "react";
 import { CornerDownRight } from "lucide-react";
 import { readingStructure } from "./structure";
@@ -10,18 +11,16 @@ export default function DialogueReader({
   name,
   line,
   goTo,
-  fontSize,
-  lineHeight,
-  width,
 }: {
   text: string;
   name: string;
   line: number;
   goTo?: { file: string; line: number; nonce: number } | null;
-  fontSize: number;
-  lineHeight: number;
+  fontSize?: number;
+  lineHeight?: number;
   width?: "standard" | "wide";
 }) {
+  const { style, appearance } = useAppearance("reader");
   const host = useRef<HTMLDivElement>(null);
   const initialLine = useRef(line);
   const lines = useMemo(
@@ -48,9 +47,11 @@ export default function DialogueReader({
       aria-label="純閱讀模式"
       style={
         {
-          "--reader-size": fontSize + "px",
-          "--reader-line": lineHeight + "px",
-          "--reader-width": width === "wide" ? "900px" : "760px",
+          ...appearanceVariables(style),
+          "--reader-size": style.fontSize + "px",
+          "--reader-line": style.fontSize * style.lineHeight + "px",
+          "--reader-width":
+            appearance.widths.reader === "wide" ? "900px" : "760px",
         } as React.CSSProperties
       }
     >

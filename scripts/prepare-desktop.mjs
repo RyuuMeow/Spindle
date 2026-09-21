@@ -18,6 +18,10 @@ await cp(
   new URL("desktop/window-lifecycle.cjs", destination),
 );
 await cp(
+  new URL("desktop/system-fonts.cjs", root),
+  new URL("desktop/system-fonts.cjs", destination),
+);
+await cp(
   new URL("desktop/preload.cjs", root),
   new URL("desktop/preload.cjs", destination),
 );

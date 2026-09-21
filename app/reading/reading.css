@@ -354,3 +354,16 @@
   color: #969696;
   font-style: italic;
 }
+
+/* Content typography follows appearance; toolbars and floating assistance remain UI-sized. */
+.reading-editor .cm-scroller {
+  font-family: var(--editor-font, "Segoe UI", sans-serif);
+}
+.reading-editor ::selection {
+  background: var(--editor-selection, #464646);
+}
+
+.reading-editor .reading-raw,
+.reading-editor .reading-editing-syntax {
+  font-family: var(--editor-font, Consolas, monospace);
+}

@@ -1,4 +1,6 @@
 "use client";
+import { useCodeMirrorAppearance } from "../appearance/codemirror";
+import { appearanceVariables } from "../appearance/context";
 import { collectVariables } from "../variable-completion";
 import { commandEditing } from "../reading/command-input";
 import { sceneLinks } from "../reading/scene-links";
@@ -83,6 +85,7 @@ export default function SceneEditor(props: Props) {
   const latest = useRef(props),
     host = useRef<HTMLDivElement>(null),
     viewRef = useRef<EditorView | null>(null);
+  const appearanceConfig = useCodeMirrorAppearance(viewRef, "graph");
   latest.current = props;
   const [recovered] = useState(() =>
     loadSceneDraft(props.doc.id, props.node.name),
@@ -361,6 +364,7 @@ export default function SceneEditor(props: Props) {
               return true;
             },
           }),
+          appearanceConfig.extension,
           EditorView.theme(
             {
               "&": {
@@ -539,7 +543,11 @@ export default function SceneEditor(props: Props) {
           {renameError}
         </p>
       )}
-      <div ref={host} className="reading-editor graph-scene-editor" />
+      <div
+        ref={host}
+        className="reading-editor graph-scene-editor"
+        style={appearanceVariables(appearanceConfig.style)}
+      />
       {problem && (
         <div className="flow-scene-problem" role="alert">
           <AlertTriangle size={16} />

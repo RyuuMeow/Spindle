@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("yarnDesktop", {
     .find((a) => a.startsWith("--yarn-version="))
     ?.split("=")[1],
   request: (action) => ipcRenderer.invoke("workspace:request", action),
+  fonts: () => ipcRenderer.invoke("workspace:fonts"),
   ready: () => ipcRenderer.invoke("workspace:ready"),
   subscribe: (callback) => subscribe("workspace:changed", callback),
   session: {

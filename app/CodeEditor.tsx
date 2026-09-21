@@ -20,7 +20,9 @@ import {
   type YarnVariable,
 } from "./variable-completion";
 import { commandCall, parameterLabel, commandInput } from "./command-hints";
-import { yarnEditorTheme } from "./editor-theme";
+import { appearanceTheme } from "./editor-theme";
+import { useAppearance } from "./appearance/context";
+import { fontStack } from "./appearance/model";
 import { loadEditorLocale } from "./editor-locale";
 loader.config({ paths: { vs: "/monaco/vs" } });
 export default function CodeEditor({
@@ -33,7 +35,6 @@ export default function CodeEditor({
   onCursor,
   editorRef,
   goTo,
-  lineNumbers,
   viewKey,
   viewStates,
   modelEpoch,
@@ -61,7 +62,7 @@ export default function CodeEditor({
   onCursor: (p: Position) => void;
   editorRef: RefObject<editor.IStandaloneCodeEditor | null>;
   goTo: { file: string; line: number; column?: number; nonce: number } | null;
-  lineNumbers: boolean;
+  lineNumbers?: boolean;
   onUndo?: (redo?: boolean) => void;
   onComposition?: (active: boolean) => void;
   persistedView?: import("monaco-editor").editor.ICodeEditorViewState;
@@ -69,6 +70,15 @@ export default function CodeEditor({
   onRegisterCommand?: (command: Command) => void;
   onNavigate?: (file: string, line: number) => void;
 }) {
+  const { appearance, style } = useAppearance("source");
+  const themeApi = useRef<typeof import("monaco-editor") | null>(null);
+  useEffect(() => {
+    themeApi.current?.editor.defineTheme(
+      "yarn-dark",
+      appearanceTheme(appearance),
+    );
+  }, [appearance]);
+
   const currentDoc = useRef(doc),
     syncingModel = useRef(false);
   useLayoutEffect(() => {
@@ -265,7 +275,8 @@ export default function CodeEditor({
             ],
           },
         });
-        m.editor.defineTheme("yarn-dark", yarnEditorTheme);
+        themeApi.current = m;
+        m.editor.defineTheme("yarn-dark", appearanceTheme(appearance));
         providers.current.forEach((p) => p.dispose());
         providers.current = [
           m.languages.registerCompletionItemProvider("yarn", {
@@ -667,29 +678,33 @@ export default function CodeEditor({
       }}
       options={{
         editContext: false,
-        fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
-        fontSize: 16,
-        lineHeight: 29,
+        fontFamily: fontStack(style.fontFamily),
+        fontSize: style.fontSize,
+        lineHeight: style.fontSize * style.lineHeight,
         padding: { top: 16, bottom: 40 },
         minimap: { enabled: false },
-        lineNumbers: lineNumbers ? "on" : "off",
+        lineNumbers: appearance.source.lineNumbers ? "on" : "off",
         lineDecorationsWidth: 16,
         lineNumbersMinChars: 3,
         overviewRulerLanes: 0,
         hideCursorInOverviewRuler: true,
         scrollbar: { verticalScrollbarSize: 7, horizontalScrollbarSize: 7 },
-        guides: { indentation: false, bracketPairs: false },
+        guides: {
+          indentation: appearance.source.indentGuides,
+          bracketPairs: false,
+        },
         scrollBeyondLastLine: false,
         automaticLayout: true,
-        tabSize: 4,
-        insertSpaces: true,
-        renderLineHighlight: "none",
+        tabSize: appearance.source.tabSize,
+        insertSpaces: appearance.source.insertSpaces,
+        renderWhitespace: appearance.source.whitespace,
+        renderLineHighlight: style.highlightLine ? "line" : "none",
         smoothScrolling: true,
         bracketPairColorization: { enabled: false },
         glyphMargin: false,
         folding: false,
         quickSuggestions: true,
-        wordWrap: "on",
+        wordWrap: appearance.source.wordWrap ? "on" : "off",
         wrappingIndent: "same",
         fixedOverflowWidgets: true,
       }}

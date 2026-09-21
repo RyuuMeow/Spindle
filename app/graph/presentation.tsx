@@ -1,3 +1,4 @@
+import { fontStack, type Typography } from "../appearance/model";
 import { Fragment } from "react";
 import { contextLabel, type Link } from "../parser";
 import type { GraphTransition } from "./model";
@@ -53,13 +54,15 @@ export function parentSummary(link: Link) {
     )
     .join(" / ");
 }
-export function measureLabels(groups: GraphTransition[]) {
+export function measureLabels(groups: GraphTransition[], style?: Typography) {
+  const fontSize = style?.fontSize || 12;
+  const lineHeight = style ? style.fontSize * style.lineHeight : 18;
   const context =
     typeof document !== "undefined"
       ? document.createElement("canvas").getContext("2d")
       : null;
   if (context)
-    context.font = '12px "Segoe UI", "Microsoft JhengHei", sans-serif';
+    context.font = `${fontSize}px ${fontStack(style?.fontFamily || "system-sans")}`;
   const width = (s: string) =>
     context?.measureText(s).width ??
     [...s].reduce((sum, c) => sum + (c.charCodeAt(0) > 255 ? 12 : 7), 0);
@@ -84,8 +87,8 @@ export function measureLabels(groups: GraphTransition[]) {
             text,
             width: w,
             height:
-              Math.max(32, lines * 18 + 14) +
-              (parentSummary(g.items[0]) ? 18 : 0),
+              Math.max(32, lines * lineHeight + 14) +
+              (parentSummary(g.items[0]) ? lineHeight : 0),
           },
         ];
       }),
@@ -98,8 +101,8 @@ export function measureLabels(groups: GraphTransition[]) {
       const d = dimensions[g.id];
       d.width = w;
       d.height =
-        Math.max(32, Math.ceil(width(d.text) / (w - 38)) * 18 + 14) +
-        (parentSummary(g.items[0]) ? 18 : 0);
+        Math.max(32, Math.ceil(width(d.text) / (w - 38)) * lineHeight + 14) +
+        (parentSummary(g.items[0]) ? lineHeight : 0);
     }
   }
   return dimensions;

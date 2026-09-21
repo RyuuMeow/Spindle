@@ -1,4 +1,8 @@
-import { migrateAppearance, normalizeAppearance, patchAppearance } from "../appearance/model";
+import {
+  migrateAppearance,
+  normalizeAppearance,
+  patchAppearance,
+} from "../appearance/model";
 import { findCommand } from "../command-catalog";
 import {
   addFolder,
@@ -50,16 +54,44 @@ class BrowserService {
   notices: string[] = [];
   constructor() {
     try {
-      const raw = JSON.parse(localStorage.getItem("spindle.preferences.v1") || "null");
-      this.preferences = { reopenLastProject: raw?.reopenLastProject === true,
-        editorAppearance: raw?.editorAppearance ? normalizeAppearance(raw.editorAppearance) : migrateAppearance(JSON.parse(localStorage.getItem("yarn-workbench.session.v2") || "null") || undefined) };
-      localStorage.setItem("spindle.preferences.v1", JSON.stringify(this.preferences));
-    } catch (error) { this.notices.push("風格設定無法讀取：" + String(error)); }
+      const raw = JSON.parse(
+        localStorage.getItem("spindle.preferences.v1") || "null",
+      );
+      this.preferences = {
+        reopenLastProject: raw?.reopenLastProject === true,
+        editorAppearance: raw?.editorAppearance
+          ? normalizeAppearance(raw.editorAppearance)
+          : migrateAppearance(
+              JSON.parse(
+                localStorage.getItem("yarn-workbench.session.v2") || "null",
+              ) || undefined,
+            ),
+      };
+      localStorage.setItem(
+        "spindle.preferences.v1",
+        JSON.stringify(this.preferences),
+      );
+    } catch (error) {
+      this.notices.push("風格設定無法讀取：" + String(error));
+    }
     const restored = readWorkspace(localStorage);
     if (restored.error) this.notices.push(restored.error);
     this.engine = new DocumentEngine(restored.value || []);
   }
   snapshot(): WorkspaceSnapshot {
+    try {
+      const raw = JSON.parse(
+        localStorage.getItem("spindle.preferences.v1") || "null",
+      );
+      if (raw)
+        this.preferences = {
+          ...this.preferences,
+          editorAppearance: normalizeAppearance(raw.editorAppearance),
+        };
+    } catch (error) {
+      const message = "風格設定無法讀取：" + String(error);
+      if (!this.notices.includes(message)) this.notices.push(message);
+    }
     return structuredClone({
       preferences: this.preferences,
       projects: this.engine.projects,
@@ -85,7 +117,14 @@ class BrowserService {
         this.engine.projects.push(p);
       }
     } else if (a.type === "appearance") {
-      const next = { ...this.preferences, editorAppearance: patchAppearance(this.preferences.editorAppearance, a.patch) };
+      this.snapshot();
+      const next = {
+        ...this.preferences,
+        editorAppearance: patchAppearance(
+          this.preferences.editorAppearance,
+          a.patch,
+        ),
+      };
       localStorage.setItem("spindle.preferences.v1", JSON.stringify(next));
       this.preferences = next;
     } else if (a.type === "createProject") {
@@ -312,7 +351,18 @@ export class WorkspaceClient {
   error = "";
   windowId = window.yarnDesktop?.windowId || "browser";
   constructor() {
-    this.adapter = window.yarnDesktop || new BrowserService();
+    if (window.yarnDesktop) this.adapter = window.yarnDesktop;
+    else {
+      const browser = new BrowserService();
+      this.adapter = {
+        request: async (action) =>
+          action.type === "appearance" && navigator.locks
+            ? navigator.locks.request("spindle-appearance", () =>
+                browser.request(action),
+              )
+            : browser.request(action),
+      };
+    }
   }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -386,6 +436,14 @@ export class WorkspaceClient {
       this.unsubscribe = window.yarnDesktop.subscribe(() => {
         void this.refresh().catch((e) => this.fail(e));
       });
+    else if (!this.disposed) {
+      const onStorage = (event: StorageEvent) => {
+        if (event.key === "spindle.preferences.v1")
+          void this.refresh().catch((e) => this.fail(e));
+      };
+      window.addEventListener("storage", onStorage);
+      this.unsubscribe = () => window.removeEventListener("storage", onStorage);
+    }
   }
   private fail(error: unknown) {
     this.error = error instanceof Error ? error.message : String(error);

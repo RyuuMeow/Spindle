@@ -808,3 +808,41 @@
 .story-canvas.is-dragging * {
   cursor: grabbing !important;
 }
+
+.story-canvas {
+  background: var(--editor-bg, #1f1f1f);
+}
+.story-canvas .flow-card,
+.story-canvas .flow-edge-label {
+  font-family: var(--editor-font, "Segoe UI", sans-serif);
+  font-size: var(--editor-size, 14px);
+  line-height: var(--editor-line, 1.8);
+  color: var(--editor-text, #cdcdcd);
+}
+.story-canvas .flow-card-title {
+  font-size: 1em;
+  color: inherit;
+}
+.story-canvas .flow-card-summary {
+  font-size: 0.9em;
+  line-height: var(--editor-line, 1.8);
+  color: inherit;
+}
+.story-canvas .flow-card-file {
+  font-size: 0.8em;
+}
+.story-canvas .flow-edge-text {
+  font-size: 1em;
+  line-height: var(--editor-line, 1.8);
+}
+.story-canvas .flow-edge-parent {
+  font-size: 0.8em;
+  line-height: inherit;
+}
+.story-canvas .flow-scene-editor-header,
+.story-canvas .flow-scene-location {
+  font:
+    13px/1.5 "Segoe UI",
+    "Microsoft JhengHei",
+    sans-serif;
+}

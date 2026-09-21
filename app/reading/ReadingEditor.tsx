@@ -1,4 +1,6 @@
 "use client";
+import { useCodeMirrorAppearance } from "../appearance/codemirror";
+import { appearanceVariables } from "../appearance/context";
 import type { YarnVariable } from "../variable-completion";
 import { commandEditing } from "./command-input";
 import { sceneLinks } from "./scene-links";
@@ -82,8 +84,8 @@ type Props = {
   onSelection?: (selection: { anchor: number; head: number }) => void;
   onNavigate?: (target: string) => void;
   canNavigate?: (target: string) => boolean;
-  fontSize: number;
-  lineHeight: number;
+  fontSize?: number;
+  lineHeight?: number;
   readingWidth?: "standard" | "wide";
   readOnly?: boolean;
   folded?: ReadingFold[];
@@ -95,6 +97,7 @@ export default function ReadingEditor(props: Props) {
     viewRef = useRef<EditorView | null>(null),
     readOnlyConfig = useRef(new Compartment()),
     latest = useRef(props);
+  const appearanceConfig = useCodeMirrorAppearance(viewRef, "rendered");
   useEffect(() => {
     latest.current = props;
   });
@@ -390,6 +393,7 @@ export default function ReadingEditor(props: Props) {
             return true;
           },
         }),
+        appearanceConfig.extension,
         EditorView.theme(
           {
             "&": {
@@ -507,6 +511,8 @@ export default function ReadingEditor(props: Props) {
       viewRef.current = null;
       config.actionsRef.current = null;
     };
+    // Appearance reconfigures its own compartment; it must not recreate the document view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.doc.id, props.actionsRef]);
   useEffect(() => {
     const view = viewRef.current;
@@ -560,9 +566,11 @@ export default function ReadingEditor(props: Props) {
       className="reading-editor"
       style={
         {
-          "--reading-size": `${props.fontSize}px`,
-          "--reading-height": `${props.lineHeight}px`,
-          "--reading-width": props.readingWidth === "wide" ? "900px" : "760px",
+          ...appearanceVariables(appearanceConfig.style),
+          "--reading-width":
+            appearanceConfig.appearance.widths.rendered === "wide"
+              ? "900px"
+              : "760px",
         } as React.CSSProperties
       }
       aria-label="即時渲染編輯器"

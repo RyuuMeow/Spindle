@@ -373,6 +373,10 @@ async function openPaths(paths, source) {
   synchronizeBindings(service, windows);
 }
 function wire() {
+  ipcMain.handle("workspace:fonts", (event) => {
+    owner(event);
+    return require("./system-fonts.cjs")();
+  });
   ipcMain.handle("workspace:ready", (event) => {
     owner(event).signalReady();
   });
