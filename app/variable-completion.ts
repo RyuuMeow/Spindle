@@ -149,23 +149,19 @@ export function variableCompletionContext(
   return { from: tail.index, assignment };
 }
 
-/** Only syntactic references expose metadata or navigation. */
-export function variableAt(
-  line: string,
-  offset: number,
-  variables: readonly YarnVariable[],
-) {
+/** Syntactic references, including undefined variables; strings and prose are excluded. */
+export function variableReferenceAt(line: string, offset: number) {
   for (const match of line.matchAll(/\$[A-Za-z_]\w*/g)) {
-    if (offset < match.index || offset >= match.index + match[0].length)
-      continue;
-    const prefix = line
-      .slice(0, match.index + match[0].length)
-      .replace(/^(\s*<<)declare\b/, "$1set");
+    if (offset < match.index || offset >= match.index + match[0].length) continue;
+    const prefix = line.slice(0, match.index + match[0].length).replace(/^(\s*<<)declare\b/, "$1set");
     if (!variableCompletionContext(prefix)) return null;
-    const variable = variables.find((v) => v.declared && v.name === match[0]);
-    return variable
-      ? { from: match.index, to: match.index + match[0].length, variable }
-      : null;
+    return { from: match.index, to: match.index + match[0].length, name: match[0] };
   }
   return null;
+}
+/** Only declared syntactic references expose definition metadata or navigation. */
+export function variableAt(line: string, offset: number, variables: readonly YarnVariable[]) {
+  const reference = variableReferenceAt(line, offset);
+  const variable = reference && variables.find(v => v.declared && v.name === reference.name);
+  return reference && variable ? { from: reference.from, to: reference.to, variable } : null;
 }

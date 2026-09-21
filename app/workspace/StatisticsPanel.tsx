@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import { BarChart3 } from "lucide-react";
 import { PanelResizeHandle } from "@/components/PanelResizeHandle";
-import { authorStatistics, readingStructure } from "../reading/structure";
+import { documentStatistics } from "./statistics";
 import type { DocumentRecord } from "./types";
 export default function StatisticsPanel({
   doc,
@@ -15,28 +15,7 @@ export default function StatisticsPanel({
   onWidth: (width: number) => void;
   onNavigate: (line: number) => void;
 }) {
-  const data = useMemo(() => {
-    const roles = new Map<string, number>();
-    const scenes: { name: string; line: number; count: number }[] = [];
-    for (const line of readingStructure(doc.text.replace(/\r\n/g, "\n"))) {
-      if (line.kind === "title")
-        scenes.push({
-          name: line.text.replace(/^\s*title\s*:\s*/, ""),
-          line: line.line,
-          count: 0,
-        });
-      if (line.kind === "dialogue") {
-        if (scenes.length) scenes[scenes.length - 1].count++;
-        const role = line.text.match(/^\s*([^:<>]+):/)?.[1] || "旁白";
-        roles.set(role, (roles.get(role) || 0) + 1);
-      }
-    }
-    return {
-      stats: authorStatistics(doc.text),
-      scenes,
-      roles: [...roles].sort((a, b) => b[1] - a[1]),
-    };
-  }, [doc.text]);
+  const data = useMemo(() => documentStatistics(doc.text), [doc.text]);
   const metrics = [
     ["場景", data.stats.scenes],
     ["選項", data.stats.options],

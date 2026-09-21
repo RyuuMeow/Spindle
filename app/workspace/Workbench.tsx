@@ -1,4 +1,6 @@
 "use client";
+import { useAgentContext } from "../mcp/use-agent-context";
+import { lineOffset } from "./authoring";
 import { EditorView } from "@codemirror/view";
 import { AppearanceProvider } from "../appearance/context";
 import {
@@ -242,6 +244,19 @@ function WorkbenchContent({
     () => collectVariables(project?.documents || []),
     [project?.documents],
   );
+  useAgentContext(client, session, (request) => {
+    if (request.action === "activate" && request.tabId) {
+      if (!tabs.some(t => t.id === request.tabId)) throw Error("TAB_NOT_FOUND");
+      activate(request.tabId);
+    }
+    if (request.action === "reveal") {
+      const target = project.documents.find(d => d.id === request.documentId);
+      if (!target) throw Error("DOCUMENT_NOT_FOUND");
+      const offset = request.from ?? 0;
+      const line = target.text.slice(0, offset).split("\n").length;
+      openDocument(target.id, false, line, offset - lineOffset(target.text, line) + 1, true, "source");
+    }
+  });
   const utility = !!utilityNames[active?.documentId || ""];
   const commandHasDraft = commandDirty;
   const outlineOpen = !!session.outline?.[mode];
@@ -2365,11 +2380,12 @@ function WorkbenchContent({
                     0,
                   )
                 }
-                onChange={async (commands) =>
+                onChange={async (commands, expectedCommands) =>
                   !!(await perform({
                     type: "commands",
                     projectId: project.id,
                     commands,
+                    expectedCommands,
                   }))
                 }
               />

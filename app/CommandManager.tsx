@@ -105,7 +105,7 @@ export default function CommandManager({
   referenceCount,
 }: {
   commands: Command[];
-  onChange: (commands: Command[]) => boolean | Promise<boolean>;
+  onChange: (commands: Command[], expectedCommands?: string) => boolean | Promise<boolean>;
   notify: (message: string) => void;
   onDirtyChange: (dirty: boolean) => void;
   actionsRef: Ref<CommandActions>;
@@ -116,6 +116,8 @@ export default function CommandManager({
   const [draft, setDraft] = useState<Command>(() =>
     structuredClone(commands[0] || emptyCommand()),
   );
+  const commandBase = useRef(JSON.stringify(commands));
+  const [draftBase, setDraftBase] = useState(() => JSON.stringify(commands[0] || emptyCommand()));
   const [query, setQuery] = useState("");
   const matchesQuery = (command: Command) =>
     `${command.name} ${command.displayName || ""}`
@@ -139,7 +141,7 @@ export default function CommandManager({
   const formId = useId();
   const errorId = `${formId}-error`;
   const dirty =
-    JSON.stringify(draft) !== JSON.stringify(commands[index] || emptyCommand());
+    JSON.stringify(draft) !== draftBase;
   const draftIssue = commandIssue(
     draft,
     commands.filter((_, i) => i !== index),
@@ -170,6 +172,8 @@ export default function CommandManager({
   }, []);
 
   const choose = (nextIndex: number) => {
+    commandBase.current = JSON.stringify(commands);
+    setDraftBase(JSON.stringify(commands[nextIndex] || emptyCommand()));
     setHistory({ past: [], future: [] });
     setIndex(nextIndex);
     setDraft(structuredClone(commands[nextIndex] || emptyCommand()));
@@ -179,6 +183,10 @@ export default function CommandManager({
   const save = useCallback(async () => {
     if (saving) return false;
     if (!dirty && index >= 0) return true;
+    if (commandBase.current !== JSON.stringify(commands)) {
+      reportIssue({ message: "指令定義已由其他操作更新。草稿已保留，請先複製需要的內容，再捨棄草稿以載入最新定義。", field: "save" });
+      return false;
+    }
     const validation = commandIssue(
       draft,
       commands.filter((_, i) => i !== index),
@@ -192,13 +200,15 @@ export default function CommandManager({
     else next[index] = draft;
     setSaving(true);
     try {
-      if (!(await onChange(next))) {
+      if (!(await onChange(next, commandBase.current))) {
         reportIssue({
           message: "無法套用指令。草稿仍在此處，請重試或匯出專案備份。",
           field: "save",
         });
         return false;
       }
+      commandBase.current = JSON.stringify(next);
+      setDraftBase(JSON.stringify(draft));
       if (index < 0) setIndex(next.length - 1);
       reportIssue(null);
       notify("指令定義已套用，補全與診斷已更新");
@@ -226,6 +236,10 @@ export default function CommandManager({
     focusError,
     discard: () => choose(index),
     prepare: () => {
+      if (commandBase.current !== JSON.stringify(commands)) {
+        reportIssue({ message: "指令定義已更新；請保留需要的草稿內容並重新載入。", field: "save" });
+        return null;
+      }
       const validation = commandIssue(
         draft,
         commands.filter((_, i) => i !== index),
@@ -795,11 +809,17 @@ export default function CommandManager({
               variant="destructive"
               onClick={async (event) => {
                 event.preventDefault();
+                if (JSON.stringify(commands) !== commandBase.current) {
+                  setRemoveError("指令集已更新，請重新選取指令後再刪除。");
+                  return;
+                }
                 const next = commands.filter((_, i) => i !== index);
-                if (!(await onChange(next))) {
+                if (!(await onChange(next, commandBase.current))) {
                   setRemoveError("無法刪除指令，請先下載專案備份。");
                   return;
                 }
+                commandBase.current = JSON.stringify(next);
+                setDraftBase(JSON.stringify(emptyCommand()));
                 setIndex(-1);
                 setHistory({ past: [], future: [] });
                 setDraft(emptyCommand());

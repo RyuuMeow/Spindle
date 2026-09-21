@@ -234,7 +234,14 @@ export class WorkspaceService {
     this.services.changed();
   }
   async request(action: WorkspaceAction): Promise<ActionResult> {
-    const task = this.queue.then(() => this.execute(action));
+    return this.requestChecked(action, () => {});
+  }
+  async requestChecked(action: WorkspaceAction, check: () => void, onFailure?: () => void): Promise<ActionResult> {
+    const task = this.queue.then(async () => {
+      check();
+      try { return await this.execute(action); }
+      catch (error) { onFailure?.(); throw error; }
+    });
     this.queue = task.catch(() => undefined);
     return task;
   }
@@ -873,6 +880,7 @@ export class WorkspaceService {
         this.metadata(p);
         this.catalog.opened(p);
       } else if (a.type === "commands" || a.type === "registerCommand") {
+        if (a.type === "commands" && a.expectedCommands !== undefined && a.expectedCommands !== JSON.stringify(p.commands)) throw Error("指令定義已變更，請重新載入後套用；草稿已保留。");
         if (
           a.type === "registerCommand" &&
           findCommand(a.command.name, p.commands)
