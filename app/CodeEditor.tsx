@@ -1,4 +1,5 @@
 "use client";
+import { tabOut } from "./tab-out";
 import { quietDiagnostic } from "./diagnostics/use-diagnostics";
 import { useEditorContext } from "./mcp/editor-context";
 import { offsetAt, positionAt } from "./mcp/coordinates";
@@ -480,6 +481,64 @@ export default function CodeEditor({
         );
         editor.onDidDispose(() => highlights.current?.dispose());
         editor.onDidChangeModel(syncModel);
+        const canTabOut = editor.createContextKey<boolean>("spindleCanTabOut", false);
+        let tabComposing = false;
+        const tabTargets = () => {
+          const model = editor.getModel();
+          const selections = editor.getSelections();
+          if (
+            !model ||
+            !selections?.length ||
+            tabComposing ||
+            selections.some((s) => !s.isEmpty())
+          )
+            return null;
+          const targets = selections.map((s) => {
+            const next = tabOut(
+              model.getLineContent(s.positionLineNumber),
+              s.positionColumn - 1,
+            );
+            return next === null
+              ? null
+              : new m.Selection(
+                  s.positionLineNumber,
+                  next + 1,
+                  s.positionLineNumber,
+                  next + 1,
+                );
+          });
+          return targets.every((target) => target !== null) ? targets : null;
+        };
+        const refreshTabOut = () => canTabOut.set(tabTargets() !== null);
+        const tabSubscriptions = [
+          editor.onDidChangeCursorSelection(refreshTabOut),
+          editor.onDidChangeModelContent(refreshTabOut),
+          editor.onDidChangeModel(refreshTabOut),
+          editor.onDidCompositionStart(() => {
+            tabComposing = true;
+            refreshTabOut();
+          }),
+          editor.onDidCompositionEnd(() => {
+            tabComposing = false;
+            refreshTabOut();
+          }),
+          editor.addAction({
+            id: "spindle.tabOut",
+            label: "跳出目前容器",
+            keybindings: [m.KeyCode.Tab],
+            precondition:
+              "editorTextFocus && spindleCanTabOut && !editorReadonly && !suggestWidgetVisible && !inSnippetMode && !tabMovesFocus",
+            run: () => {
+              const targets = tabTargets();
+              if (targets) editor.setSelections(targets);
+            },
+          }),
+        ];
+        refreshTabOut();
+        editor.onDidDispose(() =>
+          tabSubscriptions.forEach((subscription) => subscription.dispose()),
+        );
+
         const assistance = sourceCommandAssistance(
           editor,
           () => latest.current.commands,

@@ -657,3 +657,41 @@ test("scene hover resolves unique locations only", () => {
   assert.equal(sceneAt("<<jump Village>>", 9, [...scenes, ...scenes]), null);
   assert.equal(sceneAt("Narrator: Village", 10, scenes), null);
 });
+
+const tabOutput = path.resolve("outputs/tests/tab-out.cjs");
+buildSync({
+  entryPoints: ["app/tab-out.ts"],
+  outfile: tabOutput,
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+});
+const { tabOut } = createRequire(import.meta.url)(tabOutput);
+test("Tab exits only an adjacent matched container, innermost first", () => {
+  for (const [before, after] of [
+    ['<<set $x = "hello', '">>'],
+    ['<<set $x = "hello"', ">>"],
+    ["<<give_item ", ">>"],
+    ["<<set $x = (1 + 2", ")>>"],
+    ['Narrator: "hello', '"'],
+    ['<<set $x = "', '">>'],
+    ['<<set $x = "a\\"b', '">>'],
+  ])
+    assert.equal(
+      tabOut(before + after, before.length),
+      before.length + (after.startsWith(">>") ? 2 : 1),
+    );
+});
+test("Tab preserves indentation away from valid closers", () => {
+  for (const [before, after] of [
+    ["Narrator: hello", ""],
+    ['<<set $x = "hel', 'lo">>'],
+    ['<<set $x = "hello', " >>"],
+    ["text ", ">>"],
+    ["// <<stop ", ">>"],
+    ['<<set $x = "a\\', '"b">>'],
+    ["<<set $x = (1", ">>"],
+    ["<<stop>>", ""],
+  ])
+    assert.equal(tabOut(before + after, before.length), null);
+});

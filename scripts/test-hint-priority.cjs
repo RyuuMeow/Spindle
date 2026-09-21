@@ -155,6 +155,24 @@ const tips = () => page.locator(".reading-command-tooltip:visible, .source-comma
           .locator(".flow-card-title")
           .filter({ hasText: /^Help$/ })
           .dblclick();
+      const editorState = () => page.evaluate(() => {
+        const cm = document.querySelector(".cm-content")?.cmTile?.root?.view;
+        if (cm) return { text: cm.state.doc.toString(), offset: cm.state.selection.main.head };
+        const ed = window.monaco.editor.getEditors().find(e => e.getDomNode()?.isConnected);
+        return { text: ed.getModel().getValue(), offset: ed.getModel().getOffsetAt(ed.getPosition()) };
+      });
+      for (const [line, at, step] of [
+        ['<<play_sound "wind" 0.5>>', '<<play_sound "wind'.length, 1],
+        ['<<play_sound "wind" 0.5>>', '<<play_sound "wind" 0.5'.length, 2],
+      ]) {
+        await caret(line, at);
+        const before = await editorState();
+        await page.keyboard.press("Tab");
+        await page.waitForTimeout(100);
+        const after = await editorState();
+        assert.equal(after.text, before.text, mode + ": Tab out preserves text");
+        assert.equal(after.offset, before.offset + step, mode + ": Tab exits container");
+      }
       await caret("<<fade_in >>", "<<fade_in ".length);
       assert.equal(await page.locator(".command-parameter-popup:visible").count(), 1, mode + ": custom required argument diagnostic does not suppress cursor help");
       assert.match(await page.locator(".command-parameter-popup:visible").innerText(), /duration/);

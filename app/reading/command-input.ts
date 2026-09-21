@@ -1,7 +1,14 @@
+import { tabOut } from "../tab-out";
 import { sceneAt } from "../scene-link";
 import { readingVariableAt } from "./variable-reference";
 import { variableFixes } from "./variable-fixes";
-import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
+import {
+  EditorSelection,
+  EditorState,
+  Prec,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -354,6 +361,34 @@ export function commandEditing(
     Prec.highest(
       keymap.of([
         { key: "Tab", run: acceptCompletion },
+        {
+          key: "Tab",
+          run: (view) => {
+            if (
+              view.composing ||
+              view.state.readOnly ||
+              completionStatus(view.state)
+            )
+              return false;
+            const ranges = view.state.selection.ranges;
+            if (ranges.some((range) => !range.empty)) return false;
+            const targets = ranges.map((range) => {
+              const line = view.state.doc.lineAt(range.head);
+              const next = tabOut(line.text, range.head - line.from);
+              return next === null ? null : line.from + next;
+            });
+            if (targets.some((target) => target === null)) return false;
+            view.dispatch({
+              selection: EditorSelection.create(
+                targets.map((target) => EditorSelection.cursor(target!)),
+                view.state.selection.mainIndex,
+              ),
+              scrollIntoView: true,
+              userEvent: "select",
+            });
+            return true;
+          },
+        },
         {
           key: "Escape",
           run: (view) => {
