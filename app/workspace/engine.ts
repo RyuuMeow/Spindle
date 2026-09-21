@@ -152,6 +152,8 @@ export function validateProject(value: unknown): Project {
     !Array.isArray(p.recovery)
   )
     throw Error("專案資料格式錯誤");
+  // Unapplied command forms belong only to their open tab, never to saved projects.
+  delete (p as Project & { commandDraft?: unknown }).commandDraft;
   validateCommands(p.commands);
   p.folders = Array.isArray(p.folders)
     ? p.folders.filter(

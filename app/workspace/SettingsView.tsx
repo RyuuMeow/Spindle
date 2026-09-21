@@ -126,6 +126,7 @@ export default function SettingsView({
   onClose,
   version,
   initialSection = "reading",
+  focusOnMount = true,
   returnLabel = "返回編輯",
   appPreferences,
   onAppPreferences,
@@ -142,6 +143,7 @@ export default function SettingsView({
   onClose?: () => void;
   version?: string;
   initialSection?: SettingsSection;
+  focusOnMount?: boolean;
 }) {
   const [section, setSection] = useState<SettingsSection>(
     workspaceSettings ? initialSection : "saving",
@@ -150,8 +152,8 @@ export default function SettingsView({
   const [zoomResetVersion, setZoomResetVersion] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
+    if (focusOnMount) headingRef.current?.focus();
+  }, [focusOnMount]);
   const lineNumbersId = useId();
   const change = (patch: Partial<WorkspacePreferences>) =>
     onChange({ ...preferences, ...patch });

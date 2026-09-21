@@ -790,7 +790,6 @@ export class WorkspaceService {
       });
       const p = this.engine.project(created.projectId!);
       p.commands = structuredClone(legacy.commands);
-      p.commandDraft = structuredClone(legacy.commandDraft);
       const remap = new Map<string, string>();
       for (const d of legacy.documents) {
         const result = await this.execute({
@@ -902,8 +901,7 @@ export class WorkspaceService {
           p.commands = previous;
           throw error;
         }
-      } else if (a.type === "commandDraft") p.commandDraft = a.draft;
-      else if (a.type === "createDocument") {
+      } else if (a.type === "createDocument") {
         const d = this.engine.create(p.id, a.name, a.text, a.firstInOrder);
         documentId = d.id;
         if (p.root) {
@@ -1142,7 +1140,6 @@ export class WorkspaceService {
             at: Date.now(),
             reason: "恢復指令前",
           });
-          delete p.commandDraft;
           this.changed();
           return { snapshot: this.snapshot(), documentId: "@commands" };
         }
@@ -1218,7 +1215,6 @@ export class WorkspaceService {
                 {
                   format: "yarn-workbench",
                   version: 2,
-                  commandDraft: p.commandDraft,
                   name: p.name,
                   files: p.documents.map((d) => ({
                     id: d.id,

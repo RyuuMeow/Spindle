@@ -58,7 +58,6 @@ export type Project = {
   folders?: string[];
   treeOrder?: string[];
   recovery: RecoveryEntry[];
-  commandDraft?: unknown;
 };
 export type EditorMode = "source" | "rendered" | "graph";
 export type TabView = {
@@ -171,7 +170,6 @@ export type WorkspaceAction =
     }
   | { type: "registerCommand"; projectId: string; command: Command }
   | { type: "commands"; projectId: string; commands: Command[] }
-  | { type: "commandDraft"; projectId: string; draft: unknown }
   | {
       type: "transaction";
       projectId: string;

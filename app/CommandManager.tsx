@@ -102,8 +102,6 @@ export default function CommandManager({
   notify,
   onDirtyChange,
   actionsRef,
-  initialDraft,
-  onDraftChange,
   referenceCount,
 }: {
   commands: Command[];
@@ -111,42 +109,12 @@ export default function CommandManager({
   notify: (message: string) => void;
   onDirtyChange: (dirty: boolean) => void;
   actionsRef: Ref<CommandActions>;
-  initialDraft?: unknown;
-  onDraftChange?: (value: { index: number; draft: Command }) => void;
   referenceCount?: (name: string) => number;
   projectName?: string;
 }) {
-  const [recovered] = useState(() => {
-    const value = initialDraft as { index: number; draft: Command } | undefined;
-    return value &&
-      Number.isInteger(value.index) &&
-      value.index < commands.length &&
-      value.index >= -1 &&
-      value.draft &&
-      typeof value.draft.name === "string" &&
-      (value.draft.displayName === undefined ||
-        typeof value.draft.displayName === "string") &&
-      typeof value.draft.description === "string" &&
-      typeof value.draft.example === "string" &&
-      Array.isArray(value.draft.params) &&
-      value.draft.params.every(
-        (p) =>
-          p &&
-          typeof p.name === "string" &&
-          (p.displayName === undefined || typeof p.displayName === "string") &&
-          (p.description === undefined || typeof p.description === "string") &&
-          typeof p.defaultValue === "string" &&
-          typeof p.required === "boolean" &&
-          ["string", "number", "boolean"].includes(p.type),
-      )
-      ? value
-      : null;
-  });
-  const [index, setIndex] = useState(
-    recovered?.index ?? (commands.length ? 0 : -1),
-  );
+  const [index, setIndex] = useState(commands.length ? 0 : -1);
   const [draft, setDraft] = useState<Command>(() =>
-    structuredClone(recovered?.draft || commands[0] || emptyCommand()),
+    structuredClone(commands[0] || emptyCommand()),
   );
   const [query, setQuery] = useState("");
   const matchesQuery = (command: Command) =>
@@ -160,14 +128,7 @@ export default function CommandManager({
     past: [],
     future: [],
   });
-  const draftCallback = useRef(onDraftChange);
   const [saving, setSaving] = useState(false);
-  useEffect(() => {
-    draftCallback.current = onDraftChange;
-  }, [onDraftChange]);
-  useEffect(() => {
-    draftCallback.current?.({ index, draft });
-  }, [index, draft]);
   const [issue, setIssue] = useState<CommandIssue | null>(null);
   const [remove, setRemove] = useState(false);
   const [removeError, setRemoveError] = useState("");

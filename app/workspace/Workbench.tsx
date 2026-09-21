@@ -241,20 +241,7 @@ export default function Workbench({
     [project?.documents],
   );
   const utility = !!utilityNames[active?.documentId || ""];
-  const recoveredCommand = project?.commandDraft as
-    { index?: number; draft?: unknown } | undefined;
-  const commandHasDraft =
-    commandDirty ||
-    (!!recoveredCommand?.draft &&
-      JSON.stringify(recoveredCommand.draft) !==
-        JSON.stringify(
-          project.commands[recoveredCommand.index ?? -1] || {
-            name: "",
-            description: "",
-            params: [],
-            example: "",
-          },
-        ));
+  const commandHasDraft = commandDirty;
   const outlineOpen = !!session.outline?.[mode];
   const [narrowPanels, setNarrowPanels] = useState(false);
   useEffect(() => {
@@ -640,7 +627,6 @@ export default function Workbench({
   async function closeTabs(ids: string[], force = false) {
     if (!force) {
       await client.flush(project.id);
-      // Command drafts, including invalid intermediate input, are persisted independently.
       const result = await perform({ type: "save", projectId: project.id });
       if (!result) return;
       const failed = result.snapshot.projects
@@ -1477,7 +1463,6 @@ export default function Workbench({
           data.commands,
         );
         if (Array.isArray(data.folders)) p.folders = data.folders;
-        if (data.commandDraft) p.commandDraft = data.commandDraft;
         await adopt(await perform({ type: "import", project: p }));
       } else {
         for (const entry of entries) {
@@ -2325,73 +2310,80 @@ export default function Workbench({
               <button onClick={() => setConflict(doc)}>處理</button>
             </div>
           )}
-          {active?.documentId === "@commands" ? (
-            <CommandManager
-              key={project.id}
-              commands={project.commands}
-              notify={notify}
-              onDirtyChange={setCommandDirty}
-              actionsRef={commandActions}
-              initialDraft={project.commandDraft}
-              onDraftChange={(draft) => {
-                void perform({
-                  type: "commandDraft",
-                  projectId: project.id,
-                  draft,
-                });
-              }}
-              referenceCount={(name) =>
-                analysis.nodes.reduce(
-                  (sum, n) =>
-                    sum + n.calls.filter((c) => c.name === name).length,
-                  0,
-                )
-              }
-              onChange={async (commands) =>
-                !!(await perform({
-                  type: "commands",
-                  projectId: project.id,
-                  commands,
-                }))
-              }
-            />
-          ) : active?.documentId === "@settings" ? (
-            <SettingsView
-              key={settingsSection}
-              initialSection={settingsSection}
-              appPreferences={snapshot.preferences}
-              onAppPreferences={
-                onNavigate
-                  ? (value) =>
-                      void perform({
-                        type: "preferences",
-                        reopenLastProject: value,
-                      })
-                  : undefined
-              }
-              preferences={session}
-              onChange={(next) => setSession((s) => ({ ...s, ...next }))}
-              onResetLayout={() =>
-                setSession((s) => ({
-                  ...s,
-                  left: true,
-                  sidebarWidth: 220,
-                  rightPanelWidth: 260,
-                  problemsHeight: 140,
-                  outline: {},
-                }))
-              }
-              onOpenData={
-                window.yarnDesktop
-                  ? () =>
-                      void window.yarnDesktop
-                        ?.openLogs()
-                        .catch((e) => notify(String(e)))
-                  : undefined
-              }
-              version={window.yarnDesktop?.version || "Web"}
-            />
-          ) : active?.documentId === "@recovery" ? (
+          {tabs.some((tab) => tab.documentId === "@commands") && (
+            <div
+              className="retained-utility"
+              hidden={active?.documentId !== "@commands"}
+            >
+              <CommandManager
+                key={project.id}
+                commands={project.commands}
+                notify={notify}
+                onDirtyChange={setCommandDirty}
+                actionsRef={commandActions}
+                referenceCount={(name) =>
+                  analysis.nodes.reduce(
+                    (sum, n) =>
+                      sum + n.calls.filter((c) => c.name === name).length,
+                    0,
+                  )
+                }
+                onChange={async (commands) =>
+                  !!(await perform({
+                    type: "commands",
+                    projectId: project.id,
+                    commands,
+                  }))
+                }
+              />
+            </div>
+          )}
+          {tabs.some((tab) => tab.documentId === "@settings") && (
+            <div
+              className="retained-utility"
+              hidden={active?.documentId !== "@settings"}
+            >
+              <SettingsView
+                key={settingsSection}
+                initialSection={settingsSection}
+                focusOnMount={false}
+                appPreferences={snapshot.preferences}
+                onAppPreferences={
+                  onNavigate
+                    ? (value) =>
+                        void perform({
+                          type: "preferences",
+                          reopenLastProject: value,
+                        })
+                    : undefined
+                }
+                preferences={session}
+                onChange={(next) => setSession((s) => ({ ...s, ...next }))}
+                onResetLayout={() =>
+                  setSession((s) => ({
+                    ...s,
+                    left: true,
+                    sidebarWidth: 220,
+                    rightPanelWidth: 260,
+                    problemsHeight: 140,
+                    outline: {},
+                  }))
+                }
+                onOpenData={
+                  window.yarnDesktop
+                    ? () =>
+                        void window.yarnDesktop
+                          ?.openLogs()
+                          .catch((e) => notify(String(e)))
+                    : undefined
+                }
+                version={window.yarnDesktop?.version || "Web"}
+              />
+            </div>
+          )}
+          {active?.documentId === "@commands" ||
+          active?.documentId === "@settings" ? null : active?.documentId ===
+            "@recovery" ? (
             <RecoveryView
               key={project.id}
               project={project}

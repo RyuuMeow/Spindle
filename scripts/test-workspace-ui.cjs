@@ -356,12 +356,8 @@ async function chooseMode(page, name) {
     await second
       .getByRole("textbox", { name: "變數名稱", exact: true })
       .fill("bad name");
-    await until(
-      async () =>
-        !!(await current(second)).commandDraft?.draft?.name.includes("bad"),
-      "command draft not persisted",
-    );
-    results.invalidDraftRecoverySaved = true;
+    assert.equal((await current(second)).commandDraft, undefined);
+    results.commandDraftIsTransient = true;
     await until(async () => {
       const s = await second.evaluate(() => window.yarnDesktop.session.load());
       return s.tabs.some((t) => t.documentId === "@commands");
@@ -379,9 +375,9 @@ async function chooseMode(page, name) {
       .getByRole("button", { name: projectName, exact: true })
       .click();
     await restored
-      .getByRole("menuitem", { name: "自訂指令 · 有草稿", exact: true })
+      .getByRole("menuitem", { name: "自訂指令", exact: true })
       .click();
-    assert.equal(
+    assert.notEqual(
       await restored
         .getByRole("textbox", { name: "變數名稱", exact: true })
         .inputValue(),

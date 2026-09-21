@@ -803,3 +803,11 @@ test("trash failure keeps the file and latest recoverable source; retry moves it
     fs.rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("restoring workspace discards legacy command drafts but retains applied definitions", () => {
+  const p = project();
+  p.commandDraft = { index: -1, draft: { name: "unfinished" } };
+  const restored = restoreProjects([p]).projects[0];
+  assert.equal("commandDraft" in restored, false);
+  assert.deepEqual(restored.commands, p.commands);
+});

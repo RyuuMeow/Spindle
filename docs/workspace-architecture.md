@@ -123,3 +123,7 @@ map-sources.ts 訂閱 WorkspaceClient 每筆共享文件交易。即使圖表未
 ### 指令快速註冊與專案目錄
 
 專案設定、歷史及垃圾桶統一使用 `.spindle/`，不讀取或遷移舊 `.yarn-workbench/`。`command-quick-fix.ts` 只從完整呼叫建立保守的參數定義；純文字、閱讀與節點編輯共用。`registerCommand` 由工作區服務基於目前指令集追加並去重，沿用驗證、歷史與持久化，不由 renderer 覆蓋整份舊清單；不修改劇本文字。
+
+### Utility tab 生命週期
+
+設定與指令頁的 React instance 隨開啟 tab 存活，切換以 hidden 隱藏，關閉時卸載。指令草稿只存在該 instance，不提供工作區 commandDraft action，不包含於 profile、備份或遷移；讀取舊資料時移除殘留欄位。已套用定義照常保存及建立版本歷史。文件 tab 與復原頁繼續使用既有視圖快取／RecoveryViewState。

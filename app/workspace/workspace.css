@@ -894,3 +894,7 @@ button.statistics-bar:hover { color:#fff; background:#ffffff05; }
 .recovery-folder-files { display:flex; flex-wrap:wrap; gap:8px; padding:12px 20px; color:var(--muted-foreground); border-bottom:1px solid var(--border); }
 .recovery-folder-files button { padding:4px 8px; border-radius:4px; }
 .recovery-folder-files button.active { background:var(--accent); }
+
+.retained-utility { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.retained-utility[hidden] { display: none; }
+.retained-utility > .command-workspace { flex: 1; min-height: 0; }

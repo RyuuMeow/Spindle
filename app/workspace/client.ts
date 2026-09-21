@@ -159,8 +159,7 @@ class BrowserService {
           reason: "修改指令前",
         });
         p.commands = commands;
-      } else if (a.type === "commandDraft") p.commandDraft = a.draft;
-      else if (a.type === "save") {
+      } else if (a.type === "save") {
         for (const d of p.documents.filter(
           (d) => !a.documentId || d.id === a.documentId,
         )) {
@@ -190,7 +189,6 @@ class BrowserService {
             next = JSON.parse(e.text);
           validateCommands(next);
           p.commands = next;
-          delete p.commandDraft;
           p.recovery.push({
             id: uuid(),
             documentId: "@commands",
@@ -234,7 +232,6 @@ class BrowserService {
                 {
                   format: "yarn-workbench",
                   version: 2,
-                  commandDraft: p.commandDraft,
                   name: p.name,
                   files: p.documents.map((d) => ({
                     name: d.name,
