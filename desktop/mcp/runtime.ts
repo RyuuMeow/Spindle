@@ -277,3 +277,5 @@ export function createMcpRuntime(
 ) {
   return new McpRuntime(profile, service, host);
 }
+
+export { AgentInstaller } from "../agent-installation";
