@@ -659,6 +659,41 @@ else {
         clipboard.writeText(text);
       });
       ipcMain.handle("agent:connection", event => { owner(event); return mcpRuntime.connection(); });
+      const { AgentInstaller } = require("./mcp-runtime.cjs");
+      const installer = new AgentInstaller(profile, {
+        defaultProfile: path.join(app.getPath("appData"), "Yarn Workbench"),
+        skillSource: path.join(__dirname, "../skills/spindle/SKILL.md"),
+        connection: () => mcpRuntime.connection(),
+        enabled: () => mcpRuntime.settings().running && mcpRuntime.settings().mode !== "disabled",
+      });
+      const checkClient = client => {
+        if (!["codex", "claude"].includes(client)) throw new Error("不支援的 Agent");
+      };
+      ipcMain.handle("agent:installations", event => {
+        owner(event); return [installer.inspect("codex"), installer.inspect("claude")];
+      });
+      ipcMain.handle("agent:install-action", async (event, client, action) => {
+        owner(event); checkClient(client);
+        if (!["install", "remove", "test"].includes(action)) throw new Error("不支援的安裝操作");
+        return installer[action](client);
+      });
+      ipcMain.handle("agent:install-path", async (event, client, part) => {
+        owner(event); checkClient(client);
+        if (!["config", "skill"].includes(part)) throw new Error("不支援的路徑類型");
+        const window = BrowserWindow.fromWebContents(event.sender);
+        const target = installer.target(client);
+        const selected = part === "config"
+          ? await dialog.showSaveDialog(window, { title: "選擇 Agent 使用者設定檔", defaultPath: target.configPath, properties: ["showHiddenFiles", "dontAddToRecent"], buttonLabel: "選擇設定檔" })
+          : await dialog.showOpenDialog(window, { title: "選擇 Skill 上層目錄（將建立 spindle 子目錄）", defaultPath: path.dirname(target.skillPath), properties: ["openDirectory", "createDirectory", "showHiddenFiles", "dontAddToRecent"] });
+        const chosen = part === "config" ? selected.filePath : selected.filePaths?.[0];
+        if (!selected.canceled && chosen) return installer.setTarget(client, part, chosen);
+        return installer.inspect(client);
+      });
+      ipcMain.handle("agent:connection-format", (event, format) => {
+        owner(event);
+        if (!["codex", "claude", "http"].includes(format)) throw new Error("不支援的格式");
+        return installer.format(format);
+      });
       await mcpRuntime.start();
       wire();
       const files = process.argv.filter(

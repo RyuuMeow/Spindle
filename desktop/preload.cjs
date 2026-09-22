@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld("yarnDesktop", {
     ?.split("=")[1],
   request: (action) => ipcRenderer.invoke("workspace:request", action),
   agent: {
+    installations: () => ipcRenderer.invoke("agent:installations"),
+    installAction: (client, action) => ipcRenderer.invoke("agent:install-action", client, action),
+    selectInstallPath: (client, part) => ipcRenderer.invoke("agent:install-path", client, part),
+    connectionFormat: format => ipcRenderer.invoke("agent:connection-format", format),
     onRequest: (callback) => subscribe("agent:request", callback),
     respond: (token, context, error) => ipcRenderer.send("agent:response", { token, context, error }),
     summary: (value) => ipcRenderer.send("agent:summary", value),

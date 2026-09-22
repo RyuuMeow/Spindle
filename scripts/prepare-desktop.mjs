@@ -10,6 +10,7 @@ const root = new URL("../", import.meta.url);
 for (const file of ["main.cjs", "preload.cjs", "mcp-windows.cjs", "window-lifecycle.cjs"])
   execFileSync(process.execPath, ["--check", fileURLToPath(new URL("desktop/" + file, root))]);
 const destination = new URL("dist-desktop/app/", root);
+await cp(new URL("skills/spindle/", root), new URL("skills/spindle/", destination), { recursive: true });
 const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
 await mkdir(new URL("desktop/", destination), { recursive: true });
 await cp(

@@ -1,4 +1,5 @@
 "use client";
+import AgentInstallations from "./AgentInstallations";
 import { copyText } from "@/app/clipboard";
 import { useEffect, useState } from "react";
 import { Copy, RefreshCw, RotateCcw } from "lucide-react";
@@ -9,6 +10,7 @@ export default function McpSettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [installRevision, setInstallRevision] = useState(0);
   const [port, setPort] = useState<string | null>(null);
   const bridge =
     typeof window === "undefined" ? undefined : window.yarnDesktop?.agent;
@@ -40,6 +42,7 @@ export default function McpSettings() {
     if (!bridge) return;
     try {
       setSettings(await bridge.configure(patch));
+      setInstallRevision((value) => value + 1);
       setError("");
       setMessage("");
       return true;
@@ -48,17 +51,10 @@ export default function McpSettings() {
       return false;
     }
   }
-  async function copyConnection() {
+  async function copyConnection(format: "codex" | "claude" | "http" = "http") {
     if (!bridge) return;
     try {
-      const value = await bridge.connection();
-      await copyText(
-        JSON.stringify(
-          { mcpServers: { spindle: { type: "http", ...value } } },
-          null,
-          2,
-        ),
-      );
+      await copyText(await bridge.connectionFormat(format));
       setError("");
       setMessage("已複製連線資料，包含此電腦的存取憑證。");
     } catch (error) {
@@ -66,7 +62,12 @@ export default function McpSettings() {
     }
   }
   if (!bridge)
-    return <p className="setting-help">MCP 整合適用於 Windows 桌面版。</p>;
+    return (
+      <p className="setting-help">
+        MCP 與 Agent 安裝適用於 Windows 桌面版。接入指南：Spindle 原始碼的
+        docs/mcp.md。
+      </p>
+    );
   return (
     <>
       <section className="settings-group" aria-label="MCP 連線">
@@ -153,6 +154,24 @@ export default function McpSettings() {
             複製 MCP 連線資料
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            disabled={!settings?.running}
+            onClick={() => void copyConnection("codex")}
+          >
+            <Copy size={14} />
+            複製 Codex 設定
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!settings?.running}
+            onClick={() => void copyConnection("claude")}
+          >
+            <Copy size={14} />
+            複製 Claude Code 設定
+          </Button>
+          <Button
             variant="ghost"
             size="sm"
             onClick={() => void change({ resetToken: true })}
@@ -176,6 +195,11 @@ export default function McpSettings() {
           </p>
         )}
       </section>
+      <AgentInstallations
+        bridge={bridge}
+        enabled={!!settings?.running}
+        revision={installRevision + JSON.stringify(settings)}
+      />
       <section className="settings-group">
         <h3>最近操作</h3>
         <p className="setting-help">

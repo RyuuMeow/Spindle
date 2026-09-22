@@ -24,7 +24,8 @@
     "desktop/mcp-windows.cjs",
     "desktop/mcp-runtime.cjs",
     "desktop/system-fonts.cjs",
-    "licenses/**/*"
+    "licenses/**/*",
+    "skills/spindle/**/*"
   ],
   "asar": true,
   "win": {

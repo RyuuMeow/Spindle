@@ -1,3 +1,9 @@
+import type {
+  AgentClient,
+  AgentInstallation,
+  InstallAction,
+  InstallResult,
+} from "./install-types";
 import type { EditorMode } from "../workspace/types";
 export type SourceSelection = { anchor: number; head: number };
 export type EditorCapture = {
@@ -52,6 +58,16 @@ export type McpSettings = {
   operations: { at: number; tool: string; outcome: string }[];
 };
 export type AgentBridge = {
+  installations: () => Promise<AgentInstallation[]>;
+  installAction: (
+    client: AgentClient,
+    action: InstallAction,
+  ) => Promise<InstallResult>;
+  selectInstallPath: (
+    client: AgentClient,
+    part: "config" | "skill",
+  ) => Promise<AgentInstallation>;
+  connectionFormat: (format: AgentClient | "http") => Promise<string>;
   onRequest: (callback: (request: ContextRequest) => void) => () => void;
   respond: (
     token: string,
