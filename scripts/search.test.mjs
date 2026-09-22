@@ -36,3 +36,20 @@ test('snippets follow the current scene and match case-insensitively', () => {
   const item=doc('one','story.yarn','title: One\n---\nMira: HELLO\n===\ntitle: Two\n---\nMira: hello\n===');
   assert.deepEqual(projectSearch([item],'hello','content').hits.map(hit=>[hit.scene,hit.line]),[['One',3],['Two',7]]);
 });
+
+const {paletteSearch,validDocumentName} = require('../'+output);
+test('palette mixes destinations without losing document locations',()=>{
+ const base={documents:[doc('one','a.yarn','Mira: font')],commands:[{name:'font_size'}],settings:[{id:'fontSize',section:'reading',field:'fontSize',label:'Font size',keywords:'font'}],query:'font',scope:'all',canCreate:true};
+ const hits=paletteSearch(base).hits;
+ assert.deepEqual(hits.map(h=>h.kind),['setting','command','document']);
+ assert.equal(hits[2].hit.column,7);
+ assert.equal(paletteSearch({...base,query:'new'}).hits[0].kind,'create');
+ assert.equal(paletteSearch({...base,query:'Chapter 2'}).hits[0].name,'Chapter 2');
+ assert.equal(paletteSearch({...base,query:'../escape'}).invalidName,true);
+ assert.equal(paletteSearch({...base,query:'new',canCreate:false}).hits.length,0);
+});
+test('palette rejects reserved Windows names and keeps recent files first',()=>{
+ for(const name of ['CON','aux.yarn','bad/child','name.']) assert.equal(validDocumentName(name),false);
+ const hits=paletteSearch({documents:[doc('one','a',''),doc('two','b','')],commands:[],settings:[],query:'',scope:'files',canCreate:true,recent:['two']}).hits;
+ assert.equal(hits[0].kind,'create');assert.equal(hits[1].hit.documentId,'two');
+});

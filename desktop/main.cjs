@@ -406,13 +406,13 @@ function wire() {
     )
       throw Error("不可保存其他視窗的專案");
     if (
-      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) && !action.background &&
       item.projectId
     )
       flushWindow(service, item);
     const result = await service.request(action);
     if (
-      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) && !action.background &&
       result.projectId
     ) {
       const existing = [...windows.values()].find(
@@ -428,7 +428,7 @@ function wire() {
       }
     }
     if (
-      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) && !action.background &&
       result.projectId &&
       !result.cancelled
     )

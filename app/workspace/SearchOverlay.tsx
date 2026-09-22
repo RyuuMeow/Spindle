@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileText, Search, X, Plus, CornerDownLeft } from "lucide-react";
+import { FileText, Search, X, Plus, Settings2, Terminal, CornerDownLeft } from "lucide-react";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ChromeButton } from "@/components/ChromeButton";
-import { projectSearch, type SearchHit, type SearchScope } from "./search";
+import { paletteSearch, type PaletteHit, type SettingEntry, type SearchScope } from "./search";
 import type { DocumentRecord } from "./types";
 import "./overlays.css";
 export type SearchDismissReason = "escape" | "outside" | "blur" | "choose";
@@ -45,16 +45,19 @@ export function SearchOverlay({
   onClose,
   newTab = false,
   onCreate,
+  commands = [], settings = [], recent = [], onChoose,
 }: {
   documents: DocumentRecord[];
   query: string;
   onQuery: (value: string) => void;
   scope: SearchScope;
   onScope: (scope: SearchScope) => void;
-  onNavigate: (hit: SearchHit, newTab: boolean) => void;
+  onNavigate: (hit: import("./search").SearchHit, newTab: boolean) => void;
+  commands?: import("../parser").Command[]; settings?: SettingEntry[]; recent?: string[];
+  onChoose?: (hit: PaletteHit) => void;
   onClose: (reason: SearchDismissReason) => void;
   newTab?: boolean;
-  onCreate?: () => void;
+  onCreate?: (name?: string) => void;
 }) {
   const panel = useRef<HTMLDivElement>(null),
     input = useRef<HTMLInputElement>(null);
@@ -64,9 +67,9 @@ export function SearchOverlay({
   const originalFocus = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   const [selection, setSelection] = useState({ query, scope, index: 0 });
-  const { hits, total } = useMemo(
-    () => projectSearch(documents, query, scope),
-    [documents, query, scope],
+  const { hits, total, invalidName } = useMemo(
+    () => paletteSearch({documents,commands,settings,recent,query,scope,canCreate:!!onCreate}),
+    [documents, commands, settings, recent, query, scope, onCreate],
   );
   const current =
     selection.query === query && selection.scope === scope
@@ -117,7 +120,10 @@ export function SearchOverlay({
   function choose(index: number, explicitNew = false) {
     if (!hits[index] || composing.current) return;
     closing.current = true;
-    onNavigate(hits[index], newTab || explicitNew);
+    const hit = hits[index];
+    if (hit.kind === "document") onNavigate(hit.hit, newTab || explicitNew);
+    else if (hit.kind === "create") onCreate?.(hit.name);
+    else onChoose?.(hit);
     onClose("choose");
   }
   function escape() {
@@ -217,7 +223,10 @@ export function SearchOverlay({
             value={scope}
             onChange={(value) => onScope(value as SearchScope)}
             options={[
+              { value: "all", label: "全部" },
               { value: "content", label: "內容" },
+              { value: "settings", label: "設定" },
+              { value: "commands", label: "指令" },
               { value: "files", label: "檔案" },
             ]}
           />
@@ -241,7 +250,7 @@ export function SearchOverlay({
             aria-selected={current === index}
             tabIndex={-1}
             id={`${listId}-${index}`}
-            key={`${hit.documentId}:${hit.line}`}
+            key={hit.id}
             className={current === index ? "active" : ""}
             onPointerMove={() => select(index)}
             onMouseDown={(event) => {
@@ -255,21 +264,16 @@ export function SearchOverlay({
               }
             }}
           >
-            <FileText size={16} aria-hidden="true" />
+            {hit.kind === "create" ? <Plus size={16}/> : hit.kind === "setting" ? <Settings2 size={16}/> : hit.kind === "command" ? <Terminal size={16}/> : <FileText size={16}/> }
             <span className="search-result-body">
               <span className="search-result-text">
                 <Highlight
                   text={hit.text}
                   query={query}
-                  context={hit.kind === "content"}
+                  context={hit.kind === "document" && hit.hit.kind === "content"}
                 />
               </span>
-              {hit.kind === "content" && (
-                <small>
-                  {hit.file}
-                  {hit.scene ? ` · ${hit.scene}` : ""} · 第 {hit.line} 行
-                </small>
-              )}
+              <small>{hit.detail}</small>
             </span>
             {current === index && (
               <CornerDownLeft
@@ -282,7 +286,7 @@ export function SearchOverlay({
         ))}
         {!hits.length && (
           <p className="search-overlay-empty">
-            {documents.length
+            {invalidName ? "名稱不可包含路徑、保留名稱或無效字元。" : documents.length
               ? "沒有符合的項目，試試其他關鍵字。"
               : "專案還沒有劇本。"}
           </p>
@@ -290,18 +294,7 @@ export function SearchOverlay({
       </div>
       <div className="search-overlay-footer">
         <span>方向鍵選擇 · Enter 開啟{!newTab && " · Ctrl+Enter 新分頁"}</span>
-        {scope === "files" && onCreate && (
-          <button
-            onClick={() => {
-              closing.current = true;
-              onClose("choose");
-              onCreate();
-            }}
-          >
-            <Plus size={14} />
-            新增劇本
-          </button>
-        )}
+
       </div>
     </div>,
     document.body,

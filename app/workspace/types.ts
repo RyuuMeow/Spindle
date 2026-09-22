@@ -92,6 +92,7 @@ export type DocumentViewState = Pick<
 export type NavigationLocation = DocumentViewState & { documentId: string };
 export type FileSortMode = "manual" | "name-asc" | "name-desc";
 export type WindowSession = {
+  recentDocuments?: string[];
   screen?: "home" | "editor";
   recovery?: RecoveryViewState;
   id: string;
@@ -197,7 +198,8 @@ export type WorkspaceAction =
   | { type: "preferences"; reopenLastProject: boolean }
   | { type: "closeProject"; projectId: string }
   | { type: "purgeTrash"; projectId: string; recoveryId?: string }
-  | { type: "migrateDraft"; projectId: string; name: string; root: string }
+  | { type: "deleteDraft"; projectId: string }
+  | { type: "migrateDraft"; projectId: string; name: string; root: string; background?: boolean }
   | { type: "openFiles"; paths?: string[] }
   | {
       type: "resolve";

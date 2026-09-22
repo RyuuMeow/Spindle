@@ -9,14 +9,15 @@ import {
   Info,
   Keyboard,
   RotateCcw,
-  Save,
+  Save, Globe, ArchiveRestore, Plug,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { WindowSession, AppPreferences } from "./types";
 import "./settings.css";
 import McpSettings from "../mcp/McpSettings";
-import { Plug } from "lucide-react";
+import { settingSections, type SettingsSection } from "./settings-registry";
+export type { SettingsSection } from "./settings-registry";
 import AppearanceSettings from "../appearance/AppearanceSettings";
 import type { AppearancePatch } from "../appearance/model";
 
@@ -26,15 +27,8 @@ export type WorkspacePreferences = Pick<
 > & {
   readingWidth?: "standard" | "wide";
 };
-export type SettingsSection = "reading" | "saving" | "shortcuts" | "about" | "mcp";
-
-const sections = [
-  { id: "reading", label: "編輯器風格", icon: BookOpen },
-  { id: "saving", label: "編輯與保存", icon: Save },
-  { id: "shortcuts", label: "快捷鍵", icon: Keyboard },
-  { id: "mcp", label: "MCP／Agent 整合", icon: Plug },
-  { id: "about", label: "關於", icon: Info },
-] as const;
+const sectionIcons = {BookOpen,Save,Globe,ArchiveRestore,Keyboard,Plug,Info};
+const sections = settingSections.map(s=>({...s,icon:sectionIcons[s.icon]}));
 
 function NumericSetting({
   label,
@@ -135,7 +129,10 @@ export default function SettingsView({
   appPreferences,
   onAppPreferences,
   onAppearance,
+  navigation, rescue,
 }: {
+  navigation?: {section: SettingsSection; field?: string; nonce: number};
+  rescue?: React.ReactNode;
   onAppearance?: (patch: AppearancePatch) => void;
   workspaceSettings?: boolean;
   appPreferences?: AppPreferences;
@@ -156,6 +153,16 @@ export default function SettingsView({
   useEffect(() => {
     if (focusOnMount) headingRef.current?.focus();
   }, [focusOnMount]);
+  useEffect(() => {
+    if (!navigation) return;
+    setSection(navigation.section);
+    const frame = requestAnimationFrame(() => {
+      const field = navigation.field ? document.querySelector<HTMLElement>(`[data-setting="${navigation.field}"]`) : null;
+      field?.scrollIntoView({block:"center"});
+      field?.querySelector<HTMLElement>("input,button,select")?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [navigation]);
   const change = (patch: Partial<WorkspacePreferences>) =>
     onChange({ ...preferences, ...patch });
   return (
@@ -194,6 +201,7 @@ export default function SettingsView({
                   </Button>
                 )}
               </div>
+              {category === "rescue" && rescue}
               {category === "mcp" && <McpSettings />}
               {category === "reading" && (
                 <>

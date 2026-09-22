@@ -18,24 +18,7 @@ import {
   syntaxDefaults,
 } from "./model";
 import "./settings.css";
-const labels: Record<keyof Typography, string> = {
-  fontFamily: "字型",
-  fontSize: "文字大小",
-  lineHeight: "行距",
-  foreground: "文字顏色",
-  background: "背景顏色",
-  selection: "文字選取底色",
-  matches: "選取文字的其他相符處",
-  symbols: "游標符號關聯顏色",
-  symbolStyle: "游標符號關聯樣式",
-  highlightMatches: "高亮選取文字的其他相符處",
-  highlightSymbols: "高亮游標符號關聯",
-  search: "其他搜尋結果",
-  searchCurrent: "目前搜尋結果",
-  cursor: "游標顏色",
-  activeLine: "目前行底色",
-  highlightLine: "高亮目前行",
-};
+import { appearanceLabels as labels } from "../workspace/settings-registry";
 const modeLabels = {
   source: "純文字",
   rendered: "閱讀編輯",
@@ -466,6 +449,7 @@ function StyleFields({
                   : "")
               }
               key={key}
+              data-setting={key}
             >
               <label htmlFor={prefix + key}>
                 {labels[key]}

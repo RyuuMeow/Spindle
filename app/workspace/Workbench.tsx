@@ -101,6 +101,8 @@ import {
 import ActionMenu, { type MenuAction, type MenuState } from "./ActionMenu";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import SettingsView from "./SettingsView";
+import { settingEntries, type SettingsSection } from "./settings-registry";
+import RescueSettings from "./RescueSettings";
 import { HistoryList, HistoryPreview } from "./HistoryView";
 import RecoveryView from "./RecoveryView";
 import type { RecoveryEntry } from "./types";
@@ -122,6 +124,7 @@ type Prompt = {
 };
 const modes = { source: "純文字", rendered: "閱讀編輯", graph: "流程圖" };
 const utilityNames: Record<string, string> = {
+  "@new-document": "新增劇本",
   "@settings": "設定",
   "@commands": "自訂指令",
   "@recovery": "專案復原",
@@ -186,7 +189,7 @@ function WorkbenchContent({
   const [toast, setToast] = useState(""),
     [searchOpen, setSearchOpen] = useState(false),
     [searchQuery, setSearchQuery] = useState(""),
-    [searchScope, setSearchScope] = useState<SearchScope>("content"),
+    [searchScope, setSearchScope] = useState<SearchScope>("all"),
     [quickNewTab, setQuickNewTab] = useState(false),
     [sceneQuery, setSceneQuery] = useState(""),
     [problems, setProblems] = useState(false),
@@ -202,11 +205,12 @@ function WorkbenchContent({
       text: string;
       version: number;
     } | null>(null),
-    [settingsSection, setSettingsSection] = useState<
-      "reading" | "saving" | "shortcuts" | "about"
-    >("reading"),
+    [settingsSection, setSettingsSection] = useState<SettingsSection>("reading"),
     [conflict, setConflict] = useState<DocumentRecord | null>(null),
     [commandDirty, setCommandDirty] = useState(false);
+  const [settingsNavigation, setSettingsNavigation] = useState<{section: SettingsSection; field?: string; nonce:number}>();
+  const [commandTarget, setCommandTarget] = useState<string>();
+  const pendingDocument = useRef<{tabId:string;origin:string} | null>(null);
   const [goto, setGoto] = useState<{
     file: string;
     line: number;
@@ -302,7 +306,7 @@ function WorkbenchContent({
           : window.getSelection()?.toString();
     if (selected) setSearchQuery(selected);
     setQuickNewTab(false);
-    setSearchScope("content");
+    setSearchScope("all");
     setSearchOpen(true);
   }
   function showFiles(newTab = false) {
@@ -318,6 +322,7 @@ function WorkbenchContent({
   }
   function openSettings(section: typeof settingsSection = "reading") {
     setSettingsSection(section);
+    setSettingsNavigation({section,nonce:Date.now()});
     openDocument("@settings");
   }
   function navigateHit(hit: SearchHit, newTab: boolean, source = false) {
@@ -606,6 +611,7 @@ function WorkbenchContent({
       );
     });
     setSelected("");
+    if (document) setSession(s=>({...s,recentDocuments:[id,...(s.recentDocuments||[]).filter(x=>x!==id)].slice(0,30)}));
     if (document && line !== undefined)
       setGoto((previous) => ({
         file: document.name,
@@ -811,6 +817,11 @@ function WorkbenchContent({
   }
   function cancelInline() {
     if (inlineSubmitting.current) return;
+    if (pendingDocument.current) {
+      const pending = pendingDocument.current;
+      setSession(s=>({...s,tabs:s.tabs.filter(t=>t.id!==pending.tabId),activeId:pending.origin}));
+      pendingDocument.current = null;
+    }
     setInlineDraft(null);
     requestAnimationFrame(
       () => inlineOrigin.current?.isConnected && inlineOrigin.current.focus(),
@@ -820,6 +831,15 @@ function WorkbenchContent({
     if (inlineSubmitting.current) return;
     inlineOrigin.current = document.activeElement as HTMLElement;
     setInlineDraft(next);
+  }
+  function createFromSearch(name?: string) {
+    const folder = activeFolder ?? (utility ? "" : folderOf(doc?.name || ""));
+    capture();
+    const tabId = uuid();
+    pendingDocument.current = {tabId,origin:session.activeId};
+    setSession(s=>navigateSession({...s,left:true},"@new-document",{newTab:true},tabId));
+    setSearchOpen(false);
+    beginInline({kind:"new-document",folder:projectFolders(project).includes(folder)?folder:"",value:name || uniqueDocumentName(project.documents,folder)});
   }
   function newDocument(inNewTab = false) {
     if (standalone) {
@@ -1066,7 +1086,11 @@ function WorkbenchContent({
         setInlineDraft(null);
         if (draft.kind === "new-document") {
           setFileSort("manual");
-          openDocument(created.id, !!draft.newTab);
+          if (pendingDocument.current) {
+            const pending = pendingDocument.current;
+            pendingDocument.current = null;
+            setSession(s=>({...s,activeId:pending.tabId,tabs:s.tabs.map(t=>t.id===pending.tabId?{...t,documentId:created.id,past:[],future:[]}:t)}));
+          } else openDocument(created.id, !!draft.newTab);
         }
       } else {
         const target = latest.documents.find((d) => d.id === draft.documentId);
@@ -2372,6 +2396,7 @@ function WorkbenchContent({
             >
               <CommandManager
                 key={project.id}
+                revealName={commandTarget}
                 commands={project.commands}
                 notify={notify}
                 onDirtyChange={setCommandDirty}
@@ -2400,7 +2425,8 @@ function WorkbenchContent({
               hidden={active?.documentId !== "@settings"}
             >
               <SettingsView
-                key={settingsSection}
+                navigation={settingsNavigation}
+                rescue={<RescueSettings client={client}/>}
                 initialSection={settingsSection}
                 focusOnMount={false}
                 appPreferences={snapshot.preferences}
@@ -2440,7 +2466,7 @@ function WorkbenchContent({
               />
             </div>
           )}
-          {active?.documentId === "@commands" ||
+          {active?.documentId === "@new-document" ? <div className="settings-content"><h2>新增劇本</h2><p>{inlineDraft?.folder || "專案最外層"}</p><p>請在劇本清單確認名稱；Escape 取消。</p></div> : active?.documentId === "@commands" ||
           active?.documentId === "@settings" ? null : active?.documentId ===
             "@recovery" ? (
             <RecoveryView
@@ -3001,7 +3027,14 @@ function WorkbenchContent({
           newTab={quickNewTab}
           onNavigate={navigateHit}
           onClose={() => setSearchOpen(false)}
-          onCreate={standalone ? undefined : () => newDocument(quickNewTab)}
+          commands={project.commands}
+          settings={settingEntries}
+          recent={session.recentDocuments}
+          onChoose={hit=>{
+            if(hit.kind === "setting") {openSettings(hit.section as SettingsSection);setSettingsNavigation({section:hit.section as SettingsSection,field:hit.field,nonce:Date.now()});}
+            if(hit.kind === "command") {openCommands();setCommandTarget(hit.name);}
+          }}
+          onCreate={standalone ? undefined : createFromSearch}
         />
       )}
       <Dialog

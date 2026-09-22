@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  useCallback,
+  useCallback, useEffectEvent,
   useEffect,
   useId,
   useImperativeHandle,
@@ -102,7 +102,7 @@ export default function CommandManager({
   notify,
   onDirtyChange,
   actionsRef,
-  referenceCount,
+  referenceCount, revealName,
 }: {
   commands: Command[];
   onChange: (commands: Command[], expectedCommands?: string) => boolean | Promise<boolean>;
@@ -111,6 +111,7 @@ export default function CommandManager({
   actionsRef: Ref<CommandActions>;
   referenceCount?: (name: string) => number;
   projectName?: string;
+  revealName?: string;
 }) {
   const [index, setIndex] = useState(commands.length ? 0 : -1);
   const [draft, setDraft] = useState<Command>(() =>
@@ -254,6 +255,14 @@ export default function CommandManager({
         : commands.map((command, i) => (i === index ? draft : command));
     },
   }));
+
+  const reveal = useEffectEvent((name: string) => {
+    const next = commands.findIndex(c=>c.name===name);
+    if (next < 0 || next === index) return;
+    setQuery("");
+    if (dirty) setPending(next); else choose(next);
+  });
+  useEffect(()=>{if(revealName) reveal(revealName);},[revealName]);
 
   const updateDraft = (next: Command) => {
     setHistory((h) => ({

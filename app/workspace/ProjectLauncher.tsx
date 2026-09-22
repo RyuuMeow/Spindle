@@ -14,6 +14,7 @@ import {
 import { ChromeButton } from "@/components/ChromeButton";
 import ActionMenu, { type MenuState } from "./ActionMenu";
 import SettingsView from "./SettingsView";
+import RescueSettings from "./RescueSettings";
 import type { WorkspaceClient } from "./client";
 import {
   defaultSession,
@@ -132,6 +133,7 @@ export default function ProjectLauncher({
       </header>
       {page === "settings" ? (
         <SettingsView
+          rescue={<RescueSettings client={client}/>}
           workspaceSettings={false}
           preferences={prefs}
           onChange={(next) => setPrefs((p) => ({ ...p, ...next }))}
@@ -268,15 +270,6 @@ export default function ProjectLauncher({
                       ? "沒有符合的專案"
                       : "開啟資料夾，或建立你的第一個專案。"}
                   </p>
-                )}
-                {!!drafts.length && (
-                  <button
-                    className="launcher-drafts"
-                    onClick={() => setPage("drafts")}
-                  >
-                    <ArchiveRestore size={16} />
-                    待移轉草稿<span>{drafts.length}</span>
-                  </button>
                 )}
                 <button
                   className="launcher-open-file"

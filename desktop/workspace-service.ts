@@ -758,7 +758,7 @@ export class WorkspaceService {
         updates: this.engine.updates(a.projectId, a.documentId, a.version),
       };
     if (a.type === "bootstrap") {
-      if (!this.engine.projects.length && a.legacy?.documents.length) {
+      if (!this.engine.projects.length && a.legacy?.documents.length && !fs.existsSync(path.join(this.profile,"legacy-import-v1.json"))) {
         const p = makeProject(
           this.notices.length ? "復原工作區" : a.legacy?.name || "未命名專案",
           this.notices.length ? [] : a.legacy?.documents || [],
@@ -767,6 +767,8 @@ export class WorkspaceService {
         validateProject(p);
         this.engine.projects.push(p);
         this.currentProjectId = p.id;
+        this.persist();
+        atomicWrite(path.join(this.profile,"legacy-import-v1.json"), JSON.stringify({completed:true}));
       }
     } else if (a.type === "openFolder") {
       const root = a.root || (await this.services.chooseFolder());
@@ -849,8 +851,15 @@ export class WorkspaceService {
         delete this.catalog.preferences.lastProjectId;
         this.catalog.persist();
       }
+    } else if (a.type === "deleteDraft") {
+      const p = this.engine.project(a.projectId);
+      if(p.root || p.kind === "standalone") throw Error("只能刪除待移轉草稿");
+      atomicWrite(path.join(this.profile,"legacy-import-v1.json"),JSON.stringify({completed:true}));
+      this.engine.projects = this.engine.projects.filter(item=>item!==p);
     } else if (a.type === "migrateDraft") {
       const legacy = this.engine.project(a.projectId);
+      if(legacy.root || legacy.kind === "standalone") throw Error("只能轉存待移轉草稿");
+      atomicWrite(path.join(this.profile,"legacy-import-v1.json"),JSON.stringify({completed:true}));
       const created = await this.execute({
         type: "createProject",
         name: a.name,

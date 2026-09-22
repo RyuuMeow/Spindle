@@ -151,7 +151,7 @@ export function restoreSession(
         (t) =>
           t &&
           typeof t.id === "string" &&
-          typeof t.documentId === "string" &&
+          typeof t.documentId === "string" && t.documentId !== "@new-document" &&
           ["source", "rendered", "graph"].includes(t.mode),
       )
       .map((t) => ({
