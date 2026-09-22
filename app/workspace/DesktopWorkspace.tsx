@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import {
   useEffect,
   useEffectEvent,
@@ -57,7 +59,7 @@ export default function DesktopWorkspace({
           result.projectId,
         ) || next;
     } catch {
-      setError("先前視圖無法讀取；已保留原始資料。");
+      setError(tr("m30b932df2c62"));
     }
     next = {
       ...next,

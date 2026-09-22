@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import type { EditorState } from "@codemirror/state";
 import { hoverTooltip, type EditorView } from "@codemirror/view";
 import type { Command } from "../parser";
@@ -40,9 +41,9 @@ export const commandTooltips = (
             dom.className = "reading-command-tooltip command-quick-fix";
             const message = document.createElement("div");
             message.textContent =
-              "未註冊指令「" + candidate.command.name + "」";
+              tr("m54ff568e9852") + candidate.command.name + "」";
             const button = document.createElement("button");
-            button.textContent = "新增指令";
+            button.textContent = tr("m05cc9992623a");
             button.title = "Alt+Enter";
             button.onmousedown = (event) => event.preventDefault();
             button.onclick = () => {

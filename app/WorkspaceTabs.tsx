@@ -1,4 +1,5 @@
 "use client";
+import { t as tr } from "./i18n/index.ts";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -121,20 +122,20 @@ export default function WorkspaceTabs({
         onValueChange={onActivate}
         className="file-tabs"
       >
-        <TabsList aria-label="開啟的劇本">
+        <TabsList aria-label={tr("m53127dbd0a28")}>
           {tabs.map((tab, index) => {
             const utilityNames: Record<string, string> = {
-              "@commands": "自訂指令",
-              "@settings": "設定",
-              "@recovery": "專案復原",
+              "@commands": tr("mae2f19d77e06"),
+              "@settings": tr("m0d8619aae051"),
+              "@recovery": tr("m525e69a5165d"),
             };
             const name = utilityNames[tab.file] || tab.file;
             const mode = utilityNames[tab.file]
-              ? "設定"
+              ? tr("m0d8619aae051")
               : tab.mode === "graph"
-                ? "流程"
-                : "撰寫";
-            const title = `${name} · ${mode}${tab.location ? " · " + tab.location : ""}${tab.dirty ? " · 尚未儲存" : ""}`;
+                ? tr("mbdd207e8c6e3")
+                : tr("m0bfa2376e1d1");
+            const title = `${name} · ${mode}${tab.location ? " · " + tab.location : ""}${tab.dirty ? tr("m4d4dc771e260") : ""}`;
             const Icon =
               tab.file === "@recovery"
                 ? ArchiveRestore
@@ -234,19 +235,21 @@ export default function WorkspaceTabs({
               >
                 <TabsTrigger
                   value={tab.id}
-                  aria-label={`分頁 ${index + 1}：${name}`}
+                  aria-label={tr("ma9cde878bdf7", [index + 1, name])}
                   title={title}
                 >
                   <Icon size={13} aria-hidden="true" />
                   <span className="tab-name">
-                    {tab.pinned && <Pin size={11} aria-label="已固定" />}
+                    {tab.pinned && (
+                      <Pin size={11} aria-label={tr("m317c1a85ec1c")} />
+                    )}
                     {name.replace(/\.yarn$/, "")}
                   </span>
                 </TabsTrigger>
-                <ControlTooltip label="關閉分頁">
+                <ControlTooltip label={tr("maa9a10827fb5")}>
                   <button
                     className="tab-close"
-                    aria-label={`關閉分頁 ${index + 1}：${tab.file}`}
+                    aria-label={tr("m65ea34b018df", [index + 1, tab.file])}
                     onClick={() => closeTab(tab.id)}
                   >
                     <X size={13} />
@@ -257,17 +260,21 @@ export default function WorkspaceTabs({
           })}
         </TabsList>
       </Tabs>
-      <ControlTooltip label="新增分頁 · 選擇或建立劇本">
-        <button className="new-tab" aria-label="新增分頁" onClick={onAdd}>
+      <ControlTooltip label={tr("m6e28bae41c7e")}>
+        <button
+          className="new-tab"
+          aria-label={tr("ma38d62ae74d4")}
+          onClick={onAdd}
+        >
           <Plus size={17} />
         </button>
       </ControlTooltip>
       {overflow && (
         <DropdownMenu>
-          <ControlTooltip label="所有開啟的分頁">
+          <ControlTooltip label={tr("m87241a211d76")}>
             <DropdownMenuTrigger
               className="tab-overflow"
-              aria-label="所有開啟的分頁"
+              aria-label={tr("m87241a211d76")}
             >
               <ChevronDown size={16} />
             </DropdownMenuTrigger>
@@ -290,20 +297,21 @@ export default function WorkspaceTabs({
                 <span>
                   <strong>
                     {{
-                      "@commands": "自訂指令",
-                      "@settings": "設定",
-                      "@recovery": "專案復原",
+                      "@commands": tr("mae2f19d77e06"),
+                      "@settings": tr("m0d8619aae051"),
+                      "@recovery": tr("m525e69a5165d"),
                     }[tab.file] || tab.file}
                   </strong>
                   <small>
-                    分頁 {index + 1} ·{" "}
+                    {tr("m842433f0a425")}
+                    {index + 1} ·{" "}
                     {tab.file === "@commands"
-                      ? "設定"
+                      ? tr("m0d8619aae051")
                       : tab.mode === "graph"
-                        ? "流程"
-                        : "撰寫"}
+                        ? tr("mbdd207e8c6e3")
+                        : tr("m0bfa2376e1d1")}
                     {tab.location && " · " + tab.location}
-                    {tab.dirty && " · 尚未儲存"}
+                    {tab.dirty && tr("m4d4dc771e260")}
                   </small>
                 </span>
               </DropdownMenuItem>

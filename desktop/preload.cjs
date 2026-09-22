@@ -5,6 +5,15 @@ const subscribe = (channel, callback) => {
   return () => ipcRenderer.removeListener(channel, handler);
 };
 contextBridge.exposeInMainWorld("yarnDesktop", {
+  locale: process.argv
+    .find((a) => a.startsWith("--spindle-locale="))
+    ?.split("=")[1],
+  commandDraftDecision: () => ipcRenderer.invoke("app:command-draft"),
+  updates: {
+    action: (action) => ipcRenderer.invoke("app:update", action),
+    subscribe: (callback) => subscribe("app:update-state", callback),
+  },
+  restart: () => ipcRenderer.invoke("app:restart"),
   platform: process.platform,
   titleBarOverlay: process.platform === "win32",
   windowId: process.argv
@@ -16,11 +25,15 @@ contextBridge.exposeInMainWorld("yarnDesktop", {
   request: (action) => ipcRenderer.invoke("workspace:request", action),
   agent: {
     installations: () => ipcRenderer.invoke("agent:installations"),
-    installAction: (client, action) => ipcRenderer.invoke("agent:install-action", client, action),
-    selectInstallPath: (client, part) => ipcRenderer.invoke("agent:install-path", client, part),
-    connectionFormat: format => ipcRenderer.invoke("agent:connection-format", format),
+    installAction: (client, action) =>
+      ipcRenderer.invoke("agent:install-action", client, action),
+    selectInstallPath: (client, part) =>
+      ipcRenderer.invoke("agent:install-path", client, part),
+    connectionFormat: (format) =>
+      ipcRenderer.invoke("agent:connection-format", format),
     onRequest: (callback) => subscribe("agent:request", callback),
-    respond: (token, context, error) => ipcRenderer.send("agent:response", { token, context, error }),
+    respond: (token, context, error) =>
+      ipcRenderer.send("agent:response", { token, context, error }),
     summary: (value) => ipcRenderer.send("agent:summary", value),
     settings: () => ipcRenderer.invoke("agent:settings"),
     configure: (patch) => ipcRenderer.invoke("agent:configure", patch),

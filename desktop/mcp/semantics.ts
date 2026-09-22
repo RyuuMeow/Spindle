@@ -1,3 +1,4 @@
+import { t as tr } from "../../app/i18n";
 import { parse } from "../../app/parser";
 import {
   collectVariables,
@@ -86,7 +87,7 @@ export function semantics(p: Project) {
           })
       )
         candidate = {
-          label: "新增指令 " + registration.command.name,
+          label: tr("m05cc9992623a") + registration.command.name,
           documentId: d.id,
           version: d.version,
           command: registration.command,

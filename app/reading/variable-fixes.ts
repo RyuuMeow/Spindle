@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import {
   Decoration,
   EditorView,
@@ -124,7 +125,7 @@ export function variableFixes(
                 ? messages.join("\n")
                 : fix!.replace
                   ? fix!.label
-                  : `變數「${fix!.name}」尚未宣告`;
+                  : tr("m5b27b0adfbe3", [fix!.name]);
               dom.appendChild(message);
               if (fix?.insert) {
                 const button = document.createElement("button");

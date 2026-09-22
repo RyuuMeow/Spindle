@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { authorStatistics, readingStructure } from "../reading/structure";
 export function documentStatistics(text: string) {
   const roles = new Map<string, number>();
@@ -11,7 +12,8 @@ export function documentStatistics(text: string) {
       });
     if (line.kind === "dialogue") {
       if (scenes.length) scenes[scenes.length - 1].count++;
-      const role = line.text.match(/^\s*([^:<>]+):/)?.[1] || "旁白";
+      const role =
+        line.text.match(/^\s*([^:<>]+):/)?.[1] || tr("m101f6e6d6095");
       roles.set(role, (roles.get(role) || 0) + 1);
     }
   }

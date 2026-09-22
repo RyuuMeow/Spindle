@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "./i18n/index.ts";
+
 import { tabOut } from "./tab-out";
 import { quietDiagnostic } from "./diagnostics/use-diagnostics";
 import { useEditorContext } from "./mcp/editor-context";
@@ -93,12 +95,10 @@ export default function CodeEditor({
           anchor: map(r.getSelectionStart()),
           head: map(r.getPosition()),
         })),
-        visibleRanges: e
-          .getVisibleRanges()
-          .map((r) => ({
-            from: map(r.getStartPosition()),
-            to: map(r.getEndPosition()),
-          })),
+        visibleRanges: e.getVisibleRanges().map((r) => ({
+          from: map(r.getStartPosition()),
+          to: map(r.getEndPosition()),
+        })),
         blocked:
           model.getValue(undefined, true).replace(/\r\n/g, "\n") !==
           doc.text.replace(/\r\n/g, "\n"),
@@ -261,7 +261,7 @@ export default function CodeEditor({
     }
   }, [goTo, doc.name, editorRef]);
   if (!localeReady)
-    return <div className="editor-loading">正在載入文字編輯器…</div>;
+    return <div className="editor-loading">{tr("m972a5d5f4976")}</div>;
   return (
     <Editor
       path={
@@ -281,7 +281,7 @@ export default function CodeEditor({
           event,
         )
       }
-      loading={<div className="editor-loading">正在載入文字編輯器…</div>}
+      loading={<div className="editor-loading">{tr("m972a5d5f4976")}</div>}
       beforeMount={(m) => {
         api.current = m;
         monacoRef.current = m;
@@ -376,7 +376,10 @@ export default function CodeEditor({
                       kind: m.languages.CompletionItemKind.Variable,
                       insertText: v.name,
                       detail:
-                        v.type + (v.readOnly ? " · 唯讀" : "") + " · " + v.file,
+                        v.type +
+                        (v.readOnly ? tr("m51f76a1414d4") : "") +
+                        " · " +
+                        v.file,
                       range: {
                         ...range,
                         startColumn: variable.from + 1,
@@ -481,7 +484,10 @@ export default function CodeEditor({
         );
         editor.onDidDispose(() => highlights.current?.dispose());
         editor.onDidChangeModel(syncModel);
-        const canTabOut = editor.createContextKey<boolean>("spindleCanTabOut", false);
+        const canTabOut = editor.createContextKey<boolean>(
+          "spindleCanTabOut",
+          false,
+        );
         let tabComposing = false;
         const tabTargets = () => {
           const model = editor.getModel();
@@ -524,7 +530,7 @@ export default function CodeEditor({
           }),
           editor.addAction({
             id: "spindle.tabOut",
-            label: "跳出目前容器",
+            label: tr("mc21da047e276"),
             keybindings: [m.KeyCode.Tab],
             precondition:
               "editorTextFocus && spindleCanTabOut && !editorReadonly && !suggestWidgetVisible && !inSnippetMode && !tabMovesFocus",
@@ -628,7 +634,7 @@ export default function CodeEditor({
                     isPreferred: true,
                     command: {
                       id: variableFixCommand,
-                      title: "新增宣告",
+                      title: tr("mb4d233ea3787"),
                       arguments: [
                         range.startLineNumber,
                         line,
@@ -649,12 +655,13 @@ export default function CodeEditor({
                 candidate && register
                   ? [
                       {
-                        title: "新增指令「" + candidate.command.name + "」",
+                        title:
+                          tr("m268e9b0534d6") + candidate.command.name + "」",
                         kind: "quickfix",
                         isPreferred: true,
                         command: {
                           id: register,
-                          title: "新增指令",
+                          title: tr("m05cc9992623a"),
                           arguments: [
                             line,
                             range.startColumn - 1,
@@ -670,7 +677,7 @@ export default function CodeEditor({
         });
         editor.addAction({
           id: "spindle.quickFix",
-          label: "快速修正",
+          label: tr("me4333530b83d"),
           keybindings: [m.KeyMod.Alt | m.KeyCode.Enter],
           run: () => {
             if (composing.current) return;
@@ -766,7 +773,7 @@ export default function CodeEditor({
               contents: [
                 {
                   value:
-                    "[新增指令](command:" +
+                    tr("mcb7c264e4636") +
                     register +
                     "?" +
                     args +
@@ -850,7 +857,7 @@ export default function CodeEditor({
         };
         editor.addAction({
           id: "yarn.goToScene",
-          label: "前往場景原文",
+          label: tr("m91c7cf173d2e"),
           keybindings: [m.KeyCode.F12],
           contextMenuGroupId: "navigation",
           run: navigate,

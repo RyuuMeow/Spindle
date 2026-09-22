@@ -1,3 +1,4 @@
+import { t as tr } from "../app/i18n";
 import * as TOML from "@iarna/toml";
 import {
   parseTree,
@@ -50,7 +51,7 @@ export function readEntry(
     const node = findNodeAtLocation(tree, ["mcpServers", name]);
     return node ? getNodeValue(node) : undefined;
   } catch {
-    throw new Error("設定檔格式無法安全解析；原檔未修改。");
+    throw new Error(tr("mcf0e0881816f"));
   }
 }
 function markers(name: string) {
@@ -98,7 +99,7 @@ export function patchEntry(
       source.indexOf(begin, start + begin.length) >= 0 ||
       source.indexOf(end, finish + end.length) >= 0
     )
-      throw new Error("Spindle 設定區塊重複。");
+      throw new Error(tr("mfbe15e0ff535"));
     // Verify the marked block contains exactly this server, never another table.
     const parsed = TOML.parse(source.slice(start + begin.length, finish));
     const table = parsed.mcp_servers as Record<string, unknown> | undefined;
@@ -107,7 +108,7 @@ export function patchEntry(
       !table ||
       Object.keys(table).some((k) => k !== name)
     )
-      throw new Error("Spindle 設定區塊已被修改；保留原檔。");
+      throw new Error(tr("m8a151b3bd136"));
     const tail = finish + end.length;
     const length = source.startsWith("\r\n", tail)
       ? 2
@@ -117,7 +118,7 @@ export function patchEntry(
     result = source.slice(0, start) + block + source.slice(tail + length);
   } else {
     if (old !== undefined || start >= 0 || finish >= 0)
-      throw new Error("同名設定不是 Spindle 管理的區塊。");
+      throw new Error(tr("m346653d62c56"));
     result = source + (source && !source.endsWith("\n") ? newline : "") + block;
   }
   readEntry(client, result, name);
@@ -131,6 +132,6 @@ export function patchEntry(
     return JSON.stringify(root);
   };
   if (unrelated(source) !== unrelated(result))
-    throw new Error("修改會影響其他 TOML 設定；保留原檔。");
+    throw new Error(tr("m7e17bbe59daa"));
   return result;
 }

@@ -1,7 +1,9 @@
 "use client";
+import { t as tr } from "./i18n/index.ts";
 
 import {
-  useCallback, useEffectEvent,
+  useCallback,
+  useEffectEvent,
   useEffect,
   useId,
   useImperativeHandle,
@@ -69,9 +71,7 @@ function commandIssue(
     return {
       field: "name",
       message:
-        nameError === "指令名稱須以字母或底線起始"
-          ? "指令名稱須以英文字母或底線起始，且只能包含英文字母、數字和底線。"
-          : nameError,
+        nameError === tr("mb7b256c22693") ? tr("mc2ac8caa3e6c") : nameError,
     };
   }
   for (let i = 0; i < command.params.length; i++) {
@@ -89,7 +89,7 @@ function commandIssue(
           ? "required"
           : "defaultValue";
     return {
-      message: `參數 ${i + 1}：${message}`,
+      message: tr("mb29bde06c083", [i + 1, message]),
       field: `param-${i}-${field}`,
     };
   }
@@ -102,23 +102,31 @@ export default function CommandManager({
   notify,
   onDirtyChange,
   actionsRef,
-  referenceCount, revealName,
+  referenceCount,
+  revealName,
+  revealNonce,
 }: {
   commands: Command[];
-  onChange: (commands: Command[], expectedCommands?: string) => boolean | Promise<boolean>;
+  onChange: (
+    commands: Command[],
+    expectedCommands?: string,
+  ) => boolean | Promise<boolean>;
   notify: (message: string) => void;
   onDirtyChange: (dirty: boolean) => void;
   actionsRef: Ref<CommandActions>;
   referenceCount?: (name: string) => number;
   projectName?: string;
   revealName?: string;
+  revealNonce?: number;
 }) {
   const [index, setIndex] = useState(commands.length ? 0 : -1);
   const [draft, setDraft] = useState<Command>(() =>
     structuredClone(commands[0] || emptyCommand()),
   );
   const commandBase = useRef(JSON.stringify(commands));
-  const [draftBase, setDraftBase] = useState(() => JSON.stringify(commands[0] || emptyCommand()));
+  const [draftBase, setDraftBase] = useState(() =>
+    JSON.stringify(commands[0] || emptyCommand()),
+  );
   const [query, setQuery] = useState("");
   const matchesQuery = (command: Command) =>
     `${command.name} ${command.displayName || ""}`
@@ -141,8 +149,7 @@ export default function CommandManager({
   const focusAfterSwitch = useRef(false);
   const formId = useId();
   const errorId = `${formId}-error`;
-  const dirty =
-    JSON.stringify(draft) !== draftBase;
+  const dirty = JSON.stringify(draft) !== draftBase;
   const draftIssue = commandIssue(
     draft,
     commands.filter((_, i) => i !== index),
@@ -185,7 +192,7 @@ export default function CommandManager({
     if (saving) return false;
     if (!dirty && index >= 0) return true;
     if (commandBase.current !== JSON.stringify(commands)) {
-      reportIssue({ message: "指令定義已由其他操作更新。草稿已保留，請先複製需要的內容，再捨棄草稿以載入最新定義。", field: "save" });
+      reportIssue({ message: tr("m16d034be25d9"), field: "save" });
       return false;
     }
     const validation = commandIssue(
@@ -203,7 +210,7 @@ export default function CommandManager({
     try {
       if (!(await onChange(next, commandBase.current))) {
         reportIssue({
-          message: "無法套用指令。草稿仍在此處，請重試或匯出專案備份。",
+          message: tr("mf56188fe83d9"),
           field: "save",
         });
         return false;
@@ -212,10 +219,13 @@ export default function CommandManager({
       setDraftBase(JSON.stringify(draft));
       if (index < 0) setIndex(next.length - 1);
       reportIssue(null);
-      notify("指令定義已套用，補全與診斷已更新");
+      notify(tr("ma54f2759e31c"));
       return true;
     } catch (error) {
-      reportIssue({ message: "無法套用指令：" + String(error), field: "save" });
+      reportIssue({
+        message: tr("m64bb491e7493") + String(error),
+        field: "save",
+      });
       return false;
     } finally {
       setSaving(false);
@@ -238,7 +248,7 @@ export default function CommandManager({
     discard: () => choose(index),
     prepare: () => {
       if (commandBase.current !== JSON.stringify(commands)) {
-        reportIssue({ message: "指令定義已更新；請保留需要的草稿內容並重新載入。", field: "save" });
+        reportIssue({ message: tr("m3ed3208b3335"), field: "save" });
         return null;
       }
       const validation = commandIssue(
@@ -257,12 +267,18 @@ export default function CommandManager({
   }));
 
   const reveal = useEffectEvent((name: string) => {
-    const next = commands.findIndex(c=>c.name===name);
+    const next = commands.findIndex((c) => c.name === name);
     if (next < 0 || next === index) return;
     setQuery("");
-    if (dirty) setPending(next); else choose(next);
+    if (dirty) setPending(next);
+    else choose(next);
   });
-  useEffect(()=>{if(revealName) reveal(revealName);},[revealName]);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (revealName) reveal(revealName);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [revealName, revealNonce]);
 
   const updateDraft = (next: Command) => {
     setHistory((h) => ({
@@ -347,14 +363,14 @@ export default function CommandManager({
 
   return (
     <div className="command-workspace">
-      <aside className="command-list" aria-label="指令列表">
+      <aside className="command-list" aria-label={tr("m945e6f8b3e4e")}>
         <div className="section-heading">
-          <span>指令列表</span>
-          <ControlTooltip label="新增指令">
+          <span>{tr("m945e6f8b3e4e")}</span>
+          <ControlTooltip label={tr("m05cc9992623a")}>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="新增指令"
+              aria-label={tr("m05cc9992623a")}
               disabled={saving}
               onClick={() => (dirty ? setPending(-1) : choose(-1))}
             >
@@ -365,8 +381,8 @@ export default function CommandManager({
         <div className="node-search">
           <Search size={13} />
           <input
-            aria-label="搜尋指令"
-            placeholder="搜尋指令"
+            aria-label={tr("m756605eb7a31")}
+            placeholder={tr("m756605eb7a31")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -394,12 +410,10 @@ export default function CommandManager({
           </button>
         ))}
         {commands.length === 0 && (
-          <p className="command-empty">
-            尚未定義自訂指令。填寫右側表單後套用。
-          </p>
+          <p className="command-empty">{tr("m88c3c3d38f24")}</p>
         )}
         {!!commands.length && !commands.some(matchesQuery) && (
-          <p className="command-empty">找不到符合的指令。</p>
+          <p className="command-empty">{tr("m46bcd0385c36")}</p>
         )}
       </aside>
 
@@ -418,10 +432,10 @@ export default function CommandManager({
           <div className="command-heading-label">
             <h2>
               {index < 0
-                ? "新增指令"
+                ? tr("m05cc9992623a")
                 : commands[index]?.displayName ||
                   commands[index]?.name ||
-                  "指令定義"}
+                  tr("m7fc749991aed")}
             </h2>
             <span
               className={
@@ -430,47 +444,47 @@ export default function CommandManager({
               role="status"
             >
               {saving
-                ? "正在套用"
+                ? tr("m9d4b7e145711")
                 : dirty
                   ? draftIssue
-                    ? "草稿有待修正欄位"
-                    : "草稿尚未套用"
+                    ? tr("m2569bff0c51d")
+                    : tr("m409d3ca3eede")
                   : index < 0
-                    ? "填寫指令定義"
-                    : "已套用"}
+                    ? tr("m41f9c910c875")
+                    : tr("mc0edb04e0855")}
             </span>
           </div>
           <div className="command-actions">
-            <ControlTooltip label="復原指令表單變更">
+            <ControlTooltip label={tr("m31fb1c0d6810")}>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label="復原指令表單變更"
+                aria-label={tr("m31fb1c0d6810")}
                 disabled={!history.past.length || saving}
                 onClick={undo}
               >
                 <Undo2 size={15} />
               </Button>
             </ControlTooltip>
-            <ControlTooltip label="重做指令表單變更">
+            <ControlTooltip label={tr("m368037a44b6a")}>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label="重做指令表單變更"
+                aria-label={tr("m368037a44b6a")}
                 disabled={!history.future.length || saving}
                 onClick={redo}
               >
                 <Redo2 size={15} />
               </Button>
             </ControlTooltip>
-            <ControlTooltip label="建立指令副本">
+            <ControlTooltip label={tr("mf9b5c0b256f0")}>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label="建立指令副本"
+                aria-label={tr("mf9b5c0b256f0")}
                 disabled={!draft.name || saving}
                 onClick={() => {
                   let name = (draft.name || "command") + "_copy",
@@ -493,7 +507,7 @@ export default function CommandManager({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="指令更多操作"
+                    aria-label={tr("m2deef2c2631b")}
                     disabled={saving}
                   >
                     <MoreHorizontal size={16} />
@@ -508,7 +522,7 @@ export default function CommandManager({
                     }}
                   >
                     <Trash2 size={14} />
-                    刪除指令
+                    {tr("m7a80dc500e60")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -519,7 +533,7 @@ export default function CommandManager({
               {...fieldProps("save")}
             >
               <Check size={14} />
-              套用定義
+              {tr("mbde887e266e5")}
             </Button>
           </div>
         </div>
@@ -527,13 +541,13 @@ export default function CommandManager({
           {issue?.field === "save" && renderError()}
           <div className="command-identity">
             <label className="command-field" htmlFor={`${formId}-name`}>
-              <span>變數名稱</span>
+              <span>{tr("mdc8f0070a144")}</span>
               <input
                 id={`${formId}-name`}
                 {...fieldProps("name")}
-                aria-label="變數名稱"
+                aria-label={tr("mdc8f0070a144")}
                 value={draft.name}
-                placeholder="例如 play_animation"
+                placeholder={tr("m9043bba2a978")}
                 autoComplete="off"
                 spellCheck={false}
                 onChange={(event) =>
@@ -543,20 +557,22 @@ export default function CommandManager({
               {issue?.field === "name" && renderError()}
               {index >= 0 && draft.name !== commands[index]?.name && (
                 <span className="command-field-hint">
-                  更名影響：{referenceCount?.(commands[index].name) || 0}{" "}
-                  處呼叫仍使用舊名稱，需同步修改劇本。
+                  {tr("m23f565688a5a")}
+                  {referenceCount?.(commands[index].name) || 0}{" "}
+                  {tr("m6fc9366abbea")}
                 </span>
               )}
             </label>
             <label className="command-field" htmlFor={`${formId}-display-name`}>
               <span>
-                指令名稱（顯示） <span className="command-optional">選填</span>
+                {tr("m1d4052cd25f6")}
+                <span className="command-optional">{tr("mefd49a86e463")}</span>
               </span>
               <input
                 id={`${formId}-display-name`}
-                aria-label="指令名稱（顯示）"
+                aria-label={tr("m1d4052cd25f6")}
                 value={draft.displayName || ""}
-                placeholder={draft.name || "例如 播放動畫"}
+                placeholder={draft.name || tr("m46dc0a873ece")}
                 onChange={(event) =>
                   updateDraft({ ...draft, displayName: event.target.value })
                 }
@@ -565,7 +581,8 @@ export default function CommandManager({
           </div>
           <label className="command-field" htmlFor={`${formId}-description`}>
             <span>
-              說明 <span className="command-optional">選填</span>
+              {tr("m6d3c9336bf4c")}
+              <span className="command-optional">{tr("mefd49a86e463")}</span>
             </span>
             <textarea
               id={`${formId}-description`}
@@ -577,7 +594,7 @@ export default function CommandManager({
             />
           </label>
           <div className="section-heading command-params-heading">
-            <h3>參數</h3>
+            <h3>{tr("m247f068716b3")}</h3>
             <Button
               type="button"
               variant="outline"
@@ -598,27 +615,29 @@ export default function CommandManager({
               }
             >
               <Plus size={14} />
-              新增參數
+              {tr("mdc5c574311c2")}
             </Button>
           </div>
           <div className="params">
             {draft.params.length === 0 && (
-              <p className="command-empty">這個指令沒有參數。</p>
+              <p className="command-empty">{tr("mcc184a1bbdbc")}</p>
             )}
             {draft.params.map((param, i) => (
               <fieldset className="param" key={i}>
-                <legend className="sr-only">參數 {i + 1}</legend>
+                <legend className="sr-only">
+                  {tr("m247f068716b3")} {i + 1}
+                </legend>
                 <div className="param-top">
                   <label
                     className="command-field"
                     htmlFor={`${formId}-param-${i}-name`}
                   >
-                    <span>變數名稱</span>
+                    <span>{tr("mdc8f0070a144")}</span>
                     <input
                       id={`${formId}-param-${i}-name`}
                       {...fieldProps(`param-${i}-name`)}
-                      aria-label={`參數 ${i + 1} 變數名稱`}
-                      placeholder="例如 animation"
+                      aria-label={tr("meeb5cf1c3524", [i + 1])}
+                      placeholder={tr("m2dfa55190d28")}
                       value={param.name}
                       spellCheck={false}
                       autoComplete="off"
@@ -632,13 +651,16 @@ export default function CommandManager({
                     htmlFor={`${formId}-param-${i}-display-name`}
                   >
                     <span>
-                      顯示名稱 <span className="command-optional">選填</span>
+                      {tr("mbda532c613dd")}
+                      <span className="command-optional">
+                        {tr("mefd49a86e463")}
+                      </span>
                     </span>
                     <input
                       id={`${formId}-param-${i}-display-name`}
-                      aria-label={`參數 ${i + 1} 顯示名稱`}
+                      aria-label={tr("m46c6e11e83df", [i + 1])}
                       value={param.displayName || ""}
-                      placeholder={param.name || "例如 動畫"}
+                      placeholder={param.name || tr("ma657de974471")}
                       onChange={(event) =>
                         updateParam(i, { displayName: event.target.value })
                       }
@@ -648,25 +670,25 @@ export default function CommandManager({
                     className="command-field"
                     htmlFor={`${formId}-param-${i}-type`}
                   >
-                    <span>型別</span>
+                    <span>{tr("m3a5821e57dbf")}</span>
                     <CompactSelect
                       id={`${formId}-param-${i}-type`}
-                      label={`參數 ${i + 1} 型別`}
+                      label={tr("m8cf4216a8657", [i + 1])}
                       value={param.type}
                       onChange={(value) =>
                         updateParam(i, { type: value as Param["type"] })
                       }
                       options={[
-                        { value: "string", label: "文字" },
-                        { value: "number", label: "數字" },
-                        { value: "boolean", label: "布林" },
+                        { value: "string", label: tr("m14b69bd6eeb0") },
+                        { value: "number", label: tr("m365bd33d1106") },
+                        { value: "boolean", label: tr("m797e0d9ba126") },
                       ]}
                     />
                   </label>
                   <div
                     className="param-order"
                     role="group"
-                    aria-label={`參數 ${i + 1} 操作`}
+                    aria-label={tr("m63d87fa75333", [i + 1])}
                   >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -674,7 +696,7 @@ export default function CommandManager({
                           type="button"
                           variant="ghost"
                           size="icon-sm"
-                          aria-label={`參數 ${i + 1} 操作`}
+                          aria-label={tr("m63d87fa75333", [i + 1])}
                         >
                           <MoreHorizontal size={16} />
                         </Button>
@@ -685,14 +707,14 @@ export default function CommandManager({
                           onSelect={() => moveParam(i, -1)}
                         >
                           <ArrowUp size={14} />
-                          上移參數
+                          {tr("m7d840c6881d8")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={i === draft.params.length - 1}
                           onSelect={() => moveParam(i, 1)}
                         >
                           <ArrowDown size={14} />
-                          下移參數
+                          {tr("m9d8f039ae485")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           variant="destructive"
@@ -704,7 +726,7 @@ export default function CommandManager({
                           }
                         >
                           <Trash2 size={14} />
-                          刪除參數
+                          {tr("m6b20c5e4849e")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -718,29 +740,29 @@ export default function CommandManager({
                     <Checkbox
                       id={`${formId}-param-${i}-required`}
                       {...fieldProps(`param-${i}-required`)}
-                      aria-label={`參數 ${i + 1} 必填`}
+                      aria-label={tr("m6510be3e9e4e", [i + 1])}
                       checked={param.required}
                       onCheckedChange={(value) =>
                         updateParam(i, { required: value === true })
                       }
                     />
-                    必填
+                    {tr("m11da9dc44285")}
                   </label>
                   <label
                     className="command-field command-default"
                     htmlFor={`${formId}-param-${i}-default`}
                   >
-                    <span>預設值</span>
+                    <span>{tr("m576a77a40390")}</span>
                     <input
                       id={`${formId}-param-${i}-default`}
                       {...fieldProps(`param-${i}-defaultValue`)}
-                      aria-label={`參數 ${i + 1} 預設值`}
+                      aria-label={tr("md8c23c44ec67", [i + 1])}
                       placeholder={
                         param.type === "string"
-                          ? '例如 "idle"'
+                          ? tr("m25156232ded6")
                           : param.type === "number"
-                            ? "例如 1"
-                            : "true 或 false"
+                            ? tr("m5c16379c34db")
+                            : tr("mede25e9a6148")
                       }
                       value={param.defaultValue}
                       disabled={param.required}
@@ -755,20 +777,27 @@ export default function CommandManager({
                   key={`description-${index}-${i}`}
                 >
                   <summary>
-                    參數說明 <span className="command-optional">選填</span>
+                    {tr("m57ce93aa4f7f")}
+                    <span className="command-optional">
+                      {tr("mefd49a86e463")}
+                    </span>
                     {param.description && (
-                      <span className="param-description-present">已填寫</span>
+                      <span className="param-description-present">
+                        {tr("mfa3d8a8c01ea")}
+                      </span>
                     )}
                   </summary>
                   <label
                     className="command-field"
                     htmlFor={`${formId}-param-${i}-description`}
                   >
-                    <span className="sr-only">參數 {i + 1} 說明</span>
+                    <span className="sr-only">
+                      {tr("m247f068716b3")} {i + 1} {tr("m6d3c9336bf4c")}
+                    </span>
                     <textarea
                       id={`${formId}-param-${i}-description`}
                       rows={2}
-                      aria-label={`參數 ${i + 1} 說明`}
+                      aria-label={tr("m7d8625b350e3", [i + 1])}
                       value={param.description || ""}
                       onChange={(event) =>
                         updateParam(i, { description: event.target.value })
@@ -782,7 +811,8 @@ export default function CommandManager({
           </div>
           <label className="command-field" htmlFor={`${formId}-example`}>
             <span>
-              使用範例 <span className="command-optional">選填</span>
+              {tr("m991e00cf35e4")}
+              <span className="command-optional">{tr("mefd49a86e463")}</span>
             </span>
             <input
               id={`${formId}-example`}
@@ -801,11 +831,10 @@ export default function CommandManager({
       <AlertDialog open={remove} onOpenChange={setRemove}>
         <AlertDialogContent>
           <AlertDialogTitle>
-            刪除 {commands[index]?.name || draft.name}？
+            {tr("m3c8f5b363ab3")}
+            {commands[index]?.name || draft.name}？
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            腳本中的呼叫會保留，並改為未註冊指令警告。
-          </AlertDialogDescription>
+          <AlertDialogDescription>{tr("mbcac2c4bcdab")}</AlertDialogDescription>
           {removeError && (
             <p className="command-error" role="alert">
               <CircleAlert size={16} />
@@ -813,18 +842,18 @@ export default function CommandManager({
             </p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{tr("m2cd0f3be8738")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={async (event) => {
                 event.preventDefault();
                 if (JSON.stringify(commands) !== commandBase.current) {
-                  setRemoveError("指令集已更新，請重新選取指令後再刪除。");
+                  setRemoveError(tr("m9a39ffac9253"));
                   return;
                 }
                 const next = commands.filter((_, i) => i !== index);
                 if (!(await onChange(next, commandBase.current))) {
-                  setRemoveError("無法刪除指令，請先下載專案備份。");
+                  setRemoveError(tr("mc3a3987f2446"));
                   return;
                 }
                 commandBase.current = JSON.stringify(next);
@@ -836,7 +865,7 @@ export default function CommandManager({
                 setRemove(false);
               }}
             >
-              刪除指令
+              {tr("m7a80dc500e60")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -857,19 +886,17 @@ export default function CommandManager({
             }
           }}
         >
-          <AlertDialogTitle>指令有尚未套用的修改</AlertDialogTitle>
-          <AlertDialogDescription>
-            先套用定義，或捨棄修改後切換。
-          </AlertDialogDescription>
+          <AlertDialogTitle>{tr("maaf316d45b5b")}</AlertDialogTitle>
+          <AlertDialogDescription>{tr("mc710844a63a4")}</AlertDialogDescription>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{tr("m2cd0f3be8738")}</AlertDialogCancel>
             <AlertDialogAction
               variant="outline"
               onClick={() => {
                 if (pending !== null) choose(pending);
               }}
             >
-              捨棄修改
+              {tr("m530ca27a9634")}
             </AlertDialogAction>
             <Button
               onClick={async () => {
@@ -879,7 +906,7 @@ export default function CommandManager({
                 setPending(null);
               }}
             >
-              套用並切換
+              {tr("mf511e4fa746e")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

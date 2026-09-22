@@ -1,5 +1,10 @@
 "use client";
-import { useDiagnostics, requestDiagnostics } from "../diagnostics/use-diagnostics";
+import { t as tr } from "../i18n/index.ts";
+
+import {
+  useDiagnostics,
+  requestDiagnostics,
+} from "../diagnostics/use-diagnostics";
 import { copyText } from "@/app/clipboard";
 import { useAgentContext } from "../mcp/use-agent-context";
 import { lineOffset } from "./authoring";
@@ -122,23 +127,27 @@ type Prompt = {
   submitLabel?: string;
   run: (value: string) => Promise<void> | void;
 };
-const modes = { source: "純文字", rendered: "閱讀編輯", graph: "流程圖" };
+const modes = {
+  source: tr("m9982ffc60be9"),
+  rendered: tr("m34e439ce0fb9"),
+  graph: tr("m3f633044cfc6"),
+};
 const utilityNames: Record<string, string> = {
-  "@new-document": "新增劇本",
-  "@settings": "設定",
-  "@commands": "自訂指令",
-  "@recovery": "專案復原",
+  "@new-document": tr("m47fcdf3ee211"),
+  "@settings": tr("m0d8619aae051"),
+  "@commands": tr("mae2f19d77e06"),
+  "@recovery": tr("m525e69a5165d"),
 };
 const pendingWrite = (doc: DocumentRecord) =>
   ["pending", "saving"].includes(doc.status);
 const saveLabels = {
-  saved: "已儲存至原檔",
-  pending: "等待自動儲存",
-  saving: "正在寫入",
-  draft: "已保留本機草稿",
-  conflict: "外部修改衝突",
-  missing: "來源檔案已移除",
-  error: "寫入失敗",
+  saved: tr("m17785778d3f8"),
+  pending: tr("m65e79e864dc2"),
+  saving: tr("mc79aaeb37b09"),
+  draft: tr("m1aa3ecd6d58d"),
+  conflict: tr("m611d89781f2f"),
+  missing: tr("m7ebaa672118d"),
+  error: tr("m38dd0a6e8c39"),
 };
 
 function WorkbenchContent({
@@ -198,19 +207,31 @@ function WorkbenchContent({
   const [selected, setSelected] = useState(""),
     [focus, setFocus] = useState(0),
     [historyOpen, setHistoryOpen] = useState(false),
-    [historyCompare, setHistoryCompare] = useState<"preview" | "diff">("preview"),
+    [historyCompare, setHistoryCompare] = useState<"preview" | "diff">(
+      "preview",
+    ),
     [statisticsOpen, setStatisticsOpen] = useState(false),
     [historySelection, setHistorySelection] = useState<{
       entry: RecoveryEntry;
       text: string;
       version: number;
     } | null>(null),
-    [settingsSection, setSettingsSection] = useState<SettingsSection>("reading"),
+    [settingsSection, setSettingsSection] =
+      useState<SettingsSection>("reading"),
     [conflict, setConflict] = useState<DocumentRecord | null>(null),
     [commandDirty, setCommandDirty] = useState(false);
-  const [settingsNavigation, setSettingsNavigation] = useState<{section: SettingsSection; field?: string; nonce:number}>();
-  const [commandTarget, setCommandTarget] = useState<string>();
-  const pendingDocument = useRef<{tabId:string;origin:string} | null>(null);
+  const [settingsNavigation, setSettingsNavigation] = useState<{
+    section: SettingsSection;
+    field?: string;
+    nonce: number;
+  }>();
+  const [commandTarget, setCommandTarget] = useState<{
+    name: string;
+    nonce: number;
+  }>();
+  const pendingDocument = useRef<{ tabId: string; origin: string } | null>(
+    null,
+  );
   const [goto, setGoto] = useState<{
     file: string;
     line: number;
@@ -247,22 +268,35 @@ function WorkbenchContent({
         : { nodes: [], issues: [], links: [] },
     [project],
   );
-  const diagnostics = useDiagnostics(project, analysis.issues, doc?.id, active?.line);
+  const diagnostics = useDiagnostics(
+    project,
+    analysis.issues,
+    doc?.id,
+    active?.line,
+  );
   const variables = useMemo(
     () => collectVariables(project?.documents || []),
     [project?.documents],
   );
   useAgentContext(client, session, (request) => {
     if (request.action === "activate" && request.tabId) {
-      if (!tabs.some(t => t.id === request.tabId)) throw Error("TAB_NOT_FOUND");
+      if (!tabs.some((t) => t.id === request.tabId))
+        throw Error("TAB_NOT_FOUND");
       activate(request.tabId);
     }
     if (request.action === "reveal") {
-      const target = project.documents.find(d => d.id === request.documentId);
+      const target = project.documents.find((d) => d.id === request.documentId);
       if (!target) throw Error("DOCUMENT_NOT_FOUND");
       const offset = request.from ?? 0;
       const line = target.text.slice(0, offset).split("\n").length;
-      openDocument(target.id, false, line, offset - lineOffset(target.text, line) + 1, true, "source");
+      openDocument(
+        target.id,
+        false,
+        line,
+        offset - lineOffset(target.text, line) + 1,
+        true,
+        "source",
+      );
     }
   });
   const utility = !!utilityNames[active?.documentId || ""];
@@ -322,7 +356,7 @@ function WorkbenchContent({
   }
   function openSettings(section: typeof settingsSection = "reading") {
     setSettingsSection(section);
-    setSettingsNavigation({section,nonce:Date.now()});
+    setSettingsNavigation({ section, nonce: Date.now() });
     openDocument("@settings");
   }
   function navigateHit(hit: SearchHit, newTab: boolean, source = false) {
@@ -345,9 +379,9 @@ function WorkbenchContent({
     expectedText?: string,
   ) {
     ask({
-      title: "還原 " + entry.name + "？",
-      description: "目前版本會先保留，還原後可從版本歷史取回。",
-      submitLabel: "還原此版本",
+      title: tr("mc07fb8c4d3e4") + entry.name + "？",
+      description: tr("m3777094a62ad"),
+      submitLabel: tr("mcd31b7281ae1"),
       run: async () => {
         await client.flush(project.id);
         const result = await perform({
@@ -357,16 +391,18 @@ function WorkbenchContent({
           expectedVersion,
           expectedText,
         });
-        if (!result) throw Error("未還原。請重新比較目前版本後再試。");
+        if (!result) throw Error(tr("m90f6f4e13d24"));
         setHistorySelection(null);
         setHistoryOpen(false);
         if (result.documentId) openDocument(result.documentId, false);
-        notify("已還原，還原前的版本已保留");
+        notify(tr("m98902be3e465"));
       },
     });
   }
   const nodes = analysis.nodes.filter((n) => n.file === doc?.name),
-    errorCount = diagnostics.published.filter((i) => i.severity === "error").length,
+    errorCount = diagnostics.published.filter(
+      (i) => i.severity === "error",
+    ).length,
     warningCount = diagnostics.published.filter(
       (i) => i.severity === "warning",
     ).length;
@@ -423,17 +459,15 @@ function WorkbenchContent({
     if (
       failed ||
       current?.persistenceError ||
-      state.notices.find((message) => message.startsWith("復原草稿寫入失敗："))
+      state.notices.find((message) => message.startsWith(tr("m32b9dabb0ba4")))
     )
       throw Error(
-        (failed?.composing
-          ? "同一專案的編輯器仍在組字中，請完成輸入後重試。"
-          : failed?.error) ||
+        (failed?.composing ? tr("md6ebdebd8c14") : failed?.error) ||
           current?.persistenceError ||
           state.notices.find((message) =>
-            message.startsWith("復原草稿寫入失敗："),
+            message.startsWith(tr("m32b9dabb0ba4")),
           ) ||
-          "保存未完成",
+          tr("m8f52fe1c3c78"),
       );
   }
   async function leaveWorkspace(action: WorkspaceAction | "home" | "create") {
@@ -458,9 +492,30 @@ function WorkbenchContent({
       setCloseSaving(false);
     }
   }
+  const prepareWebReload = useEffectEvent(async (event: Event) => {
+    const { resolve, reject } = (
+      event as CustomEvent<{
+        resolve: () => void;
+        reject: (error: unknown) => void;
+      }>
+    ).detail;
+    try {
+      if (commandDirty) throw Error(tr("drafts.close"));
+      await saveBeforeLeaving();
+      resolve();
+    } catch (error) {
+      reject(error);
+    }
+  });
+  useEffect(() => {
+    if (window.yarnDesktop) return;
+    const handler = (event: Event) => void prepareWebReload(event);
+    window.addEventListener("spindle:prepare-reload", handler);
+    return () => window.removeEventListener("spindle:prepare-reload", handler);
+  }, []);
   const prepareClose = useEffectEvent(async (token: string) => {
     if (leaving.current) {
-      window.yarnDesktop?.closePrepared(token, "工作區正在切換，請稍後重試。");
+      window.yarnDesktop?.closePrepared(token, tr("m108cf73c6a09"));
       return;
     }
     leaving.current = true;
@@ -470,6 +525,13 @@ function WorkbenchContent({
       if (client.hasPendingWritesIn(project.id)) setCloseSaving(true);
     }, 250);
     try {
+      if (commandDirty) {
+        const decision = await window.yarnDesktop?.commandDraftDecision();
+        if (decision === "cancel") throw Error(tr("drafts.close"));
+        if (decision === "apply" && !(await commandActions.current?.save()))
+          throw Error(tr("drafts.close"));
+        if (decision === "discard") commandActions.current?.discard();
+      }
       await saveBeforeLeaving();
       window.yarnDesktop?.closePrepared(token);
     } catch (error) {
@@ -525,17 +587,14 @@ function WorkbenchContent({
       const result = await client.action(action);
       if (onNavigate && action.type === "import") {
         await leaveWorkspace("home");
-        notify("備份已匯入待移轉草稿，請從初始畫面轉存為正式專案。");
+        notify(tr("m7d5909bba540"));
         return;
       }
       if (action.type === "save") {
         const recoveryFailure = result.snapshot.notices.find((message) =>
-          message.startsWith("復原草稿寫入失敗："),
+          message.startsWith(tr("m32b9dabb0ba4")),
         );
-        if (recoveryFailure)
-          throw Error(
-            recoveryFailure + "；目前內容仍在編輯器中，請先另存或重試。",
-          );
+        if (recoveryFailure) throw Error(recoveryFailure + tr("mc555cf5542a0"));
       }
       if (client.error) notify(client.error);
       return result;
@@ -572,7 +631,9 @@ function WorkbenchContent({
     }
   }
   function activate(id: string) {
-    setInlineDraft(null);
+    if (inlineSubmitting.current) return;
+    if (pendingDocument.current?.tabId === id) return;
+    cancelInline();
     capture();
     resetTransient();
     setSession((s) => ({ ...s, activeId: id }));
@@ -587,7 +648,8 @@ function WorkbenchContent({
     record = true,
     forcedMode?: TabView["mode"],
   ) {
-    setInlineDraft(null);
+    if (inlineSubmitting.current) return;
+    cancelInline();
     resetTransient();
     capture();
     const document = project.documents.find((d) => d.id === id);
@@ -611,7 +673,14 @@ function WorkbenchContent({
       );
     });
     setSelected("");
-    if (document) setSession(s=>({...s,recentDocuments:[id,...(s.recentDocuments||[]).filter(x=>x!==id)].slice(0,30)}));
+    if (document)
+      setSession((s) => ({
+        ...s,
+        recentDocuments: [
+          id,
+          ...(s.recentDocuments || []).filter((x) => x !== id),
+        ].slice(0, 30),
+      }));
     if (document && line !== undefined)
       setGoto((previous) => ({
         file: document.name,
@@ -665,6 +734,9 @@ function WorkbenchContent({
     });
   }
   async function closeTabs(ids: string[], force = false) {
+    if (inlineSubmitting.current) return;
+    if (pendingDocument.current && ids.includes(pendingDocument.current.tabId))
+      cancelInline();
     if (!force) {
       await client.flush(project.id);
       const result = await perform({ type: "save", projectId: project.id });
@@ -679,11 +751,11 @@ function WorkbenchContent({
         );
       if (failed?.length) {
         ask({
-          title: "部分文件未寫入原檔",
+          title: tr("m0e4cd8db9388"),
           description:
             failed.map((d) => d.name + "：" + d.error).join("\n") +
-            "\n關閉後會保留復原草稿。",
-          submitLabel: "保留草稿並關閉",
+            tr("m1ca48e5d4368"),
+          submitLabel: tr("m1e18232c29fd"),
           run: () => closeTabs(ids, true),
         });
         return;
@@ -742,7 +814,7 @@ function WorkbenchContent({
         )
     ) {
       ask({
-        title: "目前專案有未寫入文件",
+        title: tr("me5d43a490c3c"),
         description: result.snapshot.projects
           .find((p) => p.id === project.id)
           ?.documents.filter((d) =>
@@ -750,7 +822,7 @@ function WorkbenchContent({
           )
           .map((d) => d.name + "：" + d.error)
           .join("\n"),
-        submitLabel: "保留草稿並切換",
+        submitLabel: tr("mcbdd4c94f552"),
         run: () => selectProject(id, true),
       });
       return;
@@ -763,7 +835,7 @@ function WorkbenchContent({
         ? restoreSession(JSON.parse(saved), client.windowId, id)
         : null;
     } catch {
-      notify("先前視圖無法還原，將開啟新視圖");
+      notify(tr("me94957411044"));
     }
     localStorage.setItem(
       "yarn-project-view-" + project.id,
@@ -795,9 +867,9 @@ function WorkbenchContent({
           );
         if (failed?.length) {
           ask({
-            title: "目前專案有未寫入文件",
+            title: tr("me5d43a490c3c"),
             description: failed.map((d) => d.name + "：" + d.error).join("\n"),
-            submitLabel: "保留草稿並切換",
+            submitLabel: tr("mcbdd4c94f552"),
             run: () => adopt(result, true),
           });
           return;
@@ -819,7 +891,11 @@ function WorkbenchContent({
     if (inlineSubmitting.current) return;
     if (pendingDocument.current) {
       const pending = pendingDocument.current;
-      setSession(s=>({...s,tabs:s.tabs.filter(t=>t.id!==pending.tabId),activeId:pending.origin}));
+      setSession((s) => ({
+        ...s,
+        tabs: s.tabs.filter((t) => t.id !== pending.tabId),
+        activeId: pending.origin,
+      }));
       pendingDocument.current = null;
     }
     setInlineDraft(null);
@@ -836,10 +912,22 @@ function WorkbenchContent({
     const folder = activeFolder ?? (utility ? "" : folderOf(doc?.name || ""));
     capture();
     const tabId = uuid();
-    pendingDocument.current = {tabId,origin:session.activeId};
-    setSession(s=>navigateSession({...s,left:true},"@new-document",{newTab:true},tabId));
+    pendingDocument.current = { tabId, origin: session.activeId };
+    setSession((s) =>
+      navigateSession(
+        { ...s, left: true },
+        "@new-document",
+        { newTab: true },
+        tabId,
+      ),
+    );
     setSearchOpen(false);
-    beginInline({kind:"new-document",folder:projectFolders(project).includes(folder)?folder:"",value:name || uniqueDocumentName(project.documents,folder)});
+    beginInline({
+      kind: "new-document",
+      folder: projectFolders(project).includes(folder) ? folder : "",
+      value: name || uniqueDocumentName(project.documents, folder),
+      provisional: true,
+    });
   }
   function newDocument(inNewTab = false) {
     if (standalone) {
@@ -890,12 +978,12 @@ function WorkbenchContent({
   function folderMenu(path: string): MenuAction[] {
     return [
       {
-        label: "新增資料夾",
+        label: tr("m67b8c733279b"),
         icon: <FolderPlus size={15} />,
         run: () => newFolder(path),
       },
       {
-        label: "新增劇本",
+        label: tr("m47fcdf3ee211"),
         icon: <FilePlus2 size={15} />,
         run: () => {
           setSession((s) => ({ ...s, left: true }));
@@ -907,18 +995,18 @@ function WorkbenchContent({
         },
       },
       {
-        label: "更名",
+        label: tr("mdc993eb727db"),
         icon: <FilePenLine size={15} />,
         run: () => renameFolderInline(path),
       },
       {
-        label: "移至資料夾",
+        label: tr("m7b109ada159b"),
         icon: <Folder size={15} />,
         run: () => moveMenu("folder:" + path),
       },
       null,
       {
-        label: "移到垃圾桶",
+        label: tr("m4a086dd00b9b"),
         icon: <Trash2 size={15} />,
         danger: true,
         run: () =>
@@ -944,7 +1032,7 @@ function WorkbenchContent({
                 !parent.startsWith(entry.slice(7) + "/")),
           )
           .map((parent) => ({
-            label: parent || "專案最外層",
+            label: parent || tr("mad3639a602e1"),
             icon: <Folder size={15} />,
             run: () =>
               void perform({
@@ -1025,9 +1113,9 @@ function WorkbenchContent({
       const latest = client
         .getSnapshot()
         .projects.find((p) => p.id === project.id);
-      if (!latest) throw Error("專案已關閉");
+      if (!latest) throw Error(tr("m14d579d4a0c3"));
       if (draft.kind === "new-folder" || draft.kind === "rename-folder") {
-        if (!name || /[\\/]/.test(name)) throw Error("請輸入資料夾名稱");
+        if (!name || /[\\/]/.test(name)) throw Error(tr("m044277ffa28a"));
         const path = (draft.folder ? draft.folder + "/" : "") + name;
         await client.action(
           draft.kind === "new-folder"
@@ -1047,8 +1135,7 @@ function WorkbenchContent({
         draft.kind === "new-document" ||
         draft.kind === "rename-document"
       ) {
-        if (!name || /[\\/]/.test(name))
-          throw Error("請輸入檔名；移動資料夾請使用移動操作");
+        if (!name || /[\\/]/.test(name)) throw Error(tr("mfddb2b6425c0"));
         const filename = name.endsWith(".yarn") ? name : name + ".yarn";
         const relative = (draft.folder ? draft.folder + "/" : "") + filename;
         const existing = latest.documents.find(
@@ -1080,23 +1167,30 @@ function WorkbenchContent({
           setInlineDraft((previous) =>
             previous ? { ...previous, createdId: created.id } : previous,
           );
-          throw Error(created.error || "建立未完成，請重試");
+          throw Error(created.error || tr("m7f421624d815"));
         }
-        if (!created) throw Error("找不到建立結果");
+        if (!created) throw Error(tr("mfa941e733477"));
         setInlineDraft(null);
         if (draft.kind === "new-document") {
           setFileSort("manual");
           if (pendingDocument.current) {
             const pending = pendingDocument.current;
             pendingDocument.current = null;
-            setSession(s=>({...s,activeId:pending.tabId,tabs:s.tabs.map(t=>t.id===pending.tabId?{...t,documentId:created.id,past:[],future:[]}:t)}));
+            setSession((s) => ({
+              ...s,
+              activeId: pending.tabId,
+              tabs: s.tabs.map((t) =>
+                t.id === pending.tabId
+                  ? { ...t, documentId: created.id, past: [], future: [] }
+                  : t,
+              ),
+            }));
           } else openDocument(created.id, !!draft.newTab);
         }
       } else {
         const target = latest.documents.find((d) => d.id === draft.documentId);
-        if (!target) throw Error("劇本已移除");
-        if (!validSceneName(name))
-          throw Error("名稱須以英文字母起始，僅含英文字母、數字與底線");
+        if (!target) throw Error(tr("maa6484ef65ac"));
+        if (!validSceneName(name)) throw Error(tr("m0989b4859445"));
         if (draft.kind === "rename-scene" && name === draft.sceneName) {
           setInlineDraft(null);
           return;
@@ -1181,19 +1275,19 @@ function WorkbenchContent({
     const tab = tabs.find((t) => t.id === id)!;
     return [
       {
-        label: "關閉分頁",
+        label: tr("maa9a10827fb5"),
         icon: <X size={15} />,
         run: () => void closeTabs([id]),
       },
       {
-        label: "關閉其他分頁",
+        label: tr("m1c42e1dbcc4e"),
         run: () =>
           void closeTabs(
             tabs.filter((t) => t.id !== id && !t.pinned).map((t) => t.id),
           ),
       },
       {
-        label: "關閉右側分頁",
+        label: tr("m16a9494c6443"),
         run: () =>
           void closeTabs(
             tabs
@@ -1203,18 +1297,18 @@ function WorkbenchContent({
           ),
       },
       {
-        label: "關閉全部未固定分頁",
+        label: tr("mf16334e03bc9"),
         run: () =>
           void closeTabs(tabs.filter((t) => !t.pinned).map((t) => t.id)),
       },
       {
-        label: "重新開啟已關閉分頁",
+        label: tr("m5d54e52e5d14"),
         disabled: !session.closedTabs.length,
         run: reopen,
       },
       null,
       {
-        label: tab.pinned ? "取消固定" : "固定分頁",
+        label: tab.pinned ? tr("m20590a6a7b9a") : tr("m11a5d69200e6"),
         icon: tab.pinned ? <PinOff size={15} /> : <Pin size={15} />,
         run: () =>
           setSession((s) => ({
@@ -1225,7 +1319,7 @@ function WorkbenchContent({
           })),
       },
       {
-        label: "同稿另一個視圖",
+        label: tr("m5d0299b8bf75"),
         disabled: !!utilityNames[tab.documentId],
         run: () => openDocument(tab.documentId, true, tab.line, tab.column),
       },
@@ -1233,7 +1327,7 @@ function WorkbenchContent({
         ? [
             null,
             {
-              label: "移至新視窗",
+              label: tr("m1b8ce46d4f3c"),
               run: () =>
                 void window
                   .yarnDesktop!.windows.move(tab, project.id)
@@ -1244,7 +1338,7 @@ function WorkbenchContent({
                 (w) => w.id !== client.windowId && w.projectId === project.id,
               )
               .map((w) => ({
-                label: "移至 " + w.title,
+                label: tr("mbf451b4bfdfe") + w.title,
                 run: () =>
                   void window
                     .yarnDesktop!.windows.move(tab, project.id, w.id)
@@ -1257,12 +1351,12 @@ function WorkbenchContent({
   function fileMenu(d: DocumentRecord): MenuAction[] {
     return [
       {
-        label: "在新分頁開啟",
+        label: tr("mb7d4526756b3"),
         icon: <ExternalLink size={15} />,
         run: () => openDocument(d.id, true),
       },
       {
-        label: "版本歷史",
+        label: tr("m4c3cec274391"),
         icon: <Clock3 size={15} />,
         run: () => {
           openDocument(d.id);
@@ -1270,23 +1364,23 @@ function WorkbenchContent({
         },
       },
       {
-        label: "更名",
+        label: tr("mdc993eb727db"),
         icon: <FilePenLine size={15} />,
         run: () => renameDocumentInline(d),
       },
       {
-        label: "移至資料夾",
+        label: tr("m7b109ada159b"),
         icon: <Folder size={15} />,
         run: () => moveMenu("file:" + d.id),
       },
       {
-        label: "複製劇本",
+        label: tr("mf1f3ea857593"),
         icon: <Copy size={15} />,
         run: () => void duplicateDocument(d).catch((e) => notify(String(e))),
       },
       null,
       {
-        label: window.yarnDesktop ? "匯出劇本…" : "下載劇本",
+        label: window.yarnDesktop ? tr("m764829a168df") : tr("m40c2e3f77dac"),
         run: () =>
           void perform({
             type: "export",
@@ -1297,7 +1391,7 @@ function WorkbenchContent({
       ...(window.yarnDesktop
         ? [
             {
-              label: "在檔案總管顯示",
+              label: tr("m40b45c5c9ac4"),
               disabled: !d.path,
               run: () =>
                 void perform({
@@ -1307,17 +1401,16 @@ function WorkbenchContent({
                 }),
             },
             {
-              label: "複製路徑",
+              label: tr("m0ad53126b2f9"),
               disabled: !d.path,
               run: () =>
-                void copyText(d.path || "")
-                  .catch((e) => notify(String(e))),
+                void copyText(d.path || "").catch((e) => notify(String(e))),
             },
           ]
         : []),
       null,
       {
-        label: "移到垃圾桶",
+        label: tr("m4a086dd00b9b"),
         icon: <Trash2 size={15} />,
         danger: true,
         run: () =>
@@ -1333,10 +1426,13 @@ function WorkbenchContent({
   function sceneMenu(node: YarnNode): MenuAction[] {
     const d = project.documents.find((d) => d.name === node.file)!;
     return [
-      { label: "前往原文", run: () => go(node.file, node.body) },
-      { label: "同稿新視圖", run: () => openDocument(d.id, true, node.body) },
+      { label: tr("m8ab2c257bdec"), run: () => go(node.file, node.body) },
       {
-        label: "查看引用",
+        label: tr("mc406ef3984bf"),
+        run: () => openDocument(d.id, true, node.body),
+      },
+      {
+        label: tr("mebaad66708ec"),
         run: () => {
           showSearch();
           setSearchQuery(node.name);
@@ -1344,11 +1440,11 @@ function WorkbenchContent({
       },
       null,
       {
-        label: "更名並更新引用",
+        label: tr("m152bcd653980"),
         run: () => renameSceneInline(node),
       },
       {
-        label: "複製場景",
+        label: tr("mb7c6eeaf4ef3"),
         icon: <Copy size={15} />,
         run: () =>
           void (async () => {
@@ -1370,7 +1466,7 @@ function WorkbenchContent({
             const r = await perform({
               type: "transaction",
               projectId: project.id,
-              label: "複製場景",
+              label: tr("mb7c6eeaf4ef3"),
               documents: [
                 {
                   id: source.id,
@@ -1389,7 +1485,7 @@ function WorkbenchContent({
           })(),
       },
       {
-        label: "移至另一份劇本",
+        label: tr("m2e60b137242e"),
         icon: <Folder size={15} />,
         run: () => {
           const origin = menu;
@@ -1425,7 +1521,7 @@ function WorkbenchContent({
                       await perform({
                         type: "transaction",
                         projectId: project.id,
-                        label: "移動場景",
+                        label: tr("m943c9c62ee56"),
                         documents: [
                           {
                             id: source.id,
@@ -1454,14 +1550,14 @@ function WorkbenchContent({
       },
       null,
       {
-        label: "刪除場景",
+        label: tr("mdd2852f76d71"),
         icon: <Trash2 size={15} />,
         danger: true,
         run: () =>
           void perform({
             type: "transaction",
             projectId: project.id,
-            label: "刪除場景",
+            label: tr("mdd2852f76d71"),
             documents: [
               {
                 id: d.id,
@@ -1483,7 +1579,7 @@ function WorkbenchContent({
     await perform({
       type: "transaction",
       projectId: project.id,
-      label: "調整場景順序",
+      label: tr("m5520294e7fa3"),
       documents: [
         {
           id: d.id,
@@ -1509,7 +1605,7 @@ function WorkbenchContent({
           ![1, 2].includes(data.version) ||
           !Array.isArray(data.files)
         )
-          throw Error("不是支援的專案備份");
+          throw Error(tr("m34f5922a7b94"));
         validateCommands(data.commands);
         const p = makeProject(
           data.name,
@@ -1700,7 +1796,7 @@ function WorkbenchContent({
       y: detail.y,
       actions: [
         {
-          label: "撤銷",
+          label: tr("m3f7281dde090"),
           icon: <Undo2 size={15} />,
           run: () =>
             void perform({
@@ -1710,7 +1806,7 @@ function WorkbenchContent({
             }),
         },
         {
-          label: "重做",
+          label: tr("m03717b6f1070"),
           icon: <Redo2 size={15} />,
           run: () =>
             void perform({
@@ -1721,25 +1817,34 @@ function WorkbenchContent({
         },
         null,
         {
-          label: "複製可讀文字",
+          label: tr("m7e60518d053d"),
           run: () =>
             void readingActions.current
               ?.copyReadable()
               .catch((e) => notify(String(e))),
         },
-        { label: "尋找", run: () => readingActions.current?.find() },
         {
-          label: "前往跳轉目標 · F12",
+          label: tr("md47270a2ecc5"),
+          run: () => readingActions.current?.find(),
+        },
+        {
+          label: tr("m19eedc9329cd"),
           run: () => readingActions.current?.follow(),
         },
-        { label: "折疊目前場景", run: () => readingActions.current?.fold() },
-        { label: "聚焦目前場景", run: () => readingActions.current?.focus() },
         {
-          label: "展開全部場景",
+          label: tr("m65a013dc9e0a"),
+          run: () => readingActions.current?.fold(),
+        },
+        {
+          label: tr("mc507f7f09fdc"),
+          run: () => readingActions.current?.focus(),
+        },
+        {
+          label: tr("m2b27eca8913b"),
           run: () => readingActions.current?.unfoldAll(),
         },
         {
-          label: "展開目前場景",
+          label: tr("m61e2c710505b"),
           run: () => readingActions.current?.unfold(),
         },
       ],
@@ -1763,7 +1868,8 @@ function WorkbenchContent({
       fileSortByProject: { ...s.fileSortByProject, [project.id]: value },
     }));
   }
-  if (!project) return <div className="empty-editor">正在開啟工作區…</div>;
+  if (!project)
+    return <div className="empty-editor">{tr("m54df28110c50")}</div>;
   return (
     <main
       className={
@@ -1801,8 +1907,8 @@ function WorkbenchContent({
       <header className="workspace-header">
         <div className="workspace-identity">
           <ChromeButton
-            aria-label="切換劇本側欄"
-            title="切換劇本側欄"
+            aria-label={tr("m2d2bb5d9817d")}
+            title={tr("m2d2bb5d9817d")}
             disabled={utility || standalone}
             onClick={() => {
               setSideFocus("left");
@@ -1837,9 +1943,9 @@ function WorkbenchContent({
                   onNavigate
                     ? void leaveWorkspace("create")
                     : ask({
-                        title: "新增專案",
-                        label: "專案名稱",
-                        value: "我的故事",
+                        title: tr("m4efd9b7b6756"),
+                        label: tr("mc4f17fe66069"),
+                        value: tr("md70df31e32d2"),
                         run: async (name) => {
                           await adopt(
                             await perform({ type: "createProject", name }),
@@ -1849,7 +1955,7 @@ function WorkbenchContent({
                 }
               >
                 <FolderPlus size={15} />
-                建立專案
+                {tr("m181ad3312ed1")}
               </DropdownMenuItem>
               {onNavigate && (
                 <>
@@ -1857,20 +1963,20 @@ function WorkbenchContent({
                     onSelect={() => void leaveWorkspace({ type: "openFolder" })}
                   >
                     <FolderOpen size={15} />
-                    開啟專案資料夾…
+                    {tr("m7e116545a4ad")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => void perform({ type: "openFiles" })}
                   >
                     <FileText size={15} />
-                    開啟劇本…
+                    {tr("ma1e8c391c80d")}
                   </DropdownMenuItem>
                 </>
               )}
               {!standalone && (
                 <DropdownMenuItem onSelect={() => input.current?.click()}>
                   <FilePlus2 size={15} />
-                  匯入劇本或專案備份…
+                  {tr("mfa648d30197e")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
@@ -1888,7 +1994,7 @@ function WorkbenchContent({
                     event.stopPropagation();
                     showMenu(event, [
                       {
-                        label: "從最近列表中移除",
+                        label: tr("m4679d41e738f"),
                         icon: <Trash2 size={15} />,
                         run: () =>
                           void perform({
@@ -1922,7 +2028,8 @@ function WorkbenchContent({
                     void perform({ type: "save", projectId: project.id })
                   }
                 >
-                  儲存全部<span className="menu-shortcut">Ctrl+Shift+S</span>
+                  {tr("m96d510bbf21a")}
+                  <span className="menu-shortcut">Ctrl+Shift+S</span>
                 </DropdownMenuItem>
               )}
               {!standalone && (
@@ -1933,17 +2040,18 @@ function WorkbenchContent({
                     }
                   >
                     <ExternalLink size={15} />
-                    匯出專案備份…
+                    {tr("m13861276e06f")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => openDocument("@recovery")}>
                     <ArchiveRestore size={15} />
-                    最近刪除與指令復原
+                    {tr("mdfe27c2e6e7e")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => requestAnimationFrame(openCommands)}
                   >
                     <Settings2 size={15} />
-                    自訂指令{commandHasDraft ? " · 有草稿" : ""}
+                    {tr("mae2f19d77e06")}
+                    {commandHasDraft ? tr("m96f6a0f923e8") : ""}
                   </DropdownMenuItem>
                 </>
               )}
@@ -1954,16 +2062,16 @@ function WorkbenchContent({
                   }
                 >
                   <FolderOpen size={15} />
-                  在檔案總管開啟
+                  {tr("mb89391aa4985")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => openSettings()}>
                 <Settings2 size={15} />
-                設定…
+                {tr("mc98007f226ed")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openSettings("about")}>
-                關於與使用說明
+                {tr("m09ace4e0d455")}
               </DropdownMenuItem>
               {onNavigate && (
                 <>
@@ -1972,7 +2080,7 @@ function WorkbenchContent({
                     onSelect={() => void leaveWorkspace("home")}
                   >
                     <X size={15} />
-                    {standalone ? "關閉檔案" : "關閉專案"}
+                    {standalone ? tr("m1903e4e73f4b") : tr("me642581df698")}
                   </DropdownMenuItem>
                 </>
               )}
@@ -1989,7 +2097,9 @@ function WorkbenchContent({
               file: d?.name || t.documentId,
               dirty: !!d && pendingWrite(d),
               mode: t.mode === "graph" ? "graph" : "text",
-              location: d ? `${modes[t.mode]} · 第 ${t.line} 行` : project.name,
+              location: d
+                ? tr("maf91f32f7ba8", [modes[t.mode], t.line])
+                : project.name,
               pinned: t.pinned,
             };
           })}
@@ -2053,7 +2163,7 @@ function WorkbenchContent({
               setTimeout(() => URL.revokeObjectURL(url), 1000);
             }}
           >
-            匯出救援資料
+            {tr("md4ac3777de8f")}
           </button>
         </div>
       )}
@@ -2062,16 +2172,16 @@ function WorkbenchContent({
           <>
             <div className="document-heading">
               <ChromeButton
-                title="返回 · Alt+Left"
-                aria-label="返回"
+                title={tr("m6366c7c54bb5")}
+                aria-label={tr("m572cf45ba436")}
                 disabled={!navigationAvailable.back}
                 onClick={() => history(true)}
               >
                 <ArrowLeft size={15} />
               </ChromeButton>
               <ChromeButton
-                title="前進 · Alt+Right"
-                aria-label="前進"
+                title={tr("m4c9b86bdf289")}
+                aria-label={tr("m9b49a6e0393e")}
                 disabled={!navigationAvailable.forward}
                 onClick={() => history(false)}
               >
@@ -2080,7 +2190,7 @@ function WorkbenchContent({
               <span title={doc?.path || doc?.name}>
                 {doc?.name ||
                   utilityNames[active?.documentId || ""] ||
-                  "工作區"}
+                  tr("m1c5ab76e581d")}
               </span>
               {doc && ["error", "conflict", "missing"].includes(doc.status) && (
                 <span
@@ -2088,7 +2198,7 @@ function WorkbenchContent({
                   role="status"
                   title={
                     saveLabels[doc.status] +
-                    (doc.path ? " · " + doc.path : " · 僅保留在此裝置")
+                    (doc.path ? " · " + doc.path : tr("mb09d56aec273"))
                   }
                 >
                   <AlertTriangle size={13} />
@@ -2100,7 +2210,7 @@ function WorkbenchContent({
               {doc && (
                 <>
                   <SegmentedControl
-                    label="編輯模式"
+                    label={tr("mc25be7b46423")}
                     value={mode}
                     onChange={(value) => {
                       tabPatch({ dialogueOnly: false });
@@ -2126,8 +2236,8 @@ function WorkbenchContent({
                   />
                   <div className="document-icon-tools">
                     <ChromeButton
-                      title="純閱讀：只顯示對話與選項"
-                      aria-label="純閱讀"
+                      title={tr("m9c633473d49a")}
+                      aria-label={tr("mf40b96ff73c0")}
                       aria-pressed={!!active.dialogueOnly}
                       onClick={() => {
                         capture();
@@ -2137,7 +2247,7 @@ function WorkbenchContent({
                       <BookText size={16} />
                     </ChromeButton>
                     <ChromeButton
-                      title="版本歷史"
+                      title={tr("m4c3cec274391")}
                       aria-pressed={historyOpen}
                       onClick={() => {
                         capture();
@@ -2150,7 +2260,7 @@ function WorkbenchContent({
                       <Clock3 size={16} />
                     </ChromeButton>
                     <ChromeButton
-                      title="場景大綱"
+                      title={tr("m9c44f8a4637d")}
                       aria-pressed={showOutline}
                       onClick={() => {
                         setHistoryOpen(false);
@@ -2167,16 +2277,19 @@ function WorkbenchContent({
                     </ChromeButton>
                     <ChromeButton
                       title={
-                        "結構檢查 · " +
+                        tr("m628f065501a2") +
                         errorCount +
-                        " 錯誤 · " +
+                        tr("m3399917a26f3") +
                         warningCount +
-                        " 警告"
+                        tr("ma8b7a4480407")
                       }
-                      aria-label="結構檢查"
+                      aria-label={tr("mcf85ad10cef3")}
                       aria-pressed={problems}
                       className="check-button"
-                      onClick={() => { requestDiagnostics(); setProblems((v) => !v); }}
+                      onClick={() => {
+                        requestDiagnostics();
+                        setProblems((v) => !v);
+                      }}
                     >
                       {errorCount > 0 && (
                         <span className="diagnostic-count error">
@@ -2193,8 +2306,8 @@ function WorkbenchContent({
                       {!errorCount && !warningCount && <Check size={16} />}
                     </ChromeButton>
                     <ChromeButton
-                      title="作者統計"
-                      aria-label="作者統計"
+                      title={tr("me3ca8ea79b91")}
+                      aria-label={tr("me3ca8ea79b91")}
                       aria-pressed={statisticsOpen}
                       onClick={() => {
                         setStatisticsOpen(!statisticsOpen);
@@ -2217,15 +2330,15 @@ function WorkbenchContent({
                         }
                       >
                         <FilePlus2 size={15} />
-                        <span>存成檔案…</span>
+                        <span>{tr("mf0ce89ab17f9")}</span>
                       </button>
                     )}
                   </div>
                 </>
               )}
               <ChromeButton
-                title="全專案搜尋 · Ctrl+Shift+F"
-                aria-label="全專案搜尋"
+                title={tr("mf8ff4ec5e324")}
+                aria-label={tr("m3b406d1c3710")}
                 aria-pressed={searchOpen}
                 onClick={showSearch}
               >
@@ -2253,22 +2366,22 @@ function WorkbenchContent({
               style={{ width: session.sidebarWidth }}
             >
               <div className="section-heading">
-                <span>劇本</span>
+                <span>{tr("m627b75e6aced")}</span>
                 <div>
                   <ChromeButton
                     title={
                       fileSort === "name-asc"
-                        ? "名稱升冪；點擊改為降冪"
+                        ? tr("m06be05a30639")
                         : fileSort === "name-desc"
-                          ? "名稱降冪；點擊改為升冪"
-                          : "手動排序；點擊依名稱升冪，右鍵選擇排序方式"
+                          ? tr("ma8c46cf0616f")
+                          : tr("m6ea8a7b7ac40")
                     }
                     aria-label={
                       fileSort === "name-asc"
-                        ? "名稱升冪"
+                        ? tr("m5e3ccf27d155")
                         : fileSort === "name-desc"
-                          ? "名稱降冪"
-                          : "手動排序"
+                          ? tr("mabcbf8218926")
+                          : tr("m1f50bd5ddbca")
                     }
                     onClick={() =>
                       setFileSort(
@@ -2278,15 +2391,15 @@ function WorkbenchContent({
                     onContextMenu={(e) =>
                       showMenu(e, [
                         {
-                          label: "手動排序",
+                          label: tr("m1f50bd5ddbca"),
                           run: () => setFileSort("manual"),
                         },
                         {
-                          label: "名稱升冪",
+                          label: tr("m5e3ccf27d155"),
                           run: () => setFileSort("name-asc"),
                         },
                         {
-                          label: "名稱降冪",
+                          label: tr("mabcbf8218926"),
                           run: () => setFileSort("name-desc"),
                         },
                       ])
@@ -2294,15 +2407,15 @@ function WorkbenchContent({
                     onKeyDown={(e) =>
                       menuKeys(e, [
                         {
-                          label: "手動排序",
+                          label: tr("m1f50bd5ddbca"),
                           run: () => setFileSort("manual"),
                         },
                         {
-                          label: "名稱升冪",
+                          label: tr("m5e3ccf27d155"),
                           run: () => setFileSort("name-asc"),
                         },
                         {
-                          label: "名稱降冪",
+                          label: tr("mabcbf8218926"),
                           run: () => setFileSort("name-desc"),
                         },
                       ])
@@ -2316,12 +2429,15 @@ function WorkbenchContent({
                       <ListOrdered size={15} />
                     )}
                   </ChromeButton>
-                  <ChromeButton title="新增資料夾" onClick={() => newFolder()}>
+                  <ChromeButton
+                    title={tr("m67b8c733279b")}
+                    onClick={() => newFolder()}
+                  >
                     <FolderPlus size={15} />
                   </ChromeButton>
                   <ChromeButton
-                    title="新增劇本"
-                    aria-label="新增劇本"
+                    title={tr("m47fcdf3ee211")}
+                    aria-label={tr("m47fcdf3ee211")}
                     onClick={() => newDocument()}
                   >
                     <Plus size={15} />
@@ -2362,9 +2478,9 @@ function WorkbenchContent({
                 />
                 {!project.documents.length && (
                   <p className="empty-small">
-                    尚無劇本。
+                    {tr("m38e52dafbea7")}
                     <button onClick={() => newDocument()}>
-                      建立第一份劇本
+                      {tr("m28238f630328")}
                     </button>
                   </p>
                 )}
@@ -2374,7 +2490,7 @@ function WorkbenchContent({
                 value={session.sidebarWidth}
                 min={180}
                 max={420}
-                label="調整侧欄寬度"
+                label={tr("ma1f0112c8a95")}
                 onResize={(sidebarWidth) =>
                   setSession((s) => ({ ...s, sidebarWidth }))
                 }
@@ -2386,7 +2502,9 @@ function WorkbenchContent({
             <div className="workspace-notice" role="alert">
               <AlertTriangle size={15} />
               <span>{doc.error || saveLabels[doc.status]}</span>
-              <button onClick={() => setConflict(doc)}>處理</button>
+              <button onClick={() => setConflict(doc)}>
+                {tr("mcece58780d3c")}
+              </button>
             </div>
           )}
           {tabs.some((tab) => tab.documentId === "@commands") && (
@@ -2396,7 +2514,8 @@ function WorkbenchContent({
             >
               <CommandManager
                 key={project.id}
-                revealName={commandTarget}
+                revealName={commandTarget?.name}
+                revealNonce={commandTarget?.nonce}
                 commands={project.commands}
                 notify={notify}
                 onDirtyChange={setCommandDirty}
@@ -2426,7 +2545,7 @@ function WorkbenchContent({
             >
               <SettingsView
                 navigation={settingsNavigation}
-                rescue={<RescueSettings client={client}/>}
+                rescue={<RescueSettings client={client} />}
                 initialSection={settingsSection}
                 focusOnMount={false}
                 appPreferences={snapshot.preferences}
@@ -2434,11 +2553,11 @@ function WorkbenchContent({
                   void perform({ type: "appearance", patch })
                 }
                 onAppPreferences={
-                  onNavigate
+                  true
                     ? (value) =>
                         void perform({
                           type: "preferences",
-                          reopenLastProject: value,
+                          ...value,
                         })
                     : undefined
                 }
@@ -2466,8 +2585,14 @@ function WorkbenchContent({
               />
             </div>
           )}
-          {active?.documentId === "@new-document" ? <div className="settings-content"><h2>新增劇本</h2><p>{inlineDraft?.folder || "專案最外層"}</p><p>請在劇本清單確認名稱；Escape 取消。</p></div> : active?.documentId === "@commands" ||
-          active?.documentId === "@settings" ? null : active?.documentId ===
+          {active?.documentId === "@new-document" ? (
+            <div className="settings-content">
+              <h2>{tr("m47fcdf3ee211")}</h2>
+              <p>{inlineDraft?.folder || tr("mad3639a602e1")}</p>
+              <p>{tr("mddde16c6ddf6")}</p>
+            </div>
+          ) : active?.documentId === "@commands" ||
+            active?.documentId === "@settings" ? null : active?.documentId ===
             "@recovery" ? (
             <RecoveryView
               key={project.id}
@@ -2602,7 +2727,7 @@ function WorkbenchContent({
                           true,
                           "rendered",
                         );
-                    } else notify("找不到場景：" + name);
+                    } else notify(tr("me4b39c373b97") + name);
                   }}
                   key={active.id + doc.id}
                   doc={doc}
@@ -2681,7 +2806,7 @@ function WorkbenchContent({
                       .projects.find((p) => p.id === project.id)
                       ?.documents.find((d) => d.name === node.file);
                     if (!current || current.text !== expectedText) {
-                      notify("文件已變更，請重新確認場景名稱。");
+                      notify(tr("me8153c416722"));
                       return false;
                     }
                     return !!(await perform({
@@ -2713,23 +2838,25 @@ function WorkbenchContent({
             <div className="empty-editor">
               <BookText size={36} />
               <h2>
-                {project.documents.length ? "繼續你的故事" : "寫下第一個場景"}
+                {project.documents.length
+                  ? tr("m20c81a3a79e0")
+                  : tr("m9acaf2907b3c")}
               </h2>
               <p>
                 {project.documents.length
-                  ? "選擇已有劇本，或建立新稿。"
-                  : "建立劇本，或開啟已有的專案資料夾。"}
+                  ? tr("m2d6200bec9c3")
+                  : tr("me93802c2c235")}
               </p>
               <div className="empty-actions">
                 <button className="primary" onClick={() => newDocument()}>
-                  新增劇本
+                  {tr("m47fcdf3ee211")}
                 </button>
                 <button
                   onClick={() => {
                     showFiles();
                   }}
                 >
-                  開啟劇本
+                  {tr("m2048d78f9db8")}
                 </button>
                 {window.yarnDesktop && (
                   <button
@@ -2737,7 +2864,7 @@ function WorkbenchContent({
                       void perform({ type: "openFolder" }).then(adopt)
                     }
                   >
-                    開啟資料夾…
+                    {tr("m9ea1db41d4bb")}
                   </button>
                 )}
               </div>
@@ -2796,7 +2923,7 @@ function WorkbenchContent({
         {showOutline && !utility && (
           <aside
             className="document-side workspace-scenes"
-            aria-label="場景大綱"
+            aria-label={tr("m9c44f8a4637d")}
             style={{
               width: session.rightPanelWidth ?? 260,
               flexBasis: session.rightPanelWidth ?? 260,
@@ -2807,19 +2934,20 @@ function WorkbenchContent({
               value={session.rightPanelWidth ?? 260}
               min={220}
               max={420}
-              label="調整大綱寬度"
+              label={tr("mc0a9957d0f32")}
               onResize={(rightPanelWidth) =>
                 setSession((s) => ({ ...s, rightPanelWidth }))
               }
             />
             <div className="section-heading">
               <strong>
-                場景 <small>{nodes.length}</small>
+                {tr("mcb88dc73b257")}
+                <small>{nodes.length}</small>
               </strong>
               <div>
                 <ChromeButton
-                  title="新增場景"
-                  aria-label="新增場景"
+                  title={tr("m0478321878a2")}
+                  aria-label={tr("m0478321878a2")}
                   disabled={!doc}
                   onClick={newScene}
                 >
@@ -2830,8 +2958,8 @@ function WorkbenchContent({
             <div className="node-search">
               <Search size={13} />
               <input
-                aria-label="篩選目前劇本場景、角色或 tag"
-                placeholder="場景、角色或 tag"
+                aria-label={tr("m3cf6f8a53f47")}
+                placeholder={tr("m1caeda23f27a")}
                 value={sceneQuery}
                 onChange={(e) => setSceneQuery(e.target.value)}
               />
@@ -2962,9 +3090,9 @@ function WorkbenchContent({
         }}
       >
         <DialogContent>
-          <DialogTitle>{prompt?.title || "操作"}</DialogTitle>
+          <DialogTitle>{prompt?.title || tr("med31fbb483ee")}</DialogTitle>
           <DialogDescription style={{ whiteSpace: "pre-line" }}>
-            {prompt?.description || "修改會保留可恢復的紀錄。"}
+            {prompt?.description || tr("meb65ff62ffbe")}
           </DialogDescription>
           <form
             onSubmit={async (e) => {
@@ -3004,14 +3132,16 @@ function WorkbenchContent({
                 onClick={() => setPrompt(null)}
                 disabled={busy}
               >
-                取消
+                {tr("m2cd0f3be8738")}
               </button>
               <button
                 type="submit"
                 disabled={busy}
                 className={prompt?.danger ? "destructive" : "primary"}
               >
-                {busy ? "處理中…" : prompt?.submitLabel || "確定"}
+                {busy
+                  ? tr("md166e71ff3ae")
+                  : prompt?.submitLabel || tr("m20db9f87b860")}
               </button>
             </div>
           </form>
@@ -3030,9 +3160,20 @@ function WorkbenchContent({
           commands={project.commands}
           settings={settingEntries}
           recent={session.recentDocuments}
-          onChoose={hit=>{
-            if(hit.kind === "setting") {openSettings(hit.section as SettingsSection);setSettingsNavigation({section:hit.section as SettingsSection,field:hit.field,nonce:Date.now()});}
-            if(hit.kind === "command") {openCommands();setCommandTarget(hit.name);}
+          onChoose={(hit) => {
+            if (hit.kind === "setting") {
+              openSettings(hit.section as SettingsSection);
+              setSettingsNavigation({
+                section: hit.section as SettingsSection,
+                field: hit.field,
+                nonce: Date.now(),
+              });
+            }
+            if (hit.kind === "utility") openCommands();
+            if (hit.kind === "command") {
+              openCommands();
+              setCommandTarget({ name: hit.name, nonce: Date.now() });
+            }
           }}
           onCreate={standalone ? undefined : createFromSearch}
         />
@@ -3044,20 +3185,23 @@ function WorkbenchContent({
         }}
       >
         <DialogContent className="conflict-dialog">
-          <DialogTitle>處理 {conflict?.name}</DialogTitle>
+          <DialogTitle>
+            {tr("mcece58780d3c")} {conflict?.name}
+          </DialogTitle>
           <DialogDescription>
-            {conflict?.error}。目前內容仍在編輯器中，可重試或另存。
+            {conflict?.error}
+            {tr("mc97238f67983")}
           </DialogDescription>
           <div className="conflict-columns">
             <label>
-              目前版本
+              {tr("mc2f0001e7e2e")}
               <textarea readOnly value={conflict?.text || ""} />
             </label>
             <label>
-              磁碟版本
+              {tr("ma58034b77334")}
               <textarea
                 readOnly
-                value={conflict?.externalText ?? "檔案不可讀或已移除"}
+                value={conflict?.externalText ?? tr("mf225be1f7f06")}
               />
             </label>
           </div>
@@ -3074,7 +3218,7 @@ function WorkbenchContent({
                   });
               }}
             >
-              另存…
+              {tr("m2754144d1c1d")}
             </button>
             {conflict?.externalText !== undefined && (
               <>
@@ -3090,7 +3234,7 @@ function WorkbenchContent({
                     })
                   }
                 >
-                  採用磁碟版本
+                  {tr("mfcfd41034f23")}
                 </button>
                 <button
                   className="primary"
@@ -3105,7 +3249,7 @@ function WorkbenchContent({
                     })
                   }
                 >
-                  以目前版本覆寫
+                  {tr("m8f0008e2e546")}
                 </button>
               </>
             )}
@@ -3119,7 +3263,7 @@ function WorkbenchContent({
                   })
                 }
               >
-                重試保存
+                {tr("m7a824d822e96")}
               </button>
             )}
           </div>
@@ -3132,10 +3276,12 @@ function WorkbenchContent({
         }}
       >
         <DialogContent className="workbench-dialog">
-          <DialogTitle>尚未完成保存</DialogTitle>
+          <DialogTitle>{tr("mc1f4025e9e8c")}</DialogTitle>
           <DialogDescription>{leaveFailure?.message}</DialogDescription>
           <div className="dialog-actions">
-            <button onClick={() => setLeaveFailure(null)}>返回編輯</button>
+            <button onClick={() => setLeaveFailure(null)}>
+              {tr("m9f2b484bc113")}
+            </button>
             <button
               onClick={() => {
                 const action = leaveFailure!.action;
@@ -3143,7 +3289,7 @@ function WorkbenchContent({
                 void leaveWorkspace(action);
               }}
             >
-              重試保存
+              {tr("m7a824d822e96")}
             </button>
           </div>
         </DialogContent>
@@ -3161,7 +3307,7 @@ function WorkbenchContent({
           {closeSaving && (
             <div className="close-save-panel" role="status" aria-live="polite">
               <LoaderCircle size={20} className="save-spinner" />
-              <span>正在保存…</span>
+              <span>{tr("m6bdb4435095e")}</span>
             </div>
           )}
         </div>
@@ -3169,7 +3315,7 @@ function WorkbenchContent({
       {toast && !prompt && (
         <div className="toast" role="status">
           <span>{toast}</span>
-          <button aria-label="關閉通知" onClick={() => setToast("")}>
+          <button aria-label={tr("m641c2d091bbc")} onClick={() => setToast("")}>
             <X size={14} />
           </button>
         </div>

@@ -1,4 +1,4 @@
-/** Per-window bindings prevent an unrelated cached project from blocking close. */
+const { t: tr } = require("./i18n.cjs");
 function scopeOf(item) {
   return item?.projectId || "";
 }
@@ -15,7 +15,7 @@ function flushWindow(service, item) {
   if (failures.length || p.persistenceError || service.profileError)
     throw Error(
       failures
-        .map((d) => d.name + "：" + (d.error || "輸入尚未完成"))
+        .map((d) => d.name + "：" + (d.error || tr("m36898ac22e41")))
         .join("\n") ||
         p.persistenceError ||
         service.profileError,

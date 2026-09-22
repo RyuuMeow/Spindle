@@ -1,3 +1,4 @@
+import { t as tr } from "../../app/i18n";
 import { z } from "zod";
 const id = z.string().min(1).max(200);
 const offset = z.number().int().nonnegative();
@@ -145,7 +146,7 @@ export const schemas = {
       snapshotId: id,
       operationId: id.optional(),
       preview: z.boolean().default(false),
-      label: z.string().min(1).max(200).default("Agent 修改"),
+      label: z.string().min(1).max(200).default(tr("m9121ca24b590")),
       change: z.discriminatedUnion("kind", [
         z
           .object({

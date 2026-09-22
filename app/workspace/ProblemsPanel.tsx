@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import { AlertTriangle, CircleAlert, CircleCheck, Info, X } from "lucide-react";
 import { ChromeButton } from "@/components/ChromeButton";
 import { CompactSelect } from "@/components/CompactSelect";
@@ -6,13 +8,13 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { PanelResizeHandle } from "@/components/PanelResizeHandle";
 import type { Issue } from "../parser";
 const scopes = [
-  { value: "all", label: "全專案" },
-  { value: "current", label: "目前劇本" },
+  { value: "all", label: tr("m3cda0b4acf98") },
+  { value: "current", label: tr("meae7f2811778") },
 ];
 const severities = [
-  { value: "all", label: "全部" },
-  { value: "error", label: "錯誤" },
-  { value: "warning", label: "提醒" },
+  { value: "all", label: tr("m5c55a67935af") },
+  { value: "error", label: tr("m157b2f926735") },
+  { value: "warning", label: tr("m8f29b3132ccf") },
 ];
 export function ProblemsPanel({
   issues,
@@ -38,7 +40,7 @@ export function ProblemsPanel({
   return (
     <aside
       className={`workspace-problems ${issues.length ? "" : "is-empty"}`}
-      aria-label="結構檢查"
+      aria-label={tr("mcf85ad10cef3")}
       style={{ height: issues.length ? height : Math.min(height, 110) }}
     >
       <PanelResizeHandle
@@ -47,27 +49,25 @@ export function ProblemsPanel({
         min={90}
         max={420}
         onResize={onHeight}
-        label="調整結構檢查高度"
+        label={tr("me294399c7732")}
       />
       <div className="problems-toolbar">
         <span className="problems-heading">
-          結構檢查 <small>{issues.length}</small>
+          {tr("mcf85ad10cef3")}
+          <small>{issues.length}</small>
         </span>
-        <span
-          className="problems-note"
-          title="靜態結構檢查，不執行 Yarn；非官方編譯器。"
-        >
+        <span className="problems-note" title={tr("m9e4af203c96c")}>
           <Info size={13} />
         </span>
         <div className="problems-filters-wide">
           <SegmentedControl
-            label="檢查範圍"
+            label={tr("m17a2002a282a")}
             value={scope}
             onChange={onScope}
             options={scopes}
           />
           <SegmentedControl
-            label="問題嚴重度"
+            label={tr("m6463fe4dbe25")}
             value={severity}
             onChange={onSeverity}
             options={severities}
@@ -75,19 +75,19 @@ export function ProblemsPanel({
         </div>
         <div className="problems-filters-compact">
           <CompactSelect
-            label="檢查範圍"
+            label={tr("m17a2002a282a")}
             value={scope}
             onChange={onScope}
             options={scopes}
           />
           <CompactSelect
-            label="問題嚴重度"
+            label={tr("m6463fe4dbe25")}
             value={severity}
             onChange={onSeverity}
             options={severities}
           />
         </div>
-        <ChromeButton title="關閉檢查" onClick={onClose}>
+        <ChromeButton title={tr("m3b92db2cd505")} onClick={onClose}>
           <X size={15} />
         </ChromeButton>
       </div>
@@ -112,7 +112,7 @@ export function ProblemsPanel({
         {!issues.length && (
           <p className="problems-empty">
             <CircleCheck size={15} />
-            此範圍未發現結構問題。
+            {tr("mfcfdd68b5749")}
           </p>
         )}
       </div>

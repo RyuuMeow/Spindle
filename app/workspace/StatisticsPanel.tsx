@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import { useMemo } from "react";
 import { BarChart3 } from "lucide-react";
 import { PanelResizeHandle } from "@/components/PanelResizeHandle";
@@ -17,17 +19,17 @@ export default function StatisticsPanel({
 }) {
   const data = useMemo(() => documentStatistics(doc.text), [doc.text]);
   const metrics = [
-    ["場景", data.stats.scenes],
-    ["選項", data.stats.options],
-    ["台詞字元", data.stats.characters],
-    ["角色", data.stats.roles.length],
+    [tr("mcb88dc73b257"), data.stats.scenes],
+    [tr("m062cae7f1167"), data.stats.options],
+    [tr("me3fea30618a7"), data.stats.characters],
+    [tr("mc47b54e84e79"), data.stats.roles.length],
   ];
   const maxRole = Math.max(1, ...data.roles.map((r) => r[1])),
     maxScene = Math.max(1, ...data.scenes.map((s) => s.count));
   return (
     <aside
       className="document-side statistics-panel"
-      aria-label="作者統計"
+      aria-label={tr("me3ca8ea79b91")}
       style={{ width, flexBasis: width }}
     >
       <PanelResizeHandle
@@ -35,12 +37,12 @@ export default function StatisticsPanel({
         value={width}
         min={220}
         max={420}
-        label="調整分析寬度"
+        label={tr("m95b6b11c063d")}
         onResize={onWidth}
       />
       <div className="section-heading">
         <strong>
-          <BarChart3 size={15} /> 作者統計
+          <BarChart3 size={15} /> {tr("me3ca8ea79b91")}
         </strong>
       </div>
       <div className="statistics-scroll">
@@ -54,7 +56,8 @@ export default function StatisticsPanel({
           ))}
         </dl>
         <h3>
-          角色台詞分布 <small>行數</small>
+          {tr("m8b4f3af4220d")}
+          <small>{tr("mf3cd22fd562e")}</small>
         </h3>
         {data.roles.length ? (
           data.roles.map(([name, count]) => (
@@ -65,10 +68,11 @@ export default function StatisticsPanel({
             </div>
           ))
         ) : (
-          <p className="empty-small">尚無台詞</p>
+          <p className="empty-small">{tr("m6f267a4ca1de")}</p>
         )}
         <h3>
-          場景篇幅 <small>台詞行數</small>
+          {tr("mb0294e8b1885")}
+          <small>{tr("m7e4b409508b0")}</small>
         </h3>
         {data.scenes.map((s) => (
           <button

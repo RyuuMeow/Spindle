@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { FileText, Folder } from "lucide-react";
 import "./inline-name.css";
@@ -16,6 +17,7 @@ export type InlineDraft = {
   sceneName?: string;
   version?: number;
   newTab?: boolean;
+  provisional?: boolean;
   error?: string;
   busy?: boolean;
   createdId?: string;
@@ -56,10 +58,10 @@ export function InlineNameEditor({
       role="group"
       aria-label={
         draft.kind.includes("folder")
-          ? "資料夾名稱編輯"
+          ? tr("m095040309cbc")
           : draft.kind.includes("scene")
-            ? "場景名稱編輯"
-            : "劇本名稱編輯"
+            ? tr("m574c8a360824")
+            : tr("mf55e96bf758d")
       }
     >
       <div className="inline-name-row">
@@ -75,10 +77,10 @@ export function InlineNameEditor({
           aria-busy={!!draft.busy}
           aria-label={
             draft.kind.includes("folder")
-              ? "資料夾名稱"
+              ? tr("m0f42e972656c")
               : draft.kind.includes("scene")
-                ? "場景名稱"
-                : "劇本名稱"
+                ? tr("m594983ea025e")
+                : tr("madcee7b9afd1")
           }
           aria-invalid={!!draft.error}
           aria-describedby={draft.error ? "inline-name-error" : undefined}
@@ -108,7 +110,12 @@ export function InlineNameEditor({
             }
           }}
           onBlur={() => {
-            if (!composing.current && !cancelled.current && !draft.busy)
+            if (
+              !draft.provisional &&
+              !composing.current &&
+              !cancelled.current &&
+              !draft.busy
+            )
               onSubmit();
           }}
         />

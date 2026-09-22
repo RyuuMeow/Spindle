@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { ChangeSet, Text } from "@codemirror/state";
 import { rebaseUpdates, type Update } from "@codemirror/collab";
 import type { Command } from "../parser";
@@ -113,7 +114,7 @@ export function validDocumentName(name: string) {
   );
 }
 export function validateCommands(commands: Command[]) {
-  if (!Array.isArray(commands)) throw Error("指令設定格式錯誤");
+  if (!Array.isArray(commands)) throw Error(tr("mfa85a842ff6c"));
   for (const c of commands) {
     if (
       !c ||
@@ -133,7 +134,7 @@ export function validateCommands(commands: Command[]) {
           typeof p.defaultValue !== "string",
       )
     )
-      throw Error("指令設定格式錯誤");
+      throw Error(tr("mfa85a842ff6c"));
     const error = validateCommand(
       c,
       commands.filter((x) => x !== c),
@@ -151,7 +152,7 @@ export function validateProject(value: unknown): Project {
     !Array.isArray(p.excluded) ||
     !Array.isArray(p.recovery)
   )
-    throw Error("專案資料格式錯誤");
+    throw Error(tr("m7c62ab3fb761"));
   // Unapplied command forms belong only to their open tab, never to saved projects.
   delete (p as Project & { commandDraft?: unknown }).commandDraft;
   validateCommands(p.commands);
@@ -175,7 +176,7 @@ export function validateProject(value: unknown): Project {
       ids.has(d.id) ||
       names.has(d.name.toLowerCase())
     )
-      throw Error("文件資料格式錯誤或名稱重複");
+      throw Error(tr("m06f62ece09f6"));
     ids.add(d.id);
     names.add(d.name.toLowerCase());
   }
@@ -184,15 +185,16 @@ export function validateProject(value: unknown): Project {
 
 /** Recover each independent content area without allowing bad settings to hide scripts. */
 export function restoreProjects(input: unknown) {
-  if (!Array.isArray(input)) throw Error("工作區專案清單無效");
+  if (!Array.isArray(input)) throw Error(tr("m61551f7e87bf"));
   const warnings: string[] = [];
   const projects: Project[] = input.map((value, index) => {
-    if (!value || typeof value !== "object") throw Error("專案資料無效");
+    if (!value || typeof value !== "object") throw Error(tr("m12abdba55abb"));
     const p = value as Project;
     const restored: Project = {
       ...p,
       id: typeof p.id === "string" ? p.id : uuid(),
-      name: typeof p.name === "string" ? p.name : `復原專案 ${index + 1}`,
+      name:
+        typeof p.name === "string" ? p.name : tr("m1d9bb7022b66", [index + 1]),
       commands: [],
       folders: Array.isArray(p.folders)
         ? p.folders.filter(
@@ -222,11 +224,9 @@ export function restoreProjects(input: unknown) {
       validateCommands(p.commands);
       restored.commands = p.commands;
     } catch {
-      warnings.push(
-        restored.name + " 的指令設定損毀；劇本已保留，原設定存於救援副本",
-      );
+      warnings.push(restored.name + tr("m958e1d86c300"));
     }
-    if (!Array.isArray(p.documents)) throw Error("文件清單無效");
+    if (!Array.isArray(p.documents)) throw Error(tr("m7801db5bd69f"));
     restored.documents = [];
     for (const doc of p.documents) {
       try {
@@ -236,9 +236,7 @@ export function restoreProjects(input: unknown) {
         });
         restored.documents.push(doc);
       } catch {
-        warnings.push(
-          restored.name + " 有無法讀取的文件項目，原資料已保留供救援",
-        );
+        warnings.push(restored.name + tr("mf8939186b0e8"));
       }
     }
     return validateProject(restored);
@@ -264,12 +262,12 @@ export class DocumentEngine {
   }
   project(id: string) {
     const p = this.projects.find((p) => p.id === id);
-    if (!p) throw Error("找不到專案");
+    if (!p) throw Error(tr("m280051e136cf"));
     return p;
   }
   document(projectId: string, id: string) {
     const d = this.project(projectId).documents.find((d) => d.id === id);
-    if (!d) throw Error("找不到文件");
+    if (!d) throw Error(tr("m3b5c034c9e8f"));
     return d;
   }
   resetDocument(id: string) {
@@ -281,7 +279,7 @@ export class DocumentEngine {
     this.document(projectId, id);
     const log = this.logs.get(id) || [];
     if (!Number.isInteger(version) || version < 0 || version > log.length)
-      throw Error("文件版本無效，請重新同步");
+      throw Error(tr("m4949620f7a23"));
     return log
       .slice(version)
       .map((u) => ({ clientID: u.clientID, changes: u.changes.toJSON() }));
@@ -307,8 +305,9 @@ export class DocumentEngine {
     const d = this.document(projectId, id),
       log = this.logs.get(id) || [];
     if (!Number.isInteger(version) || version < 0 || version > log.length)
-      throw Error("文件版本無效");
-    if (!Array.isArray(wire) || wire.length > 1000) throw Error("修改格式無效");
+      throw Error(tr("mef703114d85c"));
+    if (!Array.isArray(wire) || wire.length > 1000)
+      throw Error(tr("ma9f3a1327d56"));
     const updates = wire.map((u) => ({
       clientID: u.clientID,
       changes: ChangeSet.fromJSON(u.changes),
@@ -334,7 +333,7 @@ export class DocumentEngine {
         this.redoHistory.set(id, []);
       } else
         this.remember({
-          label: "編輯",
+          label: tr("me0d4485966bd"),
           clientID,
           at: now,
           entries: [{ id, before, after: d.text }],
@@ -348,7 +347,7 @@ export class DocumentEngine {
   ) {
     const entries = changes.map((e) => {
       const d = this.document(projectId, e.id);
-      if (d.version !== e.version) throw Error("文件已變更，請重新執行此操作");
+      if (d.version !== e.version) throw Error(tr("m078138c1aeb0"));
       return {
         id: d.id,
         before: d.text,
@@ -356,7 +355,7 @@ export class DocumentEngine {
       };
     });
     if (new Set(entries.map((e) => e.id)).size !== entries.length)
-      throw Error("交易包含重複文件");
+      throw Error(tr("mdcbdf590a818"));
     for (const e of entries) {
       const d = this.document(projectId, e.id);
       this.accept(
@@ -379,7 +378,7 @@ export class DocumentEngine {
         d.text !== (redo ? e.before : e.after) ||
         from.get(e.id)?.at(-1) !== item
       )
-        throw Error("相關文件已有後續修改，請先撤銷後續操作");
+        throw Error(tr("m7e008ed40f3c"));
     }
     for (const e of item.entries) {
       const d = this.document(projectId, e.id),
@@ -414,7 +413,7 @@ export class DocumentEngine {
       !validDocumentName(name) ||
       p.documents.some((d) => d.name.toLowerCase() === name.toLowerCase())
     )
-      throw Error("檔名無效或已存在");
+      throw Error(tr("m5a364cf0b98a"));
     const d = makeDocument(name, value);
     if (identity) d.id = identity;
     if (firstInOrder) {

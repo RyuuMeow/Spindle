@@ -1,3 +1,4 @@
+import { t as tr } from "./i18n/index.ts";
 import type { Command } from "./parser";
 import {
   findCommand,
@@ -90,7 +91,13 @@ export const commandLabel = (command: CommandInfo) =>
 export const parameterLabel = (parameter: HelpParameter) =>
   parameter.displayName?.trim() || parameter.name;
 export function parameterHelp(parameter: HelpParameter, index: number) {
-  return `${parameterLabel(parameter)} · ${parameter.type} · 第 ${index + 1} 個參數${parameter.required ? "" : " · 選填"}${parameter.description ? "\n" + parameter.description : ""}`;
+  return tr("m02d73521f6a3", [
+    parameterLabel(parameter),
+    parameter.type,
+    index + 1,
+    parameter.required ? "" : tr("m49a0147d0c20"),
+    parameter.description ? "\n" + parameter.description : "",
+  ]);
 }
 export function commandHelp(command: CommandInfo) {
   return `${commandLabel(command)}${command.displayName?.trim() ? " · " + command.name : ""}${command.description ? "\n" + command.description : ""}`;
@@ -150,7 +157,7 @@ export function commandMarkdown(command: CommandInfo, parameterIndex = -1) {
             " | " +
             esc(p.type) +
             " | " +
-            (p.required ? "必填" : "選填") +
+            (p.required ? tr("m11da9dc44285") : tr("mefd49a86e463")) +
             " | " +
             esc(p.description || "—") +
             " |",
@@ -160,14 +167,12 @@ export function commandMarkdown(command: CommandInfo, parameterIndex = -1) {
     title,
     command.description ? esc(command.description) : "",
     rows.length
-      ? [
-          "| # | 參數 | 型別 | 需求 | 說明 |",
-          "| --- | --- | --- | --- | --- |",
-          ...rows,
-        ].join("\n")
+      ? [tr("m91800b12709f"), "| --- | --- | --- | --- | --- |", ...rows].join(
+          "\n",
+        )
       : "",
     command.example && parameterIndex < 0
-      ? "範例\n\n" + esc(command.example)
+      ? tr("m38a5716e46c9") + esc(command.example)
       : "",
   ]
     .filter(Boolean)

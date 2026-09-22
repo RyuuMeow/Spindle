@@ -1,3 +1,8 @@
+import {
+  t as tr,
+  message as renderMessage,
+  type LocalizedMessage,
+} from "./i18n/index.ts";
 export type Param = {
   displayName?: string;
   description?: string;
@@ -19,6 +24,8 @@ export type Issue = {
   line: number;
   column: number;
   message: string;
+  code?: string;
+  args?: readonly (string | number)[];
   severity: "error" | "warning";
 };
 export type Call = {
@@ -58,17 +65,19 @@ export type Link = {
   column?: number;
 };
 export function contextLabel(context: LinkContext) {
-  if (context.kind === "option") return `選擇「${context.text}」`;
-  if (context.kind === "if") return `若 ${context.text}`;
+  if (context.kind === "option") return tr("m44d038ba2817", [context.text]);
+  if (context.kind === "if") return tr("m092b023b0901", [context.text]);
   if (context.kind === "elseif")
-    return `否則若 ${context.text}（前述皆不成立：${context.preceding?.join("；")}）`;
+    return tr("mf5096af35a4a", [context.text, context.preceding?.join("；")]);
   if (context.kind === "else")
     return context.preceding?.length
-      ? `否則（前述皆不成立：${context.preceding.join("；")}）`
-      : `否則（${context.text || "所屬條件未解析"}）`;
+      ? tr("m7b497cb58944", [context.preceding.join("；")])
+      : tr("m9d770c933b33", [context.text || tr("m5c1b20c671a1")]);
   if (context.kind === "once")
-    return context.text ? `僅首次，且 ${context.text}` : "僅首次";
-  return `未解析：${context.text}`;
+    return context.text
+      ? tr("m5967bb5ba536", [context.text])
+      : tr("mdd1f7bbe333e");
+  return tr("m5e6f50458ec9", [context.text]);
 }
 export const builtins = [
   "jump",
@@ -218,10 +227,10 @@ export function missingVariablePrefixes(line: string, names: Iterable<string>) {
   return hits;
 }
 
-export function assignmentTypeError(
+export function assignmentDiagnostic(
   args: string,
   types: ReadonlyMap<string, string>,
-): string | null {
+): LocalizedMessage | null {
   const match = /^(\$[A-Za-z_]\w*)\s*(=|to\b|[+*/%\-]=)\s*(.+)$/.exec(args);
   if (!match) return null;
   const expected = types.get(match[1]),
@@ -235,24 +244,15 @@ export function assignmentTypeError(
       expected !== "number" &&
       !(match[2] === "+=" && expected === "string"))
   )
-    return (
-      "變數「" +
-      match[1] +
-      "」宣告為 " +
-      expected +
-      "，不能以 " +
-      match[2] +
-      " 指派 " +
-      actual
-    );
+    return {
+      code: "diagnostic.96d2c60e238e",
+      args: [match[1], expected, match[2], actual],
+    };
   if (bare && expected === "string")
-    return (
-      "無效的指派值「" +
-      match[3].trim() +
-      '」；字串請使用雙引號，例如 "' +
-      match[3].trim() +
-      '"。'
-    );
+    return {
+      code: "diagnostic.72bc28708b9c",
+      args: [match[3].trim(), match[3].trim()],
+    };
   return null;
 }
 function uncomment(s: string) {
@@ -270,10 +270,19 @@ export function parse(docs: Doc[], commands: Command[]) {
   const issue = (
     file: string,
     line: number,
-    message: string,
+    value: LocalizedMessage,
     severity: "error" | "warning" = "error",
     column = 1,
-  ) => issues.push({ file, line, message, severity, column });
+  ) =>
+    issues.push({
+      file,
+      line,
+      message: renderMessage(value),
+      code: value.code,
+      args: value.args,
+      severity,
+      column,
+    });
   for (const doc of docs) {
     let n: Node | null = null,
       inBody = false,
@@ -288,14 +297,15 @@ export function parse(docs: Doc[], commands: Command[]) {
     const finish = (line: number, closed: boolean) => {
       if (!n) return;
       n.end = Math.max(n.start, line);
-      if (!inBody) issue(doc.name, n.start, "節點缺少 --- 本文起始標記");
-      if (!closed) issue(doc.name, n.start, "節點缺少 === 結束標記");
+      if (!inBody)
+        issue(doc.name, n.start, { code: "diagnostic.2127bc217c62", args: [] });
+      if (!closed)
+        issue(doc.name, n.start, { code: "diagnostic.3293f1132b1c", args: [] });
       for (const s of stack) {
-        issue(
-          doc.name,
-          s.line,
-          `缺少 ${s.name === "if" ? "endif" : "endonce"}`,
-        );
+        issue(doc.name, s.line, {
+          code: "diagnostic.19a090117231",
+          args: [s.name === "if" ? "endif" : "endonce"],
+        });
         for (const link of links)
           if (link.source === n.id && link.line >= s.line)
             link.unresolved = true;
@@ -332,15 +342,12 @@ export function parse(docs: Doc[], commands: Command[]) {
           calls: [],
         };
         if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name))
-          issue(
-            doc.name,
-            line,
-            "節點名稱須以英文字母起始，僅含字母、數字及底線",
-          );
+          issue(doc.name, line, { code: "diagnostic.20bf5f7ee70f", args: [] });
         return;
       }
       if (!n) {
-        if (s) issue(doc.name, line, "內容不在節點內");
+        if (s)
+          issue(doc.name, line, { code: "diagnostic.cefbb5a823ca", args: [] });
         return;
       }
       if (s === "===") {
@@ -348,7 +355,8 @@ export function parse(docs: Doc[], commands: Command[]) {
         return;
       }
       if (s === "---") {
-        if (inBody) issue(doc.name, line, "重複的 --- 標記");
+        if (inBody)
+          issue(doc.name, line, { code: "diagnostic.914972502775", args: [] });
         inBody = true;
         n.body = line + 1;
         return;
@@ -357,7 +365,8 @@ export function parse(docs: Doc[], commands: Command[]) {
         if (!s) return;
         const h = s.match(/^([\w-]+):\s*(.*)$/);
         if (h) n.headers[h[1]] = h[2];
-        else issue(doc.name, line, "無效的節點標頭；預期 key: value 或 ---");
+        else
+          issue(doc.name, line, { code: "diagnostic.32b2c232d4dc", args: [] });
         return;
       }
       if (!s) return;
@@ -386,7 +395,8 @@ export function parse(docs: Doc[], commands: Command[]) {
               match[1] === "if" && !match[2].trim()
                 ? "unknown"
                 : (match[1] as "if" | "once"),
-            text: match[2].trim() || (match[1] === "if" ? "if 缺少條件" : ""),
+            text:
+              match[2].trim() || (match[1] === "if" ? tr("maacdf12a6848") : ""),
             line,
           });
         options.push({ indent, context });
@@ -394,7 +404,7 @@ export function parse(docs: Doc[], commands: Command[]) {
       if (!n.summary && !s.startsWith("<<") && !s.startsWith("->"))
         n.summary = s.replace(/#[\w:]+/g, "").trim();
       if ((s.match(/<</g) || []).length !== (s.match(/>>/g) || []).length) {
-        issue(doc.name, line, "指令未完成：請檢查 << 與 >>");
+        issue(doc.name, line, { code: "diagnostic.dd80a03d00ba", args: [] });
         if (/<<(?:if|elseif|else|endif|once|endonce)\b/.test(s))
           unknownContexts.push({ kind: "unknown", text: s, line });
       }
@@ -416,20 +426,25 @@ export function parse(docs: Doc[], commands: Command[]) {
               kind: name === "if" && !args.length ? "unknown" : name,
               groupLine: line,
               branchOrder: 0,
-              text: args.join(" ") || (name === "if" ? "if 缺少條件" : ""),
+              text:
+                args.join(" ") || (name === "if" ? tr("maacdf12a6848") : ""),
               line,
             },
             previous: args.length ? [args.join(" ")] : [],
           });
         }
-        if (name === "if" && !args.length) issue(doc.name, line, "if 缺少條件");
+        if (name === "if" && !args.length)
+          issue(doc.name, line, { code: "diagnostic.91d74a7b4fde", args: [] });
         if (name === "else" || name === "elseif") {
           const block = stack.at(-1);
           if (!block) {
-            issue(doc.name, line, `${name} 沒有對應的區塊`);
+            issue(doc.name, line, {
+              code: "diagnostic.7187d618d181",
+              args: [name],
+            });
             unknownContexts.push({
               kind: "unknown",
-              text: `${name} 沒有對應的區塊`,
+              text: tr("m6aae440c9598", [name]),
               line,
             });
           } else {
@@ -440,14 +455,18 @@ export function parse(docs: Doc[], commands: Command[]) {
               text:
                 name === "else"
                   ? block.name === "once"
-                    ? "此區塊已執行過"
+                    ? tr("m51218839a0a9")
                     : ""
-                  : args.join(" ") || "elseif 缺少條件",
+                  : args.join(" ") || tr("m0327042580f1"),
               line,
               preceding: [...block.previous],
             };
             if (name === "elseif") {
-              if (!args.length) issue(doc.name, line, "elseif 缺少條件");
+              if (!args.length)
+                issue(doc.name, line, {
+                  code: "diagnostic.a3b47dbacff6",
+                  args: [],
+                });
               else block.previous.push(args.join(" "));
             }
           }
@@ -455,11 +474,18 @@ export function parse(docs: Doc[], commands: Command[]) {
         if (name === "endif" || name === "endonce") {
           const expected = name === "endif" ? "if" : "once";
           if (stack.at(-1)?.name !== expected)
-            issue(doc.name, line, `${name} 沒有對應的 ${expected}`);
+            issue(doc.name, line, {
+              code: "diagnostic.e0e54e3e365b",
+              args: [name, expected],
+            });
           else stack.pop();
         }
         if (name === "jump" || name === "detour") {
-          if (!args.length) issue(doc.name, line, `${name} 缺少目標節點`);
+          if (!args.length)
+            issue(doc.name, line, {
+              code: "diagnostic.1d264537a640",
+              args: [name],
+            });
           else {
             const target = args.join(" "),
               dynamic = target.startsWith("{"),
@@ -483,11 +509,10 @@ export function parse(docs: Doc[], commands: Command[]) {
               unresolved: context.some((item) => item.kind === "unknown"),
             });
             if (!dynamic && !/^[A-Za-z][A-Za-z0-9_]*$/.test(target))
-              issue(
-                doc.name,
-                line,
-                "跳轉目標格式不正確；動態目標請使用 {表達式}",
-              );
+              issue(doc.name, line, {
+                code: "diagnostic.9450d7050fd1",
+                args: [],
+              });
           }
           continue;
         }
@@ -498,7 +523,10 @@ export function parse(docs: Doc[], commands: Command[]) {
               args.join(" "),
             )
           )
-            issue(doc.name, line, `${name} 需要變數、指定運算子與值`);
+            issue(doc.name, line, {
+              code: "diagnostic.d7f2a009889c",
+              args: [name],
+            });
           continue;
         }
         const def = commands.find((c) => c.name === name);
@@ -506,7 +534,7 @@ export function parse(docs: Doc[], commands: Command[]) {
           issue(
             doc.name,
             line,
-            `未註冊指令「${name}」；可能由外部執行環境提供`,
+            { code: "diagnostic.f9bb37d04146", args: [name] },
             "warning",
             column,
           );
@@ -518,7 +546,10 @@ export function parse(docs: Doc[], commands: Command[]) {
               issue(
                 doc.name,
                 line,
-                `${name} 缺少必要參數：${p.name} (${p.type})`,
+                {
+                  code: "diagnostic.fe1c7fa80313",
+                  args: [name, p.name, p.type],
+                },
                 "error",
                 column,
               );
@@ -528,7 +559,10 @@ export function parse(docs: Doc[], commands: Command[]) {
               issue(
                 doc.name,
                 line,
-                `${name}.${p.name} 預期 ${p.type}，收到 ${actual}`,
+                {
+                  code: "diagnostic.d3a3eee6d4d4",
+                  args: [name, p.name, p.type, actual],
+                },
                 "error",
                 column,
               );
@@ -538,7 +572,10 @@ export function parse(docs: Doc[], commands: Command[]) {
           issue(
             doc.name,
             line,
-            `${name} 最多接受 ${def.params.length} 個參數`,
+            {
+              code: "diagnostic.b249637e4133",
+              args: [name, def.params.length],
+            },
             "error",
             column,
           );
@@ -578,7 +615,7 @@ export function parse(docs: Doc[], commands: Command[]) {
         issue(
           doc.name,
           index + 1,
-          "變數「" + hit.name + "」缺少 $ 前綴",
+          { code: "diagnostic.dbaff876fe7f", args: [hit.name] },
           "error",
           hit.from + 1,
         );
@@ -593,7 +630,7 @@ export function parse(docs: Doc[], commands: Command[]) {
         issue(
           n.file,
           call.line,
-          `變數「${call.args[0]}」尚未宣告；請先新增 declare`,
+          { code: "diagnostic.824d0fcbe7bf", args: [call.args[0]] },
           "error",
           call.column,
         );
@@ -604,7 +641,7 @@ export function parse(docs: Doc[], commands: Command[]) {
           issue(
             n.file,
             call.line,
-            "wait 缺少秒數 (number)",
+            { code: "diagnostic.62512d211a63", args: [] },
             "error",
             call.column,
           );
@@ -612,7 +649,10 @@ export function parse(docs: Doc[], commands: Command[]) {
           issue(
             n.file,
             call.line,
-            call.name + " 預期 " + expected + "，收到 " + actual,
+            {
+              code: "diagnostic.bcc4e5a9d58c",
+              args: [call.name, expected, actual],
+            },
             "error",
             call.column,
           );
@@ -626,19 +666,16 @@ export function parse(docs: Doc[], commands: Command[]) {
           issue(
             n.file,
             call.line,
-            call.name +
-              "." +
-              param.name +
-              " 預期 " +
-              param.type +
-              "，收到 " +
-              type,
+            {
+              code: "diagnostic.28b5e49e9854",
+              args: [call.name, param.name, param.type, type],
+            },
             "error",
             call.column,
           );
       });
       if (call.name === "set") {
-        const error = assignmentTypeError(call.args.join(" "), declarations);
+        const error = assignmentDiagnostic(call.args.join(" "), declarations);
         if (error) issue(n.file, call.line, error, "error", call.column);
       }
     }
@@ -646,11 +683,18 @@ export function parse(docs: Doc[], commands: Command[]) {
   for (const n of nodes) names.set(n.name, [...(names.get(n.name) || []), n]);
   for (const [name, group] of names)
     if (group.length > 1)
-      for (const n of group) issue(n.file, n.start, `節點名稱重複：${name}`);
+      for (const n of group)
+        issue(n.file, n.start, {
+          code: "diagnostic.a52b23e5a5bd",
+          args: [name],
+        });
   for (const link of links) {
     const n = nodes.find((n) => n.id === link.source)!;
     if (!link.dynamic && !names.has(link.target))
-      issue(n.file, link.line, `找不到跳轉目標：${link.target}`);
+      issue(n.file, link.line, {
+        code: "diagnostic.cf6241ad8a25",
+        args: [link.target],
+      });
   }
   return {
     nodes,
@@ -661,22 +705,30 @@ export function parse(docs: Doc[], commands: Command[]) {
   };
 }
 export function validateCommand(c: Command, others: Command[]) {
-  if (!/^[A-Za-z_]\w*$/.test(c.name)) return "指令名稱須以字母或底線起始";
-  if (builtins.includes(c.name)) return "名稱與內建指令衝突";
-  if (others.some((x) => x.name === c.name)) return "指令名稱重複";
+  if (!/^[A-Za-z_]\w*$/.test(c.name)) return tr("mb7b256c22693");
+  if (builtins.includes(c.name)) return tr("m3c2a16fcb0dc");
+  if (others.some((x) => x.name === c.name)) return tr("ma9b64210374a");
   let optional = false;
   const names = new Set<string>();
   for (const p of c.params) {
     if (!/^[A-Za-z_]\w*$/.test(p.name) || names.has(p.name))
-      return "參數名稱不合法或重複";
+      return tr("me286e1bc240d");
     names.add(p.name);
     if (!p.required) optional = true;
-    else if (optional) return "必填參數必須放在選填參數之前";
+    else if (optional) return tr("m958506619752");
     if (
       !p.required &&
       (!p.defaultValue || literalType(p.defaultValue) !== p.type)
     )
-      return "選填參數須提供符合型別的預設值";
+      return tr("m55782245af4d");
   }
   return "";
+}
+
+export function assignmentTypeError(
+  args: string,
+  types: ReadonlyMap<string, string>,
+): string | null {
+  const result = assignmentDiagnostic(args, types);
+  return result ? renderMessage(result) : null;
 }

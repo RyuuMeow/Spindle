@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { parse, type Node } from "../parser";
 import type { Project, TextEdit } from "./types";
 export const validSceneName = (name: string) =>
@@ -22,19 +23,21 @@ export function lineOffset(text: string, line: number) {
 }
 export function sceneRange(text: string, node: Node) {
   return {
-    from: Math.max(text.startsWith('\ufeff')?1:0,lineOffset(text, node.start)),
+    from: Math.max(
+      text.startsWith("\ufeff") ? 1 : 0,
+      lineOffset(text, node.start),
+    ),
     to: lineOffset(text, node.end + 1),
   };
 }
 export function renamedScene(p: Project, node: Node, name: string) {
-  if (!validSceneName(name))
-    throw Error("場景名稱須以英文字母起始，僅含字母、數字與底線");
+  if (!validSceneName(name)) throw Error(tr("me47cd3a1c3f2"));
   if (
     parse(p.documents, p.commands).nodes.some(
       (n) => n.name === name && n.id !== node.id,
     )
   )
-    throw Error("專案已有同名場景");
+    throw Error(tr("m6761f1c4a1fe"));
   let references = 0;
   const documents = p.documents
     .map((d) => {
@@ -61,13 +64,14 @@ export function renamedScene(p: Project, node: Node, name: string) {
             break;
           }
         }
-        const code=line.slice(0,limit).replace(/"(?:\\.|[^"\\])*"/g,value=>' '.repeat(value.length));
-        for (const match of code.matchAll(/(<<\s*(?:jump|detour)\s+)([A-Za-z]\w*)\s*>>/g))
+        const code = line
+          .slice(0, limit)
+          .replace(/"(?:\\.|[^"\\])*"/g, (value) => " ".repeat(value.length));
+        for (const match of code.matchAll(
+          /(<<\s*(?:jump|detour)\s+)([A-Za-z]\w*)\s*>>/g,
+        ))
           if (match[2] === node.name) {
-            const at =
-              offset +
-              match.index! +
-              match[1].length;
+            const at = offset + match.index! + match[1].length;
             edits.push({ from: at, to: at + match[2].length, insert: name });
             references++;
           }
@@ -83,19 +87,45 @@ export function renamedScene(p: Project, node: Node, name: string) {
   return { documents, references };
 }
 
-export function appendedScene(p: Project, documentId: string, version: number, name: string) {
-  const d = p.documents.find(document => document.id === documentId);
-  if (!d || d.version !== version) throw Error("劇本已有變更，請重新確認後重試");
-  if (!validSceneName(name)) throw Error("場景名稱須以英文字母起始，僅含英文字母、數字與底線");
-  if (parse(p.documents, p.commands).nodes.some(node => node.name === name)) throw Error("專案已有同名場景");
+export function appendedScene(
+  p: Project,
+  documentId: string,
+  version: number,
+  name: string,
+) {
+  const d = p.documents.find((document) => document.id === documentId);
+  if (!d || d.version !== version) throw Error(tr("maad6674de872"));
+  if (!validSceneName(name)) throw Error(tr("mb1bfc1deabb5"));
+  if (parse(p.documents, p.commands).nodes.some((node) => node.name === name))
+    throw Error(tr("m6761f1c4a1fe"));
   const nl = d.text.includes("\r\n") ? "\r\n" : "\n";
   const prefix = d.text ? (d.text.endsWith(nl) ? nl : nl + nl) : "";
-  return [{ id: d.id, version, edits: [{ from: d.text.length, to: d.text.length, insert: prefix + "title: " + name + nl + "---" + nl + nl + "===" + nl }] }];
+  return [
+    {
+      id: d.id,
+      version,
+      edits: [
+        {
+          from: d.text.length,
+          to: d.text.length,
+          insert: prefix + "title: " + name + nl + "---" + nl + nl + "===" + nl,
+        },
+      ],
+    },
+  ];
 }
-export function renamedSceneByName(p: Project, documentId: string, version: number, fromName: string, name: string) {
-  const d = p.documents.find(document => document.id === documentId);
-  if (!d || d.version !== version) throw Error("劇本已有變更，請重新確認後重試");
-  const node = parse(p.documents, p.commands).nodes.find(node => node.file === d.name && node.name === fromName);
-  if (!node) throw Error("找不到原場景，請重新選取");
+export function renamedSceneByName(
+  p: Project,
+  documentId: string,
+  version: number,
+  fromName: string,
+  name: string,
+) {
+  const d = p.documents.find((document) => document.id === documentId);
+  if (!d || d.version !== version) throw Error(tr("maad6674de872"));
+  const node = parse(p.documents, p.commands).nodes.find(
+    (node) => node.file === d.name && node.name === fromName,
+  );
+  if (!node) throw Error(tr("m7500bbb76065"));
   return renamedScene(p, node, name);
 }

@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import { useState, useSyncExternalStore } from "react";
 import {
   AlertTriangle,
@@ -9,7 +11,6 @@ import {
   Settings2,
   Trash2,
   Pencil,
-  ArchiveRestore,
 } from "lucide-react";
 import { ChromeButton } from "@/components/ChromeButton";
 import ActionMenu, { type MenuState } from "./ActionMenu";
@@ -49,17 +50,12 @@ export default function ProjectLauncher({
       error?: string;
     } | null>(null),
     [menu, setMenu] = useState<MenuState | null>(null);
-  const [draftId, setDraftId] = useState<string | null>(null);
   const [prefs, setPrefs] = useState(() => defaultSession(client.windowId, ""));
   const entries = (snapshot.catalog || []).filter((e) =>
     (e.name + " " + e.root)
       .toLocaleLowerCase()
       .includes(query.toLocaleLowerCase()),
   );
-  const drafts = snapshot.projects.filter(
-    (p) => !p.root && p.kind !== "standalone",
-  );
-  const draft = drafts.find((p) => p.id === draftId);
   async function run(action: WorkspaceAction, navigate = false) {
     if (busy) return;
     setBusy(true);
@@ -81,21 +77,21 @@ export default function ProjectLauncher({
       origin: event.currentTarget as HTMLElement,
       actions: [
         {
-          label: "在檔案總管開啟",
+          label: tr("mb89391aa4985"),
           icon: <FolderOpen size={15} />,
           disabled: !!entry.unavailable,
           run: () =>
             void run({ type: "catalog", operation: "reveal", id: entry.id }),
         },
         {
-          label: "改名",
+          label: tr("m83c37e8a4a5f"),
           icon: <Pencil size={15} />,
           disabled: !!entry.unavailable,
           run: () => setRename({ id: entry.id, name: entry.name }),
         },
         null,
         {
-          label: "從列表中移除",
+          label: tr("m15208b078628"),
           icon: <Trash2 size={15} />,
           run: () =>
             void run({ type: "catalog", operation: "remove", id: entry.id }),
@@ -105,7 +101,6 @@ export default function ProjectLauncher({
   }
   const back = () => {
     setPage("projects");
-    setDraftId(null);
     setError("");
   };
   return (
@@ -133,18 +128,18 @@ export default function ProjectLauncher({
       </header>
       {page === "settings" ? (
         <SettingsView
-          rescue={<RescueSettings client={client}/>}
+          rescue={<RescueSettings client={client} />}
           workspaceSettings={false}
           preferences={prefs}
           onChange={(next) => setPrefs((p) => ({ ...p, ...next }))}
           appPreferences={snapshot.preferences}
           onAppearance={(patch) => void run({ type: "appearance", patch })}
           onAppPreferences={(value) =>
-            void run({ type: "preferences", reopenLastProject: value })
+            void run({ type: "preferences", ...value })
           }
           onResetLayout={() => setPrefs(defaultSession(client.windowId, ""))}
           onClose={back}
-          returnLabel="返回專案列表"
+          returnLabel={tr("me9683346265e")}
           onOpenData={() => void window.yarnDesktop?.openLogs()}
           version={window.yarnDesktop?.version}
         />
@@ -155,7 +150,10 @@ export default function ProjectLauncher({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand/spindle.svg" alt="" width={48} height={48} />
               <h1>Spindle</h1>
-              <ChromeButton title="設定" onClick={() => setPage("settings")}>
+              <ChromeButton
+                title={tr("m0d8619aae051")}
+                onClick={() => setPage("settings")}
+              >
                 <Settings2 size={19} />
               </ChromeButton>
             </div>
@@ -168,7 +166,7 @@ export default function ProjectLauncher({
                     onClick={() => void run({ type: "openFolder" }, true)}
                   >
                     <FolderOpen size={19} />
-                    開啟專案資料夾
+                    {tr("m5a25c4bc6162")}
                   </button>
                   <button
                     disabled={busy}
@@ -178,22 +176,25 @@ export default function ProjectLauncher({
                     }}
                   >
                     <FolderPlus size={19} />
-                    建立專案
+                    {tr("m181ad3312ed1")}
                   </button>
                 </div>
                 <div className="launcher-list-heading">
-                  <h2>專案</h2>
+                  <h2>{tr("me564b916b12e")}</h2>
                   <label className="launcher-search">
                     <Search size={15} />
                     <input
-                      aria-label="搜尋專案"
-                      placeholder="搜尋名稱或路徑"
+                      aria-label={tr("me95721a5d4df")}
+                      placeholder={tr("mdde02704467f")}
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                     />
                   </label>
                 </div>
-                <div className="launcher-projects" aria-label="專案列表">
+                <div
+                  className="launcher-projects"
+                  aria-label={tr("m2c8bbce7227b")}
+                >
                   {entries.map((entry) => (
                     <div
                       className={
@@ -207,7 +208,7 @@ export default function ProjectLauncher({
                         <div className="launcher-rename">
                           <input
                             autoFocus
-                            aria-label="專案名稱"
+                            aria-label={tr("mc4f17fe66069")}
                             value={rename.name}
                             onFocus={(e) => e.target.select()}
                             onChange={(e) =>
@@ -266,9 +267,7 @@ export default function ProjectLauncher({
                 </div>
                 {!entries.length && (
                   <p className="launcher-empty">
-                    {query
-                      ? "沒有符合的專案"
-                      : "開啟資料夾，或建立你的第一個專案。"}
+                    {query ? tr("mefff54056571") : tr("m38e407780643")}
                   </p>
                 )}
                 <button
@@ -276,57 +275,16 @@ export default function ProjectLauncher({
                   disabled={busy}
                   onClick={() => void run({ type: "openFiles" }, true)}
                 >
-                  開啟單一劇本…
+                  {tr("me14a2fccc945")}
                 </button>
-              </>
-            ) : page === "drafts" ? (
-              <>
-                <div className="launcher-section-title">
-                  <ChromeButton title="返回專案列表" onClick={back}>
-                    <ArrowLeft size={17} />
-                  </ChromeButton>
-                  <h2>待移轉草稿</h2>
-                </div>
-                {draft ? (
-                  <>
-                    <h3>{draft.name}</h3>
-                    {draft.documents.map((d) => (
-                      <section className="launcher-draft-preview" key={d.id}>
-                        <strong>{d.name}</strong>
-                        <pre>{d.text}</pre>
-                      </section>
-                    ))}
-                    <button
-                      className="launcher-primary"
-                      onClick={() => {
-                        setName(draft.name);
-                        setPage("create");
-                      }}
-                    >
-                      轉存為專案
-                    </button>
-                  </>
-                ) : (
-                  drafts.map((p) => (
-                    <button
-                      className="launcher-draft-row"
-                      key={p.id}
-                      onClick={() => setDraftId(p.id)}
-                    >
-                      <ArchiveRestore size={17} />
-                      {p.name}
-                      <small>{p.documents.length} 個劇本</small>
-                    </button>
-                  ))
-                )}
               </>
             ) : (
               <>
                 <div className="launcher-section-title">
-                  <ChromeButton title="返回專案列表" onClick={back}>
+                  <ChromeButton title={tr("me9683346265e")} onClick={back}>
                     <ArrowLeft size={17} />
                   </ChromeButton>
-                  <h2>{draft ? "轉存為專案" : "建立專案"}</h2>
+                  <h2>{tr("m181ad3312ed1")}</h2>
                 </div>
                 <form
                   className="launcher-create"
@@ -334,41 +292,34 @@ export default function ProjectLauncher({
                     e.preventDefault();
                     if (parent)
                       void run(
-                        draft
-                          ? {
-                              type: "migrateDraft",
-                              projectId: draft.id,
-                              name,
-                              root: parent,
-                            }
-                          : { type: "createProject", name, root: parent },
+                        { type: "createProject", name, root: parent },
                         true,
                       );
                   }}
                 >
                   <label>
-                    專案名稱
+                    {tr("mc4f17fe66069")}
                     <input
                       autoFocus
-                      aria-label="新專案名稱"
+                      aria-label={tr("m1abd8fe62114")}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
-                      placeholder="我的故事"
+                      placeholder={tr("md70df31e32d2")}
                     />
                   </label>
                   <label>
-                    位置
+                    {tr("m1fb4d574da92")}
                     <div className="launcher-location">
                       <input
-                        aria-label="專案父資料夾"
+                        aria-label={tr("m04a1bf33332d")}
                         value={parent}
                         readOnly
-                        placeholder="選擇存放專案的資料夾"
+                        placeholder={tr("m54f1ba1de5c0")}
                       />
                       <button
                         type="button"
-                        aria-label="選擇父資料夾"
+                        aria-label={tr("m897f00cbe49d")}
                         onClick={() =>
                           void run({ type: "chooseProjectParent" }).then(
                             (r) => {
@@ -392,7 +343,7 @@ export default function ProjectLauncher({
                     disabled={busy || !name.trim() || !parent}
                   >
                     <FolderPlus size={17} />
-                    {draft ? "轉存專案" : "建立專案"}
+                    {tr("m181ad3312ed1")}
                   </button>
                 </form>
               </>

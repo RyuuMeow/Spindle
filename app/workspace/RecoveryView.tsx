@@ -1,4 +1,6 @@
 "use client";
+import { t as tr, locale } from "../i18n/index.ts";
+
 import { useState } from "react";
 import { ArchiveRestore, FileText, Folder, Trash2 } from "lucide-react";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -82,7 +84,7 @@ export default function RecoveryView({
       if (await onRestore(entry, baseline?.version, baseline?.text)) {
         if (entry.deleted) advance(entry);
         else onChange({ ...state, baseline: { text: entry.text } });
-      } else setError("未能復原，原項目仍保留。請重試。");
+      } else setError(tr("m7531e0b166b4"));
     } finally {
       setBusy(false);
     }
@@ -102,7 +104,7 @@ export default function RecoveryView({
           });
         else if (state.selectedId === purge.id) advance(purge);
         setPurge(null);
-      } else setError("未能永久刪除，請重試。");
+      } else setError(tr("m801c84af258a"));
     } finally {
       setBusy(false);
     }
@@ -113,11 +115,11 @@ export default function RecoveryView({
         <div className="section-heading">
           <h2>
             <ArchiveRestore size={18} />
-            專案復原
+            {tr("m525e69a5165d")}
           </h2>
           {state.scope === "deleted" && (
             <ChromeButton
-              title="清空垃圾桶"
+              title={tr("m2466ad0d23ed")}
               disabled={busy || !project.recovery.some((e) => e.deleted)}
               onClick={() => setPurge("all")}
             >
@@ -126,7 +128,7 @@ export default function RecoveryView({
           )}
         </div>
         <SegmentedControl
-          label="復原範圍"
+          label={tr("m0bcac8cf6eb9")}
           value={state.scope}
           onChange={(scope) =>
             onChange({
@@ -135,18 +137,22 @@ export default function RecoveryView({
             })
           }
           options={[
-            { value: "deleted", label: "最近刪除", icon: <Trash2 size={14} /> },
-            { value: "commands", label: "指令版本" },
+            {
+              value: "deleted",
+              label: tr("mad101b80eb5e"),
+              icon: <Trash2 size={14} />,
+            },
+            { value: "commands", label: tr("m4e1571bb0041") },
           ]}
         />
         <p className="panel-description">
           {state.scope === "deleted"
-            ? "刪除項目保留 30 天。"
-            : "每組指令保留最近 50 個版本。"}
+            ? tr("mc7d43be031a6")
+            : tr("m79c03bd123f1")}
         </p>
         <input
-          aria-label="篩選復原項目"
-          placeholder="搜尋名稱"
+          aria-label={tr("mfb256450d6c8")}
+          placeholder={tr("m3733110aa464")}
           value={state.query}
           onChange={(e) => onChange({ ...state, query: e.target.value })}
         />
@@ -174,7 +180,7 @@ export default function RecoveryView({
                   origin: event.currentTarget,
                   actions: [
                     {
-                      label: "復原",
+                      label: tr("m2abdcba8d536"),
                       icon: <ArchiveRestore size={15} />,
                       disabled: busy,
                       run: () => void restore(entry),
@@ -182,7 +188,7 @@ export default function RecoveryView({
                     ...(entry.deleted
                       ? [
                           {
-                            label: "永久刪除",
+                            label: tr("m6671987c7186"),
                             icon: <Trash2 size={15} />,
                             danger: true,
                             disabled: busy,
@@ -201,14 +207,14 @@ export default function RecoveryView({
               )}
               <span>
                 <strong>{entry.name}</strong>
-                <small>{new Date(entry.at).toLocaleString("zh-TW")}</small>
+                <small>{new Date(entry.at).toLocaleString(locale())}</small>
               </span>
             </button>
           ))}
         </div>
         {!entries.length && (
           <p className="empty-small">
-            {state.query ? "沒有符合的復原項目。" : "這裡目前沒有項目。"}
+            {state.query ? tr("mf8de90b1911b") : tr("mf9eab13d8dbb")}
           </p>
         )}
         {error && !purge && (
@@ -238,7 +244,7 @@ export default function RecoveryView({
       ) : (
         <div className="empty-editor">
           <ArchiveRestore size={30} />
-          <p>選擇項目以預覽內容</p>
+          <p>{tr("m23b0426a1ee0")}</p>
         </div>
       )}
       <ActionMenu menu={menu} onClose={() => setMenu(null)} />
@@ -253,25 +259,27 @@ export default function RecoveryView({
       >
         <DialogContent className="workbench-dialog">
           <DialogTitle>
-            {purge === "all" ? "清空垃圾桶？" : "永久刪除？"}
+            {purge === "all" ? tr("mea01e3aea996") : tr("md8399a4544c9")}
           </DialogTitle>
           <DialogDescription>
             {purge === "all"
-              ? `永久刪除目前專案垃圾桶中的 ${project.recovery.filter((e) => e.deleted).length} 個項目，不受搜尋篩選影響。`
-              : `永久刪除「${purge?.name || ""}」。`}
-            此操作無法復原。
+              ? tr("m8e11f3dab6a8", [
+                  project.recovery.filter((e) => e.deleted).length,
+                ])
+              : tr("m9789e1105095", [purge?.name || ""])}
+            {tr("m9aeebb241ac5")}
           </DialogDescription>
           {error && <p role="alert">{error}</p>}
           <div className="dialog-actions">
             <button disabled={busy} onClick={() => setPurge(null)}>
-              取消
+              {tr("m2cd0f3be8738")}
             </button>
             <button
               className="danger"
               disabled={busy}
               onClick={() => void destroy()}
             >
-              永久刪除
+              {tr("m6671987c7186")}
             </button>
           </div>
         </DialogContent>

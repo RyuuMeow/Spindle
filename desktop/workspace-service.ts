@@ -1,3 +1,4 @@
+import { t as tr, validLanguage } from "../app/i18n";
 import { EntryJournal, projectMetadata } from "./entry-journal";
 import { planProjectEntry, entryActions } from "./project-entries";
 import { patchAppearance } from "../app/appearance/model";
@@ -56,16 +57,16 @@ function readScript(file: string) {
   return value;
 }
 export function withinRoot(root: string, name: string) {
-  if (!validDocumentName(name)) throw Error("檔案路徑無效");
+  if (!validDocumentName(name)) throw Error(tr("mfe0057cbbbb4"));
   const absolute = path.resolve(root, name),
     relative = path.relative(root, absolute);
   if (relative.startsWith("..") || path.isAbsolute(relative))
-    throw Error("檔案必須位於專案資料夾");
+    throw Error(tr("mfa7587f0f761"));
   let current = root;
   for (const part of relative.split(path.sep)) {
     current = path.join(current, part);
     if (fs.existsSync(current) && fs.lstatSync(current).isSymbolicLink())
-      throw Error("不直接寫入符號連結，請開啟實際來源資料夾");
+      throw Error(tr("m5271fe365870"));
   }
   return absolute;
 }
@@ -117,12 +118,7 @@ export class WorkspaceService {
       } catch (error) {
         const backup = this.profileFile + ".damaged-" + Date.now();
         fs.copyFileSync(this.profileFile, backup);
-        this.notices.push(
-          "工作區資料無法讀取，已保留救援副本：" +
-            backup +
-            "；" +
-            String(error),
-        );
+        this.notices.push(tr("m90c9c1ebb388") + backup + "；" + String(error));
       }
     this.engine = new DocumentEngine(projects);
     this.catalog = new ProjectCatalog(profile, projects);
@@ -142,7 +138,7 @@ export class WorkspaceService {
       for (const p of this.engine.projects.filter((p) => this.active.has(p.id)))
         for (const d of p.documents)
           if (this.lastSnapshots.get(d.id) !== d.text) {
-            this.engine.checkpoint(p.id, d.id, "定期快照");
+            this.engine.checkpoint(p.id, d.id, tr("md40dee58d047"));
             this.lastSnapshots.set(d.id, d.text);
           }
       this.changed();
@@ -164,11 +160,11 @@ export class WorkspaceService {
     )) {
       try {
         this.cache.save(this.recoveryStore.has(p) ? { ...p, recovery: [] } : p);
-        if (p.persistenceError?.startsWith("工作區草稿尚未保存："))
+        if (p.persistenceError?.startsWith(tr("m83888f1d84a1")))
           delete p.persistenceError;
       } catch (error) {
         // A different window's cache must not block leaving this workspace.
-        p.persistenceError = "工作區草稿尚未保存：" + String(error);
+        p.persistenceError = tr("m83888f1d84a1") + String(error);
       }
     }
     const state = this.snapshot();
@@ -181,7 +177,7 @@ export class WorkspaceService {
     if (!p.root || p.kind === "standalone") return;
     const dir = path.join(p.root, ".spindle");
     if (fs.existsSync(dir) && fs.lstatSync(dir).isSymbolicLink())
-      throw Error("專案設定目錄不可為符號連結");
+      throw Error(tr("mee1e585bdb6f"));
     this.entryJournal.metadata(p);
     atomicWrite(
       projectConfig(p.root),
@@ -195,23 +191,23 @@ export class WorkspaceService {
         this.recoveryStore.persist(p);
         delete p.persistenceError;
       } catch (error) {
-        p.persistenceError = "版本歷史尚未保存：" + String(error);
+        p.persistenceError = tr("m9763143efe32") + String(error);
       }
     }
     try {
       for (const p of this.engine.projects)
         for (const d of p.documents)
-          if (!d.path && d.error?.startsWith("復原草稿寫入失敗：")) {
+          if (!d.path && d.error?.startsWith(tr("m32b9dabb0ba4"))) {
             d.status = "draft";
             delete d.error;
           }
       this.persist();
       this.profileError = "";
       this.notices = this.notices.filter(
-        (message) => !message.startsWith("復原草稿寫入失敗："),
+        (message) => !message.startsWith(tr("m32b9dabb0ba4")),
       );
     } catch (error) {
-      const message = "復原草稿寫入失敗：" + String(error);
+      const message = tr("m32b9dabb0ba4") + String(error);
       this.profileError = message;
       for (const p of this.engine.projects)
         for (const d of p.documents)
@@ -252,7 +248,7 @@ export class WorkspaceService {
             ) ||
             p.persistenceError
           )
-            throw Error(p.persistenceError || "文件尚未保存");
+            throw Error(p.persistenceError || tr("m493941a2b199"));
           this.entryJournal.finish();
         }
         return result;
@@ -299,25 +295,26 @@ export class WorkspaceService {
     if (!force && ["conflict", "missing"].includes(d.status)) return false;
     try {
       if (p.root && withinRoot(p.root, d.name) !== d.path)
-        throw Error("文件路徑與專案不一致");
+        throw Error(tr("m87c595b62658"));
       if (!fs.existsSync(d.path)) {
         d.status = "missing";
-        d.error = "來源檔案已移除；請另存或明確恢復";
+        d.error = tr("mcaf0462c2a28");
         return false;
       }
       const disk = readScript(d.path);
       if (!force && d.diskHash && hash(disk) !== d.diskHash) {
         d.externalText = disk;
         d.status = "conflict";
-        d.error = "磁碟檔案已由其他程式修改";
+        d.error = tr("m42e5a7156477");
         return false;
       }
-      if ((fs.statSync(d.path).mode & 0o222) === 0) throw Error("檔案為唯讀");
+      if ((fs.statSync(d.path).mode & 0o222) === 0)
+        throw Error(tr("maccf42690c67"));
       d.status = "saving";
       atomicWrite(d.path, d.text, () => {
-        if (!fs.existsSync(d.path!)) throw Error("來源檔案已移除");
+        if (!fs.existsSync(d.path!)) throw Error(tr("m7ebaa672118d"));
         if (!force && d.diskHash && hash(readScript(d.path!)) !== d.diskHash)
-          throw Error("寫入期間磁碟版本已改變");
+          throw Error(tr("m4c2432c0347c"));
       });
       d.saved = d.text;
       d.diskHash = hash(d.text);
@@ -446,12 +443,12 @@ export class WorkspaceService {
         },
       );
       watcher.on("error", (error) => {
-        this.notices.push("資料夾監看失敗：" + String(error));
+        this.notices.push(tr("md49805f09654") + String(error));
         this.services.changed();
       });
       this.watchers.set(p.id, watcher);
     } catch (error) {
-      this.notices.push("無法監看資料夾：" + String(error));
+      this.notices.push(tr("m2b9030df0806") + String(error));
     }
   }
   private listFiles(root: string, folders?: string[]): string[] {
@@ -488,13 +485,13 @@ export class WorkspaceService {
       for (const d of p.documents.filter((d) => d.path)) {
         if (!fs.existsSync(d.path!)) {
           d.status = "missing";
-          d.error = "來源檔案已移除；內容仍保留";
+          d.error = tr("m5f1c042c9732");
           continue;
         }
         const disk = readScript(d.path!);
         if (hash(disk) === d.diskHash) continue;
         if (d.text === d.saved && !d.composing) {
-          this.engine.replace(p.id, d.id, disk, "外部更新");
+          this.engine.replace(p.id, d.id, disk, tr("m34d68c35e512"));
           d.saved = disk;
           d.diskHash = hash(disk);
           d.status = "saved";
@@ -503,7 +500,7 @@ export class WorkspaceService {
         } else {
           d.externalText = disk;
           d.status = "conflict";
-          d.error = "本地與磁碟都有修改，自動保存已暫停";
+          d.error = tr("m07a5af79bb3e");
         }
       }
       for (const name of names)
@@ -519,7 +516,7 @@ export class WorkspaceService {
           d.status = "saved";
         }
     } catch (error) {
-      this.notices.push("重新讀取專案失敗：" + String(error));
+      this.notices.push(tr("mee2881111c78") + String(error));
       for (const d of p.documents.filter((d) => d.path)) {
         d.status = "error";
         d.error = String(error);
@@ -552,7 +549,7 @@ export class WorkspaceService {
           Array.isArray(metadata) ||
           typeof metadata !== "object"
         )
-          throw Error("設定格式無效");
+          throw Error(tr("m7f2f7c6fae16"));
         validateCommands(
           metadata.commands === undefined ? [] : metadata.commands,
         );
@@ -564,7 +561,7 @@ export class WorkspaceService {
                 !f || typeof f.id !== "string" || typeof f.name !== "string",
             ))
         )
-          throw Error("專案檔案清單無效");
+          throw Error(tr("m64a6a2b6496d"));
         if (
           metadata.files &&
           (new Set(metadata.files.map((f) => f.id)).size !==
@@ -572,7 +569,7 @@ export class WorkspaceService {
             new Set(metadata.files.map((f) => f.name.toLowerCase())).size !==
               metadata.files.length)
         )
-          throw Error("專案檔案識別重複");
+          throw Error(tr("mb013d8afe7d5"));
         if (
           (metadata.name !== undefined && typeof metadata.name !== "string") ||
           (metadata.id !== undefined && typeof metadata.id !== "string") ||
@@ -580,9 +577,9 @@ export class WorkspaceService {
             (!Array.isArray(metadata.excluded) ||
               metadata.excluded.some((n) => typeof n !== "string")))
         )
-          throw Error("專案設定格式無效");
+          throw Error(tr("m76293c6199db"));
       } catch (error) {
-        throw Error("專案設定無法讀取，原始設定已保留：" + String(error));
+        throw Error(tr("m89a23529731c") + String(error));
       }
     }
     if (!existing) {
@@ -758,9 +755,15 @@ export class WorkspaceService {
         updates: this.engine.updates(a.projectId, a.documentId, a.version),
       };
     if (a.type === "bootstrap") {
-      if (!this.engine.projects.length && a.legacy?.documents.length && !fs.existsSync(path.join(this.profile,"legacy-import-v1.json"))) {
+      if (
+        !this.engine.projects.length &&
+        a.legacy?.documents.length &&
+        !fs.existsSync(path.join(this.profile, "legacy-import-v1.json"))
+      ) {
         const p = makeProject(
-          this.notices.length ? "復原工作區" : a.legacy?.name || "未命名專案",
+          this.notices.length
+            ? tr("m3f208d8cb012")
+            : a.legacy?.name || tr("m9009ac5a2f2b"),
           this.notices.length ? [] : a.legacy?.documents || [],
           this.notices.length ? [] : a.legacy?.commands || [],
         );
@@ -768,7 +771,10 @@ export class WorkspaceService {
         this.engine.projects.push(p);
         this.currentProjectId = p.id;
         this.persist();
-        atomicWrite(path.join(this.profile,"legacy-import-v1.json"), JSON.stringify({completed:true}));
+        atomicWrite(
+          path.join(this.profile, "legacy-import-v1.json"),
+          JSON.stringify({ completed: true }),
+        );
       }
     } else if (a.type === "openFolder") {
       const root = a.root || (await this.services.chooseFolder());
@@ -783,7 +789,7 @@ export class WorkspaceService {
           continue;
         }
         if (!file.toLowerCase().endsWith(".yarn"))
-          throw Error("請開啟 .yarn 或專案資料夾");
+          throw Error(tr("m570ba1583589"));
         const match = this.catalog.match(file);
         const p = match
           ? this.openFolder(match.root)
@@ -796,11 +802,10 @@ export class WorkspaceService {
     } else if (a.type === "createProject") {
       const root = a.root || (await this.services.chooseFolder());
       if (!root) return { snapshot: this.snapshot(), cancelled: true };
-      if (!validProjectFolderName(a.name))
-        throw Error("請輸入有效的專案資料夾名稱");
+      if (!validProjectFolderName(a.name)) throw Error(tr("mbb38283260ac"));
       const parent = canonicalPath(root),
         target = path.join(parent, a.name);
-      if (fs.existsSync(target)) throw Error("目的資料夾已存在");
+      if (fs.existsSync(target)) throw Error(tr("mf634b6f807e3"));
       fs.mkdirSync(target);
       const p = this.openFolder(target);
       projectId = p.id;
@@ -813,7 +818,7 @@ export class WorkspaceService {
       };
     } else if (a.type === "catalog") {
       const entry = this.catalog.entries.find((e) => e.id === a.id);
-      if (!entry) throw Error("專案紀錄已不存在");
+      if (!entry) throw Error(tr("m624a3ae2d305"));
       if (a.operation === "reveal") this.services.reveal(entry.root);
       else if (a.operation === "rename") {
         this.catalog.rename(a.id, a.name || "");
@@ -833,8 +838,21 @@ export class WorkspaceService {
         throw error;
       }
     } else if (a.type === "preferences") {
-      this.catalog.preferences.reopenLastProject = a.reopenLastProject;
-      this.catalog.persist();
+      const previous = structuredClone(this.catalog.preferences);
+      if (typeof a.reopenLastProject === "boolean")
+        this.catalog.preferences.reopenLastProject = a.reopenLastProject;
+      if (a.language !== undefined)
+        this.catalog.preferences.language = validLanguage(a.language);
+      if (typeof a.autoCheckUpdates === "boolean")
+        this.catalog.preferences.autoCheckUpdates = a.autoCheckUpdates;
+      if (typeof a.skippedVersion === "string")
+        this.catalog.preferences.skippedVersion = a.skippedVersion;
+      try {
+        this.catalog.persist();
+      } catch (error) {
+        this.catalog.preferences = previous;
+        throw error;
+      }
     } else if (a.type === "closeProject") {
       const failed = this.flush(a.projectId);
       if (
@@ -853,13 +871,20 @@ export class WorkspaceService {
       }
     } else if (a.type === "deleteDraft") {
       const p = this.engine.project(a.projectId);
-      if(p.root || p.kind === "standalone") throw Error("只能刪除待移轉草稿");
-      atomicWrite(path.join(this.profile,"legacy-import-v1.json"),JSON.stringify({completed:true}));
-      this.engine.projects = this.engine.projects.filter(item=>item!==p);
+      if (p.root || p.kind === "standalone") throw Error(tr("m6056b6304f0f"));
+      atomicWrite(
+        path.join(this.profile, "legacy-import-v1.json"),
+        JSON.stringify({ completed: true }),
+      );
+      this.engine.projects = this.engine.projects.filter((item) => item !== p);
     } else if (a.type === "migrateDraft") {
       const legacy = this.engine.project(a.projectId);
-      if(legacy.root || legacy.kind === "standalone") throw Error("只能轉存待移轉草稿");
-      atomicWrite(path.join(this.profile,"legacy-import-v1.json"),JSON.stringify({completed:true}));
+      if (legacy.root || legacy.kind === "standalone")
+        throw Error(tr("m792c3d42c5e8"));
+      atomicWrite(
+        path.join(this.profile, "legacy-import-v1.json"),
+        JSON.stringify({ completed: true }),
+      );
       const created = await this.execute({
         type: "createProject",
         name: a.name,
@@ -925,7 +950,7 @@ export class WorkspaceService {
                 .documents;
         this.engine.transaction(
           p.id,
-          a.type === "createScene" ? "新增場景" : "更名場景",
+          a.type === "createScene" ? tr("m0478321878a2") : tr("m4158d4fb045a"),
           documents,
         );
         documentId = a.documentId;
@@ -949,7 +974,7 @@ export class WorkspaceService {
           a.expectedCommands !== undefined &&
           a.expectedCommands !== JSON.stringify(p.commands)
         )
-          throw Error("指令定義已變更，請重新載入後套用；草稿已保留。");
+          throw Error(tr("m261b382d83f9"));
         if (
           a.type === "registerCommand" &&
           findCommand(a.command.name, p.commands)
@@ -965,10 +990,10 @@ export class WorkspaceService {
           p.recovery.push({
             id: randomUUID(),
             documentId: "@commands",
-            name: "指令定義",
+            name: tr("m7fc749991aed"),
             text: JSON.stringify(previous),
             at: Date.now(),
-            reason: "修改指令前",
+            reason: tr("m1c175d6668e0"),
           });
           p.recovery = p.recovery
             .filter((e) => e.documentId !== "@commands")
@@ -1036,9 +1061,7 @@ export class WorkspaceService {
               );
               if (cleanupFailure)
                 throw Error(
-                  String(error) +
-                    "；未完成檔案無法清理，請檢查磁碟權限後重試：" +
-                    String(cleanupFailure),
+                  String(error) + tr("mebb61ea9ed2e") + String(cleanupFailure),
                 );
               throw error;
             }
@@ -1050,7 +1073,7 @@ export class WorkspaceService {
         const d = this.engine.document(p.id, a.documentId),
           file = await this.services.saveDialog(d.name);
         if (!file) return { snapshot: this.snapshot(), cancelled: true };
-        if (!file.endsWith(".yarn")) throw Error("檔案副檔名必須為 .yarn");
+        if (!file.endsWith(".yarn")) throw Error(tr("mc9359150e3ef"));
         const absolute = path.resolve(file),
           relative = p.root ? path.relative(p.root, absolute) : null;
         if (
@@ -1062,7 +1085,7 @@ export class WorkspaceService {
             ),
           )
         )
-          throw Error("目的檔案已在工作區開啟，請使用其他檔名");
+          throw Error(tr("mbef6d3ed534e"));
         const inside =
           relative && !relative.startsWith("..") && !path.isAbsolute(relative);
         if (inside) {
@@ -1081,14 +1104,14 @@ export class WorkspaceService {
         } else {
           const targetRoot = path.dirname(absolute),
             targetName = path.basename(absolute);
-          if (!validDocumentName(targetName)) throw Error("目的檔名無效");
+          if (!validDocumentName(targetName)) throw Error(tr("m2207f9f93ddf"));
           const target = this.openFolder(targetRoot);
           if (
             target.documents.some(
               (other) => other.path?.toLowerCase() === absolute.toLowerCase(),
             )
           )
-            throw Error("目的檔案已存在於專案，請選擇其他檔名");
+            throw Error(tr("m89451b51ba3d"));
           atomicWrite(absolute, d.text);
           const copy = this.engine.create(target.id, targetName, d.text);
           copy.path = absolute;
@@ -1116,7 +1139,7 @@ export class WorkspaceService {
         if (p.root && plan.path !== plan.target) {
           for (const d of plan.documents)
             if (d.path && !this.saveDocument(p, d))
-              throw Error(d.error || "請先完成儲存");
+              throw Error(d.error || tr("ma556684cbeb5"));
           const from = plan.folder
             ? path.dirname(withinRoot(p.root, plan.path + "/folder.yarn"))
             : withinRoot(p.root, plan.path);
@@ -1124,7 +1147,7 @@ export class WorkspaceService {
             ? path.dirname(withinRoot(p.root, plan.target + "/folder.yarn"))
             : withinRoot(p.root, plan.target);
           if (fs.existsSync(to) && from.toLowerCase() !== to.toLowerCase())
-            throw Error("目的位置已存在");
+            throw Error(tr("m7b80b17617bd"));
           // Both paths are verified inside the project, including symlink ancestors.
           if (plan.folder || plan.documents.some((d) => d.path)) {
             this.entryJournal.sourceReady();
@@ -1137,12 +1160,13 @@ export class WorkspaceService {
         this.metadata(p);
       } else if (a.type === "trashFolder") {
         if (!validFolderName(a.name) || !projectFolders(p).includes(a.name))
-          throw Error("資料夾已不存在");
+          throw Error(tr("mbda62ac553c7"));
         const children = p.documents.filter((d) =>
           withinFolder(d.name, a.name),
         );
         for (const d of children)
-          if (!this.saveDocument(p, d)) throw Error(d.error || "請先完成保存");
+          if (!this.saveDocument(p, d))
+            throw Error(d.error || tr("m7f8e9edb13db"));
         this.recoveryStore.moveToTrash(p, a.name, true);
         for (const d of children) {
           clearTimeout(this.timers.get(d.id));
@@ -1158,15 +1182,16 @@ export class WorkspaceService {
             (x) => x.id !== d.id && x.name.toLowerCase() === name.toLowerCase(),
           )
         )
-          throw Error("檔名無效或已存在");
+          throw Error(tr("m5a364cf0b98a"));
         if (d.path && p.root) {
-          if (!this.saveDocument(p, d)) throw Error(d.error || "請先完成儲存");
+          if (!this.saveDocument(p, d))
+            throw Error(d.error || tr("ma556684cbeb5"));
           const target = withinRoot(p.root!, name);
           if (
             fs.existsSync(target) &&
             target.toLowerCase() !== d.path.toLowerCase()
           )
-            throw Error("目的檔案已存在");
+            throw Error(tr("mcecc5a28055c"));
           fs.mkdirSync(path.dirname(target), { recursive: true });
           this.entryJournal.sourceReady();
           fs.renameSync(d.path, target);
@@ -1176,20 +1201,21 @@ export class WorkspaceService {
         this.metadata(p);
       } else if (a.type === "removeDocument") {
         const d = this.engine.document(p.id, a.documentId);
-        if (!p.root) throw Error("單檔模式不提供專案刪除操作");
-        if (!this.saveDocument(p, d)) throw Error(d.error || "請先完成保存");
+        if (!p.root) throw Error(tr("mcdb482f960f9"));
+        if (!this.saveDocument(p, d))
+          throw Error(d.error || tr("m7f8e9edb13db"));
         this.recoveryStore.moveToTrash(p, d.name, false);
         clearTimeout(this.timers.get(d.id));
         this.engine.resetDocument(d.id);
         this.metadata(p);
       } else if (a.type === "resolve") {
         const d = this.engine.document(p.id, a.documentId);
-        this.engine.checkpoint(p.id, d.id, "解決外部修改前");
+        this.engine.checkpoint(p.id, d.id, tr("ma61ef89de3a6"));
         if (a.choice === "disk") {
           if (!d.path || !fs.existsSync(d.path))
-            throw Error("磁碟檔案已不存在，請另存");
+            throw Error(tr("mf083802d87b4"));
           const disk = readScript(d.path);
-          this.engine.replace(p.id, d.id, disk, "採用磁碟版本");
+          this.engine.replace(p.id, d.id, disk, tr("mfcfd41034f23"));
           d.saved = disk;
           d.diskHash = hash(disk);
           d.status = "saved";
@@ -1198,7 +1224,7 @@ export class WorkspaceService {
         } else this.saveDocument(p, d, true);
       } else if (a.type === "recover") {
         const entry = p.recovery.find((e) => e.id === a.recoveryId);
-        if (!entry) throw Error("找不到復原項目");
+        if (!entry) throw Error(tr("mc7d008af1df6"));
         if (entry.deleted) {
           const before = new Set(p.documents.map((d) => d.id));
           documentId = this.recoveryStore.restore(p, entry);
@@ -1213,7 +1239,7 @@ export class WorkspaceService {
             a.expectedText !== undefined &&
             JSON.stringify(p.commands) !== a.expectedText
           )
-            throw Error("指令已變更，請重新比較後再還原");
+            throw Error(tr("m229a5ee8f544"));
           const commands = JSON.parse(entry.text);
           validateCommands(commands);
           const previous = p.commands;
@@ -1227,10 +1253,10 @@ export class WorkspaceService {
           p.recovery.push({
             id: randomUUID(),
             documentId: "@commands",
-            name: "指令定義",
+            name: tr("m7fc749991aed"),
             text: JSON.stringify(previous),
             at: Date.now(),
-            reason: "恢復指令前",
+            reason: tr("m6ef7c4f577dc"),
           });
           this.changed();
           return { snapshot: this.snapshot(), documentId: "@commands" };
@@ -1242,9 +1268,9 @@ export class WorkspaceService {
               d.version !== a.expectedVersion) ||
             (a.expectedText !== undefined && d.text !== a.expectedText)
           )
-            throw Error("內容已變更，請重新比較後再還原");
-          this.engine.checkpoint(p.id, d.id, "恢復快照前");
-          this.engine.replace(p.id, d.id, entry.text, "恢復快照");
+            throw Error(tr("m307249f61830"));
+          this.engine.checkpoint(p.id, d.id, tr("ma2d1d76622c9"));
+          this.engine.replace(p.id, d.id, entry.text, tr("m1a84900c959a"));
           this.schedule(p, d);
           documentId = d.id;
         } else {
@@ -1280,7 +1306,7 @@ export class WorkspaceService {
           a.documentIds.length !== p.documents.length ||
           new Set(a.documentIds).size !== p.documents.length
         )
-          throw Error("排序清單無效");
+          throw Error(tr("mfcd5832bf47c"));
         const docs = a.documentIds.map((id) => this.engine.document(p.id, id));
         p.documents = docs;
         this.metadata(p);
@@ -1288,7 +1314,7 @@ export class WorkspaceService {
         const file = a.documentId
           ? this.engine.document(p.id, a.documentId).path
           : p.root;
-        if (!file) throw Error("此項目尚未連結磁碟路徑");
+        if (!file) throw Error(tr("m44ed78ebd61e"));
         this.services.reveal(file);
       } else if (a.type === "export") {
         const d = a.documentId

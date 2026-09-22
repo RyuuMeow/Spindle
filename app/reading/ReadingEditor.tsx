@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import {
   quietDiagnostic,
   diagnosticCursor,
@@ -190,7 +192,7 @@ export default function ReadingEditor(props: Props) {
         ]),
         EditorView.lineWrapping,
         drawSelection(),
-        placeholder("在這裡開始撰寫 Yarn 劇本"),
+        placeholder(tr("m75940e45a241")),
         gutterLineClass.compute([structure], (state) => {
           const lines = state.field(structure);
           const layout = readingLayout(lines);
@@ -210,7 +212,7 @@ export default function ReadingEditor(props: Props) {
           markerDOM: (open) => {
             const marker = document.createElement("span");
             marker.className = "reading-fold-marker";
-            marker.title = open ? "收合場景" : "展開場景";
+            marker.title = open ? tr("mb708dd537425") : tr("m7dcd826ad9b0");
             marker.setAttribute("aria-label", marker.title);
             marker.appendChild(readingIcon(open ? "expanded" : "collapsed"));
             return marker;
@@ -220,10 +222,10 @@ export default function ReadingEditor(props: Props) {
           placeholderDOM: (_view, unfold) => {
             const marker = document.createElement("span");
             marker.className = "reading-folded";
-            marker.textContent = "已收合";
-            marker.title = "展開場景";
+            marker.textContent = tr("mc83885aeeec7");
+            marker.title = tr("m7dcd826ad9b0");
             marker.setAttribute("role", "button");
-            marker.setAttribute("aria-label", "展開場景");
+            marker.setAttribute("aria-label", tr("m7dcd826ad9b0"));
             marker.tabIndex = 0;
             marker.onclick = unfold;
             marker.onkeydown = (event) => {
@@ -596,7 +598,7 @@ export default function ReadingEditor(props: Props) {
               : "760px",
         } as React.CSSProperties
       }
-      aria-label="即時渲染編輯器"
+      aria-label={tr("m85a531715832")}
       onContextMenu={(event) => {
         event.preventDefault();
         window.dispatchEvent(

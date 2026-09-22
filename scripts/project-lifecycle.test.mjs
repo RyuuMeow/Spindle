@@ -604,3 +604,38 @@ test("appearance patches persist globally and do not reimport old sessions", asy
     f.dispose();
   }
 });
+
+test("legacy draft removal leaves a receipt and does not resurrect from browser storage", async () => {
+  const f = fixture();
+  try {
+    const legacy = {
+      name: "The Last Light",
+      documents: [
+        { name: "Chapter.yarn", text: "edited draft", saved: "older draft" },
+      ],
+      commands: [],
+    };
+    await f.service.request({ type: "bootstrap", legacy });
+    const draft = f.service.snapshot().projects[0];
+    assert.equal(draft.documents[0].text, "edited draft");
+    await f.service.request({ type: "deleteDraft", projectId: draft.id });
+    f.restart();
+    await f.service.request({ type: "bootstrap", legacy });
+    assert.equal(f.service.snapshot().projects.length, 0);
+  } finally {
+    f.dispose();
+  }
+});
+test("language and update patches preserve unrelated preferences", async () => {
+  const f = fixture();
+  try {
+    await f.service.request({ type: "preferences", language: "en" });
+    await f.service.request({ type: "preferences", autoCheckUpdates: false });
+    assert.equal(f.service.snapshot().preferences.language, "en");
+    assert.equal(f.service.snapshot().preferences.autoCheckUpdates, false);
+    f.restart();
+    assert.equal(f.service.snapshot().preferences.language, "en");
+  } finally {
+    f.dispose();
+  }
+});

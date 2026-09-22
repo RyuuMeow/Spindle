@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import type { Node } from "../parser";
 import type { TextEdit } from "../workspace/types";
 import { lineOffset } from "../workspace/authoring";
@@ -64,7 +65,7 @@ export function sceneEdits(
   const body = source.slice(scope.from, scope.to),
     length = normalized(body).length;
   if (edits.some((e) => e.from < 0 || e.to < e.from || e.to > length))
-    throw Error("修改超出目前場景範圍");
+    throw Error(tr("mbe2d1aa0d248"));
   const changes = sourceEdits(body, edits).map((e) => ({
     ...e,
     insert: e.insert.replace(/\r?\n/g, source.includes("\r\n") ? "\r\n" : "\n"),

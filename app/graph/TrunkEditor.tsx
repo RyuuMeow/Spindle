@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { ViewportPortal } from "@xyflow/react";
 import { pathData, type TrunkGeometry } from "./layout-state";
 export default function TrunkEditor({
@@ -24,7 +25,7 @@ export default function TrunkEditor({
           className="flow-trunk-hit nodrag nopan"
           data-trunk-id={trunk.id}
           d={pathData(trunk.points)}
-          aria-label="共用幹線"
+          aria-label={tr("m1c72b6b4c43a")}
           role="button"
           tabIndex={0}
           onPointerDown={(e) => {

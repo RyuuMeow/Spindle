@@ -1,3 +1,5 @@
+import { APP_VERSION } from "../app/version";
+import { t as tr } from "../app/i18n";
 import fs from "node:fs";
 import { z } from "zod";
 import os from "node:os";
@@ -123,7 +125,7 @@ export class AgentInstaller {
     try {
       return registrySchema.parse(JSON.parse(text(this.registryFile)));
     } catch {
-      throw new Error("安裝紀錄無法讀取；保留既有設定。");
+      throw new Error(tr("m647ac0655a70"));
     }
   }
   private save(registry: Registry) {
@@ -142,14 +144,14 @@ export class AgentInstaller {
         if ((e as NodeJS.ErrnoException).code === "ESRCH") alive = false;
       }
       if (alive || !Number.isInteger(pid) || pid <= 0)
-        throw new Error("其他安裝正在執行；請稍後重試。");
+        throw new Error(tr("m34a6635982a6"));
       fs.unlinkSync(lock);
     }
     let fd: number;
     try {
       fd = fs.openSync(lock, "wx");
     } catch {
-      throw new Error("其他安裝正在執行；請稍後重試。");
+      throw new Error(tr("m34a6635982a6"));
     }
     try {
       fs.writeFileSync(fd, String(process.pid));
@@ -162,7 +164,7 @@ export class AgentInstaller {
   private safe(file: string) {
     for (let at = path.resolve(file); ; at = path.dirname(at)) {
       if (fs.existsSync(at) && fs.lstatSync(at).isSymbolicLink())
-        throw new Error("安裝路徑包含連結；請選擇實際目錄。");
+        throw new Error(tr("m102ebe7c7a00"));
       if (path.dirname(at) === at) break;
     }
   }
@@ -176,7 +178,7 @@ export class AgentInstaller {
   }
   target(client: AgentClient): Target {
     if (client !== "codex" && client !== "claude")
-      throw new Error("不支援的 Agent。");
+      throw new Error(tr("mf3ca0e801e74"));
     const overrides = fs.existsSync(this.targetsFile)
       ? targetsSchema.parse(JSON.parse(text(this.targetsFile)))
       : {};
@@ -206,7 +208,7 @@ export class AgentInstaller {
       const target = this.target(client),
         registry = this.registry();
       if (registry.entries[this.key(client, target)])
-        throw new Error("請先移除目前受管理的安裝，再變更路徑。");
+        throw new Error(tr("mfe31177e22ef"));
       const next =
         part === "config"
           ? { ...target, configPath: path.resolve(selected) }
@@ -279,19 +281,15 @@ export class AgentInstaller {
     this.options.beforeWrite?.();
     atomicWrite(file, content, () => {
       this.safe(file);
-      if (text(file) !== expected)
-        throw new Error("設定已由其他程式修改；請重新檢查再試。");
+      if (text(file) !== expected) throw new Error(tr("m3d64d03c6ea7"));
     });
   }
   install(client: AgentClient): InstallResult {
     return this.locked(() => {
-      if (!this.options.enabled())
-        throw new Error("請先啟用 MCP 唯讀或允許修改，並確認服務執行中。");
+      if (!this.options.enabled()) throw new Error(tr("m0c1a9e072617"));
       const state = this.inspect(client);
       if (state.mcp === "conflict" || state.skill === "conflict")
-        throw new Error(
-          state.error || "同名設定或 Skill 已被修改；保留原內容。",
-        );
+        throw new Error(state.error || tr("mc790e73e19ae"));
       const target = this.target(client),
         registry = this.registry(),
         key = this.key(client, target);
@@ -303,12 +301,12 @@ export class AgentInstaller {
         currentHash !== "absent" &&
         (!owned || ![owned.entryHash, owned.plannedHash].includes(currentHash))
       )
-        throw new Error("MCP 設定已由其他程式修改；保留原檔。");
+        throw new Error(tr("me1f70f512665"));
       const next = patchEntry(client, original, this.name(), value);
       const skillFile = path.join(target.skillPath, "SKILL.md"),
         oldSkill = text(skillFile),
         source = text(this.options.skillSource);
-      if (!source.startsWith("---")) throw new Error("內建 Skill 資源遺失。");
+      if (!source.startsWith("---")) throw new Error(tr("m5b5458f7b61f"));
       const skillKey = identity(target.skillPath);
       const record: RecordEntry = registry.entries[key] ?? {
         ...target,
@@ -329,10 +327,10 @@ export class AgentInstaller {
         oldSkill &&
         ![shared.hash, shared.plannedHash].includes(hash(oldSkill))
       )
-        throw new Error("Skill 已由其他程式修改；保留原檔。");
+        throw new Error(tr("m2be0b834184d"));
       shared.hash = fs.existsSync(skillFile) ? hash(oldSkill) : "absent";
       shared.plannedHash = hash(source);
-      shared.resourceVersion = "0.9.2";
+      shared.resourceVersion = APP_VERSION;
       if (!shared.owners.includes(key)) shared.owners.push(key);
       registry.skills[skillKey] = shared;
       this.save(registry);
@@ -347,14 +345,12 @@ export class AgentInstaller {
         this.save(registry);
         return {
           installation: this.inspect(client),
-          message:
-            "MCP 設定與 Skill 已寫入。請重新載入 Agent 或開啟新工作階段；尚未驗證 Agent 是否已載入工具。",
+          message: tr("m5a93d4d948ba"),
         };
       } catch {
         return {
           installation: this.inspect(client),
-          message:
-            "安裝部分完成；紀錄已保留。請檢查路徑權限或外部修改後重試，不會建立副本。",
+          message: tr("m65b6ed82ac80"),
         };
       }
     });
@@ -368,7 +364,7 @@ export class AgentInstaller {
       if (!record)
         return {
           installation: this.inspect(client),
-          message: "沒有可移除的受管理安裝；外部內容保留。",
+          message: tr("m35f835820555"),
         };
       const original = text(target.configPath),
         current = readEntry(client, original, record.name),
@@ -377,7 +373,7 @@ export class AgentInstaller {
         current !== undefined &&
         ![record.entryHash, record.plannedHash].includes(currentHash)
       )
-        throw new Error("MCP 設定已被外部修改；保留設定與 Skill。");
+        throw new Error(tr("m6c44e47f3a98"));
       const next =
         current === undefined
           ? original
@@ -412,14 +408,12 @@ export class AgentInstaller {
         this.save(registry);
         return {
           installation: this.inspect(client),
-          message: retained
-            ? "MCP 設定已移除；使用者修改過的 Skill 已保留。"
-            : "已移除本 profile 的安裝；其他設定及共用中的 Skill 保留。",
+          message: retained ? tr("m22b9377646e1") : tr("m563b0a187661"),
         };
       } catch {
         return {
           installation: this.inspect(client),
-          message: "移除部分完成；紀錄已保留，可重試。",
+          message: tr("m16c317368ae1"),
         };
       }
     });
@@ -438,7 +432,7 @@ export class AgentInstaller {
   async test(client: AgentClient): Promise<InstallResult> {
     const state = this.inspect(client);
     if (state.mcp !== "installed" || !this.options.enabled())
-      throw new Error("請先啟用服務並更新 MCP 安裝設定。");
+      throw new Error(tr("md32d051e973e"));
     const entry = readEntry(
       client,
       text(state.configPath),
@@ -450,8 +444,11 @@ export class AgentInstaller {
     };
     // Only connect to this profile's endpoint; edited/external URLs never receive its credential.
     if (entry.url !== this.options.connection().url)
-      throw new Error("連線網址不符。");
-    const sdk = new Client({ name: "spindle-install-check", version: "0.9.2" });
+      throw new Error(tr("m8257b3e81c08"));
+    const sdk = new Client({
+      name: "spindle-install-check",
+      version: APP_VERSION,
+    });
     const transport = new StreamableHTTPClientTransport(new URL(entry.url), {
       requestInit: { headers: entry.http_headers ?? entry.headers },
       fetch: (input, init) =>
@@ -469,10 +466,10 @@ export class AgentInstaller {
       return {
         installation: state,
         toolCount: response.tools.length,
-        message: `Spindle 握手成功，發現 ${response.tools.length} 個工具。這是連線測試，不代表 Agent 已載入。`,
+        message: tr("mf8f8af3c9e34", [response.tools.length]),
       };
     } catch {
-      throw new Error("連線檢查失敗；請確認服務、連接埠及憑證後重試。");
+      throw new Error(tr("m3403556e493b"));
     } finally {
       await sdk.close();
     }

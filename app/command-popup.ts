@@ -1,3 +1,4 @@
+import { t as tr } from "./i18n/index.ts";
 import type { CommandInfo } from "./command-catalog";
 import { commandLabel, parameterLabel } from "./command-hints";
 import { readingIcon } from "./reading/icons";
@@ -51,14 +52,15 @@ export function commandPopup(
     add(label, "strong", "", parameterLabel(p));
     if (p.displayName?.trim()) add(label, "code", "command-tip-id", p.name);
     add(label, "span", "command-tip-type", p.type);
-    if (!p.required) add(label, "span", "command-tip-optional", "選填");
+    if (!p.required)
+      add(label, "span", "command-tip-optional", tr("mefd49a86e463"));
     if (p.description) add(body, "p", "command-tip-description", p.description);
     if (p.defaultValue !== undefined && p.defaultValue !== "")
       add(
         body,
         "div",
         "command-tip-default",
-        "預設值：" + String(p.defaultValue),
+        tr("meb35f6afdae9") + String(p.defaultValue),
       );
   });
   if (
@@ -66,7 +68,7 @@ export function commandPopup(
     command.example !== command.syntax &&
     parameterIndex < 0
   ) {
-    add(dom, "div", "command-tip-caption", "範例");
+    add(dom, "div", "command-tip-caption", tr("m38a5716e46c9"));
     add(dom, "code", "command-tip-example", command.example);
   }
 
@@ -88,11 +90,14 @@ export function variablePopup(
   dom.className = "reading-command-tooltip variable-tooltip";
   for (const [className, text] of [
     ["command-tip-heading", variable.name + " · " + variable.type],
-    ["command-tip-example", "初始值：" + (variable.initialValue ?? "未知")],
+    [
+      "command-tip-example",
+      tr("me621fb6c3b6f") + (variable.initialValue ?? tr("m4d8c1c5b4283")),
+    ],
     ["command-tip-description", variable.description],
     [
       "command-tip-caption",
-      variable.file + ":" + variable.line + " · Ctrl＋點擊前往宣告",
+      variable.file + ":" + variable.line + tr("m7b0dc89688ff"),
     ],
   ]) {
     if (!text) continue;
@@ -113,7 +118,7 @@ export function scenePopup(scene: import("./scene-link").SceneLocation) {
       "command-tip-caption",
       (scene.file || "") + (scene.start ? ":" + scene.start : ""),
     ],
-    ["command-tip-description", "Ctrl＋點擊前往場景"],
+    ["command-tip-description", tr("m92ced19d7a08")],
   ]) {
     const row = document.createElement("div");
     row.className = className;

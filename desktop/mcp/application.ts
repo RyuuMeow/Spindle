@@ -1,3 +1,4 @@
+import { t as tr } from "../../app/i18n";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import type { z } from "zod";
@@ -760,7 +761,7 @@ export class AgentApplication {
     );
     return this.changes({
       ...a,
-      label: "Agent 快速修正",
+      label: tr("m430bece8b2ef"),
       change: { kind: "edits", documents },
     });
   }

@@ -34,6 +34,9 @@ export type ProjectCatalogEntry = {
   unavailable?: string;
 };
 export type AppPreferences = {
+  language?: import("../i18n").LanguagePreference;
+  autoCheckUpdates?: boolean;
+  skippedVersion?: string;
   editorAppearance?: import("../appearance/model").EditorAppearance;
   reopenLastProject: boolean;
   lastProjectId?: string;
@@ -171,7 +174,12 @@ export type WorkspaceAction =
       deleteDisk: boolean;
     }
   | { type: "registerCommand"; projectId: string; command: Command }
-  | { type: "commands"; projectId: string; commands: Command[]; expectedCommands?: string }
+  | {
+      type: "commands";
+      projectId: string;
+      commands: Command[];
+      expectedCommands?: string;
+    }
   | {
       type: "transaction";
       projectId: string;
@@ -195,11 +203,23 @@ export type WorkspaceAction =
       name?: string;
     }
   | { type: "appearance"; patch: import("../appearance/model").AppearancePatch }
-  | { type: "preferences"; reopenLastProject: boolean }
+  | {
+      type: "preferences";
+      reopenLastProject?: boolean;
+      language?: import("../i18n").LanguagePreference;
+      autoCheckUpdates?: boolean;
+      skippedVersion?: string;
+    }
   | { type: "closeProject"; projectId: string }
   | { type: "purgeTrash"; projectId: string; recoveryId?: string }
   | { type: "deleteDraft"; projectId: string }
-  | { type: "migrateDraft"; projectId: string; name: string; root: string; background?: boolean }
+  | {
+      type: "migrateDraft";
+      projectId: string;
+      name: string;
+      root: string;
+      background?: boolean;
+    }
   | { type: "openFiles"; paths?: string[] }
   | {
       type: "resolve";
@@ -245,6 +265,20 @@ export type DesktopBridge = {
   titleBarOverlay: boolean;
   windowId: string;
   version: string;
+  locale: string;
+  updates: {
+    action: (
+      action: "state" | "check" | "skip" | "cancel" | "install",
+    ) => Promise<import("../../desktop/update-service").UpdateState>;
+    subscribe: (
+      callback: (value: {
+        state: import("../../desktop/update-service").UpdateState;
+        prompt: boolean;
+      }) => void,
+    ) => () => void;
+  };
+  restart: () => Promise<void>;
+  commandDraftDecision: () => Promise<"apply" | "discard" | "cancel">;
   request: (action: WorkspaceAction) => Promise<ActionResult>;
   subscribe: (callback: () => void) => () => void;
   session: {

@@ -1,10 +1,25 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileText, Search, X, Plus, Settings2, Terminal, CornerDownLeft } from "lucide-react";
+import {
+  FileText,
+  Search,
+  X,
+  Plus,
+  Settings2,
+  Terminal,
+  CornerDownLeft,
+} from "lucide-react";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ChromeButton } from "@/components/ChromeButton";
-import { paletteSearch, type PaletteHit, type SettingEntry, type SearchScope } from "./search";
+import {
+  paletteSearch,
+  type PaletteHit,
+  type SettingEntry,
+  type SearchScope,
+} from "./search";
 import type { DocumentRecord } from "./types";
 import "./overlays.css";
 export type SearchDismissReason = "escape" | "outside" | "blur" | "choose";
@@ -45,7 +60,10 @@ export function SearchOverlay({
   onClose,
   newTab = false,
   onCreate,
-  commands = [], settings = [], recent = [], onChoose,
+  commands = [],
+  settings = [],
+  recent = [],
+  onChoose,
 }: {
   documents: DocumentRecord[];
   query: string;
@@ -53,7 +71,9 @@ export function SearchOverlay({
   scope: SearchScope;
   onScope: (scope: SearchScope) => void;
   onNavigate: (hit: import("./search").SearchHit, newTab: boolean) => void;
-  commands?: import("../parser").Command[]; settings?: SettingEntry[]; recent?: string[];
+  commands?: import("../parser").Command[];
+  settings?: SettingEntry[];
+  recent?: string[];
   onChoose?: (hit: PaletteHit) => void;
   onClose: (reason: SearchDismissReason) => void;
   newTab?: boolean;
@@ -68,7 +88,16 @@ export function SearchOverlay({
   const onCloseRef = useRef(onClose);
   const [selection, setSelection] = useState({ query, scope, index: 0 });
   const { hits, total, invalidName } = useMemo(
-    () => paletteSearch({documents,commands,settings,recent,query,scope,canCreate:!!onCreate}),
+    () =>
+      paletteSearch({
+        documents,
+        commands,
+        settings,
+        recent,
+        query,
+        scope,
+        canCreate: !!onCreate,
+      }),
     [documents, commands, settings, recent, query, scope, onCreate],
   );
   const current =
@@ -138,7 +167,7 @@ export function SearchOverlay({
       ref={panel}
       className="search-overlay"
       role="dialog"
-      aria-label={newTab ? "新增分頁" : "全局搜尋"}
+      aria-label={newTab ? tr("ma38d62ae74d4") : tr("m77fd2d10b9fd")}
       data-workspace-overlay="search"
       onKeyDown={(event) => {
         if (event.nativeEvent.isComposing || composing.current) return;
@@ -153,13 +182,15 @@ export function SearchOverlay({
         <Search size={19} aria-hidden="true" />
         <input
           ref={input}
-          aria-label={scope === "files" ? "搜尋劇本" : "搜尋全專案文字"}
+          aria-label={
+            scope === "files" ? tr("m99ee2db34b01") : tr("mcf9e54061438")
+          }
           placeholder={
             newTab
-              ? "選擇劇本，在新分頁開啟"
+              ? tr("m62ac9359e34b")
               : scope === "files"
-                ? "搜尋檔名或路徑"
-                : "搜尋台詞、角色、場景…"
+                ? tr("med7fcd61895d")
+                : tr("m7c4c744bf792")
           }
           value={query}
           onChange={(event) => onQuery(event.target.value)}
@@ -203,7 +234,7 @@ export function SearchOverlay({
         />
         {query && (
           <ChromeButton
-            title="清除搜尋"
+            title={tr("m0c2d1a3aeaff")}
             onClick={() => {
               onQuery("");
               input.current?.focus();
@@ -216,32 +247,35 @@ export function SearchOverlay({
       </div>
       <div className="search-overlay-meta">
         {newTab ? (
-          <span>新增分頁</span>
+          <span>{tr("ma38d62ae74d4")}</span>
         ) : (
           <SegmentedControl
-            label="搜尋範圍"
+            label={tr("m0e63548278eb")}
             value={scope}
             onChange={(value) => onScope(value as SearchScope)}
             options={[
-              { value: "all", label: "全部" },
-              { value: "content", label: "內容" },
-              { value: "settings", label: "設定" },
-              { value: "commands", label: "指令" },
-              { value: "files", label: "檔案" },
+              { value: "all", label: tr("m5c55a67935af") },
+              { value: "content", label: tr("m21e5bce6a622") },
+              { value: "settings", label: tr("m0d8619aae051") },
+              { value: "commands", label: tr("m6ee4a9a86f73") },
+              { value: "files", label: tr("ma11ac5efe91d") },
             ]}
           />
         )}
         <span role="status">
           {query.trim()
-            ? `${total} 個結果${total > hits.length ? `，顯示前 ${hits.length} 筆` : ""}`
-            : "劇本"}
+            ? tr("m21f3677bcc05", [
+                total,
+                total > hits.length ? tr("m8974422d941c", [hits.length]) : "",
+              ])
+            : tr("m627b75e6aced")}
         </span>
       </div>
       <div
         className="search-overlay-results"
         id={listId}
         role="listbox"
-        aria-label="搜尋結果"
+        aria-label={tr("m0cbcf954d0cc")}
       >
         {hits.map((hit, index) => (
           <button
@@ -264,13 +298,23 @@ export function SearchOverlay({
               }
             }}
           >
-            {hit.kind === "create" ? <Plus size={16}/> : hit.kind === "setting" ? <Settings2 size={16}/> : hit.kind === "command" ? <Terminal size={16}/> : <FileText size={16}/> }
+            {hit.kind === "create" ? (
+              <Plus size={16} />
+            ) : hit.kind === "setting" ? (
+              <Settings2 size={16} />
+            ) : hit.kind === "command" ? (
+              <Terminal size={16} />
+            ) : (
+              <FileText size={16} />
+            )}
             <span className="search-result-body">
               <span className="search-result-text">
                 <Highlight
                   text={hit.text}
                   query={query}
-                  context={hit.kind === "document" && hit.hit.kind === "content"}
+                  context={
+                    hit.kind === "document" && hit.hit.kind === "content"
+                  }
                 />
               </span>
               <small>{hit.detail}</small>
@@ -286,15 +330,19 @@ export function SearchOverlay({
         ))}
         {!hits.length && (
           <p className="search-overlay-empty">
-            {invalidName ? "名稱不可包含路徑、保留名稱或無效字元。" : documents.length
-              ? "沒有符合的項目，試試其他關鍵字。"
-              : "專案還沒有劇本。"}
+            {invalidName
+              ? tr("m31505fe0ec22")
+              : documents.length
+                ? tr("mac222982bd40")
+                : tr("mc6650d11ca97")}
           </p>
         )}
       </div>
       <div className="search-overlay-footer">
-        <span>方向鍵選擇 · Enter 開啟{!newTab && " · Ctrl+Enter 新分頁"}</span>
-
+        <span>
+          {tr("m017f56f2238c")}
+          {!newTab && tr("m897fd63576ef")}
+        </span>
       </div>
     </div>,
     document.body,

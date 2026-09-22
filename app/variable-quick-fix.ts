@@ -1,3 +1,4 @@
+import { t as tr } from "./i18n/index.ts";
 import { commandCall } from "./command-hints";
 import type { Command } from "./parser";
 import {
@@ -77,7 +78,7 @@ export function variableQuickFix(
       to: prefix.to,
       insert: "$" + prefix.name,
       replace: true,
-      label: "補上變數前綴 $",
+      label: tr("m7d1ce55bf07e"),
     };
   const types = new Map(
     variables.filter((v) => v.declared).map((v) => [v.name, v.type]),
@@ -103,7 +104,7 @@ export function variableQuickFix(
         to: empty[1].length,
         insert: " = " + defaults[type],
         replace: true,
-        label: "補上指定運算子與 " + type + " 初始值",
+        label: tr("mace55b15c9d6") + type + tr("mf2921e5b0707"),
       };
   }
   if (assignment) {
@@ -127,8 +128,14 @@ export function variableQuickFix(
         insert: defaults[expected],
         replace: true,
         label: value
-          ? "改為 " + expected + " 預設值 " + defaults[expected]
-          : "補上 " + expected + " 初始值 " + defaults[expected],
+          ? tr("m2c8212e0cc81") +
+            expected +
+            tr("m576a77a40390") +
+            defaults[expected]
+          : tr("ma266c7aeb367") +
+            expected +
+            tr("mf2921e5b0707") +
+            defaults[expected],
       };
     }
   }
@@ -143,7 +150,7 @@ export function variableQuickFix(
         to: condition[1].length + condition[2].length,
         insert: (/\s$/.test(condition[1]) ? "" : " ") + "true",
         replace: true,
-        label: "補正為 boolean 預設值 true",
+        label: tr("mf20c365309ac"),
       };
   }
   const call = commandCall(line, commands);
@@ -167,7 +174,7 @@ export function variableQuickFix(
             (line[at - 1]?.match(/\s/) ? "" : " ") +
             remaining.map((p) => defaults[p.type]).join(" "),
           replace: true,
-          label: "補上必要參數預設值",
+          label: tr("mcf348191b695"),
         };
       }
       if (span) {
@@ -186,7 +193,7 @@ export function variableQuickFix(
             to: span.to,
             insert: "$" + value,
             replace: true,
-            label: "補上變數前綴 $",
+            label: tr("m7d1ce55bf07e"),
           };
         if (actual && actual !== "expression" && actual !== param.type)
           return {
@@ -196,7 +203,12 @@ export function variableQuickFix(
             insert: initial,
             replace: true,
             label:
-              "將 " + param.name + " 改為 " + param.type + " 預設值 " + initial,
+              tr("me400c5484ebf") +
+              param.name +
+              tr("m2c8212e0cc81") +
+              param.type +
+              tr("m576a77a40390") +
+              initial,
           };
       }
     }
@@ -223,12 +235,12 @@ export function variableQuickFix(
         to: from + match[2].length,
         insert: JSON.stringify(match[2]),
         replace: true,
-        label: "補上雙引號",
+        label: tr("m961797814b59"),
       };
     }
   }
   const declaration = missingDeclaration(line, column, variables);
   return declaration
-    ? { ...declaration, replace: false, label: "新增宣告" }
+    ? { ...declaration, replace: false, label: tr("mb4d233ea3787") }
     : null;
 }

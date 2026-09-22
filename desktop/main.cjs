@@ -1,3 +1,4 @@
+const { t: tr, locale } = require("./i18n.cjs");
 const {
   app,
   BrowserWindow,
@@ -14,6 +15,19 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { randomUUID } = require("node:crypto");
+try {
+  const dir =
+    app.commandLine.getSwitchValue("user-data-dir") ||
+    path.join(app.getPath("appData"), "Yarn Workbench");
+  const prefs = JSON.parse(
+    fs.readFileSync(path.join(dir, "project-catalog-v1.json"), "utf8"),
+  );
+  process.env.SPINDLE_LOCALE = prefs.preferences?.language || "system";
+} catch (error) {
+  if (error.code !== "ENOENT")
+    console.warn("Unable to load language preference");
+}
+
 const {
   WorkspaceService,
   atomicWrite,
@@ -115,6 +129,7 @@ function createWindow(id = randomUUID(), initial, foreground = true) {
       additionalArguments: [
         `--yarn-window-id=${id}`,
         `--yarn-version=${app.getVersion()}`,
+        `--spindle-locale=${locale()}`,
       ],
     },
   });
@@ -145,7 +160,15 @@ function createWindow(id = randomUUID(), initial, foreground = true) {
   window.once("ready-to-show", showInitialWindow);
   // A hidden secondary process can finish its workspace without a first paint.
   // The validated renderer handshake is also sufficient to show it, once only.
-  void ready.then(showInitialWindow);
+  void ready.then(() => {
+    showInitialWindow();
+    const updateToken = app.commandLine.getSwitchValue("spindle-update-token");
+    if (/^[a-f0-9-]{36}$/.test(updateToken))
+      atomicWrite(
+        path.join(app.getPath("userData"), "updates", updateToken + ".ready"),
+        "ready",
+      );
+  });
   window.webContents.setWindowOpenHandler(({ url }) => {
     openExternal(url);
     return { action: "deny" };
@@ -173,10 +196,10 @@ function createWindow(id = randomUUID(), initial, foreground = true) {
         window.webContents.send("workspace:close-cancelled");
         const choice = await dialog.showMessageBox(window, {
           type: "warning",
-          title: "尚未完成保存",
-          message: "視窗已保留，請重試保存後再關閉。",
+          title: tr("mc1f4025e9e8c"),
+          message: tr("m750fd727b6ef"),
           detail: error,
-          buttons: ["重試保存", "返回編輯"],
+          buttons: [tr("m7a824d822e96"), tr("m9f2b484bc113")],
           defaultId: 1,
           cancelId: 1,
         });
@@ -186,16 +209,16 @@ function createWindow(id = randomUUID(), initial, foreground = true) {
       }
       try {
         if (windows.get(id)?.projectId !== closingProject)
-          throw Error("保存期間工作區已變更，視窗已保留。");
+          throw Error(tr("m127eac08d660"));
         completeClose();
       } catch (error) {
         closePending = false;
         window.webContents.send("workspace:close-cancelled");
         await dialog.showMessageBox(window, {
           type: "error",
-          message: "保存未完成，視窗已保留。",
+          message: tr("m0af3bb06c0b7"),
           detail: String(error),
-          buttons: ["繼續編輯"],
+          buttons: [tr("m24a05e3c2c3b")],
         });
       }
     };
@@ -204,10 +227,7 @@ function createWindow(id = randomUUID(), initial, foreground = true) {
         return;
       void finish(typeof value.error === "string" ? value.error : undefined);
     };
-    const timer = setTimeout(
-      () => void finish("編輯器尚未回應，未關閉視窗以保留內容。"),
-      15000,
-    );
+    const timer = setTimeout(() => void finish(tr("m4df91e6f12f8")), 15000);
     ipcMain.on("workspace:close-prepared", acknowledged);
     window.webContents.send("workspace:prepare-close", token);
   });
@@ -223,7 +243,7 @@ function createWindow(id = randomUUID(), initial, foreground = true) {
     try {
       saveSessions();
     } catch (error) {
-      console.error("視窗布局保存失敗", error);
+      console.error(tr("m056e496b1d04"), error);
     }
     closeApproved = true;
     window.close();
@@ -252,7 +272,7 @@ function createWindow(id = randomUUID(), initial, foreground = true) {
     });
   window.on("closed", () => clearTimeout(geometryTimer));
   window.loadURL(origin + "/").catch((error) => {
-    dialog.showErrorBox("Spindle 無法啟動", error.message);
+    dialog.showErrorBox(tr("mf22f4a180ebd"), error.message);
     window.destroy();
   });
   return window;
@@ -266,14 +286,14 @@ async function moveTab(source, tab, projectId, targetId, point) {
       .documents.some((d) => d.id === tab.documentId) &&
       !["@commands", "@settings", "@recovery"].includes(tab.documentId))
   )
-    throw Error("分頁已不存在");
+    throw Error(tr("m0eaf2d6c6027"));
   if (targetId === source.id) return;
   let target = targetId ? windows.get(targetId) : null;
-  if (targetId && !target) throw Error("目標視窗已關閉");
+  if (targetId && !target) throw Error(tr("m0513fd07e28c"));
   if (target) {
     const session = sessions[targetId]?.session;
     if (session && session.projectId !== projectId)
-      throw Error("只能移至相同專案的視窗");
+      throw Error(tr("m6d2882ef5c49"));
   }
   if (!target) {
     const id = randomUUID();
@@ -301,7 +321,7 @@ async function moveTab(source, tab, projectId, targetId, point) {
     target = windows.get(id);
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(
-        () => reject(Error("新視窗開啟逾時；原分頁已保留")),
+        () => reject(Error(tr("mfff359bdcb3a"))),
         20000,
       );
       target.ready.then(() => {
@@ -310,11 +330,11 @@ async function moveTab(source, tab, projectId, targetId, point) {
       });
       window.webContents.once("did-fail-load", () => {
         clearTimeout(timeout);
-        reject(Error("新視窗無法載入；原分頁已保留"));
+        reject(Error(tr("m09f33af50a93")));
       });
       window.once("closed", () => {
         clearTimeout(timeout);
-        reject(Error("新視窗已關閉；原分頁已保留"));
+        reject(Error(tr("m7c0187638a14")));
       });
     });
   } else {
@@ -399,20 +419,22 @@ function wire() {
       return { snapshot: service.snapshot(), cancelled: true };
     }
     if (action.type === "closeProject" && item.projectId !== action.projectId)
-      throw Error("工作區保存範圍已改變");
+      throw Error(tr("mb4a9a54e4de3"));
     if (
       action.type === "save" &&
       (!item.projectId || item.projectId !== action.projectId)
     )
-      throw Error("不可保存其他視窗的專案");
+      throw Error(tr("m48316baa104b"));
     if (
-      ["openFolder", "createProject", "migrateDraft"].includes(action.type) && !action.background &&
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      !action.background &&
       item.projectId
     )
       flushWindow(service, item);
     const result = await service.request(action);
     if (
-      ["openFolder", "createProject", "migrateDraft"].includes(action.type) && !action.background &&
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      !action.background &&
       result.projectId
     ) {
       const existing = [...windows.values()].find(
@@ -428,7 +450,8 @@ function wire() {
       }
     }
     if (
-      ["openFolder", "createProject", "migrateDraft"].includes(action.type) && !action.background &&
+      ["openFolder", "createProject", "migrateDraft"].includes(action.type) &&
+      !action.background &&
       result.projectId &&
       !result.cancelled
     )
@@ -447,14 +470,14 @@ function wire() {
   ipcMain.handle("workspace:session-save", (event, value) => {
     const { id } = owner(event);
     if (value.id !== id || !Array.isArray(value.tabs))
-      throw Error("工作階段格式錯誤");
+      throw Error(tr("m0b455487ece5"));
     const item = windows.get(id),
       nextProjectId = value.screen === "home" ? "" : value.projectId;
     if (
       nextProjectId !== item.projectId &&
       item.pendingProjectId !== nextProjectId
     )
-      throw Error("工作區切換尚未完成保存或開啟流程");
+      throw Error(tr("m699f9e580006"));
     saveProjectView(value);
     sessions[id] = { ...sessions[id], session: value };
     if (item.pendingProjectId === nextProjectId) delete item.pendingProjectId;
@@ -528,7 +551,9 @@ else {
       openPaths(
         files,
         [...windows.values()].find((w) => w.window === focused()),
-      ).catch((error) => dialog.showErrorBox("無法開啟", error.message));
+      ).catch((error) =>
+        dialog.showErrorBox(tr("m0ca495c92bd3"), error.message),
+      );
     else {
       focused()?.restore();
       focused()?.show();
@@ -550,7 +575,7 @@ else {
             Array.isArray(projectViews) ||
             typeof projectViews !== "object"
           )
-            throw Error("專案視圖格式錯誤");
+            throw Error(tr("mca662fbaaad9"));
         } catch (error) {
           fs.copyFileSync(
             projectViewsFile,
@@ -567,10 +592,10 @@ else {
             typeof sessions !== "object" ||
             Array.isArray(sessions)
           )
-            throw Error("視窗工作階段格式無效");
+            throw Error(tr("m6ba6296e7d99"));
           for (const [id, entry] of Object.entries(sessions)) {
             if (!entry || typeof entry !== "object")
-              throw Error("視窗工作階段格式無效");
+              throw Error(tr("m6ba6296e7d99"));
             if (entry.session)
               entry.session = restoreSession(
                 entry.session,
@@ -585,7 +610,7 @@ else {
                 entry.bounds.width <= 0 ||
                 entry.bounds.height <= 0)
             )
-              throw Error("視窗位置損毀");
+              throw Error(tr("mc628bc940385"));
           }
         } catch (error) {
           fs.copyFileSync(sessionFile, sessionFile + ".damaged-" + Date.now());
@@ -649,53 +674,220 @@ else {
         callback(false),
       );
       session.defaultSession.setPermissionCheckHandler(() => false);
-      agentHost = require("./mcp-windows.cjs")({ windows, sessions: () => sessions, service, ipcMain, owner, createWindow, sessionForResult });
-      mcpRuntime = require("./mcp-runtime.cjs").createMcpRuntime(profile, service, agentHost);
-      ipcMain.handle("agent:settings", event => { owner(event); return mcpRuntime.settings(); });
-      ipcMain.handle("agent:configure", (event, patch) => { owner(event); return mcpRuntime.configure(patch).then(value => { broadcast(); return value; }); });
+      agentHost = require("./mcp-windows.cjs")({
+        windows,
+        sessions: () => sessions,
+        service,
+        ipcMain,
+        owner,
+        createWindow,
+        sessionForResult,
+      });
+      mcpRuntime = require("./mcp-runtime.cjs").createMcpRuntime(
+        profile,
+        service,
+        agentHost,
+      );
+      ipcMain.handle("agent:settings", (event) => {
+        owner(event);
+        return mcpRuntime.settings();
+      });
+      ipcMain.handle("agent:configure", (event, patch) => {
+        owner(event);
+        return mcpRuntime.configure(patch).then((value) => {
+          broadcast();
+          return value;
+        });
+      });
       ipcMain.handle("workspace:copy-text", (event, text) => {
         owner(event);
         if (typeof text !== "string") throw new Error("Invalid clipboard text");
         clipboard.writeText(text);
       });
-      ipcMain.handle("agent:connection", event => { owner(event); return mcpRuntime.connection(); });
+      ipcMain.handle("agent:connection", (event) => {
+        owner(event);
+        return mcpRuntime.connection();
+      });
       const { AgentInstaller } = require("./mcp-runtime.cjs");
       const installer = new AgentInstaller(profile, {
         defaultProfile: path.join(app.getPath("appData"), "Yarn Workbench"),
         skillSource: path.join(__dirname, "../skills/spindle/SKILL.md"),
         connection: () => mcpRuntime.connection(),
-        enabled: () => mcpRuntime.settings().running && mcpRuntime.settings().mode !== "disabled",
+        enabled: () =>
+          mcpRuntime.settings().running &&
+          mcpRuntime.settings().mode !== "disabled",
       });
-      const checkClient = client => {
-        if (!["codex", "claude"].includes(client)) throw new Error("不支援的 Agent");
+      const checkClient = (client) => {
+        if (!["codex", "claude"].includes(client))
+          throw new Error(tr("m5f4e4dd4c7f9"));
       };
-      ipcMain.handle("agent:installations", event => {
-        owner(event); return [installer.inspect("codex"), installer.inspect("claude")];
+      ipcMain.handle("agent:installations", (event) => {
+        owner(event);
+        return [installer.inspect("codex"), installer.inspect("claude")];
       });
       ipcMain.handle("agent:install-action", async (event, client, action) => {
-        owner(event); checkClient(client);
-        if (!["install", "remove", "test"].includes(action)) throw new Error("不支援的安裝操作");
+        owner(event);
+        checkClient(client);
+        if (!["install", "remove", "test"].includes(action))
+          throw new Error(tr("m7f021dc1db14"));
         return installer[action](client);
       });
       ipcMain.handle("agent:install-path", async (event, client, part) => {
-        owner(event); checkClient(client);
-        if (!["config", "skill"].includes(part)) throw new Error("不支援的路徑類型");
+        owner(event);
+        checkClient(client);
+        if (!["config", "skill"].includes(part))
+          throw new Error(tr("mfc160e5a873f"));
         const window = BrowserWindow.fromWebContents(event.sender);
         const target = installer.target(client);
-        const selected = part === "config"
-          ? await dialog.showSaveDialog(window, { title: "選擇 Agent 使用者設定檔", defaultPath: target.configPath, properties: ["showHiddenFiles", "dontAddToRecent"], buttonLabel: "選擇設定檔" })
-          : await dialog.showOpenDialog(window, { title: "選擇 Skill 上層目錄（將建立 spindle 子目錄）", defaultPath: path.dirname(target.skillPath), properties: ["openDirectory", "createDirectory", "showHiddenFiles", "dontAddToRecent"] });
-        const chosen = part === "config" ? selected.filePath : selected.filePaths?.[0];
-        if (!selected.canceled && chosen) return installer.setTarget(client, part, chosen);
+        const selected =
+          part === "config"
+            ? await dialog.showSaveDialog(window, {
+                title: tr("m49902ed261bf"),
+                defaultPath: target.configPath,
+                properties: ["showHiddenFiles", "dontAddToRecent"],
+                buttonLabel: tr("me182a105f6b0"),
+              })
+            : await dialog.showOpenDialog(window, {
+                title: tr("m17f5c44204a2"),
+                defaultPath: path.dirname(target.skillPath),
+                properties: [
+                  "openDirectory",
+                  "createDirectory",
+                  "showHiddenFiles",
+                  "dontAddToRecent",
+                ],
+              });
+        const chosen =
+          part === "config" ? selected.filePath : selected.filePaths?.[0];
+        if (!selected.canceled && chosen)
+          return installer.setTarget(client, part, chosen);
         return installer.inspect(client);
       });
       ipcMain.handle("agent:connection-format", (event, format) => {
         owner(event);
-        if (!["codex", "claude", "http"].includes(format)) throw new Error("不支援的格式");
+        if (!["codex", "claude", "http"].includes(format))
+          throw new Error(tr("m2c5751f2debd"));
         return installer.format(format);
       });
       await mcpRuntime.start();
       wire();
+      const restartFile = path.join(profile, "restart-once-v1.json");
+      const restart = require("./restart.cjs").createRestartCoordinator({
+        windows,
+        ipcMain,
+        flush: (item) => flushWindow(service, item),
+        record: (items) => {
+          for (const item of items)
+            sessions[item.id] = {
+              ...sessions[item.id],
+              bounds: item.window.getNormalBounds(),
+              maximized: item.window.isMaximized(),
+            };
+          saveSessions();
+          atomicWrite(
+            restartFile,
+            JSON.stringify({
+              created: Date.now(),
+              ids: items.map((i) => i.id),
+              workspaces: items
+                .filter((i) => i.projectId)
+                .map((i) => {
+                  const p = service.engine.project(i.projectId);
+                  return {
+                    id: p.id,
+                    root: p.root,
+                    files:
+                      p.kind === "standalone"
+                        ? p.documents.map((d) => d.path).filter(Boolean)
+                        : [],
+                  };
+                }),
+            }),
+          );
+        },
+        commit: () => {
+          app.relaunch({
+            execPath: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath,
+          });
+          quitting = true;
+          app.quit();
+        },
+      });
+      const updates = new (require("./update-service.cjs").UpdateService)({
+        profile,
+        locale: locale(),
+        portable: process.env.PORTABLE_EXECUTABLE_FILE,
+        executable: process.execPath,
+        resources: __dirname,
+        preferences: () => service.catalog.preferences,
+        skip: (version) => {
+          service.catalog.preferences.skippedVersion = version;
+          service.catalog.persist();
+          broadcast();
+        },
+        changed: (state, prompt) => {
+          for (const item of windows.values())
+            if (!item.window.isDestroyed())
+              item.window.webContents.send("app:update-state", {
+                state,
+                prompt: prompt && item.window === focused(),
+              });
+        },
+        prepare: (commit) =>
+          restart(async () => {
+            quitting = true;
+            try {
+              await commit();
+            } catch (e) {
+              quitting = false;
+              throw e;
+            }
+          }),
+        failedInstall: () => {
+          quitting = false;
+          if (fs.existsSync(restartFile)) fs.unlinkSync(restartFile);
+          for (const item of windows.values())
+            if (!item.window.isDestroyed())
+              item.window.webContents.send("workspace:close-cancelled");
+        },
+        exit: () => {
+          quitting = true;
+          app.quit();
+        },
+      });
+      ipcMain.handle("app:update", (event, action) => {
+        owner(event);
+        if (action === "state") return updates.state;
+        if (action === "check") return updates.check(true);
+        if (action === "skip") return updates.skip();
+        if (action === "cancel") return updates.cancel();
+        if (action === "install") return updates.install();
+        throw Error("Unknown update action");
+      });
+      const updateTimer = setTimeout(() => {
+        if (service.catalog.preferences.autoCheckUpdates !== false)
+          void updates.check(false);
+      }, 10000);
+      updateTimer.unref();
+      ipcMain.handle("app:restart", (event) => {
+        owner(event);
+        return restart();
+      });
+      ipcMain.handle("app:command-draft", async (event) => {
+        const item = owner(event);
+        const answer = await dialog.showMessageBox(item.window, {
+          type: "question",
+          message: tr("drafts.close"),
+          buttons: [
+            tr("drafts.apply"),
+            tr("drafts.discard"),
+            tr("common.cancel"),
+          ],
+          defaultId: 2,
+          cancelId: 2,
+        });
+        return ["apply", "discard", "cancel"][answer.response];
+      });
       const files = process.argv.filter(
         (a) => !a.startsWith("-") && a.toLowerCase().endsWith(".yarn"),
       );
@@ -703,6 +895,43 @@ else {
         if (files.length) {
           await openPaths(files);
           return;
+        }
+        if (fs.existsSync(restartFile)) {
+          const restartState = JSON.parse(fs.readFileSync(restartFile, "utf8"));
+          fs.unlinkSync(restartFile);
+          if (
+            Date.now() - restartState.created < 10 * 60 * 1000 &&
+            Array.isArray(restartState.ids)
+          ) {
+            for (const id of restartState.ids) {
+              const saved = sessions[id]?.session;
+              if (!saved) continue;
+              const entry = service.catalog.entries.find(
+                (e) => e.id === saved.projectId,
+              );
+              if (entry)
+                await service.request({ type: "openFolder", root: entry.root });
+              else if (
+                restartState.workspaces?.find((p) => p.id === saved.projectId)
+                  ?.files?.length
+              )
+                await service.request({
+                  type: "openFiles",
+                  paths: restartState.workspaces.find(
+                    (p) => p.id === saved.projectId,
+                  ).files,
+                });
+              else if (
+                saved.projectId &&
+                !service
+                  .snapshot()
+                  .projects.some((p) => p.id === saved.projectId)
+              )
+                continue;
+              createWindow(id, saved);
+            }
+            if (windows.size) return;
+          }
         }
         const last =
           service.catalog.preferences.reopenLastProject &&
@@ -719,13 +948,13 @@ else {
             createWindow(id, sessionForResult(id, r));
             return;
           } catch (error) {
-            service.notices.push("上次專案無法開啟：" + String(error));
+            service.notices.push(tr("m150437435c45") + String(error));
           }
         }
         const id = Object.keys(sessions).at(-1) || randomUUID();
         createWindow(id, initialSession(id));
       })().catch((error) => {
-        dialog.showErrorBox("無法開啟", error.message);
+        dialog.showErrorBox(tr("m0ca495c92bd3"), error.message);
         const id = randomUUID();
         createWindow(id, initialSession(id));
       });
@@ -737,7 +966,7 @@ else {
       });
     })
     .catch((error) => {
-      dialog.showErrorBox("啟動失敗", error.message);
+      dialog.showErrorBox(tr("md428150d1df6"), error.message);
       app.quit();
     });
   app.on("window-all-closed", () => {

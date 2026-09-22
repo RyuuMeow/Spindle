@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import { useEffect, useState } from "react";
 import { Download, RefreshCw, Trash2, FolderOpen, Plug } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,10 +11,10 @@ import type {
   InstallAction,
 } from "./install-types";
 const labels = {
-  missing: "未安裝",
-  installed: "已安裝",
-  outdated: "需要更新",
-  conflict: "設定衝突",
+  missing: tr("m684afa253fb4"),
+  installed: tr("m1e8b9769df70"),
+  outdated: tr("m3e9c10186e66"),
+  conflict: tr("m9ba917e1ec80"),
 };
 export default function AgentInstallations({
   bridge,
@@ -39,7 +41,7 @@ export default function AgentInstallations({
           }
         })
         .catch(() => {
-          if (alive) setError("無法讀取安裝狀態；請檢查設定目錄。");
+          if (alive) setError(tr("mdebffca5123e"));
         });
     };
     refresh();
@@ -65,19 +67,16 @@ export default function AgentInstallations({
     } catch (e) {
       setMessages((old) => ({
         ...old,
-        [client]: e instanceof Error ? e.message : "操作未完成",
+        [client]: e instanceof Error ? e.message : tr("m79be13bdf0c5"),
       }));
     } finally {
       setBusy(null);
     }
   }
   return (
-    <section className="settings-group" aria-label="Agent 安裝">
-      <h3>Agent 安裝</h3>
-      <p className="setting-help">
-        安裝 MCP 連線與 Spindle Skill 至目前使用者，所有專案共用。存取憑證會寫入
-        Agent 本機設定。Spindle 必須保持開啟。
-      </p>
+    <section className="settings-group" aria-label={tr("me4801a5a4b6d")}>
+      <h3>{tr("me4801a5a4b6d")}</h3>
+      <p className="setting-help">{tr("m96b7626a3304")}</p>
       {error && (
         <p className="setting-error" role="alert">
           {error}
@@ -88,7 +87,7 @@ export default function AgentInstallations({
           key={item.client}
           className="agent-install-card"
           aria-label={
-            item.client === "codex" ? "Codex 安裝" : "Claude Code 安裝"
+            item.client === "codex" ? tr("mb3476ff04164") : tr("mcc8fb20b3b72")
           }
         >
           <h4>{item.client === "codex" ? "Codex" : "Claude Code"}</h4>
@@ -96,14 +95,17 @@ export default function AgentInstallations({
             <div>
               <strong>MCP · {labels[item.mcp]}</strong>
               <code>{item.configPath}</code>
-              <small>伺服器：{item.serverName}</small>
+              <small>
+                {tr("maee4ef8c2b91")}
+                {item.serverName}
+              </small>
             </div>
             <Button
               variant="ghost"
               size="sm"
               disabled={!!busy}
               onClick={() => void run(item.client, "config")}
-              aria-label="選擇 MCP 設定檔"
+              aria-label={tr("m09f2bebcab20")}
             >
               <FolderOpen size={16} />
             </Button>
@@ -118,13 +120,13 @@ export default function AgentInstallations({
               size="sm"
               disabled={!!busy}
               onClick={() => void run(item.client, "skill")}
-              aria-label="選擇 Skill 上層目錄"
+              aria-label={tr("m198f258524a1")}
             >
               <FolderOpen size={16} />
             </Button>
           </div>
           {item.pending && (
-            <p className="setting-error">上次操作部分完成，可重試。</p>
+            <p className="setting-error">{tr("m53e61660cf70")}</p>
           )}
           {item.error && <p className="setting-error">{item.error}</p>}
           <div className="setting-reset-actions">
@@ -145,8 +147,8 @@ export default function AgentInstallations({
                 <RefreshCw size={14} />
               )}
               {item.mcp === "missing" && item.skill === "missing"
-                ? "安裝 MCP＋Skill"
-                : "更新安裝"}
+                ? tr("m9ab89b17e1be")
+                : tr("mcebf46bcd808")}
             </Button>
             <Button
               variant="ghost"
@@ -155,7 +157,7 @@ export default function AgentInstallations({
               onClick={() => void run(item.client, "test")}
             >
               <Plug size={14} />
-              檢查連線
+              {tr("m4c0422810aeb")}
             </Button>
             <Button
               variant="ghost"
@@ -169,7 +171,7 @@ export default function AgentInstallations({
               onClick={() => void run(item.client, "remove")}
             >
               <Trash2 size={14} />
-              移除
+              {tr("m6135d4159e89")}
             </Button>
           </div>
           {messages[item.client] && (
@@ -179,14 +181,8 @@ export default function AgentInstallations({
           )}
         </article>
       ))}
-      {!enabled && (
-        <p className="setting-help">
-          請先啟用 MCP 唯讀或允許修改，並確認服務執行中。
-        </p>
-      )}
-      <p className="setting-help">
-        設定已寫入不代表 Agent 已載入。安裝後請重新載入 Agent 或開啟新工作階段。
-      </p>
+      {!enabled && <p className="setting-help">{tr("m0c1a9e072617")}</p>}
+      <p className="setting-help">{tr("mbfefe9bcb299")}</p>
     </section>
   );
 }

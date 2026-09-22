@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 export type ReadingLine = {
   from: number;
   to: number;
@@ -107,7 +108,7 @@ export function readingStructure(source: string): ReadingLine[] {
           if (match[1] === "if" || match[1] === "once") {
             stack.push({
               name: match[1],
-              label: match[2] || "首次",
+              label: match[2] || tr("mf64725f34d2f"),
               line: index,
             });
             entry.depth = stack.length;
@@ -125,7 +126,7 @@ export function readingStructure(source: string): ReadingLine[] {
                 .sort((a, b) => a.line - b.line)
                 .map((s) => s.label);
               stack[stack.length - 1].label =
-                match[1] === "else" ? "否則" : match[2] || "";
+                match[1] === "else" ? tr("m9be688476db3") : match[2] || "";
             }
           }
         } else if (!clean.startsWith("<<") && !clean.startsWith("//"))
