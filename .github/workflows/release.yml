@@ -1,0 +1,83 @@
+name: Draft Windows release
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      SPINDLE_LOCALE: zh-TW
+      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm version:check
+      - run: pnpm i18n:check
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm lint
+      - run: pnpm test:unit
+      - run: pnpm test:release
+      - run: pnpm test:mcp
+      - run: pnpm test:agent-installation
+      - run: pnpm build
+      - run: pnpm desktop:pack
+      - run: pnpm test:public-ui
+        env:
+          SPINDLE_PORTABLE: release/Spindle-0.10.0-Portable-x64.exe
+      - run: node scripts/third-party-sources.mjs
+      - run: pnpm release:metadata
+      - shell: pwsh
+        run: |
+          $v=(Get-Content version.json | ConvertFrom-Json).version
+          git archive --format=zip --output="release/Spindle-$v-source.zip" HEAD
+          Copy-Item LICENSE release/LICENSE.txt
+          Copy-Item THIRD_PARTY_NOTICES.md release/THIRD_PARTY_NOTICES.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            release/*.exe
+            release/*.yml
+            release/*-release.json
+            release/SHA256SUMS-*.txt
+            release/*-source.zip
+            release/*-notes.md
+            release/LICENSE.txt
+            release/THIRD_PARTY_NOTICES.md
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release
+      - name: Create draft and verify downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(node -p "require('./version.json').version")
+          if gh release view "v$v" >/dev/null 2>&1; then
+            test "$(gh release view "v$v" --json isDraft --jq .isDraft)" = true
+          else
+            gh release create "v$v" --draft --target "$GITHUB_SHA" --title "Spindle $v" --notes-file "release/Spindle-$v-notes.md"
+          fi
+          gh release upload "v$v" release/* --clobber
+          mkdir verify
+          gh release download "v$v" --dir verify
+          cd verify
+          sha256sum --check "SHA256SUMS-$v.txt"

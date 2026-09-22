@@ -42,7 +42,11 @@ fs.writeFileSync(
         recent: true,
       },
     ],
-    preferences: { reopenLastProject: false },
+    preferences: {
+      reopenLastProject: false,
+      language: "zh-TW",
+      autoCheckUpdates: false,
+    },
   }),
 );
 const env = {
@@ -132,7 +136,7 @@ let app;
           .createHash("sha256")
           .update(fs.readFileSync(file))
           .digest("hex");
-      assert.equal(archive.version, "0.9.2");
+      assert.equal(archive.version, require("../version.json").version);
       assert.equal(archive.skillHash, digest("skills/spindle/SKILL.md"));
       assert.equal(
         archive.runtimeHash,

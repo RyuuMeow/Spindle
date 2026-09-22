@@ -55,6 +55,10 @@ export function candidate(release: Release, current: string) {
     ? v
     : null;
 }
+export async function installedUpdater() {
+  const { autoUpdater } = await import("electron-updater");
+  return autoUpdater;
+}
 export class UpdateService {
   state: UpdateState = { phase: "idle" };
   private release?: Release;
@@ -215,7 +219,7 @@ export class UpdateService {
         this.downloaded = file.slice(0, -8);
         fs.renameSync(file, this.downloaded);
       } else {
-        const { autoUpdater } = await import("electron-updater");
+        const autoUpdater = await installedUpdater();
         this.updater = autoUpdater;
         autoUpdater.removeAllListeners("download-progress");
         autoUpdater.on("download-progress", (value) =>
@@ -308,7 +312,47 @@ export class UpdateService {
           });
           child.unref();
           this.options.exit();
-        } else this.updater!.quitAndInstall(false, true);
+        } else {
+          const directory = path.join(this.options.profile, "updates");
+          fs.mkdirSync(directory, { recursive: true });
+          const helper = path.join(directory, "installed-restart.ps1"),
+            job = path.join(directory, randomUUID() + ".json");
+          fs.copyFileSync(
+            path.join(this.options.resources, "installed-restart.ps1"),
+            helper,
+          );
+          fs.writeFileSync(
+            job,
+            JSON.stringify({
+              target: this.options.executable,
+              profile: this.options.profile,
+              pid: process.pid,
+              installer: this.downloaded,
+              version: this.manifest!.version,
+            }),
+            { flag: "wx" },
+          );
+          const child = spawn(
+            "powershell.exe",
+            [
+              "-NoProfile",
+              "-NonInteractive",
+              "-ExecutionPolicy",
+              "Bypass",
+              "-File",
+              helper,
+              "-JobFile",
+              job,
+            ],
+            { detached: true, windowsHide: true, stdio: "ignore" },
+          );
+          await new Promise<void>((resolve, reject) => {
+            child.once("spawn", resolve);
+            child.once("error", reject);
+          });
+          child.unref();
+          this.updater!.quitAndInstall(true, false);
+        }
       });
       return this.state;
     } catch (e) {

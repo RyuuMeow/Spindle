@@ -107,7 +107,7 @@ editorSessionId 只在本次 App 執行、同一視窗工作區綁定內有效�
 
 `pnpm test:mcp` 驗證服務、官方 SDK client、版本保護、唯讀／憑證撤銷、埠衝突、跨檔交易、歧義及分頁。`pnpm test:mcp-ui` 使用隔離 profile 啟動實際桌面 build，測試多視窗、讀取與修改、純文字／閱讀／圖表映射、草稿、合成組字事件及重啟；需先 `pnpm desktop:stage`，使用本機 Playwright runtime。
 
-本輪不修改圖表布局／pin，不提供 Resources、Prompts、通知、遠端連線或自動修改 client 設定。原生中文 IME、混合 DPI／多螢幕、每種第三方 client 設定 UI 及安裝版未逐一實測。驗證與實際交付狀態見[實作追蹤](implementation-progress.md)。
+本輪不修改圖表布局／pin，不提供 Resources、Prompts、通知、遠端連線或自動修改 client 設定。原生中文 IME、混合 DPI／多螢幕、每種第三方 client 設定 UI 及安裝版未逐一實測。驗證與實際交付狀態見[實作追蹤](history/implementation-progress.md)。
 
 桌面版的複製連線資料透過受信任視窗的原生剪貼簿介面寫入，不依賴瀏覽器剪貼簿權限；憑證不會寫入操作日誌。
 
@@ -159,3 +159,7 @@ http_headers = { Authorization = "Bearer TOKEN" }
 Claude Code 使用前述 JSON 的 `mcpServers`，每個 entry 包含 `type: "http"`、`url` 及 `headers`。不要把占位值當真實憑證，也不要將含憑證設定加入版本庫。
 
 官方格式：[Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)、[Codex Skills](https://learn.chatgpt.com/docs/build-skills)、[Claude Code MCP](https://code.claude.com/docs/en/mcp)、[Claude Code Skills](https://code.claude.com/docs/en/skills)。
+
+## 0.10.0 語系及版本
+
+MCP server 與 Agent 安裝資源版本取自 `version.json`。工具名稱、工作階段 ID、snapshot／operation ID、文件識別與錯誤類別不翻譯；介面及診斷說明依本次 App 啟動語言顯示。更新或語言重啟會使執行期間工作階段失效，Agent 必須重新列出工作階段。仍為 20 個工具，預設停用，憑證不包含於發行資源。

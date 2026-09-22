@@ -29,11 +29,15 @@
     "skills/spindle/**/*",
     "desktop/restart.cjs",
     "desktop/update-service.cjs",
-    "desktop/portable-update.ps1"
+    "desktop/portable-update.ps1",
+    "desktop/installed-restart.ps1"
   ],
   "asar": true,
   "win": {
-    "target": ["nsis", "portable"],
+    "target": [
+      "nsis",
+      "portable"
+    ],
     "icon": "desktop/icon.ico"
   },
   "nsis": {

@@ -1,3 +1,7 @@
+# Historical development record
+
+This document describes an earlier milestone. Current behavior and release status are documented in the main architecture/UI guides and release verification report. Links to local verification outputs are retained as labels only; those artifacts are not distributed.
+
 # Yarn Workbench 桌面設計複審
 
 > 0.5.0 決策更新：使用者後續指定自訂指令改為設定式工具 tab，取代下方 0.4.0 的暗幕 modal 方案。顯示名稱、參數提示及點圖表空白退出的現行契約見 [UI 規範](ui-design.md)。以下保留歷史取證。
@@ -124,7 +128,7 @@
 
 使用者於開始實作後明確補充：正文以外物件應簡單低調。採用低彩度角色、命令、tags、變數與接近正文底色的條件區域；不以更多亮色、強邊框、裝飾卡片或新增圖示辨認每一種語法。主次先由字級、群組間距及對齊建立，再以色彩輔助。操作 SVG 保留一致尺寸／語義與可及名稱，不能將必要操作回饋一起淡化。
 
-閱讀層已實作並取得可重現的局部證據：18 項來源／裝飾／語義間距測試，以及 [CodeMirror 幾何與編輯 harness](../outputs/reading-refinement/harness/results.json)。實測命令和正文同行框、條件和正文文字 x 起點相同、分支內距 16／16px、場景線前後 24／24px，另驗跨區塊貼上／Undo／Redo、折疊與字級比例。這不能替代完整 App、打包版或原生輸入法驗收；本輪其他模組仍由主代理整合及總驗證。
+閱讀層已實作並取得可重現的局部證據：18 項來源／裝飾／語義間距測試，以及 `CodeMirror 幾何與編輯 harness` (local verification artifact)。實測命令和正文同行框、條件和正文文字 x 起點相同、分支內距 16／16px、場景線前後 24／24px，另驗跨區塊貼上／Undo／Redo、折疊與字級比例。這不能替代完整 App、打包版或原生輸入法驗收；本輪其他模組仍由主代理整合及總驗證。
 
 ### 本輪整合順序與驗收（尚未結案）
 
@@ -276,7 +280,7 @@ Ctrl+S 保留立即寫入，Save All 留在選單／快捷鍵，另存與匯出�
 
 交付驗收應以完整任務為單位：「找兩處台詞並回到原位置」「檢查舊版但取消」「還原後撤銷」「調整閱讀大小後繼續輸入」「收起側欄後重開與縮小視窗」，不是只檢查按鈕存在。原生多視窗、IME、連續選取及保存保障仍遵守既有契約。
 
-下方原始互動示意僅展示區域如何替換與基本資訊層級，非完整編輯器或最終像素稿。已檢查示意的主要切換與360／800／1024px無水平溢出；這不等於產品已通過相同驗收。[示意檢查結果](../outputs/ui-audit-2026-09-18/proposal-check.json)
+下方原始互動示意僅展示區域如何替換與基本資訊層級，非完整編輯器或最終像素稿。已檢查示意的主要切換與360／800／1024px無水平溢出；這不等於產品已通過相同驗收。`示意檢查結果` (local verification artifact)
 
 <details>
 <summary>0.2.1 第一輪問題證據與比較來源（歷史，不作目前待辦）</summary>
@@ -312,7 +316,7 @@ P1：資訊可信度或實際輸入／導航錯誤。P2：核心閱讀與日常�
 | T04 | P1 | 搜尋的鍵盤與滑鼠使用不同導航規則 | 實測同一结果 Enter 保留「渲染」，滑鼠點擊改成「純文字」；方向鍵仍停留輸入框，沒有活躍結果選取。 | 同一結果、不同輸入方式應遵守同一模式／定位契約；上下選擇、Enter 開啟、Ctrl+Enter 新視圖的文案與行為一致。 |
 | T05 | P2 | 收合後露出白色 `…` | 實測背景為 `rgb(238,238,238)`；確認是 CodeMirror 未定製的 fold placeholder。 | 自訂暗色、緊湊且可辨認的收合列；展開箭頭與標題同列，保留鍵盤操作。 |
 
-證據：[App 實測資料](../outputs/ui-audit-2026-09-18/probe-facts.json)、[App 取證腳本](../outputs/ui-audit-2026-09-18/probe.cjs)、[parser 重現資料](../outputs/ui-audit-2026-09-18/parser-facts.json)、[parser 腳本](../outputs/ui-audit-2026-09-18/parser-probe.mjs)。
+證據：`App 實測資料` (local verification artifact)、`App 取證腳本` (local verification artifact)、`parser 重現資料` (local verification artifact)、`parser 腳本` (local verification artifact)。
 
 ## 頂欄、分頁、側欄與狀態列（圖 1–5）
 
@@ -351,7 +355,7 @@ P1：資訊可信度或實際輸入／導航錯誤。P2：核心閱讀與日常�
 | 閱讀字級設定只放大正文 | 標題固定21px、命令13px、tags12px、變數13px；正文可調到28px，層級會反轉。 | 閱讀系統採相對比例與最小可讀尺寸；字級、行距、標籤基線一起變化，Monaco 維持原樣。 |
 | 頂端註解混合作品與產品教學 | 範例寫「切換至節點預覽」，既過時，又會當作作品內容保存。作者自己的註解則可能很重要。 | 新範例的產品教學移至一次性提示／說明入口。既有作者註解保留，可用安靜的註記樣式；不能直接刪除或一律隱藏所有註解。 |
 
-來源：[渲染裝飾](../app/reading/ReadingEditor.tsx:73)、[渲染樣式](../app/reading/reading.css:8)、[實測折疊畫面](../outputs/ui-audit-2026-09-18/folded.png)。
+來源：[渲染裝飾](../app/reading/ReadingEditor.tsx:73)、[渲染樣式](../app/reading/reading.css:8)、`實測折疊畫面` (local verification artifact)。
 
 ## 流程圖（圖 1）
 
@@ -441,8 +445,8 @@ P1：資訊可信度或實際輸入／導航錯誤。P2：核心閱讀與日常�
 
 ## 取證入口
 
-使用者原圖：[1 流程](../outputs/ui-audit-2026-09-18/user-01.png)、[2 渲染](../outputs/ui-audit-2026-09-18/user-02.png)、[3 註解](../outputs/ui-audit-2026-09-18/user-03.png)、[4 分支與收合](../outputs/ui-audit-2026-09-18/user-04.png)、[5 指令](../outputs/ui-audit-2026-09-18/user-05.png)、[6 復原](../outputs/ui-audit-2026-09-18/user-06.png)、[7 偏好](../outputs/ui-audit-2026-09-18/user-07.png)、[8 關於](../outputs/ui-audit-2026-09-18/user-08.png)、[9 搜尋](../outputs/ui-audit-2026-09-18/user-09.png)。
+使用者原圖：`1 流程` (local verification artifact)、`2 渲染` (local verification artifact)、`3 註解` (local verification artifact)、`4 分支與收合` (local verification artifact)、`5 指令` (local verification artifact)、`6 復原` (local verification artifact)、`7 偏好` (local verification artifact)、`8 關於` (local verification artifact)、`9 搜尋` (local verification artifact)。
 
-三份獨立分析：[桌面與輔助流程](../outputs/ui-audit-2026-09-18/shell-dialog.md)、[渲染編輯](../outputs/ui-audit-2026-09-18/reading.md)、[流程圖](../outputs/ui-audit-2026-09-18/graph.md)。本文件是合併去重與交叉核對後的入口。以上取證階段當時未修改產品，也沒有 Git 中繼資料；不表示本輪後續未實作。專案其後已建立 0.3.0 Git 基線，當前修改及驗證狀態見文件頂部入口。
+三份獨立分析：`桌面與輔助流程` (local verification artifact)、`渲染編輯` (local verification artifact)、`流程圖` (local verification artifact)。本文件是合併去重與交叉核對後的入口。以上取證階段當時未修改產品，也沒有 Git 中繼資料；不表示本輪後續未實作。專案其後已建立 0.3.0 Git 基線，當前修改及驗證狀態見文件頂部入口。
 
 </details>

@@ -1,95 +1,70 @@
+[English](README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md)
+
+![Spindle](docs/images/banner.svg)
+
 # Spindle
 
-本機 Yarn 劇本編輯器。Windows 桌面版支援磁碟專案、自動保存、多視窗、Monaco 純文字編輯、CodeMirror 即時渲染與故事流程圖；網頁版保留本機工作區與匯入／匯出。
+A local-first Yarn Spinner dialogue editor for writers and game developers. Write in source or a reading editor, arrange your story on a flowchart, and connect a local agent through MCP.
 
-## 啟動與打包
+[Download Windows builds](https://github.com/RyuuMeow/Spindle/releases) · [MCP guide](docs/mcp.md) · [Report an issue](https://github.com/RyuuMeow/Spindle/issues)
 
-需要 Node.js 22.13+ 與 pnpm。
+> 0.10.0 is being prepared as a private release draft. Downloads become public only after publication. Windows builds are currently unsigned.
 
-```sh
-pnpm install
-pnpm dev
-pnpm desktop:start
-pnpm desktop:pack:portable
-```
+## Your story, three views
 
-Windows x64 **0.9.2 Portable**：`release/Spindle-0.9.2-Portable-x64.exe`，SHA-256 見同目錄 `.exe.sha256`。本輪不產出 Setup。打包包含離線 Monaco、CodeMirror、ELK Worker、libavoid WASM、MCP runtime、字型服務與授權檔，不依賴編輯器 CDN。正式 bundle 不含示範劇本；新專案及新 Web 工作區保持空白，不刪除使用者既有資料。程式未簽章。
+![Reading editor](docs/images/reading.png)
 
-Spindle 為原 Yarn Workbench 的新名稱；沿用原 App profile、專案 `.spindle` 及安裝識別，保留既有資料。SVG 原檔在 `public/brand/`，桌面圖示由專案素材產生。
+- **Source** — completion, parameter help, diagnostics, quick fixes and project-wide search.
+- **Reading editor** — readable dialogue with inline editing and a dialogue-only reading mode.
+- **Flowchart** — automatic arrangement when requested, movable cards, pins and saved manual layouts.
+- **Local projects** — quiet autosave, multiple windows, per-document history and a recoverable project trash.
+- **Your workspace** — shared style defaults with per-mode overrides, English / 繁體中文 / 简体中文.
 
-Portable 開啟時會先顯示「正在解壓並啟動」；0.2.1 改用 ZIP 與每次啟動獨立的暫存目錄。更新時先關閉舊版，再開新版本；兩者沿用同一個 App profile。
-
-## 本機 Agent 整合
-
-0.9.2 可在「設定 → MCP／Agent 整合 → Agent 安裝」一鍵安裝 Codex／Claude Code 的使用者 MCP 設定與 Spindle Skill，並提供更新、連線測試及移除。憑證會寫入 agent 本機設定，安裝不改變其批准規則。獨立 Skill 在 [skills/spindle](skills/spindle/SKILL.md)，完整安裝、手動設定與故障排查見 [MCP 接入指南](docs/mcp.md#agent-一鍵安裝092)。
-
-桌面設定的「MCP／Agent 整合」可啟用唯讀或修改存取，提供多視窗目標、即時游標／選取、語義查詢、診斷、統計及版本化修改。預設停用；接入方式與完整工具契約見 [Spindle MCP v1](docs/mcp.md)。0.9.1 Portable 已包含此功能，共 20 個工具；文件／資料夾查詢、新增、移動、移入垃圾桶及復原皆使用工作區服務與版本保護，永久刪除保留 UI 確認。
-
-輸入會立即暫緩正在編輯範圍的診斷，停止 800ms 或離開該行後顯示；組字期間繼續暫緩。補全與空白參數提示保持即時，手動檢查及 MCP 驗證不受自動提示時機限制。
-
-## 保存與恢復
-
-- 預設啟動顯示獨立專案列表，可開啟資料夾或建立同名子資料夾專案；既有資料夾沒有設定檔時才建立 `.spindle/project.json`。損毀設定不會被靜默覆寫。
-- 完整專案列表不限數量，可搜尋、行內改名、從列表移除；Project 選單只列最近 5 個。移除紀錄不刪磁碟資料。設定可選擇啟動時開啟上次專案，預設關閉。
-- 直接開啟 `.yarn` 時，依已知專案最深層實際路徑辨識歸屬；否則開獨立單檔視窗，自動寫回原檔，不在所在資料夾建立專案。
-- 停止輸入 800ms 後寫回原檔，中文組字期間暫停。Ctrl+S 立即保存。桌面不再顯示日常「儲存全部／存成檔案」入口。語法錯誤不阻止劇本保存。
-- 舊無路徑草稿保留在初始畫面的「待移轉草稿」，預覽後可轉存為正式專案。匯出只建立交付副本；保存失敗時保留另存救援。
-- 偵測外部修改、刪除、唯讀或寫入失敗時保留內容。雙方都有修改時暫停該檔自動保存，提供比較、採用磁碟版本、覆寫或另存。
-- 劇本移到垃圾桶不再要求確認；完整檔案／資料夾（含非 Yarn 資源）移入專案 `.spindle/trash/`，不另送 Windows 資源回收筒；舊系統垃圾桶內容不操作。移除入口統一為垃圾桶。更名與日常保存不顯示轉圈，失敗仍保留錯誤。
-- 每分鐘對有變更文件留下快照，每份保留最近 50 份；最近刪除保留 30 天。指令設定另有復原快照，未套用表單只保留於開啟中的指令 tab，關閉即捨棄。
-- 專案名稱、文件識別與有效指令定義寫入 `.spindle/project.json`；專案歷史在 `.spindle/history/`，單檔歷史與視窗布局在 App profile。Windows 安裝版及 portable 預設皆使用 `%APPDATA%/Yarn Workbench`，portable 不把資料放在 exe 旁。
-- v1 專案備份仍可匯入。v2 備份包含相對路徑、指令定義；桌面匯入備份保留為待移轉草稿，再轉存正式專案；保留原專案。
-- 網頁資料存於該瀏覽器的 localStorage，與桌面 profile 分開；請用專案備份轉移。清除網站資料會移除網頁工作區。
-
-## 編輯與操作
-
-游標緊貼配對引號、指令 `>>` 或指令內括號的結尾時，Tab 可逐層跳出容器；補全與 snippet 優先，其他位置沿用縮排。三種編輯入口一致，不修改文字。
-
-書本按鈕切換純閱讀，僅保留場景、對話與選項；不修改原文。分析按鈕開啟角色／場景統計側欄。資料夾按箭頭展開、單擊選取、雙擊改名，文件與資料夾可跨層拖移；複製後原位改名。圖表首次自動整理，之後只在按下整理時重排全部或所選場景／線上卡片。左鍵框選／Shift 多選，右鍵拖動平移；雙擊支線加 pin；線段與共用幹線僅供選取，理線透過場景、條件卡與 pin。卡片可框選、自由移動並與場景一起搬移；路線跟隨卡片與 pin；拖動時近距離吸附對齊，同來源分岔前可共線，分岔後不同去向以平行間距分開，同向末段允許匯流。pin 右鍵或 Delete 可刪除。手動布局、完整 Undo／Redo 隨文件視圖保存；拖動與縮放保留無關路線。檢查無問題時顯示勾號。
-
-按住 Ctrl 懸浮在可解析的 jump／detour 目標，文字會變色、加底線，Ctrl＋左鍵在目前分頁跳轉；純文字、閱讀與節點編輯一致。指令懸浮提示依名稱、說明、參數與範例分區，虛擬參數標籤也提供對應說明。自動提示只出現在空參數位置；已有值則保持安靜。補全清單、空參數提示、hover 按此順序擇一顯示，Esc 或失焦關閉。
-
-
-0.7.0 的全局搜尋是中央偏上的輕量浮層，結果出現在輸入框下方，選取、點外部或失焦即關閉。自訂指令與設定皆使用獨立工具 tab；指令與參數可設定顯示名稱及說明，閱讀顯示別名，純文字保留原始語法，兩者提供虛擬參數提示與懸浮說明。右側大綱只由工具列切換，左右面板及診斷區可調整尺寸。文件時鐘開啟版本時間線、唯讀預覽與差異比較。
-
-桌面原檔自動保存，不再放常駐 Save 按鈕；Web 保留本機工作區及匯出方式。一般自動保存不顯示 tab 未保存圓點、檔案轉圈或常駐成功狀態；衝突與錯誤仍會提示。切換／關閉專案及關閉視窗共用保存流程，只檢查目前工作區；250ms 後仍待保存才顯示小型面板，失敗或組字未完成保留原畫面並可重試。閱讀編輯可選760／900px欄寬，字級會同步調整標題、命令與標籤，折疊跟隨分頁保存。
-
-純文字保留原有 Monaco 外觀與編輯習慣。閱讀或圖表修改後切回純文字即時更新，不必再次打字。三種編輯入口共用內建指令的語法、參數說明與範例；`set` 可補全專案中已定義的變數，條件與運算式輸入 `$` 也可查找。渲染是同一份來源文字的連續編輯面：灰色 tags、紫色變數標籤、平面條件區域與場景分隔。游標／選取觸及語法時揭露原文；複製取得原始 Yarn，右鍵另有「複製可讀文字」。渲染顯示所有分支，不執行條件。
-
-一般切劇本、搜尋及大綱定位沿用目前分頁；中鍵、＋或明確新分頁操作才新增視圖。劇本與場景新增／更名在側欄直接輸入，預設名稱反白，Esc 可取消。每個分頁保有獨立導航歷史與各稿件閱讀位置。
-
-分頁可拖移、固定、中鍵關閉、批次關閉、重新開啟及移至其他視窗。＋開啟輕量文件選擇器；「同稿另一個視圖」保留獨立位置與模式。跨視窗共用來源文字、保存狀態與撤銷紀錄；文字歷史保留於目前 App 執行階段，重啟後可使用持久化快照。
-
-| 操作 | 快捷鍵 |
+| Follow the branches | Find anything |
 |---|---|
-| 新分頁／關閉／重開 | Ctrl+T／Ctrl+W／Ctrl+Shift+T |
-| 切換分頁 | Ctrl+Tab／Ctrl+Shift+Tab |
-| 分頁鍵盤排序 | 聚焦分頁後 Alt+Shift+←／→ |
-| 快速開啟／全專案搜尋 | Ctrl+P／Ctrl+Shift+F |
-| 返回／前進 | Alt+←／→、滑鼠側鍵 |
-| 前往靜態 jump／detour 目標 | F12／Ctrl+點擊 |
-| 撤銷／重做 | Ctrl+Z／Ctrl+Y 或 Ctrl+Shift+Z |
-| App 縮放／重設 | Ctrl+＋／－／0 |
+| ![Flowchart](docs/images/graph.png) | ![Unified search](docs/images/search.png) |
 
-場景可更名並更新靜態引用、複製、刪除、跨檔移動與排序。跨檔文字修改是一筆共同撤銷交易。雙擊圖表節點可直接編輯台詞、角色和命令，與原稿共用保存及 Undo；跨檔節點編輯不切換分頁。編輯期間固定布局，暫時不完整的語法仍可輸入。圖表拖動與自動整理使用獨立布局歷史，不改寫劇本。
+| Make it yours | Connect an agent |
+|---|---|
+| ![Appearance](docs/images/appearance.png) | ![Agent integration](docs/images/agent.png) |
 
-## 驗證與文檔
+## Start writing
+
+1. Open a project folder or create a new project from the launcher.
+2. Press **Ctrl+P** and choose **New script**. Name it and start writing Yarn.
+3. Switch between Source, Reading editor and Flowchart. **Ctrl+Shift+F** searches across the project and settings.
+
+Projects store configuration, history and trash in `.spindle/`. Existing `.yarn` files can also be opened independently. No demo project is inserted into your workspace.
+
+## MCP and Skill
+
+Enable read-only or editing access in **Settings → MCP / Agent integration**. Install the user-level Codex or Claude Code connection and Skill from the same page. Spindle must remain running. The agent can inspect selections, validate scripts, manage commands and perform version-protected edits.
+
+Read the [connection guide](docs/mcp.md) and [portable Skill](skills/spindle/SKILL.md). Agent installation does not change its approval policy.
+
+## Development
+
+Use Node.js 22.22.0 and the pnpm version pinned in `package.json`.
 
 ```sh
+pnpm install --frozen-lockfile
+pnpm dev                 # Web
+pnpm desktop:start       # Windows desktop
 pnpm test:unit
-pnpm exec tsc --noEmit
 pnpm lint
-pnpm build
-pnpm desktop:stage
-pnpm test:project-launcher
+pnpm desktop:pack        # Portable + NSIS
 ```
 
-桌面整合測試需要 Playwright（可透過 `PLAYWRIGHT_MODULE` 指定），每次建立隔離 profile 與測試專案。`test:project-launcher` 涵蓋初始畫面、專案清單、復原、單檔、多視窗保存及離線編輯器資源。
+`version.json` is the only manually edited product version. Run `pnpm version:sync`, add notes in `releases/<version>/`, then run `pnpm version:check`. [Release process](docs/releases.md).
 
-預設測試準備好的開發版；設定 `SPINDLE_PORTABLE=1` 使用 `release/` 下目前版本的實際 Portable。測試驅動以本機 inspector／CDP 連接解壓後的 App，結束時關閉連接。輸出於 `outputs/project-launcher-ui/`，可用 `DESKTOP_TEST_OUTPUT` 指定結果目錄。現行實包驗證結果由[實作追蹤](docs/implementation-progress.md)集中列出。
+## License and contributing
 
-目前完成狀態、測試證據與未驗證項目見 [實作追蹤](docs/implementation-progress.md)。設計規則見 [UI 規範](docs/ui-design.md)，保存與同步契約見 [架構說明](docs/workspace-architecture.md)，版本記錄見 [CHANGELOG](CHANGELOG.md)。早期審查與 39 組盤點保留為歷史取證。
+Spindle is licensed under [GPL-3.0-only](LICENSE). Third-party components retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md). [Contribution guide](CONTRIBUTING.md).
 
-本專案只支援 Yarn 結構解析與作者工具；不是官方編譯器，沒有執行引擎、Unity 連接、雲端協作、外掛系統或圖上拉線改寫。未知／未完成語法保留原文。更新來源尚未設定，沒有無效的自動更新按鈕。
+[Architecture](docs/workspace-architecture.md) · [UI conventions](docs/ui-design.md) · [Release notes](releases/0.10.0/en.md)
 
-編輯器風格支援全局預設及四模式逐欄覆寫，所有專案與單檔共用。
+## Assistance and history
+
+| Editor assistance | Version comparison |
+|---|---|
+| ![Assistance](docs/images/assistance.png) | ![History](docs/images/history.png) |

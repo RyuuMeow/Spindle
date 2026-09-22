@@ -1,3 +1,7 @@
+# Historical development record
+
+This document describes an earlier milestone. Current behavior and release status are documented in the main architecture/UI guides and release verification report. Links to local verification outputs are retained as labels only; those artifacts are not distributed.
+
 # Desktop 基本功能盤點
 
 > 本文件保留 0.1.1 時點的 39 組缺口與原始取證，表格狀態和舊程式行號不是目前狀態。使用者已批准 M0–M6 計畫，包含直接交付完整連續渲染編輯；早期「先區塊編輯」建議已被取代。0.2.0 現況以 [實作追蹤](implementation-progress.md) 和 [UI 規範](ui-design.md) 為準。
@@ -14,8 +18,8 @@
 ## 證據與排序方式
 
 - 「已具備／部分／缺少」依目前實作確認。源碼可確認事件、資料流與入口是否存在，不等同本輪實際操作過全部路徑。
-- 上一輪 [打包版結果](../outputs/ui-optimization/desktop-ui-results.json) 已驗證文字右鍵、撤銷重做、保存重載、分頁溢位與圖表操作。本輪沒有重跑完整 UI／build；僅新增三個記憶體內 parser 檢查。
-- 損毀恢復問題引用 [先前隔離測試](../outputs/ui-audit/probe-facts.json) 並核對目前程式仍有同一資料流；不是宣稱本輪重新實測。
+- 上一輪 `打包版結果` (local verification artifact) 已驗證文字右鍵、撤銷重做、保存重載、分頁溢位與圖表操作。本輪沒有重跑完整 UI／build；僅新增三個記憶體內 parser 檢查。
+- 損毀恢復問題引用 `先前隔離測試` (local verification artifact) 並核對目前程式仍有同一資料流；不是宣稱本輪重新實測。
 - 優先級是設計／工程判斷，並非量測過的使用頻率：**P0** 可能損失內容；**P1** 高頻基本工作或其必要保護；**P2** 效率與連續性；**P3** 另立範圍的產品延伸。
 
 ## 使用者點名的四項
@@ -107,7 +111,7 @@
 
 | ID | 能力／狀態 | 實際缺口、建議結果 | 優先／證據 |
 |---|---|---|---|
-| R01 | 儲存資料故障隔離：缺陷仍在 | documents/config/layout 在同一 try 讀取；任一 JSON 解析失敗可保留範例 state，隨後開啟自動保存。先前已實測版面損毀導致劇本被範例覆蓋。需各自驗證、保留損毀原始資料、禁止錯誤覆寫並提供救援。 | **P0**；[page:40](../app/page.tsx#L40)、[page:41](../app/page.tsx#L41)、[歷史實測](../outputs/ui-audit/probe-facts.json) |
+| R01 | 儲存資料故障隔離：缺陷仍在 | documents/config/layout 在同一 try 讀取；任一 JSON 解析失敗可保留範例 state，隨後開啟自動保存。先前已實測版面損毀導致劇本被範例覆蓋。需各自驗證、保留損毀原始資料、禁止錯誤覆寫並提供救援。 | **P0**；[page:40](../app/page.tsx#L40)、[page:41](../app/page.tsx#L41)、`歷史實測` (local verification artifact) |
 | R02 | 草稿恢復與保存全部：部分 | 劇本有 500ms 草稿保存；指令 draft 只在記憶體。缺合法／暫時非法指令草稿恢復、Save All；退出只有繼續／關閉，不能直接儲存全部退出。 | P1；[page:41](../app/page.tsx#L41)、[CommandManager:54](../app/CommandManager.tsx#L54)、[main:42](../desktop/main.cjs#L42) |
 | R03 | 最近刪除、快照與取代復原：缺少 | 有確認和手動下載，但刪除或匯入取代後沒有內建恢復。需刪除／取代前快照、最近刪除、立即復原及重開後恢復，包含同名衝突處理。 | P1；[page:58](../app/page.tsx#L58)、[page:61](../app/page.tsx#L61) |
 | R04 | 字級／介面縮放與布局重設：部分 | 面板可拖尺寸、側欄可收合、行號可切；文字固定 16px/29px。缺可發現且保存的字級／App 縮放、回到 100%、重設布局；不必因此引入龐大偏好頁。 | P2；[CodeEditor:27](../app/CodeEditor.tsx#L27)、[page:79](../app/page.tsx#L79) |

@@ -6,8 +6,12 @@ $source = [IO.Path]::GetFullPath($job.source)
 $backup = $target + '.previous-' + $job.token
 try {
  if ([IO.Path]::GetExtension($target) -ne '.exe' -or [IO.Path]::GetExtension($source) -ne '.exe') { throw 'Invalid update files' }
- if ($job.version -and ((([Diagnostics.FileVersionInfo]::GetVersionInfo($source).FileVersion -split '\.')[0..2]) -join '.') -ne $job.version) { throw 'Executable version mismatch' }
- if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $job.sha256) { throw 'Checksum mismatch' }
+ $sourceVersion = (([Diagnostics.FileVersionInfo]::GetVersionInfo($source).FileVersion -split '\.')[0..2]) -join '.'
+ if ($job.version -and $sourceVersion -ne $job.version) { throw 'Executable version mismatch' }
+ $stream = [IO.File]::OpenRead($source)
+ $algorithm = [Security.Cryptography.SHA256]::Create()
+ try { $digest = [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() } finally { $stream.Dispose(); $algorithm.Dispose() }
+ if ($digest -ne $job.sha256) { throw 'Checksum mismatch' }
  $deadline = [DateTime]::UtcNow.AddSeconds(120)
  while (Get-Process -Id $job.pid -ErrorAction SilentlyContinue) {
   if ([DateTime]::UtcNow -gt $deadline) { throw 'App did not exit' }

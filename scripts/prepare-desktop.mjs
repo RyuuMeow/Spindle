@@ -47,6 +47,7 @@ await cp(
   new URL("desktop/portable-update.ps1", root),
   new URL("desktop/portable-update.ps1", destination),
 );
+await cp(new URL("desktop/installed-restart.ps1",root),new URL("desktop/installed-restart.ps1",destination));
 const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
 await mkdir(new URL("desktop/", destination), { recursive: true });
 await cp(

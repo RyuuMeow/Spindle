@@ -1,3 +1,7 @@
+# Historical development record
+
+This document describes an earlier milestone. Current behavior and release status are documented in the main architecture/UI guides and release verification report. Links to local verification outputs are retained as labels only; those artifacts are not distributed.
+
 # Yarn Workbench Desktop UI／UX 嚴格審查
 
 2026-09-17 · Windows x64 0.1.0 · **審查與改善提案；產品程式未修改。**
@@ -40,7 +44,7 @@
 
 **改法／驗收：** 文件、指令、版面分開讀取與驗證；失敗資料保留原字串，提供匯出救援與重試。只破壞版面時文件應完整可讀；任何讀取失敗都不得自動以範例覆寫原內容。這是人工注入損毀測試，未估計正常使用的發生機率。
 
-證據：[實測結果](D:/GitHub/yarn-workbench/outputs/ui-audit/probe-facts.json)、[測試腳本](D:/GitHub/yarn-workbench/outputs/ui-audit/probe.cjs)、[恢復後畫面](D:/GitHub/yarn-workbench/outputs/ui-audit/17-corrupt-layout-resets-documents.png)。
+證據：`實測結果` (local verification artifact)、`測試腳本` (local verification artifact)、`恢復後畫面` (local verification artifact)。
 
 ### A02：保存失敗沒有可操作的回饋
 
@@ -48,7 +52,7 @@
 
 **改法／驗收：** 保留草稿，在當前框內明示原因與「返回修正」，或直接返回並聚焦錯誤欄位。兩條保存路徑都能一步到問題處，修正後完成原操作；讀屏能取得錯誤原因。[W3C 錯誤辨識原則](https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html)
 
-![錯誤留在背景表單，確認框沒有解釋](D:/GitHub/yarn-workbench/outputs/ui-audit/15-validation-behind-dialog.png)
+!`錯誤留在背景表單，確認框沒有解釋` (local verification artifact)
 
 ### A03：作者需要知道作品到底安全了沒有
 
@@ -58,13 +62,13 @@
 
 ### A04：確認框不能取代恢復能力
 
-移除劇本、刪除指令及取代專案均有明確防呆，這些應保留；但確認後找不到撤回或最近刪除。App 內建立、尚未匯出的劇本沒有另一份原始檔可救。[page.tsx:50](D:/GitHub/yarn-workbench/app/page.tsx:50)、[移除確認](D:/GitHub/yarn-workbench/outputs/ui-audit/13-remove-confirmation.png)
+移除劇本、刪除指令及取代專案均有明確防呆，這些應保留；但確認後找不到撤回或最近刪除。App 內建立、尚未匯出的劇本沒有另一份原始檔可救。[page.tsx:50](D:/GitHub/yarn-workbench/app/page.tsx:50)、`移除確認` (local verification artifact)
 
 **改法／驗收：** 刪除先進本機可恢復區，取代前自動快照。確認移除後立即撤銷、重開後恢復，都必須取回最新文字與參數；明確處理同名衝突。無需複製 Notion 的整套服務，採用它的[刪除後可恢復原則](https://www.notion.com/help/duplicate-delete-and-restore-content)即可。本輪未實際刪除使用者作品。
 
 ### A05：範例能教人看，還沒教人開始自己的作品
 
-全新 profile 直接進 The Last Light，專案選單只有匯入、備份、自訂指令、說明。沒有空白專案與專案更名；新增劇本仍落在範例專案。日常整理也缺劇本重新命名／複製，場景改名必須自行處理引用。[專案選單](D:/GitHub/yarn-workbench/outputs/ui-audit/02-project-menu.png)、[page.tsx:60](D:/GitHub/yarn-workbench/app/page.tsx:60)
+全新 profile 直接進 The Last Light，專案選單只有匯入、備份、自訂指令、說明。沒有空白專案與專案更名；新增劇本仍落在範例專案。日常整理也缺劇本重新命名／複製，場景改名必須自行處理引用。`專案選單` (local verification artifact)、[page.tsx:60](D:/GitHub/yarn-workbench/app/page.tsx:60)
 
 **改法／驗收：** 起步提供「建立故事／開啟現有稿／試用範例」，專案與文件可就地命名。新使用者三個明確操作內建立自己的命名專案及第一稿，匯出不混入範例。場景改名若後續加入，需先預覽靜態引用影響；不能以盲目文字取代處理動態引用。
 
@@ -74,13 +78,13 @@
 
 **改法／驗收：** 首次顯示總覽、後續保留使用者視野；明確要求定位才移動畫面。先加入選取節點的入／出線凸顯，再改善線路與標籤避讓；來源位置與錯誤狀態分開標示。範例及含回圈、跨檔的 20 場景測試稿中，能追完每個出口，不被無關卡片遮住。這沿用 [Miro 對連線可讀性的處理](https://help.miro.com/hc/en-us/articles/360017730733-Connection-lines)，不增加完整圖形編輯器。
 
-![首次進入流程時部分節點出界](D:/GitHub/yarn-workbench/outputs/ui-audit/03-story-flow.png)
+!`首次進入流程時部分節點出界` (local verification artifact)
 
-[按適應全部後的對照](D:/GitHub/yarn-workbench/outputs/ui-audit/04-story-flow-fit.png)。
+`按適應全部後的對照` (local verification artifact)。
 
 ### A07：分頁能力存在，但操作意圖不清楚
 
-頂部＋建立目前文件的第二視圖；兩個 tab 同名、內容同步，但可保留不同模式與位置。這是 v0.4 刻意設計，不能當成 bug。問題是最顯眼的新增動作沒有讓人選下一個目的，同稿視圖也無可見辨識。[實測画面](D:/GitHub/yarn-workbench/outputs/ui-audit/05-plus-duplicates-document.png)
+頂部＋建立目前文件的第二視圖；兩個 tab 同名、內容同步，但可保留不同模式與位置。這是 v0.4 刻意設計，不能當成 bug。問題是最顯眼的新增動作沒有讓人選下一個目的，同稿視圖也無可見辨識。`實測画面` (local verification artifact)
 
 **改法／驗收：** ＋先提供找劇本／新建／另開目前視圖的精簡入口，同稿頁籤顯示模式或場景提示。保留共享內容和獨立視野；新手在點擊前能區分「新稿」與「同稿另一視圖」。這是設計提案，應以小型任務測試驗證；[Notion 新分頁預設開搜尋](https://www.notion.com/help/notion-for-desktop)提供可比較的模式。
 
@@ -92,7 +96,7 @@
 
 ### A09：少數熟悉快捷鍵，比更多按鈕更能建立桌面感
 
-在編輯器有焦點的隔離實測中，Ctrl+Tab 不切 tab、Ctrl+T 不新增、Ctrl+W 不關 tab；Ctrl+= 的整體 zoomFactor 維持 1。現有 Ctrl+S／F 與 Monaco 編輯功能仍存在，不能說完全沒有鍵盤支援。[實測數據](D:/GitHub/yarn-workbench/outputs/ui-audit/probe-facts.json)
+在編輯器有焦點的隔離實測中，Ctrl+Tab 不切 tab、Ctrl+T 不新增、Ctrl+W 不關 tab；Ctrl+= 的整體 zoomFactor 維持 1。現有 Ctrl+S／F 與 Monaco 編輯功能仍存在，不能說完全沒有鍵盤支援。`實測數據` (local verification artifact)
 
 另外，新增劇本檔名缺可程式判讀名稱、表單錯誤未與欄位關聯；流程節點可 Enter 到原文，但個別位置操作缺非拖曳替代。這些是源碼發現，未做 NVDA 或完整鍵盤驗收。
 
@@ -100,7 +104,7 @@
 
 ### A10：安靜的介面仍須讓必要資訊可讀
 
-部分 11–12px 輔助文字使用 #777，對 #1c1c1c／#202020 的計算對比分別約 3.81／3.64:1；適用於場景計數與流程標題等指定角色，不能擴大為「全部 UI 不合格」。模式與保存文字量到 11px，部分節點 footer 宣告 10px。[globals.css:6](D:/GitHub/yarn-workbench/app/globals.css:6)、[實際控制項量測](D:/GitHub/yarn-workbench/outputs/ui-audit/capture-facts.json)
+部分 11–12px 輔助文字使用 #777，對 #1c1c1c／#202020 的計算對比分別約 3.81／3.64:1；適用於場景計數與流程標題等指定角色，不能擴大為「全部 UI 不合格」。模式與保存文字量到 11px，部分節點 footer 宣告 10px。[globals.css:6](D:/GitHub/yarn-workbench/app/globals.css:6)、`實際控制項量測` (local verification artifact)
 
 **改法／驗收：** 提升必要小字對比，重要操作標籤考慮 12–13px 並實測密度；保留灰階與低干擾風格。以有效樣式核對普通文字至少 4.5:1 的[對比參照](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)，包含透明度合成；另驗證 Windows 不同縮放。本輪不是完整 WCAG 認證。
 
@@ -114,8 +118,8 @@
 
 ## 範圍與可追溯資料
 
-本輪以打包的 Windows App、全新隔離 profile、1440×900 和 800×600 CSSpx、DPR 1 操作。收集 18 張畫面；其中 `12-check-error.png` 的測試內容未触發診斷，不拿它作錯誤證據，真正診斷圖為 [18-real-diagnostics.png](D:/GitHub/yarn-workbench/outputs/ui-audit/18-real-diagnostics.png)。截圖含 App 客戶區，不含 Windows 標題列。
+本輪以打包的 Windows App、全新隔離 profile、1440×900 和 800×600 CSSpx、DPR 1 操作。收集 18 張畫面；其中 `12-check-error.png` 的測試內容未触發診斷，不拿它作錯誤證據，真正診斷圖為 `18-real-diagnostics.png` (local verification artifact)。截圖含 App 客戶區，不含 Windows 標題列。
 
 800×600 的主畫面及指令表單沒有觀察到可確認裁切，因此沒有列為缺陷。未做真實作者測試、長時間大型專案效能測試、NVDA、觸控、Windows 高對比／150% DPI 全面驗證。使用者困惑與效率代價是根據證據的設計推論，沒有捏造訪談或量化結果。
 
-獨立審查：[創作流程](D:/GitHub/yarn-workbench/outputs/ui-audit/workflow-review.md)、[視覺與資訊架構](D:/GitHub/yarn-workbench/outputs/ui-audit/visual-review.md)、[桌面互動與可及性](D:/GitHub/yarn-workbench/outputs/ui-audit/desktop-review.md)。取證腳本：[capture.cjs](D:/GitHub/yarn-workbench/outputs/ui-audit/capture.cjs)、[probe.cjs](D:/GitHub/yarn-workbench/outputs/ui-audit/probe.cjs)。證據位於本機 outputs，不是公開託管連結。這個目錄目前沒有 Git 中繼資料，本輪未建立 commit。
+獨立審查：`創作流程` (local verification artifact)、`視覺與資訊架構` (local verification artifact)、`桌面互動與可及性` (local verification artifact)。取證腳本：`capture.cjs` (local verification artifact)、`probe.cjs` (local verification artifact)。證據位於本機 outputs，不是公開託管連結。這個目錄目前沒有 Git 中繼資料，本輪未建立 commit。
