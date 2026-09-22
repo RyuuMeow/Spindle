@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { z } from "zod";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -43,7 +44,11 @@ type RecordEntry = Target & {
   pending?: "install" | "remove";
 };
 type SkillRecord = {
-  resourceVersion?: string; hash: string; plannedHash?: string; owners: string[] };
+  resourceVersion?: string;
+  hash: string;
+  plannedHash?: string;
+  owners: string[];
+};
 type Registry = {
   version: 1;
   entries: Record<string, RecordEntry>;
@@ -58,6 +63,37 @@ type Options = {
   enabled: () => boolean;
   beforeWrite?: () => void;
 };
+const targetSchema = z.object({
+  configPath: z.string().refine(path.isAbsolute),
+  skillPath: z.string().refine(path.isAbsolute),
+});
+const hashSchema = z.string().regex(/^(absent|[a-f0-9]{64})$/);
+const registrySchema = z.object({
+  version: z.literal(1),
+  entries: z.record(
+    z.string(),
+    targetSchema.extend({
+      profile: z.string(),
+      client: z.enum(["codex", "claude"]),
+      name: z.string().regex(/^spindle(?:-[a-f0-9]{12})?$/),
+      entryHash: hashSchema,
+      plannedHash: hashSchema.optional(),
+      pending: z.enum(["install", "remove"]).optional(),
+    }),
+  ),
+  skills: z.record(
+    z.string(),
+    z.object({
+      hash: hashSchema,
+      plannedHash: hashSchema.optional(),
+      resourceVersion: z.string().optional(),
+      owners: z.array(z.string()),
+    }),
+  ),
+});
+const targetsSchema = z
+  .object({ codex: targetSchema.optional(), claude: targetSchema.optional() })
+  .strict();
 export class AgentInstaller {
   private home: string;
   private env: NodeJS.ProcessEnv;
@@ -85,10 +121,7 @@ export class AgentInstaller {
     if (!fs.existsSync(this.registryFile))
       return { version: 1, entries: {}, skills: {} };
     try {
-      const value = JSON.parse(text(this.registryFile));
-      if (value.version !== 1 || !value.entries || !value.skills)
-        throw new Error();
-      return value;
+      return registrySchema.parse(JSON.parse(text(this.registryFile)));
     } catch {
       throw new Error("安裝紀錄無法讀取；保留既有設定。");
     }
@@ -145,7 +178,7 @@ export class AgentInstaller {
     if (client !== "codex" && client !== "claude")
       throw new Error("不支援的 Agent。");
     const overrides = fs.existsSync(this.targetsFile)
-      ? JSON.parse(text(this.targetsFile))
+      ? targetsSchema.parse(JSON.parse(text(this.targetsFile)))
       : {};
     if (overrides[client]) return overrides[client];
     const claude = this.env.CLAUDE_CONFIG_DIR;
@@ -184,7 +217,7 @@ export class AgentInstaller {
       this.safe(next.configPath);
       this.safe(next.skillPath);
       const values = fs.existsSync(this.targetsFile)
-        ? JSON.parse(text(this.targetsFile))
+        ? targetsSchema.parse(JSON.parse(text(this.targetsFile)))
         : {};
       atomicWrite(
         this.targetsFile,

@@ -1,6 +1,16 @@
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.9.1 Portable**，2026-09-22。
+版本：Windows x64 **0.9.2 Portable**，2026-09-22。
+
+## 0.9.2 Agent 一鍵安裝與 Skill（2026-09-22）
+
+- 分支 `feat/agent-installation`。新增可独立安裝的 `skills/spindle/SKILL.md` 與 Codex／Claude Code 個人 MCP＋Skill 一鍵安裝、更新、移除、原生路徑選擇及握手測試。既有 20 個 MCP 工具契約不變。
+- 安裝只修改受管理 entry；保留其他設定、TOML 註解及使用者改過的 Skill。跨 profile 名稱隔離與 Skill 共用、提交前內容比對、持久操作意圖、部分失敗重試及損毀紀錄拒絕均有回歸。
+- **187 項既有單元測試、25 項 MCP 測試、12 項安裝服務測試**通過；型別、lint、Web build、desktop build 與 Portable 打包通過。
+- [實際 Portable 安裝驗證](../outputs/agent-install-ui/run-1790061226714/results.json)：Codex 與 Claude Code 真實 CLI 可讀取已安裝設定；兩者設定均可取得 20 個工具、讀取框選、拒絕唯讀修改、允許版本化修改並一次 Undo。重設憑證、更新、重啟及移除通過。Codex app-server 的 `skills/list` 確認 Spindle Skill 可被發現。
+- [既有 MCP 全流程](../outputs/agent-release-mcp.log)與[三模式提示／Tab／歷史比較](../outputs/agent-release-hints/results.json)於 **0.9.2 實際 Portable** 通過，頁面錯誤為零。測試專案、App profile 與 agent HOME 均隔離；未修改使用者既有設定或登入憑證。
+- 封裝共 **168 個檔案**；Skill 與 MCP runtime 雜湊符合 staging，Worker／WASM／授權檔存在，未包含測試資料、agent 設定或操作憑證。[交付核對與 SHA-256](../outputs/agent-release-verification.json)。產物 `release/Spindle-0.9.2-Portable-x64.exe`，151,133,965 bytes；沒有 Setup。
+- 驗證界線：CLI 設定讀取、Codex Skill 發現與官方 SDK 工具交易均為實測；隔離環境未配置模型登入，未實測 Codex／Claude 模型工作階段自動採用 Skill，Claude Skill 的模型端載入亦未確認。未測原生 IME 候選視窗、混合 DPI／多螢幕、企業 agent 管制、安裝版、實際斷電與受限 ACL；不以故障注入替代上述實機驗收。
 
 ## 0.9.1 輸入診斷、MCP 文件管理與 Portable（2026-09-22）
 

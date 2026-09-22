@@ -154,3 +154,12 @@ map-sources.ts 訂閱 WorkspaceClient 每筆共享文件交易。即使圖表未
 `project-entries` 共用 UI 與 MCP 的檔案操作規劃、路径與完整子樹驗證。`EntryJournal` 連接磁碟新增／移動與 project.json 身分資料；開始前保存意圖，保存來源後重新記錄檔案身分，metadata 成功後才清除紀錄。開啟時以設定摘要與磁碟證據恢復；不明狀態保留，拒絕默默覆寫。`RecoveryStore` 繼續負責完整垃圾桶資料與復原日誌。
 
 正式產品不再引用示範工作區；The Last Light 僅存於 scripts/fixtures。封裝白名單涵蓋 MCP runtime、視窗模組、系統字型查詢與 licenses，並以實際 Portable 驗證。
+
+
+## Agent 安裝服務（0.9.2）
+
+`AgentInstaller` 與客戶端設定 adapter 獨立於 WorkspaceService：只管理由設定頁選定的 agent 使用者設定及 Skill，不接觸劇本。可信 renderer 透過具名 IPC 檢查、安裝／更新、移除、選擇路徑及握手；憑證由主程序 MCP runtime 提供，renderer 不提交任意設定內容。Codex TOML 使用受管理區塊與解析前後的無關語義比對，Claude JSON 使用局部 edit；損毀或未知擁有權拒絕接管。
+
+每個 Spindle profile 的 `agent-targets-v1.json` 保存路徑選擇。使用者 `~/.spindle-agent/installations-v1.json` 記錄 profile、目標、資源版本、雜湊與共享 Skill 擁有者，不含憑證。安裝與移除使用跨程序鎖，先持久保存意圖／允許的前後雜湊，再逐檔原子替換；提交前重新檢查內容。部分失敗下次以紀錄核對現況續作，不還原整份第三方設定備份。失效程序鎖僅於確認程序不存在時清理。
+
+MCP entry 預設 `spindle`，非預設 profile 使用正規化 profile 路徑雜湊後綴。Skill 不含 profile 特定資訊並共用；最後一個擁有者移除時，只有檔案仍符合受管理雜湊且無額外檔案才移除。不同 client 可各自存放 Skill。連接埠／憑證更新只標示過期，使用者明確更新後同步 agent 設定。此安裝流程不建立額外 MCP 工具，也不修改 agent 的信任或工具批准設定。

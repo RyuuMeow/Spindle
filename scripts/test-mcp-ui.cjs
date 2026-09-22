@@ -104,7 +104,9 @@ async function monaco(page, operation) {
       await home.getByRole("status").filter({ hasText: "已複製連線資料" }).waitFor();
       const config = JSON.parse(fs.readFileSync(path.join(profile, "mcp-v1.json"), "utf8"));
       const matches = await app.evaluate(({ clipboard }, config) => {
-        const value = JSON.parse(clipboard.readText()).mcpServers.spindle;
+        const entries = Object.values(JSON.parse(clipboard.readText()).mcpServers);
+        if (entries.length !== 1) return false;
+        const value = entries[0];
         return value.url === `http://127.0.0.1:${config.port}/mcp` && value.headers.Authorization === `Bearer ${config.token}`;
       }, config);
       assert.equal(matches, true);

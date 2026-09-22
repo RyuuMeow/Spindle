@@ -216,3 +216,18 @@ test("custom paths, environment paths, disabled mode, and duplicate JSON keys", 
   );
   assert.equal(f.installer.inspect("claude").mcp, "conflict");
 });
+
+test("corrupt installation registry cannot reset ownership or overwrite settings", (t) => {
+  const f = fixture(t);
+  f.installer.install("codex");
+  const target = f.installer.target("codex");
+  const before = fs.readFileSync(target.configPath, "utf8");
+  const registry = path.join(f.home, ".spindle-agent/installations-v1.json");
+  fs.writeFileSync(
+    registry,
+    JSON.stringify({ version: 1, entries: [], skills: {} }),
+  );
+  assert.equal(f.installer.inspect("codex").mcp, "conflict");
+  assert.throws(() => f.installer.install("codex"));
+  assert.equal(fs.readFileSync(target.configPath, "utf8"), before);
+});

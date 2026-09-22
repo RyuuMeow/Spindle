@@ -13,13 +13,15 @@ pnpm desktop:start
 pnpm desktop:pack:portable
 ```
 
-Windows x64 **0.9.1 Portable**：`release/Spindle-0.9.1-Portable-x64.exe`，SHA-256 見同目錄 `.exe.sha256`。本輪不產出 Setup。打包包含離線 Monaco、CodeMirror、ELK Worker、libavoid WASM、MCP runtime、字型服務與授權檔，不依賴編輯器 CDN。正式 bundle 不含示範劇本；新專案及新 Web 工作區保持空白，不刪除使用者既有資料。程式未簽章。
+Windows x64 **0.9.2 Portable**：`release/Spindle-0.9.2-Portable-x64.exe`，SHA-256 見同目錄 `.exe.sha256`。本輪不產出 Setup。打包包含離線 Monaco、CodeMirror、ELK Worker、libavoid WASM、MCP runtime、字型服務與授權檔，不依賴編輯器 CDN。正式 bundle 不含示範劇本；新專案及新 Web 工作區保持空白，不刪除使用者既有資料。程式未簽章。
 
 Spindle 為原 Yarn Workbench 的新名稱；沿用原 App profile、專案 `.spindle` 及安裝識別，保留既有資料。SVG 原檔在 `public/brand/`，桌面圖示由專案素材產生。
 
 Portable 開啟時會先顯示「正在解壓並啟動」；0.2.1 改用 ZIP 與每次啟動獨立的暫存目錄。更新時先關閉舊版，再開新版本；兩者沿用同一個 App profile。
 
 ## 本機 Agent 整合
+
+0.9.2 可在「設定 → MCP／Agent 整合 → Agent 安裝」一鍵安裝 Codex／Claude Code 的使用者 MCP 設定與 Spindle Skill，並提供更新、連線測試及移除。憑證會寫入 agent 本機設定，安裝不改變其批准規則。獨立 Skill 在 [skills/spindle](skills/spindle/SKILL.md)，完整安裝、手動設定與故障排查見 [MCP 接入指南](docs/mcp.md#agent-一鍵安裝092)。
 
 桌面設定的「MCP／Agent 整合」可啟用唯讀或修改存取，提供多視窗目標、即時游標／選取、語義查詢、診斷、統計及版本化修改。預設停用；接入方式與完整工具契約見 [Spindle MCP v1](docs/mcp.md)。0.9.1 Portable 已包含此功能，共 20 個工具；文件／資料夾查詢、新增、移動、移入垃圾桶及復原皆使用工作區服務與版本保護，永久刪除保留 UI 確認。
 
@@ -40,6 +42,8 @@ Portable 開啟時會先顯示「正在解壓並啟動」；0.2.1 改用 ZIP 與
 - 網頁資料存於該瀏覽器的 localStorage，與桌面 profile 分開；請用專案備份轉移。清除網站資料會移除網頁工作區。
 
 ## 編輯與操作
+
+游標緊貼配對引號、指令 `>>` 或指令內括號的結尾時，Tab 可逐層跳出容器；補全與 snippet 優先，其他位置沿用縮排。三種編輯入口一致，不修改文字。
 
 書本按鈕切換純閱讀，僅保留場景、對話與選項；不修改原文。分析按鈕開啟角色／場景統計側欄。資料夾按箭頭展開、單擊選取、雙擊改名，文件與資料夾可跨層拖移；複製後原位改名。圖表首次自動整理，之後只在按下整理時重排全部或所選場景／線上卡片。左鍵框選／Shift 多選，右鍵拖動平移；雙擊支線加 pin；線段與共用幹線僅供選取，理線透過場景、條件卡與 pin。卡片可框選、自由移動並與場景一起搬移；路線跟隨卡片與 pin；拖動時近距離吸附對齊，同來源分岔前可共線，分岔後不同去向以平行間距分開，同向末段允許匯流。pin 右鍵或 Delete 可刪除。手動布局、完整 Undo／Redo 隨文件視圖保存；拖動與縮放保留無關路線。檢查無問題時顯示勾號。
 
