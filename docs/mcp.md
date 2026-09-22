@@ -132,3 +132,30 @@ editorSessionId 只在本次 App 執行、同一視窗工作區綁定內有效�
 快照包含文件、指令、空資料夾、樹狀順序及垃圾桶。檔案操作在 `.spindle/operations/` 保存持久意圖，與既有垃圾桶操作紀錄分工；重新開啟專案時核对磁碟結果與設定版本，恢復文件識別。若回傳 `applied:true` 且有 `persistenceError`／`recoveryRequired`，不要用新 operationId 重做；修正磁碟問題後重開專案，原紀錄與資料會保留。
 
 UI 的 800ms 診斷呈現延遲不影響 `validate_project`：工具檢查目前已同步版本，回報組字／未同步狀態。
+
+
+## Agent 一鍵安裝（0.9.2）
+
+Windows 設定 → MCP／Agent 整合 → Agent 安裝，選擇 Codex 或 Claude Code，按「安裝 MCP＋Skill」。需先啟用唯讀或允許修改；安裝不改變 agent 的信任／批准規則。憑證會存入 agent 的本機使用者設定，不寫入劇本專案。Spindle 必須持續執行。
+
+Codex 預設 MCP 位於 `$CODEX_HOME/config.toml`（未設定時 `~/.codex/config.toml`），Skill 位於 `~/.agents/skills/spindle/`。Claude Code 預設 MCP 位於 `~/.claude.json` 的使用者 `mcpServers`，Skill 位於 `~/.claude/skills/spindle/`；自訂 `CLAUDE_CONFIG_DIR` 時使用該目錄的 `.claude.json` 與 `skills/spindle/`。卡片顯示實際位置，可透過原生選擇器指定設定檔及 Skill 的上層目錄。
+
+更新、移除僅處理 Spindle 管理的項目；同名外部設定、改過的 Skill 或損毀設定會保留並顯示衝突。部分完成可重試，不重複建立副本。多個 Spindle profile 使用不同 MCP 名稱並共用 Skill。
+
+改連接埠或重設憑證後，按「更新安裝」同步各 agent；停用會撤銷憑證。安裝完成後重新載入 agent 或開啟新工作階段。「檢查連線」驗證已安裝設定能與 Spindle 握手並列出工具，不代表第三方 agent 已載入它。無法連線時確認 Spindle 執行中、存取模式、埠、憑證與 agent 的 MCP 設定。
+
+### 手動安裝
+
+將倉庫 `skills/spindle/` 複製至上述個人 Skill 目錄。在 Spindle 複製對應客戶端格式，合併至使用者設定；不要覆蓋整份設定。Skill 可獨立使用，不需要安裝額外 MCP server。
+
+Codex 範本（實際值由設定頁複製）：
+
+```toml
+[mcp_servers.spindle]
+url = "http://127.0.0.1:PORT/mcp"
+http_headers = { Authorization = "Bearer TOKEN" }
+```
+
+Claude Code 使用前述 JSON 的 `mcpServers`，每個 entry 包含 `type: "http"`、`url` 及 `headers`。不要把占位值當真實憑證，也不要將含憑證設定加入版本庫。
+
+官方格式：[Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)、[Codex Skills](https://learn.chatgpt.com/docs/build-skills)、[Claude Code MCP](https://code.claude.com/docs/en/mcp)、[Claude Code Skills](https://code.claude.com/docs/en/skills)。
