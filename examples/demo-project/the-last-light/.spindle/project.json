@@ -1,0 +1,37 @@
+{
+  "name": "The Last Light",
+  "commands": [
+    {
+      "name": "fade_in",
+      "description": "以指定秒數淡入畫面。由遊戲端負責實際執行。",
+      "params": [
+        {
+          "name": "duration",
+          "type": "number",
+          "required": true,
+          "defaultValue": ""
+        }
+      ],
+      "example": "<<fade_in 1.5>>"
+    },
+    {
+      "name": "play_sound",
+      "description": "播放指定音效，可設定播放音量。",
+      "params": [
+        {
+          "name": "clip",
+          "type": "string",
+          "required": true,
+          "defaultValue": ""
+        },
+        {
+          "name": "volume",
+          "type": "number",
+          "required": false,
+          "defaultValue": "1"
+        }
+      ],
+      "example": "<<play_sound \"evening_wind\" 0.6>>"
+    }
+  ]
+}

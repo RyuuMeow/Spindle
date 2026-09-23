@@ -1,0 +1,11 @@
+title: Shop
+tags: shop village
+---
+Merchant: 歡迎。你有 {$gold} 枚金幣。
+-> 買一盞提燈 <<if $gold >= 5>>
+    <<set $gold -= 5>>
+    Merchant: 小心黑暗。
+-> 下次再來
+    Merchant: 路上小心。
+<<jump Village>>
+===

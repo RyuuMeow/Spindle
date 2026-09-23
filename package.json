@@ -54,7 +54,9 @@
     "i18n:check": "node scripts/check-i18n.mjs",
     "release:metadata": "node scripts/release-metadata.mjs",
     "test:release": "node --test scripts/public-release.test.mjs",
-    "test:public-ui": "node scripts/test-public-ui.cjs"
+    "test:public-ui": "node scripts/test-public-ui.cjs",
+    "demo:sync": "node scripts/sync-demo-fixture.mjs",
+    "demo:check": "node scripts/sync-demo-fixture.mjs --check"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

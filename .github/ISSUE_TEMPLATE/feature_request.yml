@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest a writing or workflow improvement
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Current problem
+      description: Describe the task and where Spindle makes it difficult.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behavior
+      description: Include a small example without private project content.
+    validations:
+      required: true

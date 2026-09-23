@@ -1,315 +1,37 @@
-# Spindle UI 規範
-
-狀態：**0.10.0 統一搜尋、三語介面與更新準備。** 更新日期：2026-09-22。適用於深色 Windows 桌面與網頁工作區。
-
-本文件是最新設計規則；實際發行與最終測試結果以[實作追蹤](history/implementation-progress.md)為準。現行規則包含 R01–R08 及 0.6.0 最新回饋。搜尋維持輕量浮層；指令依最新決策改回設定式工具 tab；大綱維持單一 toggle，正文以外物件保持低調。原始根因與汰換關係保留於[設計複審](history/desktop-design-review-2026-09-18.md)。
-
-## 實作與驗證狀態
-
-| 範圍 | 已驗證 | 保留邊界 |
-|---|---|---|
-| 閱讀節奏 | 19項單元、CodeMirror幾何、跨區塊編輯及桌面整合 | 原生中文 IME 未實測 |
-| 文件導航與建立 | 目前TabId、獨立歷史、行內新增、排序、磁碟失敗回滾 | 原生跨窗拖曳另驗收 |
-| 指令與搜尋 | 工具 tab、搜尋失焦關閉、結果定位及 tab 內狀態保留 | 組字防護採合成事件 |
-| 節點直接編輯 | 共用來源／Undo、跨檔、失效範圍及未提交草稿恢復 | 不含圖上拉線改寫 |
-| 面板與控制項 | 800／1100／1440px、鍵盤尺寸調整、來源位置及溢位 | 混合DPI／讀屏另驗收 |
-| 發行 | 以[實作追蹤](history/implementation-progress.md)的新包證據為準 | 不以舊包結果替代 |
-
-## 初始畫面與專案
-
-- 預設進入獨立初始畫面；保留 Spindle 品牌、44px 原生控制列。開啟資料夾／建立專案為主動作；設定使用 SVG icon；初始畫面可進入完整全域設定，包括編輯器風格與 MCP／Agent 整合。
-- 專案列表顯示名稱與次要路徑，支援名稱／路徑搜尋；無數量上限。單擊開啟，右鍵提供移除紀錄、檔案總管與行內改名。失效路徑顯示警告 SVG、降低亮度，停用開啟及改名。
-- 建立專案使用同頁表單，名稱、父資料夾與完整路徑預覽；非法名稱或已存在目錄就地報錯。舊草稿只能預覽及轉存正式專案。
-- Project 選單列最近 5 筆，移除最近紀錄不影響完整列表；關閉專案返回初始畫面並保留視圖。單檔視窗隱藏專案限定工具。
-- Project 與 tabs 之間為 1px × 26px 置中分隔線，左右各 8px；不改 tabs 滾動。資料夾箭頭固定 24px 控制欄、30px 高、padding 0，SVG 置中繞中心旋轉。
-
-## 工作殼與面板
-
-- Windows 第一列 44px，包含專案、文件 tabs 及原生 titlebar overlay；保留 caption 安全區、可拖曳留白與不可拖曳互動區。
-- 第二列 42px：返回／前進、文件身份與保存異常、模式分段控制、文件工具。歷史預覽替換本列工具；不另增第三列或常駐統計 footer。
-- 文件樹在左、目前文件的大綱在右；大綱預設收起。主工具列是唯一顯示開關，按模式記住開關；面板內不再放 pin／close。普通換稿、搜尋、Esc 不清除偏好；歷史暫代右側後應恢復大綱。
-- 窄窗一次顯示一個輔助欄，最近明確開啟者優先；這只是暫時避讓，不覆寫開關或寬度偏好。被避讓的大綱第一次點 toggle 應顯示它，不能直接關掉隱藏偏好；pressed 反映實際可見狀態。
-- 左、右及底部面板共用 splitter：可見 hover／focus、足夠命中區；方向鍵調整、Home／End 到範圍端點，Escape 取消本次拖動。尺寸屬個人視圖狀態。
-- 四級表面為工作殼、停駐面板、主編輯面、浮層。停駐面板以約 6px 溝槽、局部 6px 圓角、低對比 1px 描邊及克制底色差分層；陰影主要用於浮層，不把每塊內容都畫成厚卡片。
-
-## Tab、文件導航與建立
+[English](ui-design.md) · [繁體中文](ui-design.zh-TW.md) · [简体中文](ui-design.zh-CN.md)
 
-- Tab 是使用者建立的視圖容器。側欄單擊、一般搜尋結果、大綱、閱讀跳轉及診斷定位，都在目前 TabId 導航；不因目標已有其他視圖而切 tab，不改 tab 數量或順序。
-- 中鍵、Ctrl+Enter、tab＋、「在新分頁開啟」才建立新容器。直接點 tab／Ctrl+Tab 切換既有容器；沒有任何 tab 時可建立首個容器。
-- 每個 tab 保存自己的返回／前進及各文件的模式、選取、捲動和圖表視野；文字、保存與 Undo 按 DocumentId 共用。普通導航保留目前模式，明確「前往原文」才切純文字。
-- 固定 tab 只固定位置並避免一般批次關閉，不使普通導航偷偷新增 tab。文件使用穩定 SVG 文件圖示；同稿多視圖才補模式／編號。＋跟在最後 tab，溢位時仍可操作。
-- 新增劇本與場景在所屬列表插入暫存列，立即聚焦並反白唯一預設名稱；Enter／合法失焦才建立，IME Enter 不提交。Escape 取消，不產生空檔或來源區塊；非法名稱／I/O 錯誤就地顯示並保留輸入。
-- 普通更名／F2 共用 inline 名稱輸入。新增期間不得因排序或篩選隱藏／移動輸入列；換文件取消尚未提交的場景列。圖表新增場景也走大綱 inline 流程。
-- 排序明示手動、名稱升冪／降冪；按鈕 SVG 與 tooltip 隨方向變化，更多選單可回手動。排序偏好不破壞手排次序，同層用自然數字排序；拖移後應有明確插入／移入回饋。
+# Spindle interface conventions
 
-## 搜尋與自訂指令浮層
+These rules describe the current dark Windows desktop and Web workspace. Historical reviews are archived under [history/](history/); the [verification report](../releases/0.10.0/verification.md) distinguishes implemented behavior from device cases not tested. UI copy is available in English, Traditional Chinese and Simplified Chinese; Yarn source, user stories and custom command content are never translated.
 
-| 情境 | 容器與結束方式 |
-|---|---|
-| 全局搜尋／快速開啟 | 中央偏上的輕量 popup，輸入及結果同一表面，不壓暗背景；點結果、點外部或整體失焦即關閉 |
-| 自訂指令 | 與設定一致的 utility tab；不顯示專案副標或重複說明，切換保留狀態，關閉捨棄未套用草稿 |
-| 顯示與閱讀等偏好 | 集中於設定工作區；不為每一個選項開小彈窗 |
-| 新增／一般更名 | 所屬列表 inline；不使用命名 modal |
-| 衝突／必要確認 | 有明確後果的對話框；不與日常查找混用 |
+## Launcher and workspaces
 
-- 搜尋寬約 680px、窄窗保留邊距，頂部約 12vh；輸入框下直接列結果，沒有大標題、長說明與確認按鈕。未輸入時列劇本；輸入後顯示命中片段、必要檔案／場景身份及行數。
-- Ctrl+P 開檔案範圍，工具列搜尋／Ctrl+Shift+F 開內容範圍；＋／Ctrl+T 使用同一容器並明示新增分頁。保留查詢，不占用文件側欄或改面板開關。
-- 方向鍵只移動選取，Enter／滑鼠開啟；Ctrl+Enter／中鍵明確開新 tab。查詢、範圍或結果集合改變後，活動結果須仍可見。截斷上限及總數應明示，不把部分結果當全部。
-- 搜尋中輸入框、範圍控制與列表間的焦點移動不關閉；Esc 回復來源焦點，點外部／App 失焦不搶回焦點。中文組字確認不得觸發導航。
-- 指令頁採左側清單、右側限寬表單，沿用設定頁層級。搜尋只顯示一層焦點框；「選填」為淡灰底、3px 圓角小標籤。語法限制於錯誤時就地提示。
-- 指令參數採緊湊列，「套用定義」位於表單頂部；未更動時停用。副本／Undo／Redo 用帶提示 SVG，刪除置於更多選單。未完成／非法定義僅在 tab 開啟期間保留於記憶體，關閉直接捨棄、不自動套用。
-- 指令 tab 支援一般分頁切換與關閉；Ctrl+S 套用定義，未套用草稿不寫入 profile 或備份。原始欄位叫「變數名稱」，另有顯示名稱；參數說明採展開欄，避免常駐大量表單。
+The launcher is separate from the editor. It offers **Open project folder**, **Create project**, a searchable full project list and access to global settings. A missing project path is dimmed and marked with an SVG warning; it can be removed from the list but not opened or renamed. Creating a project shows the parent, full destination and inline validation; it never merges into an existing folder. The Project menu lists at most five recent projects, but removing a recent item does not remove it from the complete list. Closing a project saves it before returning to the launcher. Standalone `.yarn` windows hide project-only actions. Legacy pathless drafts are managed under **Settings → Data recovery**.
 
-## 共用物件與診斷
+## Shell, tabs and navigation
 
-| 角色 | 規則 |
-|---|---|
-| SVG | 操作、狀態、折疊及語義箭頭使用 Lucide 或同等 24×24 viewBox 線性 SVG；不以 Unicode 充當控制圖示。通常 14–16px，工具命中區約 30–32px |
-| 圖示／文字 | 熟悉動作可 icon-only，但需 accessible name 及 hover／focus 提示；歧義動作、模式、提交保留文字 |
-| 字體／色彩 | 正文優先；角色、命令、tags、變數和裝飾物簡單低調，不增加無關亮色。純文字 Monaco 字體及語法配色不變 |
-| 間距 | 4／8／12／16／24／32px 尺度；label／value 就近分組，不把少量資訊推至視窗兩端 |
-| 清單 | 32px 起，整列 hover／selected；更多動作保留位置，避免文字跳動 |
-| 焦點 | hover、selected 與鍵盤 focus 分開；不能為乾淨而移除焦點標記 |
-| 分段單選 | 少量互斥值採 radiogroup／radio；一個 Tab 停留點，方向鍵及 Home／End 選擇 |
-| Select | 統一 trigger 高度、label／SVG 基線、選單起點與 selected／focus；診斷和指令參數型別共用 CompactSelect |
-| 表單 | label／value 採就近網格，欄間約 24px；數值保留未完成輸入，blur／Enter 驗證、Escape 取消，錯誤緊接欄位 |
-| 提示 | 暗色 tooltip 同時服務 hover／focus；提交錯誤留在目前互動範圍，普通 toast 不蓋住 modal |
+The first Windows row is a 44 px title/tab bar with native caption safety space. The second is a 42 px navigation and mode toolbar. A centered 1 px divider separates Project from the tabs. Document tree is on the left, current-document outline on the right; the outline is opened only by its toolbar toggle and retains its preference across normal navigation. Narrow windows temporarily show one auxiliary sidebar without overwriting its saved open/width preference. Splitters show hover/focus feedback and support keyboard movement.
 
-診斷標頭是標題／數量、篩選群與關閉：30px 左右等高控制、8px gap、左右 12–16px。寬度足夠時用「目前劇本／全專案」及嚴重度分段；窄欄用同風格 select。編譯器範圍說明移入資訊提示。無問題的初始空態不強占大面積；使用者調高後尊重其尺寸。
+A tab is a **view container**, not a unique file. Clicking the tree, an ordinary search result, the outline or a diagnostic navigates within the current TabId and retains its mode. Middle click, Ctrl+Enter, the tab plus, or an explicit new-tab action creates a new container. Each tab retains its own history, selection, scroll and graph viewport; all views of one document share text and Undo. Switching away from settings, commands or recovery does not reset that tab's controls or diff preview.
 
-## 閱讀編輯
+New script/scene names appear inline in their owning list. Enter or valid blur commits; Escape cancels without creating a file/source block; IME Enter does not commit. Invalid names or I/O failures leave the input in place. Folder arrows have a fixed 24 px control column and a centered SVG, with no hover fill; arrow click expands, name click selects, double click renames. A project tree drag uses a white insertion line, and trash is the ordinary delete destination.
 
-純文字 Monaco 維持原樣。閱讀與節點編輯共用來源結構及裝飾；整份閱讀稿維持一個 CodeMirror 連續編輯面。只映射來源 offset，不從 DOM 回生成 Yarn；所有分支都顯示，不模擬執行。
+## Unified search and creation
 
-- 閱讀欄標準最大 760px、寬版 900px，隨可用空間縮小。正文預設 16／29px，尊重既有偏好；標題 1.4em、命令 0.875em、變數 0.9em、tags 0.75em。**命令與條件沿用正文行框，不再因字較小而壓低行距。**
-- 視覺分類來自場景／台詞段落／命令群／選項／分支首尾。連續台詞與連續命令不逐行加段落距離；台詞和命令群交界 12px。來源空白行逐行保留，包含連續及僅含空白字元的行，使用偏好的閱讀行高；已有空白行時移除相鄰額外段落留白，原文字節不變。
-- 未有來源空白時，標題至 tags 6px、場景頭到正文 24px；場景分隔線前後各 24px。分隔線的留白與正文群組的留白分開計算，不再讓下一標題貼線。
-- 區域邊緣、SVG 欄與文字起點共用同一基準：一般文字距左邊緣 40px，SVG 16px＋8px 間隔掛在文字左側；800px 以下文字內距 32px。台詞、條件、命令、選項及長行續行對齊文字欄，set 不因沒有前導 icon 改變起點。
-- 每個條件分支頂／底各 16px，標頭至內容 8px；if／elseif／else 共用配方。底色接近正文面，細分隔只表達歸屬；內層結束較弱，回到共同內容有額外分界。深層不累積縮排。
-- 首個選項群與前文分隔，兄弟選項保有間距；子命令／台詞跟隨自己的選項，共同後續內容明確結束群組。簡單 jump 保留兩行連續來源，不用不可編輯 widget 硬併成一行。
-- tags 為小灰標籤；變數使用低彩度紫灰標籤，隱藏 `$` 但保留識別字。角色與台詞同列，角色只用克制字重／灰暖色辨識。字串、註解及未知 markup 的字面 `$` 不轉換。
-- 通用命令用 terminal SVG、名稱及原順序參數；jump／detour／set 保持各自語義。內嵌選項條件以低權重提示呈現，不保留突出的程式碼外框；不憑名稱猜音效或動畫圖示。
-- 游標／選取進入一行時完整揭露該行原文，使用 Monaco 原有 16／29px 字體與語法配色；該行不混用渲染 widget。離開後恢復閱讀造型。未知／未完成語法保留原文，已知分支中的未知命令仍保留區域內距。IME 期間只映射裝飾，組字結束再計算，不重建 editor。
-- 收合保留暗色提示及 SVG，範圍按分頁保存，隨來源修改映射；不再符合完整場景時展開，避免錯折。
+Global search, Ctrl+P and the add-tab action share one light popup (roughly 680 px wide, near the upper center) without a dark backdrop or confirm button. The default scope is all for global search and file-oriented for Ctrl+P/add-tab. It can find names/paths, script content, settings fields, custom commands and actions. Empty queries show **New script** first, recent scripts and settings/command entries. `New`, `新增` and `新建` match creation; a valid no-result query can become **Create “query” as script**, while an invalid filename explains why. Results show their type and essential context. Settings results reveal a category/field; command results reveal a definition without applying a draft.
 
-## 流程圖與節點編輯
+Arrow keys change the active result, Enter opens, Ctrl+Enter or middle click opens a new tab, and Esc returns focus. Composition must not trigger navigation. Search input and result-list focus changes keep the popup open; leaving the popup closes it. Creating from search first opens a **provisional editor tab** and then an inline name; cancel removes only that provisional tab and restores the source tab. Utility tab state remains untouched.
 
-- 未編輯節點保留精簡摘要：232px 寬、12px 內距、自然高度、最多兩行正文；tags／行號等低頻資訊放詳情。跨檔顯示檔案身份，不用強白邊。
-- 單擊選取；雙擊正文、Enter 或 SVG 編輯入口，在原節點展開連續編輯面，一次一顆。可改台詞、角色、命令及參數；不離開圖表、不切 tab、不改成逐欄表單。明確「前往原文」是次要動作。
-- 文字區選取、輸入及滾輪不得拖走節點或縮放畫布；文字焦點的 Undo 修改來源，畫布焦點才 Undo 布局。進入低縮放節點時調整到可讀比例，不隨每次輸入追著移動視野。
-- 編輯中保留其他節點位置，只有明確自動整理才重排全圖。Escape／收合結束編輯，已提交的來源保留；IME／補全先消耗 Escape，組字中不銷毀編輯器。
-- 節點編輯以 DocumentId、穩定會話及來源範圍映射提交，保留 BOM／CRLF、未修改註解與空白。不能用場景名稱或 DOM 摘要作唯一身分；範圍失效時保留輸入並阻止錯位套用。
-- 跨檔實體節點交易作用於其真正文件，不改活動 tab 身分。缺失／動態目標不能假造可編輯文件；標題更名使用安全引用更新交易，普通角色編輯只影響目前行。
-- 連線保存條件／選項祖先與 jump／detour 語義，未知條件明示未解析。路線避開卡片、往返分離；標籤附在線段，不以長斜線指向遠端標籤。
-- 搜尋、fit、縮放、自動整理、布局歷史及詳情集中畫布角落；首次 fit 等待實際尺寸，保存的視野優先。一般選取不自動打開詳情。
-- 圖上拉線改寫、同時編輯多節點、Yarn runtime 仍不屬本輪。
+## Editor assistance, diagnostics and reading
 
-## 復原頁
+Source completion and custom command help use the same rounded, layered popover grammar as option/parameter help; default Monaco/VS Code square boxes are suppressed. A diagnostic at the hovered range takes priority over generic command help, and only one assistance popover is visible. Parameter help appears for an empty positional argument without being blocked by its temporary missing-value diagnostic. Find controls are aligned; tooltips never overlap or flicker against their own buttons. In source, selection and cursor height follow glyphs rather than filling the configured line-height. Editor style settings are global with per-mode inherited overrides; UI chrome retains its own type and colors.
 
-- 分類、搜尋、選取、比較基準与捲動屬可保存視圖狀態；切 tab、關閉專案、重啟保留。選取不因背景更新自動改成新的比較基準。
-- 專案復原預覽沒有返回按鈕；文件歷史保留返回編輯。垃圾桶復原成功後移除該項、選取下一筆／上一筆，留在復原頁。
-- 右鍵提供復原／永久刪除，側欄標頭放清空垃圾桶 SVG；空時停用。單筆及全部永久刪除必須確認名稱／數量，清空不受搜尋影響，不刪指令版本。
+Typing, deletion, paste and Undo/Redo immediately hide local diagnostic underlines, hover errors and automatic quick fixes; the current analysis still powers completion. Diagnostics appear after an 800 ms pause or when the caret leaves the edited command/line. IME composition remains protected. The problems panel and toolbar counts use the last complete publication. Explicit checks and Alt+Enter can inspect completed input immediately. No stale diagnostic should be displayed at a remapped/deleted source range.
 
-## 保存、歷史與驗收
+The reading editor keeps dialogue readable while allowing direct editing; dialogue-only reading hides commands/tags without altering source. Outline and cross-file navigation use source positions and expand a folded destination. The graph has a separately saved manual layout: explicit auto-arrange, centered ports, movable cards/pins, branch grouping and local reroutes. Selecting a line or branch card does not open the sidebar. Graph gestures have their own layout Undo, while node text uses document Undo.
 
-桌面原檔無常駐 Save／Save All／存成檔案入口，保留 Ctrl+S、匯出與失敗救援；日常 pending／saving／saved／draft 不顯示圓點、轉圈及常駐文字，也不改變 tab 寬度。同稿多視圖不顯示撰寫序號，位置／模式由 tooltip 辨識。衝突、缺檔和失敗仍持續提示。關閉視窗時暫停編輯，先送完交易與工作階段，再由主程序寫入磁碟；超過 250ms 且仍有待保存內容才顯示小型中央進度面板，組字／握手逾時／失敗保留視窗。時鐘只開目前文件歷史；右側時間線＋中央唯讀內容／差異，預覽不建立交易。還原前保留目前版本，預覽過期須重新比較。最近刪除／指令復原仍屬專案工具；布局、閱讀與 App 縮放分開重設。
+## Recovery, saving and confirmation
 
-本輪可重現的閱讀證據：[18 項測試來源](../scripts/reading.test.mjs)、CodeMirror 幾何與編輯結果（歷史本機驗證產物，不隨倉庫發布）。幾何確認命令／正文同行框、if／正文同一 x 起點、分支 16／16px、場景分隔 24／24px；另測 800／1440px、字級比例、來源選取與共享 Undo 回呼、折疊映射。這是獨立元件驗證，不替代完整 App 或 portable。
+Project history, document history, command versions and trash are distinct. Selecting a trash item shows its preview without navigating away; restoring removes it from trash, retains the recovery page and selects the next/previous item. Version switching does not reset diff mode. Permanent delete of one/all trash items requires a compact confirmation and never deletes current scripts or command versions. Routine save is quiet; failure or a delayed workspace-exit save is visible. Project switching/close/restart keeps the editor until all applicable workspaces are safely prepared. Unapplied command drafts must be applied or discarded before a restart/update; ordinary tab close discards them.
 
-最終整合至少覆蓋：同稿多 tab 不跳轉、各 tab 歷史獨立；新增 Escape 不留下物件；排序方向及重開狀態一致；搜尋完整鍵盤流程與失焦；指令 tab 草稿／快捷鍵；大綱顯示偏好與窄窗避讓；節點直編／跨檔保存／Undo；長名稱與 800／1100／1440px。通過狀態只在實際執行後寫入實作追蹤。
-
-原生中文 IME、Windows Snap、原生 tab 拖出／拖回、多螢幕／混合 DPI、讀屏及安裝精靈仍須專項實測；合成 composition 事件、Playwright 輸入或截圖不代表以上原生驗收已完成。
-
-## 0.5.0 顯示資訊修訂
-
-依使用者最新回饋，指令工具 tab 取代 0.4.0 的暗幕面板決策。指令顯示名稱可用中文，原始 Yarn 呼叫不更名。閱讀以顯示名稱呈現，純文字保留識別字；參數前使用低對比虛擬名稱，懸浮說明顯示位置、型別及描述。提示不參與複製、保存和 Undo，閱讀正在編輯的行暫隱標籤以保留輸入空間。未知／未完成參數回退原文。流程圖點空白處結束節點編輯；組字、改名及未處理草稿期間保留編輯器。
-
-2026-09-19／0.5.1：依使用者回饋採用安靜自動保存及關閉時進度提示；自訂指令左側標題為「指令列表」。
-
-## Spindle 品牌與程式碼導航（0.6.0）
-
-- 正式名稱為 Spindle；使用 public/brand/spindle.svg（clean）與 spindle-small.svg（flat）。原稿納入 Git，ICO／PNG／favicon／啟動畫面由專案內素材產生。原 profile 和安裝識別保持相容。
-- 只有可唯一解析的靜態 jump／detour 目標在 Ctrl 懸浮時顯示藍色、底線與手形游標。滑鼠先停住再按 Ctrl 也生效；放開、移開、失焦、編輯或切文件清除。左鍵命中目標才導航，右鍵／旁邊空白不觸發。跨檔保持目前 tab。節點組字、改名及未處理草稿期間不啟用離開跳轉。
-- 指令提示：標題顯示名稱、次要原始識別字；描述另起一段；參數用位置序號、名稱、型別、選填與縮排說明對齊。範例置於底部。三種編輯入口使用共用 DOM 浮層，專案說明一律作為純文字插入。長描述允許換行，浮層限制寬高並可捲動，不把專案文字當 HTML。
-
-### 0.6.1 輸入與摺疊修正
-
-- 指令名稱候選只在 `<<` 後的名稱區間顯示；進入尚未填值的參數位置後顯示當前參數簽名與說明（顯示優先順序依 0.6.5 規則）。引號／括號內空格不推進參數位置；指令結束後關閉提示。jump／detour 參數區保留場景候選。
-- 閱讀與節點編輯器的指令名稱補全使用相同情境判斷。
-- 場景摺疊箭頭與標題第一文字行中心對齊，不把標題前 24px 語義留白計入置中；收合、展開與不同閱讀字級沿用此規則。
-
-### 0.6.2 編輯輔助一致性（使用者核准，2026-09-19）
-
-- 診斷按鈕採最小寬度加內容自適應；左右 7px、圖示與 badge 間距 6px，圖示不縮，整組共享命中與選取背景。零問題只顯示 icon。
-- 補全採純文字清單視覺：灰色選取、SVG、識別字與參數摘要；僅選取項顯示說明，優先清單右側，窄窗移下方且限制在可視範圍。
-- 指令懸浮採共用標題／描述／參數列／範例；輸入提示僅突出目前位置及其說明，以低調參數列提供上下文，Esc 或失焦關閉。
-- 閱讀與節點共用輸入 extension：輸入 `<<` 配對 `>>` 並立刻開候選；Enter／Tab 接受，空格進入參數區，僅空位置顯示提示；既有結尾跳過，空配對 Backspace 整組刪除。剪貼簿貼上不啟用配對，IME 期間不觸發輔助改寫。
-- 自訂指令位置提示採共用解析，引號／群組內空格不推進位置；jump／detour 有專案場景候選。純文字 Monaco 本體及語法配色保持原樣。
-
-### 0.6.3 空白行、側欄與浮窗（使用者核准，2026-09-20）
-
-- 空白行在活動與渲染狀態維持相同閱讀行高。場景／分支的分隔仍保留，但與來源空白相鄰的語義間距不重複計算；不新增空白壓縮偏好。
-- 新劇本在所選資料夾的文件列表頂部完成建立；原子建立時保留當下可見的既有順序及其他視窗新加入的文件。成功後顯示手動排序，取消／失敗不改排序偏好。
-- 普通雙擊文件列進入行內更名，僅反白主檔名；單擊仍在目前 tab 導航，中鍵／Ctrl 點擊維持明確開新 tab。
-- 補全清單明確設定 Consolas 字型串、16px 主字、29px 列高、85% 參數摘要；SVG、選取底色與匹配字沿用既有規格。樣式須勝過編輯器動態載入的預設，且經焦點切換後仍有效。
-- 共用旁側說明取代 Monaco 的 read-more 箭頭；移除入口也移除 hover 預留寬度，參數文字不因滑鼠移入而縮窄。
-- 純文字命令懸浮／位置參數使用 Monaco 來源定位 content widget，上方優先、空間不足移下方，來源不可見則隱藏；切文件／失焦／捲動清除。補全旁側說明仍依可視清單定位。
-
-### 0.6.4 靜默操作與語言輔助（使用者核准，2026-09-20）
-
-- 劇本「移到垃圾桶」直接執行，先留復原副本；0.9.0 起完整物件送至專案內 Spindle 垃圾桶，失敗保留復原資料。0.7.0 起移除「從專案移除」選單入口。
-- 行內新增／更名與套用定義不換成轉圈圖示；等待期間保持寬度、焦點及重複提交防護，錯誤仍就地呈現。
-- 模式切換立即顯示最新來源，切換本身不建立 Undo 紀錄；閱讀／節點編輯後的第一筆純文字輸入不得帶回舊稿。
-- 內建與自訂指令共用候選及提示版面。內建指令提供語法、說明、參數型別與範例；沒有參數的命令不重複同一語法範例。
-- `set` 的第一個位置提供專案變數候選；條件與運算式輸入 `$` 查找。候選顯示型別與來源文件；有 /// 說明時顯示旁側描述。補全選項不得被參數提示遮住，選取後依 0.6.5 空值規則重新判斷，不對已填值重新彈窗。
-
-
-### 0.6.5 指令提示顯示規則（使用者核准，2026-09-20）
-
-三個編輯入口使用同一個空參數判斷；閱讀模式只改變呈現，提示行為與純文字一致。
-
-| 情境 | 行為 |
-|---|---|
-| 指令名稱／場景／變數候選開啟 | 補全清單與所選項描述為同一組介面；暫停參數浮窗與 command hover |
-| 游標在空參數位置 | 顯示當前參數提示；立即關閉既有 hover，後續 hover 不搶走提示 |
-| 當前位置已有值 | 不自動顯示參數浮窗，包含游標位於值前、值中、值尾；0、true、空字串與未完成輸入都算已有內容 |
-| 上一參數後輸入空格 | 下一位置尚空且有定義時才提示；不追溯提示其他缺失參數 |
-| 沒有更高優先序的提示 | 懸浮 350ms 後顯示指令／參數說明；同時最多一個指令說明浮窗 |
-| Esc、失焦或組字 | 關閉浮窗；下一次實際編輯／游標移動才重新判斷。提示不改原文與 Undo |
-
-判斷須讀整行，不能只讀游標左側。if／set 等完整運算式是一個語義位置，不因內部空白誤當下一參數；不以浮窗驗證值是否正確。既有低調行內參數名稱保留，此規則管控自動浮窗。
-
-### 0.7.0 工作區與閱讀導航（使用者核准，2026-09-20）
-
-- 文件／資料夾拖移共用 before／after 白色 2px 直線；移入資料夾用整列低調底色。根目錄及各層末端可放下物件；禁止移入自身或子資料夾。同名失敗保留原件。
-- 資料夾只由箭頭展開／收合；單擊名稱選取，雙擊／F2 原位改名，右鍵與更多入口共用菜單。新增資料夾 SVG 位於新增劇本左側；空資料夾及混合手動次序保存。
-- 複製劇本／場景立即建立唯一副本、顯示 inline 改名並反白名稱；不開命名 modal。場景移動使用目的劇本列表；刪除場景直接走共享 Undo。
-- 工具提示預設朝下，碰撞範圍避開頂部 44px 原生 caption；不讓 native 按鈕蓋住 tooltip。專案選單固定 15px icon 欄，無圖示亦保留同樣起點。
-- 診斷是一個 toggle：紅色 CircleAlert＋錯誤數字、黃色 AlertTriangle＋警告數字，只顯示非零組；零問題自 0.7.1 起顯示中性 Check；兩個問題組之間為 12px，組內 5px。圖示、數字及點擊背景整體擴寬。
-- 時鐘左側 BookText 切純閱讀；這是唯讀視圖，不修改原文／歷史。隱藏命令、tags、註解及技術標頭，保留場景、角色台詞、所有選項和來源空白，不求值。模式按鈕返回可編輯視圖。
-- 分析由工具列切右側面板，取代大綱／歷史的當下位置但保留大綱偏好；提供目前文件統計、角色分布、場景篇幅。點場景定位，窄窗沿用單一輔助欄避讓。
-- 閱讀導航以獨立請求（含 nonce）套用來源位置；已掛載或已收合的場景都可定位並展開，不靠重新掛載編輯器。
-- 流程圖只移除回程邊的分層限制，保留前進方向；回程走外側通道，轉折成本與分支埠間距避免細碎蛇行。標籤按文字需要分配寬度，不用固定大底板擠走其他標籤。點線／條件只選取，詳情由明確 toggle 開啟。
-
-### 0.7.1 拖移與線路穩定性（使用者核准，2026-09-20）
-
-- 文件／資料夾整列使用指標拖移，5px 後啟動，不依賴巢狀 button 的原生 HTML drag。箭頭、更多與命名輸入各自操作；命名一列不鎖住其他列。移動過程不改樹高，根層不出現拖移文案；只顯示白線／移入底色，放開才寫入，Esc 取消。
-- 圖表拖動保留端點及避障仍有效的路徑；只有受影響線路重算。埠順序依劇本順序，返回線只參照自身端點；窄縫依實際空間縮減避讓留白。
-- 主路徑先決定，文字不能推線。標籤優先在線上；擁擠處可鄰接放置並以短引線相連，避開其他文字、卡片與路徑。
-
-
-### 0.8.4 持久布局與手動佈線（使用者核准，2026-09-20）
-
-本節取代 0.7.x 的即時計算路由與分支埠規則；0.8.1 取代卡片沿舊路徑滑動的限制；0.8.2 依使用者回饋取消線段／幹線拖曳與路線衝突提示；0.8.3 加入小幅吸附與依目的地分線；0.8.4 依使用者回饋擴大同來源共用路段至實際分岔。
-
-- 自動整理為一次性動作；首次缺布局才自動執行。未選場景或卡片時整理全部，有選取則只整理所選物件；tooltip 顯示物件數。單純線條選取不算整理範圍。只選卡片時按分支原文順序成欄，不移動場景與未選卡片；局部整理保留視野。
-- 主流程左側中心進、右側中心出，回跳／自我迴圈可走上下中心，拖動保留接點面。縮放只淡出摘要，不能改變量測尺寸。
-- 同一條件區塊或同層選項按原文成組，卡片同欄、各走水平通道；巢狀組下一欄並保留父路徑。不同區塊、相同目的地仍有獨立轉場。只有明確跳轉才有卡片，未知語法不補造流程。
-- 拖動中的場景、卡片及 pin 與所屬路線的接點在 8 畫布單位內吸附對齊；多選只施加同一位移，不搬動未選物件。自動卡片也可小幅對齊中心埠，保持卡片順序與間距。吸附範圍小於平行線距，避免把刻意分開的線又吸回去。
-- 同一來源、同一出口的連續共用路徑允許重疊，包括水平／垂直轉彎及途中 pin，不受 24 單位短幹線長度限制。共用範圍在實際分岔或第一張分支卡片前結束，不因分支組 ID 不同而強制錯開。分岔後不同目的地的共線段以 16 單位平行 offset 分開；同方向、同目的地且通過最後卡片／pin 後的末段允許匯流。反向通行及分岔後重合不能當成來源共用段。分線尊重 pin、卡片、中心埠及障礙，不為分線搬動節點；重疊的硬性控制點不強制移開。拖動預覽與放開後共用規則，未受影響線路逐點保留。
-- 初始幹線 24、平行通道目標間距 16；卡寬 160–240、同組等寬，長文換行、上下至少 24。尺寸納入避障，不能讓線穿過其他卡片。
-- 空白左鍵框選（完整包含）、Shift 加選；點節點單選，Shift 點切換，拖選取節點整組搬移。右鍵移動超過 5 CSS px 才平移，放開不彈選單；右鍵單擊命中原物件。編輯器／輸入框沿用原生行為。
-- 單擊線高亮並顯示控制點，共用幹線選整組。雙擊獨立線新增 pin；線段和共用幹線不可拖動，不顯示 resize 游標或幹線控制點。卡片、pin 具有明確操作層，透明線段命中區不能攔截上層可見控制點。
-- 卡片可自由移動、框選與混合多選；卡片和 pin 的位置決定線路，先後順序按連線保留。pin 是自由轉角，不鎖舊線的軸向；兩個控制物件之間優先使用少折點的直角連接，只為避開物件增加必要轉折。舊固定線段及幹線拖曳限制自動退役，保留節點、卡片與 pin 位置。拖動即時顯示路徑，放開修整避障，只重算受影響線。pin 右鍵提供「刪除 pin」，Delete 只刪選取 pin；「簡化線路」保留 pin、「恢復自動線路」清除該路線手動限制，不刪劇情連線。
-- 拖曳場景、卡片、pin 或右鍵平移時，游標顯示 grabbing；放開／Esc／取消恢復。單擊不新增布局歷史。一次拖曳或整理是一筆完整布局歷史，Esc 還原開始狀態；整組內部線、pin、卡片隨組搬移，跨組保留外部幾何。
-- 保存安靜；不顯示路線衝突橫幅、橙色線或卡片警告；引擎執行失敗／逾時仍提供重試。歷史、幾何與視野按 tab／DocumentId 保存。
-
-### 補全與最近專案微調（使用者核准，2026-09-21）
-
-- 純文字與閱讀編輯的補全清單沿用說明浮窗：6px 圓角、#282828 表面、1px #ffffff12 邊框及相同陰影；保留既有列高、摘要與選取色。清單內容不得溢出圓角。
-- 資料夾展開／收合箭頭不因 hover 改變背景或顏色；保留鍵盤 focus-visible 輪廓與固定控制欄。
-- 最近專案右鍵動作為 Project 清單的次層操作；開啟、取消或移除最近紀錄時維持父清單，不切換專案。
-
-- 補全列左右各 12px 留白；Monaco 的內容容器明確採 block，避免全域 `.contents` 工具類拆散布局。參數摘要使用名稱後的剩餘寬度，不設 70% 上限；實際空間不足才省略，hover 不縮短摘要。
-
-### 未註冊指令快速修正（2026-09-21）
-
-- 診斷與快速修正浮窗沿用 6px 圓角、深灰底、細邊框及陰影。純文字 hover 提供「新增指令」；Alt+Enter 直接新增游標所在的未註冊指令。閱讀／節點編輯 hover 與 Alt+Enter 同樣可註冊。
-- 只處理完整、未註冊的命令呼叫，內建、已註冊、註解及不完整語法不提供新增；不改劇本文字、不切 tab。參數先以 arg1…命名，明確數值／布林採對應型別，其餘字串；依目前呼叫建立必填參數，不猜測選填預設值，使用者可於指令列表調整。
-
-- 編輯器浮層涵蓋診斷外層 resizable wrapper、快速修正、Find／Replace、重新命名及原生右鍵選單：6px 外圓角、4px 控制項圓角、深灰表面與細邊框。診斷內層不再疊加邊框；閱讀 Find 使用右上浮層、可換行控制列，不保留框架預設漸層按鈕。
-
-- 設定與指令頁在 tab bar 仍有對應分頁時維持掛載，切離僅隱藏；分類、捲動、查詢、表單與撤銷狀態不因切換重建。關閉才卸載，重新開啟為新頁面狀態。
-
-- Find 的操作按鈕統一 22px 命中框並置中。Find／Replace 面板全部按鈕不顯示浮動滑鼠提示，保留無障礙名稱及 Escape；框架的純文字控制提示不攔截滑鼠，含連結或操作的診斷提示維持互動。
-
-
-## 編輯器風格與繼承（2026-09-21）
-
-- 設定分類「編輯器風格」頂部為可收合的全局預設，下方依序為純文字、閱讀編輯、閱讀模式、圖表。初始畫面同樣可使用；設定屬於此裝置的 App 偏好，所有視窗與專案共用。
-- 共通欄位逐項選「跟隨全局／自訂」，跟隨時保留有效值可見且停用輸入；模式專屬欄位不放繼承選單。來源與輸入採固定欄寬對齊，小視窗換行。
-- 全局預設為系統無襯線、16px、1.8 倍行高；純文字預設覆寫為等寬，圖表為 14px。「重設全局」「全部跟隨全局」「恢復此模式預設」分開，重設同時清除該區域未提交的欄位輸入。
-- 字級允許 10–40px，行距 1.0–2.5 倍並显示換算行高；字型可搜尋 Windows 已安裝字型或手動輸入，保留缺失字型名稱並使用 fallback。字型、數值與色票遵守現有 4px 控制項／6px 浮層圓角。
-- 選取底色、相同文字高亮、目前行與搜尋目前／其他結果是不同用途。唯讀閱讀不列游標、目前行及尚未支援的匹配／搜尋欄位。圖表節點選取樣式不受文字選取色影響。
-- 語法配色僅控制純文字現有 token 類別；閱讀與圖表保留語義配色及標題／次要文字比例。預覽不建立文件；設定分類與模式切換保留草稿輸入、選取和捲動。
-- 設定不變更工具列、選單與提示的 UI 字型。合法值即時生效並安靜保存；無效值顯示欄位錯誤，不修改有效設定。
-
-### 高亮優先序與不透明度
-
-- 「選取文字的其他相符處」與「游標符號關聯」獨立開關及配色。選取只標示其他相符範圍；游標關聯可選底線或背景高亮（預設底線），樣式支援全局繼承，只辨識已宣告變數與唯一場景名稱，不對一般台詞做詞彙推測。
-- 非空選取優先於符號關聯；Find 有查詢且開啟時停用兩種自動高亮。實際文字選取保留。純文字、閱讀編輯與節點內編輯共用判斷規則。
-- 色票及 HEX 僅編輯 #RRGGBB；不透明度獨立一列，0–100% 拉桿加可輸入百分比。軌道底層為棋盤格，覆蓋目前 RGB 顏色由左側透明至右側不透明的固定漸層，軌道不隨目前百分比改變；色票則預覽目前 alpha。可見軌道端點對齊滑塊中心可達位置，鍵盤 Home/End 可到 0/100%。保存仍以 RGBA HEX 表達，改 RGB 保留 alpha。
-
-- 多行設定使用 6px 圓角細邊框分組，名稱與來源選單構成頂部標頭，控制區另起一列；顏色與不透明度各有子標籤。單行設定維持緊湊欄位排列，避免標題在多個控制項中間造成歸屬不明。
-
-### 未宣告變數與診斷優先
-
-- 專案內 `set` 的變數必須有有效 `declare`，不受檔案順序限制；否則顯示錯誤。游標變數關聯亦採用專案宣告清單，節點編輯可辨識外部宣告。
-- 紅色錯誤行的 hover 優先顯示诊斷與可用快速修正，不同時顯示指令說明。純文字、閱讀編輯及節點編輯遵守同一優先序。
-- 「新增宣告」／Alt+Enter 插入同縮排的 declare，保留 set，透過原有文件交易保存及撤銷。可確認的數字、布林、字串型別分別採 0、true、空字串為初始值；未知運算式保留錯誤但不猜型別。
-
-
-### 變數型別與宣告導覽
-- 指派依同專案 declare 型別檢查，支援直接值、變數參照、可推導的運算式與複合指定；型別不符顯示紅色波浪線。未知函式結果不猜測型別。
-- 變數 Hover 顯示宣告型別、原始初始值／運算式、文件與行號；不以後續 set 值覆蓋宣告資訊。錯誤行仍優先顯示診斷。
-- 純文字、閱讀編輯及圖表節點編輯內的變數 Ctrl＋點擊跳至宣告原文，支援跨檔案；按住 Ctrl 懸浮沿用連結樣式。註解、字串內與一般台詞的字面變數名稱不觸發。
-
-
-### 指派修正與搜尋選取
-
-- set 裸文字值優先依 declare 型別診斷：number／boolean 顯示不能指派 string；僅 string 型別顯示缺少雙引號並提供 Hover／Alt+Enter「補上雙引號」。不對型別不符提供無法解決錯誤的補引號修正；未宣告變數維持宣告錯誤優先。
-- 純文字游標高度使用字級加 2px，與行距獨立。CodeMirror 延續依文字實際邊界量測游標。
-- Ctrl+Shift+F 開啟全專案搜尋時帶入當前選取文字，涵蓋純文字、閱讀與圖表內編輯器；沒有選取時保留搜尋詞。
-
-
-### 補全、語義修正與選取呈現
-- declare 指令補全插入空格及 $，游標接續輸入變數名。
-- 變數必要位置缺 $，或運算式出現可確認的已宣告變數名稱時，提供補前綴修正；一般台詞、字串、場景名與未知名稱不猜測。
-- 型別不符／缺值提供對應預設值：number 為 0、string 為空字串、boolean 為 true。新 declare 無型別且缺值時提供 0；未知型別與函式回傳不猜測。
-- 指令參數依指令集型別修正；未知型別、場景目標不填造預設值。已知變數可解釋錯誤參數時，優先補 $。
-- jump／detour 靜態目標 Hover 顯示唯一場景的名稱、檔案與行號，沿用錯誤／參數提示優先規則；重名歧義不顯示錯誤位置。
-- 文字反白繪製高度接近字級加 2px，行距空間留白；多行選取、複製及 Undo 的文字範圍不變。純文字、閱讀編輯與圖表內編輯一致。
-
-
-## MCP／Agent 整合
-
-- 設定分類使用 Plug SVG，沿用現有側欄、設定群組、欄位對齊與圓角控制；初始畫面及編輯器入口一致。
-- 存取模式為停用／唯讀／允許修改，預設停用；連線狀態、位址、連接埠、複製資料、重設憑證及重試放在同群組。輸入錯誤就地顯示，不增加日常保存轉圈。
-- 憑證只透過明確的複製動作提供，不直接顯示在頁面或操作摘要。最近操作僅顯示工具名稱、時間與結果。
-- Agent Activate／定位預設不搶焦點；未完成輸入時保留原編輯畫面。工具 tab 不被當作最後的文件情境，不對外暴露未套用指令草稿。
-- Agent 更新有效指令後，既有草稿保留；過期套用及刪除提示重新選取／載入，不能覆蓋新定義。
-
-文件歷史切換版本保留目前「預覽／比較」模式。空白位置參數的游標提示不因該行缺值診斷而停用；滑鼠懸浮錯誤時仍優先顯示診斷。
-
-### 輸入中的診斷（0.9.1）
-
-文字變更立即隱藏正在編輯來源行的診斷、錯誤 hover 與自動快速修正燈泡；800ms 無輸入或離開該行後發布最新結果。組字不提前發布，結束後重新計時；補全與空參數提示持續即時。問題側欄、數量與圖表標記保留最後完整發布結果，Monaco／CodeMirror 使用共用呈現控制器；手動結構檢查與 Alt+Enter 可要求立即檢查已完成輸入。
-
-### Tab 跳出容器
-
-純文字、閱讀編輯與圖表節點編輯共用規則：游標緊貼配對的結尾引號、指令 `>>` 或指令內括號時，Tab 逐層移到結尾之外，只移動游標、不修改文字。補全與 snippet 導航優先；組字、反白選取或未貼近結尾時維持原有操作。多游標須全部符合跳出條件，否則維持原本 Tab 行為。Shift+Tab 不變。
-
-
-## Agent 安裝（0.9.2）
-
-MCP 設定下方以 Codex、Claude Code 兩張圓角卡片呈現。每張分開列 MCP／Skill 狀態及可換行的實際路徑，SVG 資料夾按鈕開原生選擇器；安裝、更新、檢查與移除沿用既有按鈕。停用服務時不可安裝或握手，但可檢查及移除既有設定。明示憑證將写入 agent 使用者設定，不替用戶提升存取模式或改 agent 批准規則。
-
-操作期間停用重複提交，不增加日常保存轉圈。結果置於卡片內；設定衝突、需要更新及部分完成分別呈現。憑證重設／埠改變立即重新計算安裝狀態。握手只代表配置可連到 Spindle，不宣稱 agent 模型已載入工具。安裝後由用戶重新載入 agent，不自動關閉其他程式。
-
-## 0.10.0 搜尋與語系
-
-搜尋共用文件、內容、設定欄位、指令定義及操作結果。空白查詢先顯示新增劇本，之後是最近文件與工具入口。新增使用暫存新 tab，Enter 確認前不建立磁碟文件；取消返回來源 tab。設定及指令定位使用導航請求，保留未套用輸入。
-
-三種介面語言為 English、繁體中文、简体中文，首次跟隨系統，其他語系回退英文。語言保存後重啟套用，內容及 Yarn 識別不翻譯。所有語言共用圓角元件及版面；長英文必須容納。舊草稿只出現在設定的資料救援。
-
-更新預設只查詢；對話框提供略過、安裝與稍後，下載後才進入全視窗保存握手。未簽章狀態不可描述成發行者驗證。GitHub 尚未公開及網路問題的背景檢查保持安靜。
+Surfaces have four levels: shell, docked panels, editor and floating layers. Docked panels use narrow gutters, restrained contrast and small rounded corners; shadows are primarily for popovers. The same rounded control grammar applies to completion, quick fixes, Find, settings and menus. Focus, hover, selected and disabled states keep consistent geometry instead of shifting icons or text. Product UI links to locale-matched guides, while the portable Skill and legal texts remain English.

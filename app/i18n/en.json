@@ -311,7 +311,7 @@
   "m0c1a9e072617": "Enable read-only or write access for MCP and ensure the service is running first.",
   "mbfefe9bcb299": "Writing settings does not mean the agent has loaded them. Reload the agent or start a new session after installation.",
   "m66772dd0e3c2": "Connection details copied, including this computer's access credentials.",
-  "mf07df1a3d22d": "MCP and agent installation are available in the Windows desktop app. See docs/mcp.md in the Spindle repository.",
+  "mf07df1a3d22d": "MCP and agent installation are available in the Windows desktop app.",
   "m2f7028ef99b4": "MCP connection",
   "mf23153ab64a8": "Local agent access",
   "m1e4b5bf24a3c": "Allow agents on this computer to read editing context, validate projects, and perform semantic operations. Keep Spindle running.",
@@ -1021,5 +1021,6 @@
   "updates.checking": "Checking…",
   "updates.unsigned": "This build is not code-signed. Download integrity is verified with its release checksum.",
   "updates.cancel": "Cancel download",
-  "licenses.thirdParty": "Third-party licenses"
+  "licenses.thirdParty": "Third-party licenses",
+  "mcp.guide": "Connection guide"
 }

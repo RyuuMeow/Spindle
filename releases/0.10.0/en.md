@@ -12,5 +12,5 @@
 - Public-facing documentation, licensing and reproducible Windows release workflows.
 - Existing editor layouts, project history and MCP integrations are preserved.
 
-## Release status
-This is a release candidate prepared as a private GitHub draft. Windows binaries are unsigned. See the verification report for tested and untested update scenarios.
+## Distribution
+Windows x64 Portable and NSIS packages are unsigned. The verification report lists tested and untested update scenarios.

@@ -1,0 +1,18 @@
+title: Lighthouse
+tags: lighthouse chapter_two
+---
+Narrator: 塔門緩緩打開。空氣中有海鹽的氣味。
+<<play_sound "door_open" 0.8>>
+-> 往樓上走
+    <<jump LanternRoom>>
+-> 回去村莊
+    <<jump Village>>
+===
+
+title: LanternRoom
+tags: ending
+---
+Narrator: 一盞微弱的燈，正在等待新的守護者。
+<<fade_in 2>>
+<<stop>>
+===

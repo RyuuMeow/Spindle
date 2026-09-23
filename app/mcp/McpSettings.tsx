@@ -1,4 +1,5 @@
 "use client";
+import { REPOSITORY_URL } from "../version";
 import { extraSettingLabels } from "../workspace/settings-registry";
 import { t as tr, locale } from "../i18n/index.ts";
 
@@ -64,7 +65,14 @@ export default function McpSettings() {
       setError(String(error));
     }
   }
-  if (!bridge) return <p className="setting-help">{tr("mf07df1a3d22d")}</p>;
+  if (!bridge) return (
+    <p className="setting-help">
+      {tr("mf07df1a3d22d")} {" "}
+      <a href={`${REPOSITORY_URL}/blob/main/docs/mcp${locale() === "en" ? "" : `.${locale()}`}.md`} target="_blank" rel="noreferrer">
+        {tr("mcp.guide")}
+      </a>
+    </p>
+  );
   return (
     <>
       <section className="settings-group" aria-label={tr("m2f7028ef99b4")}>

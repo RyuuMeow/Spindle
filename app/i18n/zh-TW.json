@@ -311,7 +311,7 @@
   "m0c1a9e072617": "請先啟用 MCP 唯讀或允許修改，並確認服務執行中。",
   "mbfefe9bcb299": "設定已寫入不代表 Agent 已載入。安裝後請重新載入 Agent 或開啟新工作階段。",
   "m66772dd0e3c2": "已複製連線資料，包含此電腦的存取憑證。",
-  "mf07df1a3d22d": "MCP 與 Agent 安裝適用於 Windows 桌面版。接入指南：Spindle 原始碼的 docs/mcp.md。",
+  "mf07df1a3d22d": "MCP 與 Agent 安裝適用於 Windows 桌面版。",
   "m2f7028ef99b4": "MCP 連線",
   "mf23153ab64a8": "本機 Agent 存取",
   "m1e4b5bf24a3c": "讓同一台電腦上的 agent 取得編輯情境、檢查專案及執行語義操作。Spindle 必須保持開啟。",
@@ -1021,5 +1021,6 @@
   "updates.checking": "檢查中…",
   "updates.unsigned": "此版本未經程式碼簽章；下載完整性會以版本校驗碼驗證。",
   "updates.cancel": "取消下載",
-  "licenses.thirdParty": "第三方授權"
+  "licenses.thirdParty": "第三方授權",
+  "mcp.guide": "接入指南"
 }

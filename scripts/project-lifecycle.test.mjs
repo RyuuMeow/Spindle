@@ -639,3 +639,24 @@ test("language and update patches preserve unrelated preferences", async () => {
     f.dispose();
   }
 });
+
+test("public demo is an independent project with generated document IDs and commands", async () => {
+  const f = fixture();
+  try {
+    const source = path.resolve("examples/demo-project/the-last-light");
+    const target = path.join(f.base, "The Last Light");
+    fs.cpSync(source, target, { recursive: true });
+    const before = JSON.parse(fs.readFileSync(path.join(target, ".spindle/project.json"), "utf8"));
+    assert.equal(before.id, undefined);
+    assert.equal(before.files, undefined);
+    const project = f.service.openFolder(target);
+    assert.equal(project.name, "The Last Light");
+    assert.equal(project.documents.length, 3);
+    assert.deepEqual(project.documents.map((document) => document.name).sort(), ["Chapter_01.yarn", "Lighthouse.yarn", "Shop.yarn"]);
+    assert.deepEqual(project.commands.map((command) => command.name).sort(), ["fade_in", "play_sound"]);
+    assert(project.id && project.documents.every((document) => document.id));
+    assert(project.documents.some((document) => document.text.includes("<<jump AskAboutLighthouse>>")));
+  } finally {
+    f.dispose();
+  }
+});
