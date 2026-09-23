@@ -5,6 +5,8 @@ import { createRequire } from "node:module";
 import { buildSync } from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
 const require = createRequire(import.meta.url);
 const { createRestartCoordinator } = require("../desktop/restart.cjs");
 buildSync({
@@ -20,6 +22,35 @@ const {
   trustedAsset,
   UpdateService,
 } = require("../outputs/tests/update-service.cjs");
+
+test("release metadata accepts Windows checkout line endings", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "spindle-release-notes-"));
+  try {
+    fs.mkdirSync(path.join(root, "releases", "0.10.0"), { recursive: true });
+    fs.mkdirSync(path.join(root, "release"));
+    fs.writeFileSync(path.join(root, "version.json"), '{"version":"0.10.0"}');
+    for (const locale of ["en", "zh-TW", "zh-CN"])
+      fs.writeFileSync(
+        path.join(root, "releases", "0.10.0", `${locale}.md`),
+        "# Spindle 0.10.0\r\n\r\n## Features\r\n- Verified\r\n\r\n## Changes\r\n- Notes\r\n",
+      );
+    for (const kind of ["Portable", "Setup"])
+      fs.writeFileSync(
+        path.join(root, "release", `Spindle-0.10.0-${kind}-x64.exe`),
+        "test artifact",
+      );
+    execFileSync(process.execPath, [path.resolve("scripts/release-metadata.mjs")], {
+      cwd: root,
+    });
+    const metadata = JSON.parse(
+      fs.readFileSync(path.join(root, "release", "Spindle-0.10.0-release.json")),
+    );
+    assert.equal(metadata.notes.en.features, "- Verified");
+    assert.equal(metadata.notes["zh-TW"].markdown.includes("\r"), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 test("update candidates reject drafts, prereleases, same version and downgrades", () => {
   for (const [tag, draft, pre] of [
     ["v0.10.0", false, false],

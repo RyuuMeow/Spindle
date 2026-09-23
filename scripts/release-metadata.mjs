@@ -10,7 +10,9 @@ const tag =
 if (tag && tag !== `v${version}`) throw Error("Tag and version disagree");
 const notes = {};
 for (const locale of ["en", "zh-TW", "zh-CN"]) {
-  const markdown = fs.readFileSync(`releases/${version}/${locale}.md`, "utf8");
+  const markdown = fs
+    .readFileSync(`releases/${version}/${locale}.md`, "utf8")
+    .replace(/\r\n?/g, "\n");
   if (!markdown.startsWith(`# Spindle ${version}\n`))
     throw Error("Release note version mismatch");
   const features = markdown.split("## Features\n")[1]?.split(/\n## /)[0].trim();
