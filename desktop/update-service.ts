@@ -1,9 +1,32 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import semver from "semver";
 import { APP_VERSION } from "../app/version";
+
+// WMI owns the new process so the Portable launcher's job cannot terminate it.
+// Paths are passed as environment data, never interpolated into PowerShell code.
+export function launchHelper(helper: string, job: string): Promise<void> {
+  const command = `$startup = ([wmiclass]'Win32_ProcessStartup').CreateInstance(); $startup.ShowWindow = 0; $line = '"' + $PSHOME + '\\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $env:SPINDLE_HELPER_SCRIPT + '" -JobFile "' + $env:SPINDLE_HELPER_JOB + '"'; $result = ([wmiclass]'Win32_Process').Create($line, $null, $startup); if ($result.ReturnValue -ne 0) { throw ('Unable to launch update helper: ' + $result.ReturnValue) }`;
+  return new Promise((resolve, reject) => {
+    execFile(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-Command", command],
+      {
+        windowsHide: true,
+        timeout: 30000,
+        env: {
+          ...process.env,
+          SPINDLE_HELPER_SCRIPT: helper,
+          SPINDLE_HELPER_JOB: job,
+        },
+      },
+      (error) => (error ? reject(error) : resolve()),
+    );
+  });
+}
+
 export type UpdateState = {
   phase:
     | "idle"
@@ -292,25 +315,7 @@ export class UpdateService {
             }),
             { flag: "wx" },
           );
-          const child = spawn(
-            "powershell.exe",
-            [
-              "-NoProfile",
-              "-NonInteractive",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              helper,
-              "-JobFile",
-              job,
-            ],
-            { detached: true, windowsHide: true, stdio: "ignore" },
-          );
-          await new Promise<void>((resolve, reject) => {
-            child.once("spawn", resolve);
-            child.once("error", reject);
-          });
-          child.unref();
+          await launchHelper(helper, job);
           this.options.exit();
         } else {
           const directory = path.join(this.options.profile, "updates");
@@ -332,25 +337,7 @@ export class UpdateService {
             }),
             { flag: "wx" },
           );
-          const child = spawn(
-            "powershell.exe",
-            [
-              "-NoProfile",
-              "-NonInteractive",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              helper,
-              "-JobFile",
-              job,
-            ],
-            { detached: true, windowsHide: true, stdio: "ignore" },
-          );
-          await new Promise<void>((resolve, reject) => {
-            child.once("spawn", resolve);
-            child.once("error", reject);
-          });
-          child.unref();
+          await launchHelper(helper, job);
           this.updater!.quitAndInstall(true, false);
         }
       });

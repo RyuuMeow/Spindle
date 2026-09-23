@@ -32,17 +32,20 @@ jobs:
       - run: pnpm test:agent-installation
       - run: pnpm build
       - run: pnpm desktop:pack
-      - run: pnpm test:public-ui
-        env:
-          SPINDLE_PORTABLE: release/Spindle-0.10.0-Portable-x64.exe
+      - shell: pwsh
+        run: |
+          $v=(Get-Content version.json | ConvertFrom-Json).version
+          $env:SPINDLE_PORTABLE="release/Spindle-$v-Portable-x64.exe"
+          pnpm test:public-ui
       - run: node scripts/third-party-sources.mjs
-      - run: pnpm release:metadata
       - shell: pwsh
         run: |
           $v=(Get-Content version.json | ConvertFrom-Json).version
           git archive --format=zip --output="release/Spindle-$v-source.zip" HEAD
+          Copy-Item "releases/$v/verification.md" "release/Spindle-$v-verification.md"
           Copy-Item LICENSE release/LICENSE.txt
           Copy-Item THIRD_PARTY_NOTICES.md release/THIRD_PARTY_NOTICES.md
+      - run: pnpm release:metadata
       - uses: actions/upload-artifact@v4
         with:
           name: windows-release
@@ -53,6 +56,7 @@ jobs:
             release/SHA256SUMS-*.txt
             release/*-source.zip
             release/*-notes.md
+            release/*-verification.md
             release/LICENSE.txt
             release/THIRD_PARTY_NOTICES.md
   draft:

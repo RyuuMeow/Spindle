@@ -2,12 +2,7 @@ const fs = require("node:fs"),
   path = require("node:path"),
   assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
-const pw = require(
-  path.join(
-    process.env.USERPROFILE,
-    ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright",
-  ),
-);
+const pw = require("playwright");
 const base = path.resolve("outputs/agent-install-ui/run-" + Date.now());
 const home = path.join(base, "home"),
   profile = path.join(base, "profile");
@@ -63,7 +58,8 @@ const launch = () =>
   portable
     ? require("./portable-test-driver.cjs").launch(pw, {
         executablePath: path.resolve(
-          `release/Spindle-${require("../package.json").version}-Portable-x64.exe`,
+          process.env.SPINDLE_PORTABLE_PATH ||
+            `release/Spindle-${require("../package.json").version}-Portable-x64.exe`,
         ),
         args: ["--user-data-dir=" + profile],
         env,
@@ -143,6 +139,7 @@ let app;
         digest("dist-desktop/app/desktop/mcp-runtime.cjs"),
       );
       assert.ok(archive.files.some((name) => name.endsWith(".wasm")));
+      for (const file of ["desktop/i18n.cjs", "desktop/update-service.cjs", "desktop/restart.cjs", "desktop/portable-update.ps1", "desktop/installed-restart.ps1"]) assert.ok(archive.files.includes(file), file);
       assert.ok(archive.files.some((name) => name.includes("elk-worker")));
       assert.ok(archive.files.includes("licenses/mcp-dependencies.txt"));
       assert.ok(

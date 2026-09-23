@@ -76,7 +76,10 @@ const hash = (file) =>
       /saved before updating/,
     );
     const oldHash = hash(target),
-      source = path.resolve("release/Spindle-0.10.0-Portable-x64.exe"),
+      source = path.resolve(
+        process.env.SPINDLE_PORTABLE_PATH ||
+          `release/Spindle-${require("../version.json").version}-Portable-x64.exe`,
+      ),
       token = crypto.randomUUID(),
       job = path.join(profile, "updates", token + ".json");
     fs.writeFileSync(

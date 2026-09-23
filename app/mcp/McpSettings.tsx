@@ -1,4 +1,5 @@
 "use client";
+import { extraSettingLabels } from "../workspace/settings-registry";
 import { t as tr, locale } from "../i18n/index.ts";
 
 import AgentInstallations from "./AgentInstallations";
@@ -69,9 +70,9 @@ export default function McpSettings() {
       <section className="settings-group" aria-label={tr("m2f7028ef99b4")}>
         <h3>{tr("mf23153ab64a8")}</h3>
         <p className="setting-help">{tr("m1e4b5bf24a3c")}</p>
-        <div className="setting-field">
+        <div className="setting-field" data-setting="mcp.mode">
           <div className="setting-row">
-            <span>{tr("m6c75adcf707c")}</span>
+            <span>{extraSettingLabels["mcp.mode"]}</span>
             <SegmentedControl
               label={tr("m41d52025e3db")}
               value={settings?.mode || "disabled"}
@@ -97,9 +98,9 @@ export default function McpSettings() {
                 : tr("m72c69bc884ab")}
           </span>
         </div>
-        <div className="setting-row">
+        <div className="setting-row" data-setting="mcp.port">
           <label htmlFor="mcp-port">
-            {tr("ma73bbb476e36")}
+            {extraSettingLabels["mcp.port"]}
             <small>{tr("mfc0f06d66c30")}</small>
           </label>
           <div className="setting-number">

@@ -82,7 +82,39 @@ export const sourceLabels = {
   insertSpaces: tr("m78d0145d9dcf"),
   indentGuides: tr("m8efe492c26d2"),
 };
+export const extraSettingLabels = {
+  "source.tabSize": tr("m18c251b9241c"),
+  "source.whitespace": tr("mf739a03a85cf"),
+  width: tr("m673d706b95ba"),
+  zoom: tr("m1beed61b0b2b"),
+  reopenLastProject: tr("m9860c712bfc5"),
+  "mcp.mode": tr("m6c75adcf707c"),
+  "mcp.port": tr("ma73bbb476e36"),
+};
 export const settingEntries: SettingEntry[] = [
+  ...Object.entries(extraSettingLabels)
+    .filter(([id]) => id !== "width")
+    .map(([id, label]) => ({
+      id,
+      field: id,
+      section: id.startsWith("mcp.")
+        ? "mcp"
+        : id === "reopenLastProject"
+          ? "saving"
+          : "reading",
+      label,
+      keywords: id,
+    })),
+  ...(["rendered", "reader"] as const).map((mode) => ({
+    id: mode + ".width",
+    field: mode + ".width",
+    section: "reading",
+    label:
+      (mode === "reader" ? tr("m879debc5bf65") : tr("m34e439ce0fb9")) +
+      " · " +
+      extraSettingLabels.width,
+    keywords: mode + ".width width reading 寬度 宽度",
+  })),
   ...Object.entries(sourceLabels).map(([key, label]) => ({
     id: "source." + key,
     field: "source." + key,

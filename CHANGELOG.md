@@ -1,5 +1,12 @@
 # 版本記錄
 
+## 0.10.0 — 私有候選版
+
+統一搜尋、三語介面、資料救援、版本管理與更新流程。
+
+完整版本說明：[English](releases/0.10.0/en.md) · [繁體中文](releases/0.10.0/zh-TW.md) · [简体中文](releases/0.10.0/zh-CN.md)。
+驗證狀態與尚未通過的發布條件見[驗證報告](releases/0.10.0/verification.md)。
+
 ## 0.9.2 — 2026-09-22
 
 - 新增 Codex／Claude Code 一鍵安裝：MCP 使用者設定、共用 Spindle Skill、原生路徑選擇、更新、握手測試及移除。
@@ -156,7 +163,7 @@
 - 分頁排序／右鍵／固定／批次關閉／重開、輕量新分頁選擇器、多視窗轉移及工作階段恢復。
 - 全專案搜尋、來源返回、場景引用更新、跨檔交易、圖表布局 Undo／Redo 及指令草稿恢復。
 - 補齊獨立布局驗證、損毀救援、BOM／CRLF 來源映射及儲存錯誤狀態。
-- Windows x64 安裝版與 portable 包含離線編輯器；實測及原生 OS 驗證限制見 [實作追蹤](docs/implementation-progress.md)。
+- Windows x64 安裝版與 portable 包含離線編輯器；實測及原生 OS 驗證限制見 [實作追蹤](docs/history/implementation-progress.md)。
 
 ## 0.1.1
 

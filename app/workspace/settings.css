@@ -20,8 +20,8 @@
   min-width: 0;
 }
 .settings-navigation {
-  width: 180px;
-  flex: 0 0 180px;
+  width: 220px;
+  flex: 0 0 220px;
   padding: 20px 12px;
   border-right: 1px solid var(--border);
   background: #202020;
@@ -35,6 +35,9 @@
   color: var(--muted-foreground);
   font-size: 13px;
   gap: 9px;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 .settings-navigation > button[aria-current="page"] {
   color: var(--foreground);

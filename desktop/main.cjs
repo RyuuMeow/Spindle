@@ -805,10 +805,33 @@ else {
             }),
           );
         },
-        commit: () => {
-          app.relaunch({
-            execPath: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath,
-          });
+        commit: async () => {
+          if (process.env.PORTABLE_EXECUTABLE_FILE) {
+            const directory = path.join(profile, "updates");
+            fs.mkdirSync(directory, { recursive: true });
+            const helper = path.join(directory, "installed-restart.ps1");
+            fs.copyFileSync(
+              path.join(__dirname, "installed-restart.ps1"),
+              helper,
+            );
+            const job = path.join(directory, randomUUID() + ".json");
+            fs.writeFileSync(
+              job,
+              JSON.stringify({
+                target: process.env.PORTABLE_EXECUTABLE_FILE,
+                profile,
+                pid: process.pid,
+                version: app.getVersion(),
+                arguments: process.argv
+                  .slice(1)
+                  .filter((a) =>
+                    /^--(inspect=|remote-debugging-port=)/.test(a),
+                  ),
+              }),
+              { flag: "wx" },
+            );
+            await require("./update-service.cjs").launchHelper(helper, job);
+          } else app.relaunch();
           quitting = true;
           app.quit();
         },

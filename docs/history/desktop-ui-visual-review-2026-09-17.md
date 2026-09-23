@@ -6,9 +6,9 @@ This document describes an earlier milestone. Current behavior and release statu
 
 2026-09-17 · Windows 0.1.0 · 第二輪 · **以下為修改前的歷史審查。**
 
-使用者其後授權開始修改；0.1.1 的現行設計與實作入口見 [UI 規範](ui-design.md)。本頁與附圖仍保留當時的問題證據，不代表新版現況。
+使用者其後授權開始修改；0.1.1 的現行設計與實作入口見 [UI 規範](../ui-design.md)。本頁與附圖仍保留當時的問題證據，不代表新版現況。
 
-本輪由三位 Sub Agent 分別檢查桌面框架／分頁、浮層／控制項、圖表畫布；主代理操作打包 App、量測有效樣式並補查其他主要介面。與[上一輪工作流審查](D:/GitHub/yarn-workbench/docs/desktop-ui-ux-review-2026-09-17.md)分工：這份專門回答「外觀、空間、狀態與操作暗示哪裡不成立」。
+本輪由三位 Sub Agent 分別檢查桌面框架／分頁、浮層／控制項、圖表畫布；主代理操作打包 App、量測有效樣式並補查其他主要介面。與[上一輪工作流審查](desktop-ui-ux-review-2026-09-17.md)分工：這份專門回答「外觀、空間、狀態與操作暗示哪裡不成立」。
 
 **整體判斷：灰階基調可以保留，但目前各區域的框線、表面、選取、焦點與操作範圍沒有共同規則。精簡到最後，有些不重要的容器很搶眼，有些真正能操作的控制項反而消失。**
 
@@ -66,10 +66,10 @@ Linear的2026設計調整可借用兩個原則：導航與邊框降低不必要�
 | G2 | 兩個選項連到同一目標時label疊在同一位置；長label被卡片遮住。 | 平行連線錯開或合併為可展開分支；標籤獨立避讓，選中來源時能逐條讀到原文。 | `同端點分支` (local verification artifact)；觀測 |
 | G3 | 245px卡片的長名稱直接裁切，摘要固定高度切半行；footer長tag擠壓行號。 | 標題有限換行／ellipsis與完整預覽；摘要按整行截斷；來源與狀態保留固定位置。 | `長卡片` (local verification artifact)；觀測＋源碼 |
 | G4 | 有效跨檔、缺失、動態未知都用同樣灰色虛線和外連圖示。 | 跨檔用來源標籤，缺失用明確警告，動態用未知標籤；不靠最小footer才辨認狀態。 | `三種外部節點` (local verification artifact)；觀測 |
-| G5 | 常駐圓形handles暗示可拉線，但nodesConnectable=false；畫布實際編排位置，內容仍需回原文。 | 若只讀關係，弱化成路徑端點或不顯示可拖連接點；清楚說明圖上可做哪些操作。 | [Graph.tsx:19](D:/GitHub/yarn-workbench/app/Graph.tsx:19)；源碼＋外觀，未當拖曳故障 |
+| G5 | 常駐圓形handles暗示可拉線，但nodesConnectable=false；畫布實際編排位置，內容仍需回原文。 | 若只讀關係，弱化成路徑端點或不顯示可拖連接點；清楚說明圖上可做哪些操作。 | [Graph.tsx:19](../../app/Graph.tsx)；源碼＋外觀，未當拖曳故障 |
 | G6 | 點空白後選框消失，但工具列「編輯原文」仍指向舊節點；焦點／選取／編輯對象不同步。 | 單一選取來源；無選取就隱藏／停用相關動作，選中時命名對象；凸顯相連路徑。 | `點空白後` (local verification artifact)；chosen=0、editActionVisible=true |
 | G7 | 初次進圖聚焦把節點推到畫外；800px適應全部只把一切縮成小字，沒有閱讀層級切換。＋／−在左下、fit在右上，缺縮放比例。 | 首次總覽、其後還原視野；集中viewport controls與百分比；縮遠顯示標題／狀態，選取再讀摘要。 | `800px圖` (local verification artifact)、`首次圖` (local verification artifact) |
-| G8 | 「重新排列」其實是固定網格重置，與fit並列，看不出會覆蓋手排位置。 | 將視野操作與版面變更分組；明確命名並提供恢復上一版排列的方式。 | [Graph.tsx:19](D:/GitHub/yarn-workbench/app/Graph.tsx:19)；源碼確認，未測撤銷手勢 |
+| G8 | 「重新排列」其實是固定網格重置，與fit並列，看不出會覆蓋手排位置。 | 將視野操作與版面變更分組；明確命名並提供恢復上一版排列的方式。 | [Graph.tsx:19](../../app/Graph.tsx)；源碼確認，未測撤銷手勢 |
 | G9 | 零場景仍顯示整面grid、fit、重排和手勢提示，沒有建立入口；已開Empty.yarn，側欄卻提示先選劇本。 | 空圖中央明示「尚無場景」並提供新增／回原文；沒有目標的工具停用或收起。 | `真正空圖` (local verification artifact)；0 nodes實測 |
 
 畫布建議構成：上方只放文件範圍與場景數；中央以標題優先的卡片和可追讀連線呈現故事；選取才凸顯相鄰分支及「編輯〈場景〉」；角落一組縮放／fit／定位控制；空圖與解析失敗分開呈現。Miro、FigJam、Whimsical只借用關係閱讀和操作回饋的模式，不導入多人白板與工具箱。`完整圖表報告及官方參照` (local verification artifact)

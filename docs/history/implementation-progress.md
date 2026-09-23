@@ -37,7 +37,7 @@ This document describes an earlier milestone. Current behavior and release statu
 - **180 項既有測試 + 20 項 MCP 測試通過**；TypeScript、lint、Web build、desktop build／stage 通過。兩個官方 SDK client 並行、唯讀、憑證撤銷、埠衝突、設定寫入失敗及大回應限制有測試。
 - 隔離 profile 實際桌面測試：並行開啟合併、不搶焦點、反向多選、失焦保留、CRLF／中文／emoji、原文選取後移游標仍修改原範圍、Undo、閱讀原文映射、圖表節點內編輯、工具 tab 不洩漏草稿、同專案多窗、合成組字與重啟 ID 失效。頁面錯誤為零。
 - 小型專案情境讀取約 14–41ms（每輪 10 次）；1,500 場景查詢測得首次約 137–179ms、後續分頁約 108–129ms。為本機量測，不保證所有硬體上限；`最新驗證索引` (local verification artifact)與測試 scripts 可重現。
-- 原生中文 IME、混合 DPI／多螢幕、所有第三方 client 的設定 UI、安裝包尚未實測；當時未打包；現已納入 0.9.1 Portable。完整工具與邊界見 [MCP 接入](mcp.md)。
+- 原生中文 IME、混合 DPI／多螢幕、所有第三方 client 的設定 UI、安裝包尚未實測；當時未打包；現已納入 0.9.1 Portable。完整工具與邊界見 [MCP 接入](../mcp.md)。
 
 ## 已納入 0.9.1：分頁狀態與指令草稿生命週期（2026-09-21）
 
@@ -197,7 +197,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪分支 `feat/graph-layout-editing`，前版基線 `v0.7.1`；四階段提交語義保存、引擎、互動歷史與交付，發行標記為 `v0.8.0`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪分支 `feat/graph-layout-editing`，前版基線 `v0.7.1`；四階段提交語義保存、引擎、互動歷史與交付，發行標記為 `v0.8.0`。現行規則見 [UI 規範](../ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](../workspace-architecture.md)。舊版盤點不作現行待辦。
 
 ### 已納入 0.9.1：Find／Replace 控制項（2026-09-21）
 

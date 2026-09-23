@@ -24,6 +24,7 @@ import {
   appearanceLabels as labels,
   syntaxLabels,
   sourceLabels,
+  extraSettingLabels,
 } from "../workspace/settings-registry";
 const modeLabels = {
   source: tr("m9982ffc60be9"),
@@ -654,6 +655,8 @@ export default function AppearanceSettings({
     if (!navigation?.field) return;
     const frame = requestAnimationFrame(() => {
       if (/^(source|syntax)\./.test(navigation.field!)) setMode("source");
+      if (navigation.field === "reader.width") setMode("reader");
+      if (navigation.field === "rendered.width") setMode("rendered");
     });
     return () => cancelAnimationFrame(frame);
   }, [navigation]);
@@ -706,10 +709,10 @@ export default function AppearanceSettings({
           <Preview appearance={appearance} mode={m} />
           <StyleFields appearance={appearance} mode={m} onChange={onChange} />
           {(m === "reader" || m === "rendered") && (
-            <div className="setting-row">
-              <span>{tr("m673d706b95ba")}</span>
+            <div className="setting-row" data-setting={m + ".width"}>
+              <span>{extraSettingLabels["width"]}</span>
               <SegmentedControl
-                label={modeLabels[m] + tr("m673d706b95ba")}
+                label={modeLabels[m] + extraSettingLabels["width"]}
                 value={appearance.widths[m]}
                 options={[
                   { value: "standard", label: tr("m6f5de510e11d") },
@@ -745,10 +748,10 @@ export default function AppearanceSettings({
                   />
                 </div>
               ))}
-              <div className="setting-row">
-                <span>{tr("m18c251b9241c")}</span>
+              <div className="setting-row" data-setting="source.tabSize">
+                <span>{extraSettingLabels["source.tabSize"]}</span>
                 <CompactSelect
-                  label={tr("m18c251b9241c")}
+                  label={extraSettingLabels["source.tabSize"]}
                   value={String(appearance.source.tabSize)}
                   options={[2, 4, 8].map((n) => ({
                     value: String(n),
@@ -759,10 +762,10 @@ export default function AppearanceSettings({
                   }
                 />
               </div>
-              <div className="setting-row">
-                <span>{tr("mf739a03a85cf")}</span>
+              <div className="setting-row" data-setting="source.whitespace">
+                <span>{extraSettingLabels["source.whitespace"]}</span>
                 <CompactSelect
-                  label={tr("mf739a03a85cf")}
+                  label={extraSettingLabels["source.whitespace"]}
                   value={appearance.source.whitespace}
                   options={[
                     { value: "none", label: tr("m0c19fe121207") },

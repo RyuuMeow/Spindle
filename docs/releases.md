@@ -14,3 +14,5 @@ Windows signing uses optional `WINDOWS_CSC_LINK` and `WINDOWS_CSC_KEY_PASSWORD` 
 Automatic checks run once per process, respect skipped versions and never download. Installation is explicit. NSIS uses electron-updater; Portable uses a separately launched Windows helper and keeps the previous executable. Every open renderer must finish its save handshake before restart. Failed preparation leaves all windows open.
 
 Release metadata is fetched over GitHub HTTPS and names the expected architecture/type. Hashes verify download integrity; they are not publisher signatures. Private draft test credentials stay outside the product.
+
+Portable helpers are launched through the local Windows process service so that exiting the Portable launcher cannot terminate the helper. Helper jobs retain the explicit profile path; language restart does not fall back to the default profile. Failure to start the helper aborts preparation before closing the editor.

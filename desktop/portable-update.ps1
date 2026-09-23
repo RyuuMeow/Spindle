@@ -1,4 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$JobFile)
+# Use Windows PowerShell's own modules even when launched by PowerShell 7.
+$env:PSModulePath = Join-Path $PSHOME 'Modules'
 $ErrorActionPreference = 'Stop'
 $job = Get-Content -LiteralPath $JobFile -Raw | ConvertFrom-Json
 $target = [IO.Path]::GetFullPath($job.target)

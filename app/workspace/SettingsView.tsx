@@ -23,7 +23,11 @@ import "./settings.css";
 import { UpdateButton } from "./UpdateDialog";
 import LanguageSettings from "./LanguageSettings";
 import McpSettings from "../mcp/McpSettings";
-import { settingSections, type SettingsSection } from "./settings-registry";
+import {
+  settingSections,
+  extraSettingLabels,
+  type SettingsSection,
+} from "./settings-registry";
 export type { SettingsSection } from "./settings-registry";
 import AppearanceSettings from "../appearance/AppearanceSettings";
 import type { AppearancePatch } from "../appearance/model";
@@ -168,34 +172,58 @@ export default function SettingsView({
 }) {
   const [section, setSection] = useState<SettingsSection>(initialSection);
   const [zoomResetVersion, setZoomResetVersion] = useState(0);
+  const workspaceRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (focusOnMount) headingRef.current?.focus();
   }, [focusOnMount]);
   useEffect(() => {
     if (!navigation) return;
+    let focusFrame = 0;
     const frame = requestAnimationFrame(() => {
       setSection(navigation.section);
-      const field = navigation.field
-        ? document.querySelector<HTMLElement>(
-            `[data-setting="${navigation.field}"]`,
-          )
-        : null;
-      for (
-        let parent = field?.parentElement;
-        parent;
-        parent = parent.parentElement
-      )
-        if (parent instanceof HTMLDetailsElement) parent.open = true;
-      field?.scrollIntoView({ block: "center" });
-      field?.querySelector<HTMLElement>("input,button,select")?.focus();
+      const focusField = (attempt = 0) => {
+        if (!navigation.field) return;
+        const field = workspaceRef.current?.querySelector<HTMLElement>(
+          `[data-setting="${navigation.field}"]`,
+        );
+        for (
+          let parent = field?.parentElement;
+          parent;
+          parent = parent.parentElement
+        )
+          if (parent instanceof HTMLDetailsElement) parent.open = true;
+        const control = [
+          ...(field?.querySelectorAll<HTMLElement>(
+            'input:not([type="hidden"]),button,select,[tabindex="0"]',
+          ) || []),
+        ].find(
+          (el) =>
+            el.getClientRects().length > 0 && !el.hasAttribute("disabled"),
+        );
+        if (field?.getClientRects().length && control) {
+          field.scrollIntoView({ block: "center" });
+          control.focus();
+          if (field.contains(document.activeElement)) return;
+        }
+        if (attempt < 30)
+          focusFrame = requestAnimationFrame(() => focusField(attempt + 1));
+      };
+      focusFrame = requestAnimationFrame(() => focusField());
     });
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(focusFrame);
+    };
   }, [navigation]);
   const change = (patch: Partial<WorkspacePreferences>) =>
     onChange({ ...preferences, ...patch });
   return (
-    <section className="settings-workspace" aria-label={tr("m0d8619aae051")}>
+    <section
+      ref={workspaceRef}
+      className="settings-workspace"
+      aria-label={tr("m0d8619aae051")}
+    >
       <div className="settings-layout">
         <nav className="settings-navigation" aria-label={tr("m55ce2decbed0")}>
           {sections.map(({ id, label, icon: Icon }) => (
@@ -247,16 +275,18 @@ export default function SettingsView({
                   >
                     <h3>{tr("m1c5ab76e581d")}</h3>
                     {onOpenData && (
-                      <NumericSetting
-                        key={`zoom-${zoomResetVersion}`}
-                        label={tr("m1beed61b0b2b")}
-                        description={tr("m322b9bdcd691")}
-                        value={Math.round(preferences.zoom * 100)}
-                        min={60}
-                        max={200}
-                        unit="%"
-                        onCommit={(zoom) => change({ zoom: zoom / 100 })}
-                      />
+                      <div data-setting="zoom">
+                        <NumericSetting
+                          key={`zoom-${zoomResetVersion}`}
+                          label={extraSettingLabels.zoom}
+                          description={tr("m322b9bdcd691")}
+                          value={Math.round(preferences.zoom * 100)}
+                          min={60}
+                          max={200}
+                          unit="%"
+                          onCommit={(zoom) => change({ zoom: zoom / 100 })}
+                        />
+                      </div>
                     )}
                     <div className="setting-reset-actions">
                       <Button
@@ -295,7 +325,10 @@ export default function SettingsView({
                   {onAppPreferences && (
                     <section className="settings-group">
                       <h3>{tr("mb9a3e0cf4dfa")}</h3>
-                      <label className="settings-check">
+                      <label
+                        className="settings-check"
+                        data-setting="reopenLastProject"
+                      >
                         <Checkbox
                           checked={!!appPreferences?.reopenLastProject}
                           onCheckedChange={(value) =>
@@ -304,7 +337,7 @@ export default function SettingsView({
                             })
                           }
                         />
-                        {tr("m9860c712bfc5")}
+                        {extraSettingLabels.reopenLastProject}
                       </label>
                       <p className="setting-help">{tr("m3ab17ab20e9c")}</p>
                     </section>

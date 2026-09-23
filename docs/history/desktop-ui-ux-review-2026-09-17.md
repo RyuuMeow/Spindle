@@ -40,7 +40,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ### A01：錯誤恢復正在造成第二次破壞
 
-隔離 profile 中放入有效且已保存的 `AuditOnly.yarn`，只將版面 JSON 設成非法字串。重新載入後 850ms，文件儲存區已變成三份範例，測試稿的識別文字消失；畫面只說「保存資料無法讀取，已載入範例」。原因是三類資料在同一個 try 讀取，失敗後仍開啟自動保存。[page.tsx:31](D:/GitHub/yarn-workbench/app/page.tsx:31)
+隔離 profile 中放入有效且已保存的 `AuditOnly.yarn`，只將版面 JSON 設成非法字串。重新載入後 850ms，文件儲存區已變成三份範例，測試稿的識別文字消失；畫面只說「保存資料無法讀取，已載入範例」。原因是三類資料在同一個 try 讀取，失敗後仍開啟自動保存。[page.tsx:31](../../app/page.tsx)
 
 **改法／驗收：** 文件、指令、版面分開讀取與驗證；失敗資料保留原字串，提供匯出救援與重試。只破壞版面時文件應完整可讀；任何讀取失敗都不得自動以範例覆寫原內容。這是人工注入損毀測試，未估計正常使用的發生機率。
 
@@ -48,7 +48,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ### A02：保存失敗沒有可操作的回饋
 
-把指令名稱改成 `bad name`，切換另一指令後按「儲存並切換」：確認框留在原地，錯誤文字在背景表單，焦點仍在保存按鈕。關閉該分頁後選「儲存」也一樣。使用者可取消返回，因此不是無法逃出的死鎖，但 App 沒告訴他為何失敗或如何修正。[CommandManager.tsx:15](D:/GitHub/yarn-workbench/app/CommandManager.tsx:15)
+把指令名稱改成 `bad name`，切換另一指令後按「儲存並切換」：確認框留在原地，錯誤文字在背景表單，焦點仍在保存按鈕。關閉該分頁後選「儲存」也一樣。使用者可取消返回，因此不是無法逃出的死鎖，但 App 沒告訴他為何失敗或如何修正。[CommandManager.tsx:15](../../app/CommandManager.tsx)
 
 **改法／驗收：** 保留草稿，在當前框內明示原因與「返回修正」，或直接返回並聚焦錯誤欄位。兩條保存路徑都能一步到問題處，修正後完成原操作；讀屏能取得錯誤原因。[W3C 錯誤辨識原則](https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html)
 
@@ -56,25 +56,25 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ### A03：作者需要知道作品到底安全了沒有
 
-劇本文字每 500ms 保存復原草稿，Ctrl+S 再更新保存版本；指令草稿僅在記憶體。桌面退出提示已明說指令可能遺失，但意外終止沒有這個預警。另一方面，匯入 `.yarn` 後 Ctrl+S 只保存 App 工作區，原始檔不更新。這是已記載的既有行為；設計問題是主狀態「已儲存」不足以說明交付狀態。[page.tsx:32](D:/GitHub/yarn-workbench/app/page.tsx:32)、[CommandManager.tsx:8](D:/GitHub/yarn-workbench/app/CommandManager.tsx:8)、[main.cjs:34](D:/GitHub/yarn-workbench/desktop/main.cjs:34)
+劇本文字每 500ms 保存復原草稿，Ctrl+S 再更新保存版本；指令草稿僅在記憶體。桌面退出提示已明說指令可能遺失，但意外終止沒有這個預警。另一方面，匯入 `.yarn` 後 Ctrl+S 只保存 App 工作區，原始檔不更新。這是已記載的既有行為；設計問題是主狀態「已儲存」不足以說明交付狀態。[page.tsx:32](../../app/page.tsx)、[CommandManager.tsx:8](../../app/CommandManager.tsx)、[main.cjs:34](../../desktop/main.cjs)
 
 **改法／驗收：** 先讓合法與暫時非法的指令草稿都可恢復；明確選定「App 管理作品＋匯出」或「直接編輯選定檔案」的產品契約。短期主狀態寫明保存於工作區、匯入時說明是副本，讓匯出更容易找到。新使用者不讀 README，也應能回答「這次修改已寫回遊戲讀取的檔案嗎」。指令與劇本未保存工作在重開後皆能找回。指令保存通知的「此瀏覽器」也須與桌面措辭一致。
 
 ### A04：確認框不能取代恢復能力
 
-移除劇本、刪除指令及取代專案均有明確防呆，這些應保留；但確認後找不到撤回或最近刪除。App 內建立、尚未匯出的劇本沒有另一份原始檔可救。[page.tsx:50](D:/GitHub/yarn-workbench/app/page.tsx:50)、`移除確認` (local verification artifact)
+移除劇本、刪除指令及取代專案均有明確防呆，這些應保留；但確認後找不到撤回或最近刪除。App 內建立、尚未匯出的劇本沒有另一份原始檔可救。[page.tsx:50](../../app/page.tsx)、`移除確認` (local verification artifact)
 
 **改法／驗收：** 刪除先進本機可恢復區，取代前自動快照。確認移除後立即撤銷、重開後恢復，都必須取回最新文字與參數；明確處理同名衝突。無需複製 Notion 的整套服務，採用它的[刪除後可恢復原則](https://www.notion.com/help/duplicate-delete-and-restore-content)即可。本輪未實際刪除使用者作品。
 
 ### A05：範例能教人看，還沒教人開始自己的作品
 
-全新 profile 直接進 The Last Light，專案選單只有匯入、備份、自訂指令、說明。沒有空白專案與專案更名；新增劇本仍落在範例專案。日常整理也缺劇本重新命名／複製，場景改名必須自行處理引用。`專案選單` (local verification artifact)、[page.tsx:60](D:/GitHub/yarn-workbench/app/page.tsx:60)
+全新 profile 直接進 The Last Light，專案選單只有匯入、備份、自訂指令、說明。沒有空白專案與專案更名；新增劇本仍落在範例專案。日常整理也缺劇本重新命名／複製，場景改名必須自行處理引用。`專案選單` (local verification artifact)、[page.tsx:60](../../app/page.tsx)
 
 **改法／驗收：** 起步提供「建立故事／開啟現有稿／試用範例」，專案與文件可就地命名。新使用者三個明確操作內建立自己的命名專案及第一稿，匯出不混入範例。場景改名若後續加入，需先預覽靜態引用影響；不能以盲目文字取代處理動態引用。
 
 ### A06：流程圖的第一個任務是讓人讀懂關係
 
-首次進入流程會在初始 fit 後強制聚焦目前場景至 zoom=1，右侧兩個場景幾乎出界。「適應全部」可修正，但 Departure → Lighthouse 的線仍穿過 Shop 正文；「重新排列」只是依索引排三欄。跨檔有效目標和缺失／動態目標還共用淡化虛線造型，後者相似性由源碼確認，未逐一捕捉實畫。[Graph.tsx:13](D:/GitHub/yarn-workbench/app/Graph.tsx:13)
+首次進入流程會在初始 fit 後強制聚焦目前場景至 zoom=1，右侧兩個場景幾乎出界。「適應全部」可修正，但 Departure → Lighthouse 的線仍穿過 Shop 正文；「重新排列」只是依索引排三欄。跨檔有效目標和缺失／動態目標還共用淡化虛線造型，後者相似性由源碼確認，未逐一捕捉實畫。[Graph.tsx:13](../../app/Graph.tsx)
 
 **改法／驗收：** 首次顯示總覽、後續保留使用者視野；明確要求定位才移動畫面。先加入選取節點的入／出線凸顯，再改善線路與標籤避讓；來源位置與錯誤狀態分開標示。範例及含回圈、跨檔的 20 場景測試稿中，能追完每個出口，不被無關卡片遮住。這沿用 [Miro 對連線可讀性的處理](https://help.miro.com/hc/en-us/articles/360017730733-Connection-lines)，不增加完整圖形編輯器。
 
@@ -90,7 +90,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ### A08：搜尋不能要求使用者先記得答案在哪
 
-「尋找場景」只篩目前劇本的場景名稱，Ctrl+F 是目前文件內文；沒有整個故事的內容搜尋。局部功能本身有效，範圍卻不夠明顯。[page.tsx:28](D:/GitHub/yarn-workbench/app/page.tsx:28)
+「尋找場景」只篩目前劇本的場景名稱，Ctrl+F 是目前文件內文；沒有整個故事的內容搜尋。局部功能本身有效，範圍卻不夠明顯。[page.tsx:28](../../app/page.tsx)
 
 **改法／驗收：** 一個輕量入口搜尋劇本、場景與對白，結果帶檔名和片段；局部搜尋寫明「此劇本」。相同文字在不同文件都能一次找出，結果可精確導航。採用 [Linear 工作區／視圖搜尋區分](https://linear.app/docs/search)或 [Notion 工作區／頁內搜尋區分](https://www.notion.com/help/search)，不必增加永久面板。
 
@@ -104,7 +104,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ### A10：安靜的介面仍須讓必要資訊可讀
 
-部分 11–12px 輔助文字使用 #777，對 #1c1c1c／#202020 的計算對比分別約 3.81／3.64:1；適用於場景計數與流程標題等指定角色，不能擴大為「全部 UI 不合格」。模式與保存文字量到 11px，部分節點 footer 宣告 10px。[globals.css:6](D:/GitHub/yarn-workbench/app/globals.css:6)、`實際控制項量測` (local verification artifact)
+部分 11–12px 輔助文字使用 #777，對 #1c1c1c／#202020 的計算對比分別約 3.81／3.64:1；適用於場景計數與流程標題等指定角色，不能擴大為「全部 UI 不合格」。模式與保存文字量到 11px，部分節點 footer 宣告 10px。[globals.css:6](../../app/globals.css)、`實際控制項量測` (local verification artifact)
 
 **改法／驗收：** 提升必要小字對比，重要操作標籤考慮 12–13px 並實測密度；保留灰階與低干擾風格。以有效樣式核對普通文字至少 4.5:1 的[對比參照](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)，包含透明度合成；另驗證 Windows 不同縮放。本輪不是完整 WCAG 認證。
 

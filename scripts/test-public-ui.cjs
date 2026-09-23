@@ -72,7 +72,9 @@ fs.mkdirSync(base, { recursive: true });
       app = await require("./portable-test-driver.cjs").launch(pw, {
         executablePath: process.env.SPINDLE_PORTABLE
           ? path.resolve(
-              `release/Spindle-${require("../version.json").version}-Portable-x64.exe`,
+              process.env.SPINDLE_PORTABLE === "1"
+                ? `release/Spindle-${require("../version.json").version}-Portable-x64.exe`
+                : process.env.SPINDLE_PORTABLE,
             )
           : require("electron"),
         args: [
@@ -125,6 +127,32 @@ fs.mkdirSync(base, { recursive: true });
           .click();
         await page.waitForSelector(".settings-workspace");
         await page.screenshot({ path: path.join(shots, "appearance.png") });
+        for (const field of [
+          "source.tabSize",
+          "source.whitespace",
+          "reader.width",
+          "reopenLastProject",
+          "mcp.port",
+          "zoom",
+        ]) {
+          await page.keyboard.press("Control+Shift+f");
+          await page
+            .locator(".search-overlay input[role=combobox]")
+            .fill(field);
+          await page.getByRole("option").first().click();
+          const target = page.locator(`[data-setting="${field}"]`).first();
+          await target.waitFor({ state: "visible" });
+          console.log("Checking deep link " + field);
+
+          await page.waitForFunction(
+            (field) =>
+              document
+                .querySelector(`[data-setting="${field}"]`)
+                ?.contains(document.activeElement),
+            field,
+          );
+        }
+
         await page
           .getByRole("button", { name: "MCP / Agent integration", exact: true })
           .click();

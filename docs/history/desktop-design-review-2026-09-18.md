@@ -4,13 +4,13 @@ This document describes an earlier milestone. Current behavior and release statu
 
 # Yarn Workbench 桌面設計複審
 
-> 0.5.0 決策更新：使用者後續指定自訂指令改為設定式工具 tab，取代下方 0.4.0 的暗幕 modal 方案。顯示名稱、參數提示及點圖表空白退出的現行契約見 [UI 規範](ui-design.md)。以下保留歷史取證。
+> 0.5.0 決策更新：使用者後續指定自訂指令改為設定式工具 tab，取代下方 0.4.0 的暗幕 modal 方案。顯示名稱、參數提示及點圖表空白退出的現行契約見 [UI 規範](../ui-design.md)。以下保留歷史取證。
 
 ## 0.3.0 使用回饋：第二輪分析與改善方案
 
 本節的問題基線來自使用者兩張 0.3.0 截圖、三位 Sub Agents 及主代理程式碼核對。分析階段之後，使用者已批准開始實作，並補充「正文以外物件簡單低調」。**本輪已於 0.4.0 完成實作、打包及 portable 回歸；原生操作驗證限制見實作追蹤。** 下文「根因／目前行為」均指取證時的 0.3.0，不是最新程式碼的未修缺陷清單；歷史行號也不作新版本定位依據。
 
-最新規則與各模組實作／待驗證狀態集中於 [UI 規範](ui-design.md)，最終桌面、portable 和版本結果由 [實作追蹤](implementation-progress.md)統一記錄。本文件保留意圖、取捨和問題證據，避免再將已汰換的第一輪方案當成現行要求。
+最新規則與各模組實作／待驗證狀態集中於 [UI 規範](../ui-design.md)，最終桌面、portable 和版本結果由 [實作追蹤](implementation-progress.md)統一記錄。本文件保留意圖、取捨和問題證據，避免再將已汰換的第一輪方案當成現行要求。
 
 | 已汰換的第一輪規則 | 本輪替代 |
 |---|---|
@@ -48,7 +48,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ### R02：Tab 是使用者建立的視圖容器
 
-根因：[Workbench.tsx:427](../app/workspace/Workbench.tsx:427) 的 `openDocument(false)` 優先尋找全視窗第一個同文件 tab；找不到又遇到固定／utility tab 時會自動新增。共用 `past/future` 還會混入不同 tab 的導航歷史。
+根因：[Workbench.tsx:427](../../app/workspace/Workbench.tsx) 的 `openDocument(false)` 優先尋找全視窗第一個同文件 tab；找不到又遇到固定／utility tab 時會自動新增。共用 `past/future` 還會混入不同 tab 的導航歷史。
 
 - 側欄單擊、搜尋結果、閱讀跳轉、同稿大綱定位：維持活動 TabId、tab 數量和順序；目標已在其他 tab 開啟也照樣在目前容器呈現。其他視圖的模式、游標、捲動都不變。
 - 中鍵、Ctrl+Enter、tab＋、「在新分頁開啟」才建立新容器；直接點 tab 或 Ctrl+Tab 才切既有容器。沒有任何 tab 時建立首個容器屬初始化例外。
@@ -66,13 +66,13 @@ This document describes an earlier milestone. Current behavior and release statu
 
 場景建立還需處理所有入口：圖表＋或其他「新增場景」同樣開大綱的暫存列，不能保留第二套 modal；目前大綱篩選不可隱藏正在命名的列。提交時重新核對全專案重名與最新文件版本，沿用該文件換行；成功保持原模式，圖表選取新節點。命名中換文件先取消暫存列，不把場景插進新文件。目前 `newScene` 完成後呼叫 `go()` 會切純文字，這條路徑也必須修正。
 
-排序根因：[Workbench.tsx:1978](../app/workspace/Workbench.tsx:1978) 只有一次升冪陣列操作，圖示固定，沒有 sort mode／direction。建議有「手動、名稱升冪、名稱降冪」狀態；按鈕切換升降冪並切換 SVG／tooltip，更多選單回手動。名稱排序是每專案視圖偏好，不覆寫手排順序；同層資料夾與文件分別自然數字排序，新建／更名後維持目前模式。沒有可排序項目時停用；無需每次 toast。
+排序根因：[Workbench.tsx:1978](../../app/workspace/Workbench.tsx) 只有一次升冪陣列操作，圖示固定，沒有 sort mode／direction。建議有「手動、名稱升冪、名稱降冪」狀態；按鈕切換升降冪並切換 SVG／tooltip，更多選單回手動。名稱排序是每專案視圖偏好，不覆寫手排順序；同層資料夾與文件分別自然數字排序，新建／更名後維持目前模式。沒有可排序項目時停用；無需每次 toast。
 
 同类缺陷：首次從磁碟載入沒有採用 metadata.files 的手排順序；拖到不同資料夾的檔案列只是排序、拖到資料夾標題才移動。需分別呈現插入線與移入高亮，避免做了操作卻看不到效果。建立文件服務在寫入失敗時會保留 error 文件，UI 不能只看回傳物件存在便報成功。
 
 ### R04：閱讀模式要有語義節奏
 
-根因是逐行換造型，缺少「場景 → 段落 → 動作群 → 分支」的節奏資料。[reading.css:146](../app/reading/reading.css:146) 正文 29px，命令／if 卻是 14×1.65＝23.1px；場景尾把留白放在线前，線後空白又壓成 0；if／else 只有上 padding，分支尾不對稱。
+根因是逐行換造型，缺少「場景 → 段落 → 動作群 → 分支」的節奏資料。[reading.css:146](../../app/reading/reading.css) 正文 29px，命令／if 卻是 14×1.65＝23.1px；場景尾把留白放在线前，線後空白又壓成 0；if／else 只有上 padding，分支尾不對稱。
 
 水平問題也要精確處理：所有 `.cm-line` 現在同為左右 12px，不是每行 CSS 左距都錯。if 有 SVG＋6px、台詞直接從角色開始、set 無前導 icon，造成不同文字起點。應定義區域邊緣、固定圖示欄、文字欄，長行換行也跟同一文字基準。
 
@@ -94,7 +94,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ### R05：流程圖提供真正的節點內編輯
 
-根因：[Graph.tsx:104](../app/Graph.tsx:104) 只有導航回呼，Enter、雙擊與鉛筆都呼叫 open，再交由 Workbench 切去原文。加更多跳轉按鈕不能滿足節點直接改稿。
+根因：[Graph.tsx:104](../../app/Graph.tsx) 只有導航回呼，Enter、雙擊與鉛筆都呼叫 open，再交由 Workbench 切去原文。加更多跳轉按鈕不能滿足節點直接改稿。
 
 建議平時維持摘要，單擊選取；雙擊內容、Enter 或鉛筆讓**該節點原位展開**為約 420–520px 寬的連續閱讀編輯面，一次一顆，其他節點保留上下文。能直接改台詞、角色、命令／參數、變數與未知原文；角色更動僅作用該行，不能默默全專案替換。場景名稱確認後使用既有安全更名／引用更新交易。明確「前往原文」保留為次要動作。
 
@@ -114,7 +114,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 ### R07：結構檢查與面板層次一起整理
 
-[Workbench.tsx:2338](../app/workspace/Workbench.tsx:2338) 仍使用兩個原生 select；[workspace.css:82](../app/workspace/workspace.css:82) 只給少量 padding／字級修補。標題使用 flex 撐開，但缺少完整工具群組與 gap；右側大綱固定 260px，底部檢查固定 210px，只有左欄有 resize 手把。
+[Workbench.tsx:2338](../../app/workspace/Workbench.tsx) 仍使用兩個原生 select；[workspace.css:82](../../app/workspace/workspace.css) 只給少量 padding／字級修補。標題使用 flex 撐開，但缺少完整工具群組與 gap；右側大綱固定 260px，底部檢查固定 210px，只有左欄有 resize 手把。
 
 - 檢查標頭採「標題＋數量／工具群／關閉」；等高約 30px、工具間 8px、左右 12–16px。將『非官方編譯器』移入資訊提示，避免常駐搶占標題。
 - 少量互斥範圍適合分段「目前劇本／全專案」，嚴重度可用「全部／錯誤／提醒」分段並附數量；窄窗才降為有統一皮膚的 select。文字不可為省空間全部換成難辨 icon。
@@ -145,7 +145,7 @@ This document describes an earlier milestone. Current behavior and release statu
 
 2026-09-18 · 使用者的 9 張截圖＋3 位獨立 Sub Agents＋主代理交叉驗證。
 
-**本文件保留 0.2.1 問題分析與重設決策。使用者已於 2026-09-18 批准 D01–D10 及 SVG 圖示方向，0.3.0 已實作；現行規則見 [UI 規範](ui-design.md)，驗證見 [實作追蹤](implementation-progress.md)。** 截圖 8 顯示 0.2.0；本次分析當時的打包版為 0.2.1，以隔離 profile 驗證，沒有操作使用者的真實專案。以下是重設前的證據與提案，不代表 0.3.0 的現況。
+**本文件保留 0.2.1 問題分析與重設決策。使用者已於 2026-09-18 批准 D01–D10 及 SVG 圖示方向，0.3.0 已實作；現行規則見 [UI 規範](../ui-design.md)，驗證見 [實作追蹤](implementation-progress.md)。** 截圖 8 顯示 0.2.0；本次分析當時的打包版為 0.2.1，以隔離 profile 驗證，沒有操作使用者的真實專案。以下是重設前的證據與提案，不代表 0.3.0 的現況。
 
 ## 具體改善方案：建議採用的配置
 
@@ -330,7 +330,7 @@ P1：資訊可信度或實際輸入／導航錯誤。P2：核心閱讀與日常�
 | 保存按鈕、兩處圓點與 footer 缺乏同一契約 | 問題不在圓點偏左或偏右，而是使用者不知道作品是否安全。 | 按 T02 定義狀態；正常自動保存使用低權重狀態，無路徑稿件提供「另存為檔案」。保留 Ctrl+S 與失敗重試。 |
 | 圖表底部仍顯示來源行列、0 英文詞等編輯資訊 | 資訊雖真實，卻與當前任務無關；場景數又出現多次。 | footer 依模式取捨；保存狀態保持明確，統計以短摘要＋展開詳情呈現。圖表省去沒有操作意義的游標座標。 |
 
-來源：[Workbench](../app/workspace/Workbench.tsx:1543)、[側欄布局](../app/workspace/workspace.css:1)、[tab 呈現](../app/WorkspaceTabs.tsx:111)。
+來源：[Workbench](../../app/workspace/Workbench.tsx)、[側欄布局](../../app/workspace/workspace.css)、[tab 呈現](../../app/WorkspaceTabs.tsx)。
 
 ## 即時渲染（圖 2–4）
 
@@ -355,7 +355,7 @@ P1：資訊可信度或實際輸入／導航錯誤。P2：核心閱讀與日常�
 | 閱讀字級設定只放大正文 | 標題固定21px、命令13px、tags12px、變數13px；正文可調到28px，層級會反轉。 | 閱讀系統採相對比例與最小可讀尺寸；字級、行距、標籤基線一起變化，Monaco 維持原樣。 |
 | 頂端註解混合作品與產品教學 | 範例寫「切換至節點預覽」，既過時，又會當作作品內容保存。作者自己的註解則可能很重要。 | 新範例的產品教學移至一次性提示／說明入口。既有作者註解保留，可用安靜的註記樣式；不能直接刪除或一律隱藏所有註解。 |
 
-來源：[渲染裝飾](../app/reading/ReadingEditor.tsx:73)、[渲染樣式](../app/reading/reading.css:8)、`實測折疊畫面` (local verification artifact)。
+來源：[渲染裝飾](../../app/reading/ReadingEditor.tsx)、[渲染樣式](../../app/reading/reading.css)、`實測折疊畫面` (local verification artifact)。
 
 ## 流程圖（圖 1）
 
@@ -377,7 +377,7 @@ P1：資訊可信度或實際輸入／導航錯誤。P2：核心閱讀與日常�
 
 保留：集中式縮放控制、版面與劇本文字各自的 Undo、缺失／動態目標狀態、跨檔位置、回原文能力。
 
-來源：[Graph](../app/Graph.tsx:244)、[圖表樣式](../app/graph.css:6)、[路由](../app/graph-layout.ts:60)、[parser](../app/parser.ts:20)。
+來源：[Graph](../../app/Graph.tsx)、[圖表樣式](../../app/graph.css)、[路由](../../app/graph-layout.ts)、[parser](../../app/parser.ts)。
 
 ## 指令管理（圖 5）
 
@@ -389,7 +389,7 @@ P1：資訊可信度或實際輸入／導航錯誤。P2：核心閱讀與日常�
 - **提交狀態**：已保存時 Save 不該仍像待提交；保留明確的「套用變更」與草稿狀態。指令設定有最後有效版本和非法草稿，不宜因劇本 autosave 就一律自動提交。
 - **動作分層**：現在 Save、複製、Undo、Redo、刪除排在一起。將「複製」改成意思準確的「建立副本」；低頻與刪除移至所屬項目選單；Undo／Redo依是否可用呈現狀態。多參數表單的主要提交動作不能只在最底部。
 
-來源：[CommandManager](../app/CommandManager.tsx:588)、[指令布局與參數](../app/controls.css:1)。
+來源：[CommandManager](../../app/CommandManager.tsx)、[指令布局與參數](../../app/controls.css)。
 
 ## 復原、偏好、關於與搜尋（圖 6–9）
 
@@ -405,7 +405,7 @@ P1：資訊可信度或實際輸入／導航錯誤。P2：核心閱讀與日常�
 
 圖 7／9 的明亮焦點不是「沒設計就隨便畫的白框」：實测是 2px 淡藍 outline，加上 focus border，形成雙輪廓。可以統一為清楚的一套表現，**不能移除鍵盤焦點**。圖 6–9 的低灰對話框邊界可保留；更大的問題是所有任务都借用同一個中央 modal。
 
-來源：[搜尋](../app/workspace/Workbench.tsx:2111)、[恢復](../app/workspace/Workbench.tsx:2215)、[偏好](../app/workspace/Workbench.tsx:2347)、[關於](../app/workspace/Workbench.tsx:2416)。
+來源：[搜尋](../../app/workspace/Workbench.tsx)、[恢復](../../app/workspace/Workbench.tsx)、[偏好](../../app/workspace/Workbench.tsx)、[關於](../../app/workspace/Workbench.tsx)。
 
 ## 同類產品：借鑑的具體原則
 
