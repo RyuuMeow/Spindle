@@ -3,21 +3,25 @@ const path = require("node:path");
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
 const { launch } = require("./portable-test-driver.cjs");
-const playwright = require(
-  process.env.PLAYWRIGHT_MODULE ||
-    path.join(
-      process.env.USERPROFILE,
-      ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright",
-    ),
-);
+const playwright = require("playwright");
 const version = require("../package.json").version;
 const executablePath = path.resolve(
   `release/Spindle-${version}-Portable-x64.exe`,
 );
 const out = path.resolve(
-  process.env.DESKTOP_TEST_OUTPUT || "outputs/portable-startup-regression",
+  process.env.DESKTOP_TEST_OUTPUT || `outputs/portable-startup-regression-${Date.now()}`,
 );
 fs.mkdirSync(out, { recursive: true });
+const demoRoot = path.join(out, "The Last Light");
+fs.cpSync(path.resolve("examples/demo-project/the-last-light"), demoRoot, { recursive: true });
+async function openDemo(app, page) {
+  await app.evaluate(({ dialog }, root) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [root] });
+  }, demoRoot);
+  await page.locator(".launcher-primary").click();
+  await page.getByRole("button", { name: "Chapter_01.yarn", exact: true }).waitFor({ timeout: 30000 });
+}
+
 const profile = path.join(out, "profile-" + Date.now()),
   otherProfile = profile + "-other";
 const results = { version };
@@ -33,9 +37,10 @@ const open = (profile) =>
     const started = Date.now();
     first = await open(profile);
     const page = await first.firstWindow();
-    await page
-      .getByRole("button", { name: "Chapter_01.yarn", exact: true })
-      .waitFor({ timeout: 30000 });
+    await page.locator(".launcher-primary").waitFor({ timeout: 30000 });
+    assert(!(await page.getByText("The Last Light", { exact: true }).count()), "A clean profile must not preload the demo");
+    results.cleanProfileEmpty = true;
+    await openDemo(first, page);
     // DOM availability can precede Electron's ready-to-show by one paint.
     // Observe the real native state without forcing the window to show.
     const visibleDeadline = Date.now() + 10000;
@@ -72,7 +77,8 @@ const open = (profile) =>
     results.initial = initial;
     second = await open(otherProfile);
     const secondPage = await second.firstWindow();
-    await secondPage.getByRole("button", {name:"Chapter_01.yarn",exact:true}).waitFor({timeout:30000});
+    assert(!(await secondPage.getByText("The Last Light", { exact: true }).count()), "A second profile must start empty");
+    await openDemo(second, secondPage);
     const secondDeadline = Date.now() + 10000;
     let secondVisible = false;
     while (Date.now() < secondDeadline) {

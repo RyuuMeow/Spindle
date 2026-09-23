@@ -38,6 +38,7 @@ jobs:
           $v=(Get-Content version.json | ConvertFrom-Json).version
           $env:SPINDLE_PORTABLE="release/Spindle-$v-Portable-x64.exe"
           pnpm test:public-ui
+      - run: pnpm test:portable-launch
       - run: node scripts/third-party-sources.mjs
       - shell: pwsh
         run: |
@@ -52,7 +53,7 @@ jobs:
           name: windows-release
           path: |
             release/*.exe
-            release/*.yml
+            release/latest.yml
             release/*-release.json
             release/SHA256SUMS-*.txt
             release/*-source.zip
@@ -81,7 +82,11 @@ jobs:
           else
             gh release create "v$v" --draft --target "$GITHUB_SHA" --title "Spindle $v" --notes-file "release/Spindle-$v-notes.md"
           fi
-          gh release upload "v$v" release/* --clobber
+          mapfile -t assets < <(awk '{print $2}' "release/SHA256SUMS-$v.txt")
+          for asset in "${assets[@]}"; do
+            test -f "release/$asset"
+          done
+          gh release upload "v$v" "${assets[@]/#/release/}" "release/SHA256SUMS-$v.txt" --clobber
           mkdir verify
           gh release download "v$v" --dir verify
           cd verify
