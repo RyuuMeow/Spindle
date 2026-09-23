@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { validSnapshot } from "../graph/layout-state";
 import type { Command, Doc } from "../parser";
 import { validateCommands, restoreProjects } from "./engine";
@@ -43,7 +44,7 @@ function validateTabState(tab: TabView) {
           range.to > range.from,
       ))
   )
-    throw Error("閱讀折疊範圍損毀");
+    throw Error(tr("mfe9cdd0aa670"));
   if (
     tab.selection &&
     (!finite(tab.selection.anchor) ||
@@ -51,7 +52,7 @@ function validateTabState(tab: TabView) {
       tab.selection.anchor < 0 ||
       tab.selection.head < 0)
   )
-    throw Error("編輯選取範圍損毀");
+    throw Error(tr("m53031b2ec600"));
   if (
     tab.graph &&
     (!validGraphLayout(tab.graph) ||
@@ -61,7 +62,7 @@ function validateTabState(tab: TabView) {
           (!Array.isArray(history) || !history.every(validGraphLayout)),
       ))
   )
-    throw Error("圖表布局損毀");
+    throw Error(tr("m61c7cdfdc5fd"));
   if (tab.sourceView) {
     const view = tab.sourceView;
     if (
@@ -86,10 +87,10 @@ function validateTabState(tab: TabView) {
           ),
       )
     )
-      throw Error("文字編輯器布局損毀");
+      throw Error(tr("md1db89b3c28a"));
   }
   if (tab.views) {
-    if (!record(tab.views)) throw Error("文件視圖快取損毀");
+    if (!record(tab.views)) throw Error(tr("mcb41a9dcac43"));
     for (const view of Object.values(tab.views)) {
       if (
         !record(view) ||
@@ -97,7 +98,7 @@ function validateTabState(tab: TabView) {
         !finite(view.line) ||
         !finite(view.column)
       )
-        throw Error("文件視圖快取損毀");
+        throw Error(tr("mcb41a9dcac43"));
       validateTabState({
         mode: view.mode,
         line: view.line,
@@ -123,7 +124,7 @@ function validateTabState(tab: TabView) {
             !finite(location.column),
         ))
     )
-      throw Error("分頁導航歷史損毀");
+      throw Error(tr("m8e96b335dc59"));
   }
   return {
     ...tab,
@@ -144,7 +145,7 @@ export function restoreSession(
     !Array.isArray(v.tabs) ||
     !Array.isArray(v.closedTabs)
   )
-    throw Error("視窗布局格式無效");
+    throw Error(tr("m8d99484844d0"));
   const tabs = (items: TabView[]) =>
     items
       .filter(
@@ -152,6 +153,7 @@ export function restoreSession(
           t &&
           typeof t.id === "string" &&
           typeof t.documentId === "string" &&
+          t.documentId !== "@new-document" &&
           ["source", "rendered", "graph"].includes(t.mode),
       )
       .map((t) => ({
@@ -252,7 +254,10 @@ export function readProtected<T>(
     }
     return {
       value: null,
-      error: `${key} 無法讀取；${copied ? "已保留救援副本" : "原始資料保留，請匯出救援"}。`,
+      error: tr("m1e40e0769d38", [
+        key,
+        copied ? tr("me2ea375ac58a") : tr("m430246f89eff"),
+      ]),
       exists: true,
     };
   }

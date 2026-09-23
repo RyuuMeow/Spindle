@@ -7,9 +7,47 @@ import path from "node:path";
 await import("./prepare-brand-assets.mjs");
 
 const root = new URL("../", import.meta.url);
-for (const file of ["main.cjs", "preload.cjs", "mcp-windows.cjs", "window-lifecycle.cjs"])
-  execFileSync(process.execPath, ["--check", fileURLToPath(new URL("desktop/" + file, root))]);
+for (const file of [
+  "main.cjs",
+  "preload.cjs",
+  "mcp-windows.cjs",
+  "window-lifecycle.cjs",
+])
+  execFileSync(process.execPath, [
+    "--check",
+    fileURLToPath(new URL("desktop/" + file, root)),
+  ]);
 const destination = new URL("dist-desktop/app/", root);
+await build({
+  entryPoints: [fileURLToPath(new URL("app/i18n/index.ts", root))],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outfile: fileURLToPath(new URL("desktop/i18n.cjs", destination)),
+});
+await cp(
+  new URL("skills/spindle/", root),
+  new URL("skills/spindle/", destination),
+  { recursive: true },
+);
+await cp(
+  new URL("desktop/restart.cjs", root),
+  new URL("desktop/restart.cjs", destination),
+);
+const updateBuild = await build({
+  metafile: true,
+  entryPoints: [fileURLToPath(new URL("desktop/update-service.ts", root))],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  external: ["electron"],
+  outfile: fileURLToPath(new URL("desktop/update-service.cjs", destination)),
+});
+await cp(
+  new URL("desktop/portable-update.ps1", root),
+  new URL("desktop/portable-update.ps1", destination),
+);
+await cp(new URL("desktop/installed-restart.ps1",root),new URL("desktop/installed-restart.ps1",destination));
 const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
 await mkdir(new URL("desktop/", destination), { recursive: true });
 await cp(
@@ -24,7 +62,10 @@ await cp(
   new URL("desktop/system-fonts.cjs", root),
   new URL("desktop/system-fonts.cjs", destination),
 );
-await cp(new URL("desktop/mcp-windows.cjs", root), new URL("desktop/mcp-windows.cjs", destination));
+await cp(
+  new URL("desktop/mcp-windows.cjs", root),
+  new URL("desktop/mcp-windows.cjs", destination),
+);
 await cp(
   new URL("desktop/preload.cjs", root),
   new URL("desktop/preload.cjs", destination),
@@ -52,36 +93,79 @@ await build({
 const mcpBuild = await build({
   metafile: true,
   entryPoints: [fileURLToPath(new URL("desktop/mcp/runtime.ts", root))],
-  bundle: true, platform: "node", format: "cjs", target: "node22",
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  target: "node22",
   outfile: fileURLToPath(new URL("desktop/mcp-runtime.cjs", destination)),
 });
 // Bundle the license notices of dependencies actually included in the MCP runtime.
 const notices = new Map();
-for (const input of Object.keys(mcpBuild.metafile.inputs).filter(p => p.includes("node_modules/"))) {
+for (const input of Object.keys({
+  ...mcpBuild.metafile.inputs,
+  ...updateBuild.metafile.inputs,
+}).filter((p) => p.includes("node_modules/"))) {
   let folder = path.dirname(path.resolve(input));
   while (folder.includes("node_modules")) {
     try {
-      const metadata = JSON.parse(await readFile(path.join(folder, "package.json"), "utf8"));
+      const metadata = JSON.parse(
+        await readFile(path.join(folder, "package.json"), "utf8"),
+      );
       if (metadata.name && metadata.version) {
         const key = metadata.name + "@" + metadata.version;
         if (!notices.has(key)) {
-          const files = (await readdir(folder)).filter(name => /^(license|licence|copying|notice)(\.|$)/i.test(name));
-          const texts = await Promise.all(files.map(name => readFile(path.join(folder, name), "utf8")));
-          notices.set(key, key + " (" + (metadata.license || "see package") + ")\n" + texts.join("\n"));
+          const files = (await readdir(folder)).filter((name) =>
+            /^(license|licence|copying|notice)(\.|$)/i.test(name),
+          );
+          const texts = await Promise.all(
+            files.map((name) => readFile(path.join(folder, name), "utf8")),
+          );
+          notices.set(
+            key,
+            key +
+              " (" +
+              (metadata.license || "see package") +
+              ")\n" +
+              texts.join("\n"),
+          );
         }
         break;
       }
-    } catch (error) { if (error.code !== "ENOENT") throw error; }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
     folder = path.dirname(folder);
   }
 }
 await mkdir(new URL("licenses/", destination), { recursive: true });
-await writeFile(new URL("licenses/mcp-dependencies.txt", destination), [...notices.values()].join("\n\n---\n\n"));
-for (const name of ["elkjs", "libavoid-js", "monaco-editor", "react", "react-dom", "@xyflow/react"]) {
+for (const file of ["LICENSE", "THIRD_PARTY_NOTICES.md"])
+  await cp(new URL(file, root), new URL("licenses/" + file, destination));
+await writeFile(
+  new URL("licenses/mcp-dependencies.txt", destination),
+  [...notices.values()].join("\n\n---\n\n"),
+);
+for (const name of [
+  "elkjs",
+  "libavoid-js",
+  "monaco-editor",
+  "react",
+  "react-dom",
+  "@xyflow/react",
+]) {
   const directory = new URL("node_modules/" + name + "/", root);
-  const files = (await readdir(directory)).filter(file => /^(license|licence|copying|notice|thirdpartynotices)(\.|$)/i.test(file));
-  const texts = await Promise.all(files.map(file => readFile(new URL(file, directory), "utf8")));
-  await writeFile(new URL("licenses/" + name.replaceAll("/", "-").replace("@", "") + ".txt", destination), name + "\n" + texts.join("\n\n"));
+  const files = (await readdir(directory)).filter((file) =>
+    /^(license|licence|copying|notice|thirdpartynotices)(\.|$)/i.test(file),
+  );
+  const texts = await Promise.all(
+    files.map((file) => readFile(new URL(file, directory), "utf8")),
+  );
+  await writeFile(
+    new URL(
+      "licenses/" + name.replaceAll("/", "-").replace("@", "") + ".txt",
+      destination,
+    ),
+    name + "\n" + texts.join("\n\n"),
+  );
 }
 const stagedRenderer = new URL("dist-desktop/renderer/", destination);
 const relativeStage = path.relative(

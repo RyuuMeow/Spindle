@@ -1,3 +1,4 @@
+import { t as tr } from "../app/i18n";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID, createHash } from "node:crypto";
@@ -28,18 +29,18 @@ function checked(base: string, relative: string) {
     delta.startsWith(".." + path.sep) ||
     path.isAbsolute(delta)
   )
-    throw Error("復原路徑超出保存範圍");
+    throw Error(tr("m7b6971429a5c"));
   let current = path.resolve(base);
   for (const part of delta.split(path.sep)) {
     current = path.join(current, part);
     if (fs.existsSync(current) && fs.lstatSync(current).isSymbolicLink())
-      throw Error("復原操作不接受符號連結");
+      throw Error(tr("mca65eb9f5259"));
   }
   return target;
 }
 function checkTree(file: string) {
   const stat = fs.lstatSync(file);
-  if (stat.isSymbolicLink()) throw Error("資料夾含符號連結，未移動或刪除內容");
+  if (stat.isSymbolicLink()) throw Error(tr("md76197cb5e9c"));
   if (stat.isDirectory())
     for (const item of fs.readdirSync(file)) checkTree(path.join(file, item));
 }
@@ -63,7 +64,7 @@ function validEntries(value: unknown): RecoveryEntry[] {
         !Number.isFinite(e.at),
     )
   )
-    throw Error("版本歷史格式損毀，原始資料已保留");
+    throw Error(tr("m997a2a36c484"));
   return value;
 }
 /** Owns only Spindle history and trash; never touches the operating system recycle bin. */
@@ -81,7 +82,7 @@ export class RecoveryStore {
   private base(p: Project) {
     if (p.kind === "standalone")
       return checked(this.profile, "single-file-history/" + p.id);
-    if (!p.root) throw Error("此工作區沒有磁碟專案");
+    if (!p.root) throw Error(tr("m491c1744afe0"));
     projectConfig(p.root);
     return checked(p.root, ".spindle");
   }
@@ -105,7 +106,7 @@ export class RecoveryStore {
     const file = this.index(p);
     if (fs.existsSync(file)) {
       const value = JSON.parse(fs.readFileSync(file, "utf8"));
-      if (value.version !== 1) throw Error("版本歷史格式不受支援");
+      if (value.version !== 1) throw Error(tr("m16d970e4b663"));
       p.recovery = validEntries(value.entries);
     }
     if (copiedIdentity)
@@ -135,7 +136,7 @@ export class RecoveryStore {
           !Array.isArray(r.documents) ||
           !Array.isArray(r.folders)
         )
-          throw Error("垃圾桶操作紀錄損毀");
+          throw Error(tr("ma46763f5e942"));
         validEntries([r.entry]);
         r.documents = r.documents.map((d) => ({
           ...d,
@@ -210,7 +211,7 @@ export class RecoveryStore {
     this.written.set(p.id, value);
   }
   moveToTrash(p: Project, name: string, folder: boolean) {
-    if (!p.root) throw Error("請先開啟專案");
+    if (!p.root) throw Error(tr("md34c5c320c02"));
     const original = checked(p.root, name);
     checkTree(original);
     const documents = p.documents.filter((d) =>
@@ -222,7 +223,7 @@ export class RecoveryStore {
       name,
       text: folder ? "" : documents[0].text,
       at: Date.now(),
-      reason: folder ? "刪除資料夾" : "刪除劇本",
+      reason: folder ? tr("md879a69d9c20") : tr("m881b2412ca7d"),
       deleted: true,
       kind: folder ? "folder" : "file",
       files: documents.map((d) => ({ id: d.id, name: d.name, text: d.text })),
@@ -352,7 +353,7 @@ export class RecoveryStore {
     };
   }
   restore(p: Project, entry: RecoveryEntry) {
-    if (!p.root) throw Error("請先開啟專案");
+    if (!p.root) throw Error(tr("md34c5c320c02"));
     const manifest = this.recordFile(p, entry.id);
     let r: TrashRecord;
     if (fs.existsSync(manifest))
@@ -378,7 +379,7 @@ export class RecoveryStore {
       this.writeRecord(p, r);
       atomicWrite(this.payload(p, entry.id), entry.text);
     }
-    if (r.state === "purging") throw Error("此項目正在永久刪除，請重試刪除");
+    if (r.state === "purging") throw Error(tr("m53662abf9af6"));
     if (!(
       r.state === "restoring" &&
       !fs.existsSync(this.payload(p, entry.id)) &&

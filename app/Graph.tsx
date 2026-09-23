@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "./i18n/index.ts";
+
 import { useEditorContext } from "./mcp/editor-context";
 import { useAppearance, appearanceVariables } from "./appearance/context";
 
@@ -123,10 +125,10 @@ type EditSession = {
   groups: ConnectionGroup[];
 };
 const kindLabel: Record<RecordKind, string> = {
-  scene: "場景",
-  external: "跨檔延續",
-  missing: "找不到目標",
-  dynamic: "執行時決定",
+  scene: tr("mcb88dc73b257"),
+  external: tr("m762f1b036c4d"),
+  missing: tr("maba461690054"),
+  dynamic: tr("m318be3575c95"),
 };
 const sidePosition = {
   left: Position.Left,
@@ -146,16 +148,20 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
           : GitBranch;
   const action =
     data.kind === "scene"
-      ? "在節點內編輯"
+      ? tr("m6151315121f9")
       : data.kind === "external"
-        ? "在節點內編輯"
-        : "查看引用";
+        ? tr("m6151315121f9")
+        : tr("mebaad66708ec");
   return (
     <div
       className={`flow-card flow-card--${data.kind}${selected ? " is-selected" : ""}${data.editor ? " is-editing" : data.compact ? " is-overview" : ""}${!data.editor && data.zoom < 0.35 ? " is-distant" : ""}`}
       tabIndex={data.editor ? -1 : 0}
       role={data.editor ? undefined : "button"}
-      aria-label={`${data.name}，${kindLabel[data.kind]}。按 Enter ${action}`}
+      aria-label={tr("m64f54405685e", [
+        data.name,
+        kindLabel[data.kind],
+        action,
+      ])}
       onKeyDown={(event) => {
         if (data.editor) return;
         if (
@@ -205,7 +211,7 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
               <AlertTriangle
                 size={14}
                 className="flow-warning"
-                aria-label="有檢查問題"
+                aria-label={tr("m589c0b9a29a9")}
               />
             )}
           </div>
@@ -220,8 +226,8 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
             >
               {data.node?.summary ||
                 (data.kind === "missing"
-                  ? "找不到目標，請查看引用。"
-                  : "動態目標，執行時決定。")}
+                  ? tr("m57496d36d567")
+                  : tr("md8d9bccf322b"))}
             </p>
           ) : null}
           <button
@@ -908,8 +914,8 @@ function Canvas({
       },
     }));
   const selectionLabel = nodeSelection.size
-    ? "整理選取的 " + nodeSelection.size + " 個物件"
-    : "整理全部";
+    ? tr("m9188db9d7642") + nodeSelection.size + tr("m30ab8bd88957")
+    : tr("mfd774be38b47");
   const save = persistLayout;
   const fitAll = useCallback(
     (duration = 200) => {
@@ -1032,7 +1038,7 @@ function Canvas({
   function closeSearch() {
     setShowSearch(false);
     canvasElement.current
-      ?.querySelector<HTMLButtonElement>('button[aria-label="找場景"]')
+      ?.querySelector<HTMLButtonElement>(tr("m6df90a231d69"))
       ?.focus();
   }
   function arrange() {
@@ -1264,8 +1270,8 @@ function Canvas({
             <Search size={15} />
             <input
               autoFocus
-              aria-label="圖內搜尋場景"
-              placeholder="找場景"
+              aria-label={tr("m30ea1664088a")}
+              placeholder={tr("md1705561574b")}
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -1286,37 +1292,37 @@ function Canvas({
               {search.trim()
                 ? matches.length
                   ? searchIndex < 0
-                    ? `${matches.length} 項`
+                    ? tr("m917d71c380af", [matches.length])
                     : `${searchIndex + 1} / ${matches.length}`
-                  : "無結果"
+                  : tr("mb857ae588bbc")
                 : ""}
             </span>
             <ChromeButton
-              title="上一個場景"
-              aria-label="上一個場景"
+              title={tr("mb59f3495e506")}
+              aria-label={tr("mb59f3495e506")}
               disabled={!matches.length}
               onClick={() => stepMatch(-1)}
             >
               <ChevronLeft size={15} />
             </ChromeButton>
             <ChromeButton
-              title="下一個場景"
-              aria-label="下一個場景"
+              title={tr("mcacd57c7591b")}
+              aria-label={tr("mcacd57c7591b")}
               disabled={!matches.length}
               onClick={() => stepMatch(1)}
             >
               <ChevronRight size={15} />
             </ChromeButton>
             <ChromeButton
-              title="關閉圖內搜尋"
-              aria-label="關閉圖內搜尋"
+              title={tr("mdaefc89704cf")}
+              aria-label={tr("mdaefc89704cf")}
               onClick={closeSearch}
             >
               <X size={15} />
             </ChromeButton>
           </div>
           {search.trim() && (
-            <div className="flow-find-results" aria-label="符合的場景">
+            <div className="flow-find-results" aria-label={tr("mc8450c98d9f3")}>
               {matches.length ? (
                 matches.map((node, index) => (
                   <button
@@ -1332,7 +1338,11 @@ function Canvas({
                   </button>
                 ))
               ) : (
-                <p>沒有符合「{search}」的場景</p>
+                <p>
+                  {tr("m439b294a660e")}
+                  {search}
+                  {tr("m8c87ae989f0b")}
+                </p>
               )}
             </div>
           )}
@@ -1341,30 +1351,28 @@ function Canvas({
       {showHelp && (
         <div className="flow-guide">
           <div>
-            <strong>本檔場景與轉場</strong>
+            <strong>{tr("m952122269cd9")}</strong>
             <ChromeButton
               type="button"
-              aria-label="關閉圖例"
+              aria-label={tr("m84cfdb06d8bc")}
               onClick={() => setShowHelp(false)}
-              title="關閉圖例"
+              title={tr("m84cfdb06d8bc")}
             >
               <X size={14} />
             </ChromeButton>
           </div>
+          <p>{tr("m3dcae6d40d8c")}</p>
           <p>
-            拖曳卡片只調整版面；雙擊或 Enter 編輯原文。左鍵框選，Shift
-            加選，右鍵拖曳平移，滾輪縮放。移動卡片或 pin 理線；雙擊支線新增
-            pin。
-          </p>
-          <p>
-            {own.length} 個場景 · {out.length}{" "}
-            個轉場；實線為跳轉，短虛線為呼叫後返回。條件僅呈現，不模擬執行。
+            {own.length} {tr("m14f1c2e4fae1")} {out.length}{" "}
+            {tr("mf872d7afe54d")}
           </p>
           <p>
             <ArrowUpRight size={13} />
-            跨檔延續 <AlertTriangle size={13} />
-            找不到目標 <Braces size={13} />
-            執行時決定
+            {tr("m762f1b036c4d")}
+            <AlertTriangle size={13} />
+            {tr("maba461690054")}
+            <Braces size={13} />
+            {tr("m318be3575c95")}
           </p>
         </div>
       )}
@@ -1509,14 +1517,8 @@ function Canvas({
       ) : (
         <div className="flow-empty">
           <GitBranch size={32} />
-          <h2>
-            {firstIssue ? "先修正原文，才能顯示場景" : "這份劇本還沒有場景"}
-          </h2>
-          <p>
-            {firstIssue
-              ? firstIssue.message
-              : "建立第一個場景，故事的連結就會出現在這裡。"}
-          </p>
+          <h2>{firstIssue ? tr("ma54886e6c577") : tr("m7eaa77c42deb")}</h2>
+          <p>{firstIssue ? firstIssue.message : tr("m88e1cf238d4f")}</p>
           <button
             type="button"
             className="primary"
@@ -1527,34 +1529,38 @@ function Canvas({
             {firstIssue && onGoTo ? (
               <>
                 <PenLine size={15} />
-                查看第 {firstIssue.line} 行
+                {tr("md2bed0da1845")}
+                {firstIssue.line} {tr("m4cc7b00050cb")}
               </>
             ) : (
               <>
                 <Plus size={15} />
-                建立場景
+                {tr("mba0c8150556a")}
               </>
             )}
           </button>
         </div>
       )}
       {showDetails && (
-        <aside className="flow-connection-detail" aria-label="圖表詳情">
+        <aside
+          className="flow-connection-detail"
+          aria-label={tr("m41b5d40b9265")}
+        >
           <div>
             <strong>
               {selectedGroup && selectedGroup.items.length > 1
-                ? `${selectedGroup.items.length} 個分支通往同一場景`
+                ? tr("m3b2b181a4138", [selectedGroup.items.length])
                 : selectedGroup
-                  ? "轉場詳情"
+                  ? tr("m482b52e2fba0")
                   : selection
-                    ? "場景詳情"
-                    : "圖表詳情"}
+                    ? tr("m337222d440c1")
+                    : tr("m41b5d40b9265")}
             </strong>
             <ChromeButton
               type="button"
-              aria-label="關閉圖表詳情"
+              aria-label={tr("m588d9396efb5")}
               onClick={() => updateDetails(false)}
-              title="關閉圖表詳情"
+              title={tr("m588d9396efb5")}
             >
               <X size={15} />
             </ChromeButton>
@@ -1585,12 +1591,14 @@ function Canvas({
                       ) : (
                         <ArrowRight size={15} />
                       )}
-                      {link.kind === "detour" ? "呼叫後返回" : "跳轉"}
+                      {link.kind === "detour"
+                        ? tr("mf59b6234a64a")
+                        : tr("mb4488ac94a21")}
                     </div>
                     {link.unresolved && (
                       <p className="flow-detail-warning">
                         <AlertTriangle size={14} />
-                        條件尚未解析完整，請查看原文。
+                        {tr("m89bffeb1e7db")}
                       </p>
                     )}
                     {link.context?.length ? (
@@ -1598,12 +1606,15 @@ function Canvas({
                         {link.context.map((part, partIndex) => (
                           <li key={partIndex}>
                             <SemanticText text={contextLabel(part)} />
-                            <small>第 {part.line} 行</small>
+                            <small>
+                              {tr("maf50a0fe2a50")} {part.line}{" "}
+                              {tr("m4cc7b00050cb")}
+                            </small>
                           </li>
                         ))}
                       </ol>
                     ) : (
-                      <p>{link.label || "直接轉場"}</p>
+                      <p>{link.label || tr("m40d2364fd1d1")}</p>
                     )}
                     <button
                       type="button"
@@ -1611,7 +1622,9 @@ function Canvas({
                       onClick={() => goToLink(link)}
                     >
                       <FileText size={14} />
-                      查看第 {link.line} 行<ArrowUpRight size={13} />
+                      {tr("md2bed0da1845")}
+                      {link.line} {tr("m4cc7b00050cb")}
+                      <ArrowUpRight size={13} />
                     </button>
                   </li>
                 ))}
@@ -1625,7 +1638,8 @@ function Canvas({
                 <>
                   <p className="flow-detail-file">
                     <FileText size={14} />
-                    {selection.node.file} · 第 {selection.node.start} 行
+                    {selection.node.file} {tr("mca0b53cf6fe3")}{" "}
+                    {selection.node.start} {tr("m4cc7b00050cb")}
                   </p>
                   {selection.node.headers.tags && (
                     <div className="flow-tags">
@@ -1639,7 +1653,7 @@ function Canvas({
                   )}
                   {selection.node.calls.length > 0 && (
                     <>
-                      <h4>命令</h4>
+                      <h4>{tr("m928f87d4507b")}</h4>
                       <ul className="flow-command-details">
                         {selection.node.calls.map((call, index) => (
                           <li key={index}>
@@ -1648,8 +1662,8 @@ function Canvas({
                             </code>
                             <button
                               type="button"
-                              title={`查看第 ${call.line} 行`}
-                              aria-label={`查看第 ${call.line} 行`}
+                              title={tr("m7c4ebf4ae4f7", [call.line])}
+                              aria-label={tr("m7c4ebf4ae4f7", [call.line])}
                               onClick={() =>
                                 onGoTo?.(selection.node!.file, call.line)
                               }
@@ -1670,22 +1684,22 @@ function Canvas({
               >
                 <PenLine size={14} />
                 {selection.kind === "scene"
-                  ? "編輯原文"
+                  ? tr("mfcf7640dbd8a")
                   : selection.kind === "external"
-                    ? "前往劇本"
-                    : "查看引用"}
+                    ? tr("m6911a5739d0d")
+                    : tr("mebaad66708ec")}
               </button>
             </>
           ) : (
-            <p>選取場景或轉場，查看標籤、完整前提與來源。</p>
+            <p>{tr("mcbd4dbb92fb8")}</p>
           )}
         </aside>
       )}
       {!!nodes.length && (
-        <div className="flow-navigation" aria-label="畫布縮放">
+        <div className="flow-navigation" aria-label={tr("m0c27f2392b69")}>
           <ChromeButton
-            title="找場景"
-            aria-label="找場景"
+            title={tr("md1705561574b")}
+            aria-label={tr("md1705561574b")}
             aria-expanded={showSearch}
             onClick={() => setShowSearch((value) => !value)}
           >
@@ -1694,43 +1708,43 @@ function Canvas({
           <span />
           <ChromeButton
             type="button"
-            aria-label="縮小"
+            aria-label={tr("m092a4a0ba550")}
             disabled={zoom <= 0.2}
             onClick={() => void flow.zoomOut({ duration: 150 })}
-            title="縮小"
+            title={tr("m092a4a0ba550")}
           >
             <Minus size={15} />
           </ChromeButton>
           <button
             type="button"
             className="flow-zoom-value"
-            title="回到 100%"
+            title={tr("m52918cc9eae8")}
             onClick={() => void flow.zoomTo(1, { duration: 150 })}
           >
             {Math.round(zoom * 100)}%
           </button>
           <ChromeButton
             type="button"
-            aria-label="放大"
+            aria-label={tr("m80f8fbcfa011")}
             disabled={zoom >= 2}
             onClick={() => void flow.zoomIn({ duration: 150 })}
-            title="放大"
+            title={tr("m80f8fbcfa011")}
           >
             <Plus size={15} />
           </ChromeButton>
           <span />
           <ChromeButton
             type="button"
-            title="適應全部"
-            aria-label="適應全部"
+            title={tr("m9680a7c3422c")}
+            aria-label={tr("m9680a7c3422c")}
             onClick={() => fitAll()}
           >
             <Maximize size={15} />
           </ChromeButton>
           <ChromeButton
             type="button"
-            title="定位選取場景"
-            aria-label="定位選取場景"
+            title={tr("m55c0d1dfe9a9")}
+            aria-label={tr("m55c0d1dfe9a9")}
             disabled={!selection}
             onClick={() => {
               const node = nodes.find((node) => node.id === selectedId);
@@ -1748,28 +1762,28 @@ function Canvas({
           <ChromeButton
             title={
               editing
-                ? "結束節點編輯後可整理"
+                ? tr("m2c15790657d6")
                 : nodeSelection.size
                   ? selectionLabel
-                  : "整理全部"
+                  : tr("mfd774be38b47")
             }
-            aria-label="自動整理"
+            aria-label={tr("m2ee44c5afa4c")}
             disabled={!!editing || !nodes.length || layout.busy}
             onClick={arrange}
           >
             <LayoutGrid size={16} />
           </ChromeButton>
           <ChromeButton
-            title="復原布局"
-            aria-label="復原布局"
+            title={tr("m19829da14cc1")}
+            aria-label={tr("m19829da14cc1")}
             disabled={!!editing || !previousLayout}
             onClick={undoLayout}
           >
             <Undo2 size={16} />
           </ChromeButton>
           <ChromeButton
-            title="重做布局"
-            aria-label="重做布局"
+            title={tr("md566101e5aa7")}
+            aria-label={tr("md566101e5aa7")}
             disabled={!!editing || !canRedo}
             onClick={redoLayout}
           >
@@ -1777,16 +1791,16 @@ function Canvas({
           </ChromeButton>
           <span />
           <ChromeButton
-            title="圖表詳情"
-            aria-label="圖表詳情"
+            title={tr("m41b5d40b9265")}
+            aria-label={tr("m41b5d40b9265")}
             aria-expanded={showDetails}
             onClick={() => updateDetails(!showDetails)}
           >
             <PanelRight size={16} />
           </ChromeButton>
           <ChromeButton
-            title="圖例與操作說明"
-            aria-label="圖例與操作說明"
+            title={tr("m2e5060f88801")}
+            aria-label={tr("m2e5060f88801")}
             aria-expanded={showHelp}
             onClick={() => setShowHelp((value) => !value)}
           >
@@ -1799,7 +1813,7 @@ function Canvas({
           <AlertTriangle size={14} />
           <span>{layout.error}</span>
           <button onClick={() => layout.request({ kind: "repair" })}>
-            重試
+            {tr("m7e59d0f16293")}
           </button>
         </div>
       )}
@@ -1813,7 +1827,7 @@ function Canvas({
                   canvasMenu.pin && canvasMenu.edge
                     ? [
                         {
-                          label: "刪除 pin",
+                          label: tr("mc5e213f758ca"),
                           run: () =>
                             deletePin(canvasMenu.edge!, canvasMenu.pin!),
                         },
@@ -1822,15 +1836,15 @@ function Canvas({
                       ? [
                           { label: selectionLabel, run: arrange },
                           {
-                            label: "簡化線路",
+                            label: tr("m896678da6276"),
                             run: () => routeAction("simplify"),
                           },
                           {
-                            label: "恢復自動線路",
+                            label: tr("mcf9a7e5ac83a"),
                             run: () => routeAction("reset"),
                           },
                           {
-                            label: "查看來源",
+                            label: tr("m625c9661b83c"),
                             run: () => {
                               const g = groups.find(
                                 (g) => g.id === canvasMenu.edge,
@@ -1840,25 +1854,25 @@ function Canvas({
                           },
                         ]
                       : [
-                          { label: "建立場景", run: onCreate },
-                          { label: "適應全部", run: () => fitAll() },
+                          { label: tr("mba0c8150556a"), run: onCreate },
+                          { label: tr("m9680a7c3422c"), run: () => fitAll() },
                           {
-                            label: "回到 100%",
+                            label: tr("m52918cc9eae8"),
                             run: () => void flow.zoomTo(1),
                           },
                           {
                             label: nodeSelection.size
                               ? selectionLabel
-                              : "整理全部",
+                              : tr("mfd774be38b47"),
                             run: arrange,
                           },
                           {
-                            label: "復原布局",
+                            label: tr("m19829da14cc1"),
                             disabled: !previousLayout,
                             run: undoLayout,
                           },
                           {
-                            label: "重做布局",
+                            label: tr("md566101e5aa7"),
                             disabled: !canRedo,
                             run: redoLayout,
                           },

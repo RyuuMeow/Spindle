@@ -1,4 +1,8 @@
 "use client";
+import { extraSettingLabels } from "../workspace/settings-registry";
+import { t as tr, locale } from "../i18n/index.ts";
+
+import AgentInstallations from "./AgentInstallations";
 import { copyText } from "@/app/clipboard";
 import { useEffect, useState } from "react";
 import { Copy, RefreshCw, RotateCcw } from "lucide-react";
@@ -9,6 +13,7 @@ export default function McpSettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [installRevision, setInstallRevision] = useState(0);
   const [port, setPort] = useState<string | null>(null);
   const bridge =
     typeof window === "undefined" ? undefined : window.yarnDesktop?.agent;
@@ -40,6 +45,7 @@ export default function McpSettings() {
     if (!bridge) return;
     try {
       setSettings(await bridge.configure(patch));
+      setInstallRevision((value) => value + 1);
       setError("");
       setMessage("");
       return true;
@@ -48,66 +54,54 @@ export default function McpSettings() {
       return false;
     }
   }
-  async function copyConnection() {
+  async function copyConnection(format: "codex" | "claude" | "http" = "http") {
     if (!bridge) return;
     try {
-      const value = await bridge.connection();
-      await copyText(
-        JSON.stringify(
-          { mcpServers: { spindle: { type: "http", ...value } } },
-          null,
-          2,
-        ),
-      );
+      await copyText(await bridge.connectionFormat(format));
       setError("");
-      setMessage("已複製連線資料，包含此電腦的存取憑證。");
+      setMessage(tr("m66772dd0e3c2"));
     } catch (error) {
       setError(String(error));
     }
   }
-  if (!bridge)
-    return <p className="setting-help">MCP 整合適用於 Windows 桌面版。</p>;
+  if (!bridge) return <p className="setting-help">{tr("mf07df1a3d22d")}</p>;
   return (
     <>
-      <section className="settings-group" aria-label="MCP 連線">
-        <h3>本機 Agent 存取</h3>
-        <p className="setting-help">
-          讓同一台電腦上的 agent 取得編輯情境、檢查專案及執行語義操作。Spindle
-          必須保持開啟。
-        </p>
-        <div className="setting-field">
+      <section className="settings-group" aria-label={tr("m2f7028ef99b4")}>
+        <h3>{tr("mf23153ab64a8")}</h3>
+        <p className="setting-help">{tr("m1e4b5bf24a3c")}</p>
+        <div className="setting-field" data-setting="mcp.mode">
           <div className="setting-row">
-            <span>存取模式</span>
+            <span>{extraSettingLabels["mcp.mode"]}</span>
             <SegmentedControl
-              label="MCP 存取模式"
+              label={tr("m41d52025e3db")}
               value={settings?.mode || "disabled"}
               onChange={(mode) =>
                 void change({ mode: mode as Settings["mode"] })
               }
               options={[
-                { value: "disabled", label: "停用" },
-                { value: "read", label: "唯讀" },
-                { value: "write", label: "允許修改" },
+                { value: "disabled", label: tr("m4e6fd0e28c55") },
+                { value: "read", label: tr("m258b221f71b4") },
+                { value: "write", label: tr("m82e5e2d9df43") },
               ]}
             />
           </div>
-          <p className="setting-help">
-            允許修改時，agent 的文字變更可撤銷；指令定義可從專案復原頁還原版本。
-          </p>
+          <p className="setting-help">{tr("m57fee38c2881")}</p>
         </div>
         <div className="setting-row">
-          <span>連線狀態</span>
+          <span>{tr("m1c2b2d825ce3")}</span>
           <span>
             {settings?.running
-              ? "執行中"
+              ? tr("mf51b8fa9a805")
               : settings?.mode === "disabled"
-                ? "已停用"
-                : "未連線"}
+                ? tr("ma8c3698b5b8c")
+                : tr("m72c69bc884ab")}
           </span>
         </div>
-        <div className="setting-row">
+        <div className="setting-row" data-setting="mcp.port">
           <label htmlFor="mcp-port">
-            連接埠<small>0 表示自動配置並記住可用連接埠</small>
+            {extraSettingLabels["mcp.port"]}
+            <small>{tr("mfc0f06d66c30")}</small>
           </label>
           <div className="setting-number">
             <input
@@ -126,7 +120,7 @@ export default function McpSettings() {
                   value < 0 ||
                   value > 65535
                 ) {
-                  setError("連接埠須為 0–65535 的整數。");
+                  setError(tr("mfff30976ea12"));
                   return;
                 }
                 void change({ port: value }).then((ok) => {
@@ -137,9 +131,9 @@ export default function McpSettings() {
           </div>
         </div>
         <div className="setting-row">
-          <span>連線網址</span>
+          <span>{tr("meca60b93eaa1")}</span>
           <code style={{ overflowWrap: "anywhere" }}>
-            {settings?.port ? settings.url : "尚未配置"}
+            {settings?.port ? settings.url : tr("mf51bc1439591")}
           </code>
         </div>
         <div className="setting-reset-actions">
@@ -150,7 +144,25 @@ export default function McpSettings() {
             onClick={() => void copyConnection()}
           >
             <Copy size={14} />
-            複製 MCP 連線資料
+            {tr("m6b23aab7922f")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!settings?.running}
+            onClick={() => void copyConnection("codex")}
+          >
+            <Copy size={14} />
+            {tr("mbed9d3ed3c67")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!settings?.running}
+            onClick={() => void copyConnection("claude")}
+          >
+            <Copy size={14} />
+            {tr("me76c83ef5fc7")}
           </Button>
           <Button
             variant="ghost"
@@ -158,11 +170,11 @@ export default function McpSettings() {
             onClick={() => void change({ resetToken: true })}
           >
             <RotateCcw size={14} />
-            重設憑證
+            {tr("m787c2e03063e")}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void change({})}>
             <RefreshCw size={14} />
-            重試連線
+            {tr("m4b2fc19b47ed")}
           </Button>
         </div>
         {(error || settings?.error) && (
@@ -176,11 +188,14 @@ export default function McpSettings() {
           </p>
         )}
       </section>
+      <AgentInstallations
+        bridge={bridge}
+        enabled={!!settings?.running}
+        revision={installRevision + JSON.stringify(settings)}
+      />
       <section className="settings-group">
-        <h3>最近操作</h3>
-        <p className="setting-help">
-          僅記錄本次啟動的工具名稱與結果，不記錄劇本文字。
-        </p>
+        <h3>{tr("m7047b8672ca4")}</h3>
+        <p className="setting-help">{tr("maf0d429542fa")}</p>
         {settings?.operations.length ? (
           <dl className="settings-description-list">
             {[...settings.operations]
@@ -190,14 +205,16 @@ export default function McpSettings() {
                 <div key={index}>
                   <dt>{item.tool}</dt>
                   <dd>
-                    {new Date(item.at).toLocaleTimeString()} ·{" "}
-                    {item.outcome === "ok" ? "完成" : "未完成"}
+                    {new Date(item.at).toLocaleTimeString(locale())} ·{" "}
+                    {item.outcome === "ok"
+                      ? tr("mc0b3fbff51cc")
+                      : tr("m6707de42c29d")}
                   </dd>
                 </div>
               ))}
           </dl>
         ) : (
-          <p className="setting-help">尚無操作</p>
+          <p className="setting-help">{tr("m83ffac9ff8e5")}</p>
         )}
       </section>
     </>

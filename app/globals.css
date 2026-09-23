@@ -233,3 +233,10 @@ body{-webkit-user-select:none;user-select:none}input,textarea,[contenteditable="
 @media(max-width:850px){.workspace-identity{width:148px;flex-basis:148px}.workspace-header{padding-right:32px}.tab-shell{min-width:110px;max-width:190px}.tab-name{max-width:100px}.tab-context{display:none}.document-toolbar{padding:0 12px;gap:8px}.document-tools,.header-actions{gap:4px}.document-context{font-size:11px}.mode-switch [data-slot=tabs-trigger]{padding:0 7px}.issue-row{flex-wrap:wrap}.issue-row>small{margin-left:25px;max-width:100%;width:100%}}
 
 @media(hover:none){.file-options{opacity:1}}
+
+.agent-install-card { border: 1px solid var(--border, #414141); border-radius: 12px; padding: 18px 20px; margin: 14px 0; background: rgba(255,255,255,.025); }
+.agent-install-card h4 { margin: 0 0 14px; font-weight: 600; }
+.agent-install-path { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0; }
+.agent-install-path > div { display: grid; gap: 5px; min-width: 0; }
+.agent-install-path strong { font-weight: 500; }
+.agent-install-path code, .agent-install-path small { overflow-wrap: anywhere; color: var(--muted-foreground, #aaa); font-size: 12px; }

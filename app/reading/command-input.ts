@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { tabOut } from "../tab-out";
 import { sceneAt } from "../scene-link";
 import { readingVariableAt } from "./variable-reference";
@@ -150,7 +151,8 @@ export function commandEditing(
           .map((v) => ({
             label: v.name,
             type: "variable",
-            detail: v.type + (v.readOnly ? " · 唯讀" : "") + " · " + v.file,
+            detail:
+              v.type + (v.readOnly ? tr("m51f76a1414d4") : "") + " · " + v.file,
             info: v.description
               ? () => completionDescription(v.description)
               : undefined,
@@ -201,19 +203,19 @@ export function commandEditing(
         caret(update.state.doc.lineAt(update.state.selection.main.head).number);
     }),
     EditorState.phrases.of({
-      Find: "尋找",
-      Replace: "取代",
-      next: "下一個",
-      previous: "上一個",
-      all: "全部選取",
-      "match case": "區分大小寫",
-      regexp: "正規表示式",
-      "by word": "全字匹配",
-      replace: "取代",
-      "replace all": "全部取代",
-      close: "關閉",
-      "Go to line": "前往行",
-      go: "前往",
+      Find: tr("md47270a2ecc5"),
+      Replace: tr("md8f014b5b2bd"),
+      next: tr("m6268327544de"),
+      previous: tr("mf60cafb25326"),
+      all: tr("mff53602b6059"),
+      "match case": tr("mad64d85961ad"),
+      regexp: tr("m30039975a18f"),
+      "by word": tr("m9e51de68bf75"),
+      replace: tr("md8f014b5b2bd"),
+      "replace all": tr("m66ca1495f7df"),
+      close: tr("mc7fdddf79eaa"),
+      "Go to line": tr("m54a9ea29586a"),
+      go: tr("mfa96079c3b2f"),
     }),
     indentUnit.of("    "),
     // Keep overlays out of scaled/clipped graph nodes.

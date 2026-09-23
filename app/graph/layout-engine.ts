@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import type { ELK, ElkNode, ElkExtendedEdge } from "elkjs/lib/elk-api";
 import type { GraphRect, Point, Side } from "../graph-layout";
 import { segmentHitsRect, rectsOverlap } from "../graph-layout";
@@ -582,7 +583,7 @@ export async function computeLayout(
       !retraces(old.points) &&
       old.pins.every((p) => pointOnRoute(p, old.points)) &&
       constraintsMatch(old.points) &&
-      (!old.error || old.error === "等待修整")
+      (!old.error || old.error === tr("m4fb176664de5"))
     ) {
       delete old.error;
       continue;

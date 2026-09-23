@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import type { ReactNode } from "react";
 import {
   DropdownMenu,
@@ -38,7 +40,7 @@ export default function ActionMenu({
     >
       <DropdownMenuTrigger
         tabIndex={-1}
-        aria-label="物件動作"
+        aria-label={tr("maceafaa89e66")}
         className="context-menu-anchor"
         style={{ left: menu?.x || 0, top: menu?.y || 0 }}
       />

@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import type { Project, FileSortMode } from "./types";
 import { validDocumentName } from "./engine";
 import { folderOf } from "./file-order";
@@ -83,10 +84,10 @@ export function addFolder(p: Project, name: string) {
     projectFolders(p).some((f) => f.toLowerCase() === name.toLowerCase()) ||
     p.documents.some((d) => d.name.toLowerCase() === name.toLowerCase())
   )
-    throw Error("資料夾名稱無效或已存在");
+    throw Error(tr("m27a64609c761"));
   const parent = folderOf(name);
   if (parent && !projectFolders(p).includes(parent))
-    throw Error("上層資料夾已不存在");
+    throw Error(tr("mf3af13bc31d4"));
   p.folders = [...projectFolders(p), name];
   p.treeOrder = ["folder:" + name, ...(p.treeOrder || [])];
 }
@@ -103,23 +104,23 @@ export function planTreeMove(
       ? entry.slice(7)
       : p.documents.find((d) => "file:" + d.id === entry)?.name;
   if (!path || (folder && !projectFolders(p).includes(path)))
-    throw Error("物件已不存在");
+    throw Error(tr("m61718c8f1825"));
   if (parent && !projectFolders(p).includes(parent))
-    throw Error("目的資料夾已不存在");
+    throw Error(tr("m4792cc38291b"));
   const leaf = name ?? path.split("/").at(-1)!;
-  if (/[\\/]/.test(leaf)) throw Error("請只輸入名稱");
+  if (/[\\/]/.test(leaf)) throw Error(tr("m1f74454a4fe9"));
   const target = (parent ? parent + "/" : "") + leaf;
   if (folder ? !validFolderName(target) : !validDocumentName(target))
-    throw Error("名稱無效");
+    throw Error(tr("mb704197a45e2"));
   if (folder && (parent === path || withinFolder(parent, path)))
-    throw Error("不能移入資料夾自身或子資料夾");
+    throw Error(tr("m6a6598d3d64f"));
   if (
     target !== path &&
     [...projectFolders(p), ...p.documents.map((d) => d.name)].some(
       (n) => n.toLowerCase() === target.toLowerCase() && n !== path,
     )
   )
-    throw Error("目的位置已有同名物件");
+    throw Error(tr("m33a829bdc8e9"));
   const mapPath = (value: string) =>
     value === path
       ? target
@@ -139,7 +140,7 @@ export function planTreeMove(
     .map((e) => e.key)
     .filter((k) => k !== entry);
   const at = before ? siblings.indexOf(before) : siblings.length;
-  if (before && at < 0) throw Error("插入位置已變更，請重試");
+  if (before && at < 0) throw Error(tr("m6862e1c24707"));
   siblings.splice(at, 0, nextKey);
   const order = (p.treeOrder || [])
     .map((k) => (k.startsWith("folder:") ? "folder:" + mapPath(k.slice(7)) : k))

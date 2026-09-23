@@ -1,5 +1,7 @@
 "use client";
-import { useId, useRef, useState } from "react";
+import { t as tr } from "../i18n/index.ts";
+
+import { useId, useRef, useState, useEffect } from "react";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,42 +20,17 @@ import {
   syntaxDefaults,
 } from "./model";
 import "./settings.css";
-const labels: Record<keyof Typography, string> = {
-  fontFamily: "字型",
-  fontSize: "文字大小",
-  lineHeight: "行距",
-  foreground: "文字顏色",
-  background: "背景顏色",
-  selection: "文字選取底色",
-  matches: "選取文字的其他相符處",
-  symbols: "游標符號關聯顏色",
-  symbolStyle: "游標符號關聯樣式",
-  highlightMatches: "高亮選取文字的其他相符處",
-  highlightSymbols: "高亮游標符號關聯",
-  search: "其他搜尋結果",
-  searchCurrent: "目前搜尋結果",
-  cursor: "游標顏色",
-  activeLine: "目前行底色",
-  highlightLine: "高亮目前行",
-};
+import {
+  appearanceLabels as labels,
+  syntaxLabels,
+  sourceLabels,
+  extraSettingLabels,
+} from "../workspace/settings-registry";
 const modeLabels = {
-  source: "純文字",
-  rendered: "閱讀編輯",
-  reader: "閱讀模式",
-  graph: "圖表",
-};
-const syntaxLabels: Record<keyof typeof syntaxDefaults, string> = {
-  comment: "註解",
-  "keyword.header": "標頭",
-  "type.identifier": "場景／角色名稱",
-  keyword: "內建指令",
-  function: "自訂指令",
-  variable: "變數",
-  "keyword.option": "選項",
-  string: "字串",
-  number: "數字",
-  "delimiter.node": "場景分隔符",
-  tag: "標籤",
+  source: tr("m9982ffc60be9"),
+  rendered: tr("m34e439ce0fb9"),
+  reader: tr("m879debc5bf65"),
+  graph: tr("maf3ddd6db884"),
 };
 let fontRequest: Promise<string[]> | undefined;
 function FontInput({
@@ -73,8 +50,8 @@ function FontInput({
   const [query, setQuery] = useState<string | null>(null),
     [index, setIndex] = useState(0);
   const presets = [
-    { value: "system-sans", label: "系統無襯線" },
-    { value: "system-mono", label: "系統等寬" },
+    { value: "system-sans", label: tr("me7ba17b07087") },
+    { value: "system-mono", label: tr("ma8e071b7260d") },
   ];
   const name = presets.find((f) => f.value === value)?.label || value;
   const choices = [...presets, ...fonts.map((f) => ({ value: f, label: f }))]
@@ -90,7 +67,7 @@ function FontInput({
       setQuery(null);
       setOpen(false);
       setError("");
-    } else setError("請輸入有效字型名稱。");
+    } else setError(tr("mb17242efdc9a"));
   };
   return (
     <div
@@ -110,7 +87,7 @@ function FontInput({
         }
         disabled={disabled}
         value={query ?? name}
-        placeholder="搜尋或輸入字型"
+        placeholder={tr("m70f3b3a23840")}
         onChange={(e) => {
           setQuery(e.target.value);
           setIndex(0);
@@ -132,7 +109,7 @@ function FontInput({
               ]);
           void fontRequest
             .then(setFonts)
-            .catch(() => setError("字型清單無法讀取，仍可輸入字型名稱。"));
+            .catch(() => setError(tr("m0c5c7fb5bf04")));
         }}
         onBlur={() => {
           if (query?.trim()) commit(query);
@@ -167,7 +144,7 @@ function FontInput({
         <div
           id={id + "-fonts"}
           role="listbox"
-          aria-label="字型"
+          aria-label={tr("m689553e16764")}
           className="appearance-font-list"
         >
           {choices.map((f, i) => (
@@ -182,7 +159,9 @@ function FontInput({
               onClick={() => commit(f.value)}
             >
               <span>{f.label}</span>
-              <span style={{ fontFamily: fontStack(f.value) }}>文字 Aa</span>
+              <span style={{ fontFamily: fontStack(f.value) }}>
+                {tr("mb6f117726429")}
+              </span>
             </button>
           ))}
         </div>
@@ -227,7 +206,7 @@ function OpacityInput({
   };
   return (
     <div className="appearance-opacity">
-      <span>不透明度</span>
+      <span>{tr("m04405e4a9ffd")}</span>
       <div className="appearance-opacity-controls">
         <div className="appearance-opacity-track">
           <div
@@ -238,7 +217,7 @@ function OpacityInput({
           />
           <input
             type="range"
-            aria-label={label + "不透明度"}
+            aria-label={label + tr("m04405e4a9ffd")}
             min={0}
             max={100}
             step={1}
@@ -252,7 +231,7 @@ function OpacityInput({
         </div>
         <input
           type="number"
-          aria-label={label + "不透明度百分比"}
+          aria-label={label + tr("m76f14db0d4e3")}
           min={0}
           max={100}
           step={1}
@@ -271,7 +250,7 @@ function OpacityInput({
         />
         <span>%</span>
       </div>
-      {invalid && <small role="alert">請輸入 0–100 的整數。</small>}
+      {invalid && <small role="alert">{tr("mc0d10e34d54a")}</small>}
     </div>
   );
 }
@@ -301,8 +280,8 @@ function ValueInput({
         value={String(value)}
         disabled={disabled}
         options={[
-          { value: "underline", label: "底線" },
-          { value: "background", label: "背景高亮" },
+          { value: "underline", label: tr("m7d2a5822d438") },
+          { value: "background", label: tr("m56ac16c1e4dd") },
         ]}
         onChange={onCommit}
       />
@@ -339,9 +318,9 @@ function ValueInput({
       setError(
         numeric
           ? field === "fontSize"
-            ? "請輸入 10–40 的整數。"
-            : "請輸入 1.0–2.5。"
-          : "請輸入 #RRGGBB。",
+            ? tr("mb64586f1a4b0")
+            : tr("m8e4128674def")
+          : tr("me2a8b0dd69ff"),
       );
       return;
     }
@@ -353,7 +332,7 @@ function ValueInput({
     <div className="appearance-value">
       <div className="appearance-input-row">
         {!numeric && !syntax && (
-          <span className="appearance-color-label">顏色</span>
+          <span className="appearance-color-label">{tr("m394ed4a8db28")}</span>
         )}
         {!numeric && (
           <span className="appearance-color-preview">
@@ -364,7 +343,7 @@ function ValueInput({
             <input
               className="appearance-swatch"
               type="color"
-              aria-label={labels[field] + "色票"}
+              aria-label={labels[field] + tr("m437e63a9eab4")}
               disabled={disabled}
               value={String(value).slice(0, 7)}
               onChange={(e) => {
@@ -407,7 +386,9 @@ function ValueInput({
             }
           }}
         />
-        {numeric && <span>{field === "fontSize" ? "px" : "倍"}</span>}
+        {numeric && (
+          <span>{field === "fontSize" ? "px" : tr("m16729fb40af5")}</span>
+        )}
       </div>
       {!numeric && !syntax && (
         <OpacityInput
@@ -466,24 +447,25 @@ function StyleFields({
                   : "")
               }
               key={key}
+              data-setting={key}
             >
               <label htmlFor={prefix + key}>
                 {labels[key]}
                 {key === "lineHeight" && (
                   <small>
-                    {Math.round(style.fontSize * style.lineHeight * 10) / 10}px
-                    行高
+                    {Math.round(style.fontSize * style.lineHeight * 10) / 10}
+                    {tr("m9411e9645d7d")}
                   </small>
                 )}
               </label>
               <div className="appearance-controls">
                 {mode && (
                   <CompactSelect
-                    label={labels[key] + "來源"}
+                    label={labels[key] + tr("mc21db84c0653")}
                     value={inherited ? "inherit" : "custom"}
                     options={[
-                      { value: "inherit", label: "跟隨全局" },
-                      { value: "custom", label: "自訂" },
+                      { value: "inherit", label: tr("m8e4ff0db8f0b") },
+                      { value: "custom", label: tr("m1fe9883907ba") },
                     ]}
                     onChange={(v) =>
                       onChange({
@@ -529,7 +511,7 @@ function Preview({
   return (
     <div
       className={"appearance-preview " + mode}
-      aria-label={modeLabels[mode] + "樣式預覽"}
+      aria-label={modeLabels[mode] + tr("m2d2c07600775")}
       style={{
         fontFamily: fontStack(s.fontFamily),
         fontSize: s.fontSize,
@@ -547,9 +529,9 @@ function Preview({
         <>
           <div className="appearance-preview-node">
             <strong>Start</strong>
-            <p>Mira: 沿著小路前往燈塔。</p>
+            <p>{tr("mc58f8b833df8")}</p>
           </div>
-          <div className="appearance-preview-branch">↳ 前往燈塔</div>
+          <div className="appearance-preview-branch">{tr("mba3cbb6b8ea3")}</div>
         </>
       ) : (
         <>
@@ -570,7 +552,7 @@ function Preview({
                   fontStyle: "italic",
                 }}
               >
-                {"// 燈塔的風聲"}
+                {tr("me3b3fe76351f")}
               </p>
               <p>
                 <span style={{ color: appearance.syntax.keyword }}>
@@ -593,8 +575,11 @@ function Preview({
             >
               Mira:
             </strong>{" "}
-            沿著
-            <span style={{ background: s.selection }}>小路</span>前往燈塔。
+            {tr("me32fbfb229a5")}
+            <span style={{ background: s.selection }}>
+              {tr("m3ce5ec0f909f")}
+            </span>
+            {tr("m0f27ea819392")}
           </p>
           {mode !== "reader" && (
             <p
@@ -631,20 +616,20 @@ function Preview({
                 background: mode === "reader" ? undefined : s.searchCurrent,
               }}
             >
-              燈塔
+              {tr("m87340b39c251")}
             </span>
-            就在前方，
+            {tr("m3b4b85d769f3")}
             <span
               style={{ background: mode === "reader" ? undefined : s.search }}
             >
-              燈塔
+              {tr("m87340b39c251")}
             </span>
-            仍亮著。
+            {tr("m147687fdefd1")}
           </p>
           {mode === "source" && (
             <>
               <p style={{ color: appearance.syntax["keyword.option"] }}>
-                → 前往燈塔
+                {tr("me9fb790f514d")}
               </p>
               <p style={{ color: appearance.syntax["delimiter.node"] }}>===</p>
             </>
@@ -657,13 +642,24 @@ function Preview({
 export default function AppearanceSettings({
   value,
   onChange,
+  navigation,
 }: {
+  navigation?: { field?: string; nonce: number };
   value?: EditorAppearance;
   onChange: (p: AppearancePatch) => void;
 }) {
   const appearance = normalizeAppearance(value),
     [mode, setMode] = useState<AppearanceMode>("source"),
     id = useId();
+  useEffect(() => {
+    if (!navigation?.field) return;
+    const frame = requestAnimationFrame(() => {
+      if (/^(source|syntax)\./.test(navigation.field!)) setMode("source");
+      if (navigation.field === "reader.width") setMode("reader");
+      if (navigation.field === "rendered.width") setMode("rendered");
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [navigation]);
   const [resetKeys, setResetKeys] = useState<Record<string, number>>({});
   const reset = (scope: string, patch: AppearancePatch) => {
     onChange(patch);
@@ -683,7 +679,7 @@ export default function AppearanceSettings({
   return (
     <div className="appearance-settings" ref={container}>
       <details className="settings-group appearance-global" open>
-        <summary>全局預設</summary>
+        <summary>{tr("m657bc98f63bc")}</summary>
         <StyleFields
           key={resetKeys.global || 0}
           appearance={appearance}
@@ -694,11 +690,11 @@ export default function AppearanceSettings({
           onClick={() => reset("global", { reset: "global" })}
         >
           <RotateCcw size={14} />
-          重設全局預設
+          {tr("mec67cf5f796e")}
         </Button>
       </details>
       <SegmentedControl
-        label="風格模式"
+        label={tr("m4bef1debc49b")}
         value={mode}
         onChange={changeMode}
         options={modes.map((value) => ({ value, label: modeLabels[value] }))}
@@ -708,19 +704,19 @@ export default function AppearanceSettings({
           key={m + (resetKeys[m] || 0)}
           className="appearance-mode settings-group"
           hidden={mode !== m}
-          aria-label={modeLabels[m] + "風格"}
+          aria-label={modeLabels[m] + tr("mbdb95b9c7610")}
         >
           <Preview appearance={appearance} mode={m} />
           <StyleFields appearance={appearance} mode={m} onChange={onChange} />
           {(m === "reader" || m === "rendered") && (
-            <div className="setting-row">
-              <span>閱讀寬度</span>
+            <div className="setting-row" data-setting={m + ".width"}>
+              <span>{extraSettingLabels["width"]}</span>
               <SegmentedControl
-                label={modeLabels[m] + "閱讀寬度"}
+                label={modeLabels[m] + extraSettingLabels["width"]}
                 value={appearance.widths[m]}
                 options={[
-                  { value: "standard", label: "標準" },
-                  { value: "wide", label: "寬版" },
+                  { value: "standard", label: tr("m6f5de510e11d") },
+                  { value: "wide", label: tr("me51c4ee1d2d0") },
                 ]}
                 onChange={(v) =>
                   onChange({ widths: { [m]: v } } as AppearancePatch)
@@ -730,16 +726,18 @@ export default function AppearanceSettings({
           )}
           {m === "source" && (
             <>
-              <h3>編輯輔助</h3>
+              <h3>{tr("m3016f1d3f357")}</h3>
               {(
-                [
-                  ["lineNumbers", "行號"],
-                  ["wordWrap", "自動換行"],
-                  ["insertSpaces", "Tab 插入空格"],
-                  ["indentGuides", "縮排參考線"],
-                ] as const
+                Object.entries(sourceLabels) as [
+                  keyof typeof sourceLabels,
+                  string,
+                ][]
               ).map(([key, label]) => (
-                <div className="setting-row" key={key}>
+                <div
+                  className="setting-row"
+                  key={key}
+                  data-setting={"source." + key}
+                >
                   <label htmlFor={id + key}>{label}</label>
                   <Checkbox
                     id={id + key}
@@ -750,10 +748,10 @@ export default function AppearanceSettings({
                   />
                 </div>
               ))}
-              <div className="setting-row">
-                <span>縮排寬度</span>
+              <div className="setting-row" data-setting="source.tabSize">
+                <span>{extraSettingLabels["source.tabSize"]}</span>
                 <CompactSelect
-                  label="縮排寬度"
+                  label={extraSettingLabels["source.tabSize"]}
                   value={String(appearance.source.tabSize)}
                   options={[2, 4, 8].map((n) => ({
                     value: String(n),
@@ -764,15 +762,15 @@ export default function AppearanceSettings({
                   }
                 />
               </div>
-              <div className="setting-row">
-                <span>空白字元</span>
+              <div className="setting-row" data-setting="source.whitespace">
+                <span>{extraSettingLabels["source.whitespace"]}</span>
                 <CompactSelect
-                  label="空白字元"
+                  label={extraSettingLabels["source.whitespace"]}
                   value={appearance.source.whitespace}
                   options={[
-                    { value: "none", label: "隱藏" },
-                    { value: "selection", label: "選取時" },
-                    { value: "all", label: "全部" },
+                    { value: "none", label: tr("m0c19fe121207") },
+                    { value: "selection", label: tr("me41ba2c276c5") },
+                    { value: "all", label: tr("m5c55a67935af") },
                   ]}
                   onChange={(v) =>
                     onChange({
@@ -782,11 +780,15 @@ export default function AppearanceSettings({
                 />
               </div>
               <details>
-                <summary>語法配色</summary>
+                <summary>{tr("m30f6bba092e4")}</summary>
                 {(
                   Object.keys(syntaxLabels) as (keyof typeof syntaxDefaults)[]
                 ).map((key) => (
-                  <div className="appearance-field" key={key}>
+                  <div
+                    className="appearance-field"
+                    key={key}
+                    data-setting={"syntax." + key}
+                  >
                     <label htmlFor={id + key}>{syntaxLabels[key]}</label>
                     <ValueInput
                       id={id + key}
@@ -807,11 +809,11 @@ export default function AppearanceSettings({
               variant="ghost"
               onClick={() => reset(m, { modes: { [m]: null } })}
             >
-              全部跟隨全局
+              {tr("md4f76aff66b6")}
             </Button>
             <Button variant="ghost" onClick={() => reset(m, { reset: m })}>
               <RotateCcw size={14} />
-              恢復此模式預設
+              {tr("me7d67cb45c21")}
             </Button>
           </div>
         </section>

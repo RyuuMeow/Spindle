@@ -1,6 +1,9 @@
 "use client";
+import { t as tr } from "./i18n/index.ts";
+
 import { useEffect, useState } from "react";
 import { WorkspaceClient } from "./workspace/client";
+import UpdateDialog from "./workspace/UpdateDialog";
 import DesktopWorkspace from "./workspace/DesktopWorkspace";
 import Workbench from "./workspace/Workbench";
 import type { WindowSession } from "./workspace/types";
@@ -32,13 +35,15 @@ export default function Home() {
     return (
       <main className="workbench">
         <div className="empty-editor">
-          <h2>工作區尚未開啟</h2>
+          <h2>{tr("md77230a81e2a")}</h2>
           <p role="alert">{error}</p>
-          <p>原始資料會保留，請重新啟動或開啟應用程式資料目錄取得救援副本。</p>
-          <button onClick={() => location.reload()}>重試</button>
+          <p>{tr("me5e9272bbc24")}</p>
+          <button onClick={() => location.reload()}>
+            {tr("m7e59d0f16293")}
+          </button>
           {window.yarnDesktop && (
             <button onClick={() => void window.yarnDesktop?.openLogs()}>
-              開啟資料目錄
+              {tr("m9476f18bd20d")}
             </button>
           )}
         </div>
@@ -47,11 +52,14 @@ export default function Home() {
   if (!ready)
     return (
       <main className="workbench">
-        <div className="empty-editor">正在開啟本機工作區…</div>
+        <div className="empty-editor">Spindle…</div>
       </main>
     );
   return window.yarnDesktop ? (
-    <DesktopWorkspace client={ready.client} initialSession={ready.session} />
+    <>
+      <UpdateDialog />
+      <DesktopWorkspace client={ready.client} initialSession={ready.session} />
+    </>
   ) : (
     <Workbench client={ready.client} initialSession={ready.session} />
   );

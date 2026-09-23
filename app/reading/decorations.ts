@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { sourceTokens } from "./source-tokens";
 import { EditorState, RangeSetBuilder, type Range } from "@codemirror/state";
 import { Decoration, WidgetType } from "@codemirror/view";
@@ -179,10 +180,10 @@ export function readingDecorations(
     if (active && structural) classes.push("reading-editing-syntax");
     const hint =
       line.kind === "end"
-        ? "場景結束"
+        ? tr("m8c2f0fd87edd")
         : line.kind === "start"
-          ? "場景開始"
-          : "條件結束";
+          ? tr("m828685aa8618")
+          : tr("m4910cafac046");
     ranges.push(
       Decoration.line({
         attributes: {
@@ -232,7 +233,7 @@ export function readingDecorations(
         "reading-option-marker reading-leading",
         "option",
         line.context.length > line.depth ? line.context : [],
-        "選項",
+        tr("m062cae7f1167"),
       );
       const inline = trim.match(/<<\s*if\s+/);
       if (inline?.index !== undefined) {
@@ -253,7 +254,7 @@ export function readingDecorations(
           add(
             begin,
             begin + inline[0].length,
-            "若 ",
+            tr("mf94b903fd9bd"),
             "reading-inline-keyword",
             "branch",
           );
@@ -309,14 +310,14 @@ export function readingDecorations(
         string,
         { label: string; icon: ReadingIcon; title?: string }
       > = {
-        if: { label: "若 ", icon: "branch" },
-        elseif: { label: "否則若 ", icon: "branch" },
-        else: { label: "否則", icon: "branch" },
-        once: { label: "首次 ", icon: "branch" },
-        jump: { label: "", icon: "jump", title: "跳轉" },
-        detour: { label: "呼叫 ", icon: "detour" },
-        return: { label: "返回", icon: "return" },
-        stop: { label: "結束", icon: "stop" },
+        if: { label: tr("mf94b903fd9bd"), icon: "branch" },
+        elseif: { label: tr("m4b432a9ff88a"), icon: "branch" },
+        else: { label: tr("m9be688476db3"), icon: "branch" },
+        once: { label: tr("mf64725f34d2f"), icon: "branch" },
+        jump: { label: "", icon: "jump", title: tr("mb4488ac94a21") },
+        detour: { label: tr("mf3e093e32b9c"), icon: "detour" },
+        return: { label: tr("m572cf45ba436"), icon: "return" },
+        stop: { label: tr("mee1f5ad7d73a"), icon: "stop" },
       };
       const context = ["if", "once", "elseif", "else"].includes(line.command)
         ? line.context
@@ -335,7 +336,7 @@ export function readingDecorations(
           "reading-assignment",
           "assign",
           [],
-          "指定值",
+          tr("m56b9713f7b61"),
         );
       } else {
         const display = presentation[line.command] || {

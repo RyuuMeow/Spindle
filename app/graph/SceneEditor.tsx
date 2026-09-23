@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import {
   quietDiagnostic,
   diagnosticCursor,
@@ -102,9 +104,7 @@ export default function SceneEditor(props: Props) {
   const [recovered] = useState(() =>
     loadSceneDraft(props.doc.id, props.node.name),
   );
-  const recoveredMessage = recovered
-    ? "已找回上次未提交的節點內容。正式劇本沒有被覆蓋，請複製需要的內容。"
-    : "";
+  const recoveredMessage = recovered ? tr("mbd58c03493a4") : "";
   const source = useRef(recovered?.source || props.doc.text),
     scope = useRef(recovered?.scope || sceneScope(props.doc.text, props.node));
   const blockedRef = useRef(recoveredMessage),
@@ -139,7 +139,7 @@ export default function SceneEditor(props: Props) {
         at: Date.now(),
       });
     } catch {
-      message += " 本機草稿無法寫入，請在離開前複製內容。";
+      message += tr("md7ee35fae3ac");
     }
     blockedRef.current = message;
     setProblem(message);
@@ -180,9 +180,7 @@ export default function SceneEditor(props: Props) {
       return;
     const mapped = mapSceneScope(source.current, next, scope.current);
     if (!mapped) {
-      block(
-        "場景邊界已被其他修改改變。已保留目前內容，請先複製後重新開啟場景。",
-      );
+      block(tr("m7248cb873817"));
       return;
     }
     source.current = next;
@@ -241,9 +239,9 @@ export default function SceneEditor(props: Props) {
           ]),
           EditorView.lineWrapping,
           drawSelection(),
-          placeholder("輸入台詞、角色或命令…"),
+          placeholder(tr("m96945e146bf4")),
           EditorView.contentAttributes.of({
-            "aria-label": "場景內容",
+            "aria-label": tr("mcf46bacd9b49"),
             role: "textbox",
             "aria-multiline": "true",
           }),
@@ -366,11 +364,7 @@ export default function SceneEditor(props: Props) {
                   source.current,
                 )
               ) {
-                queueMicrotask(() =>
-                  block(
-                    "文件已同步到新版本，此次輸入尚未提交。文字保留在此，請複製後重新開啟場景。",
-                  ),
-                );
+                queueMicrotask(() => block(tr("mfa3fec81465a")));
                 return;
               }
               source.current = change.next;
@@ -378,9 +372,7 @@ export default function SceneEditor(props: Props) {
             } catch (error) {
               queueMicrotask(() =>
                 block(
-                  error instanceof Error
-                    ? error.message
-                    : "修改無法提交，內容仍保留在此。",
+                  error instanceof Error ? error.message : tr("m2d02f53e6bd5"),
                 ),
               );
             }
@@ -497,9 +489,11 @@ export default function SceneEditor(props: Props) {
         source.current,
       );
       if (ok) setTitle(null);
-      else setRenameError("更名未完成，請檢查名稱或同步狀態。");
+      else setRenameError(tr("m37ab4a1757a0"));
     } catch (error) {
-      setRenameError(error instanceof Error ? error.message : "更名失敗");
+      setRenameError(
+        error instanceof Error ? error.message : tr("m4d625fcf651f"),
+      );
     } finally {
       setRenaming(false);
     }
@@ -507,7 +501,7 @@ export default function SceneEditor(props: Props) {
   return (
     <section
       className="flow-scene-editor nodrag nopan nowheel"
-      aria-label={`編輯場景 ${name}`}
+      aria-label={tr("mfc8cad4b0b89", [name])}
       onDoubleClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.stopPropagation()}
@@ -527,7 +521,7 @@ export default function SceneEditor(props: Props) {
         {title === null ? (
           <button
             className="flow-scene-title"
-            title="更名場景並更新引用"
+            title={tr("mab14f95bc08c")}
             disabled={!props.onRenameScene || !!problem}
             onClick={() => setTitle(name)}
           >
@@ -542,7 +536,7 @@ export default function SceneEditor(props: Props) {
           >
             <input
               ref={titleRef}
-              aria-label="場景名稱"
+              aria-label={tr("m594983ea025e")}
               value={title}
               disabled={renaming}
               onChange={(event) => setTitle(event.target.value)}
@@ -568,15 +562,19 @@ export default function SceneEditor(props: Props) {
                 }
               }}
             />
-            <button type="submit" aria-label="確認更名" disabled={renaming}>
+            <button
+              type="submit"
+              aria-label={tr("mf9b328b5ec01")}
+              disabled={renaming}
+            >
               <Check size={16} />
             </button>
           </form>
         )}
         <button
           className="flow-scene-close"
-          aria-label="結束節點編輯"
-          title={problem ? "請先處理未提交內容" : "結束編輯（Esc）"}
+          aria-label={tr("mf412a128c700")}
+          title={problem ? tr("m3130074ed1a2") : tr("mdb8eca5ee910")}
           disabled={!!problem}
           onClick={close}
         >
@@ -588,14 +586,14 @@ export default function SceneEditor(props: Props) {
         <span title={props.doc.name}>{props.doc.name}</span>
         <span className={`flow-scene-save is-${props.doc.status}`}>
           {props.doc.status === "saved"
-            ? "已儲存"
+            ? tr("m2a4c3223c02b")
             : props.doc.status === "draft"
-              ? "草稿已保留"
+              ? tr("maed69e893f40")
               : props.doc.status === "saving"
-                ? "儲存中"
+                ? tr("m32936612bff6")
                 : props.doc.status === "pending"
-                  ? "待儲存"
-                  : props.doc.error || "需要處理儲存問題"}
+                  ? tr("m3ff13a42af34")
+                  : props.doc.error || tr("m6c6a258d987b")}
         </span>
       </div>
       {renameError && (
@@ -615,25 +613,25 @@ export default function SceneEditor(props: Props) {
           <button
             onClick={() => {
               void copyText(viewRef.current?.state.doc.toString() || "").catch(
-                () => setProblem(problem + " 複製失敗，仍可選取文字後複製。"),
+                () => setProblem(problem + tr("md649b90c97c0")),
               );
             }}
           >
             <Copy size={14} />
-            複製內容
+            {tr("m9067e5f98d39")}
           </button>
           <button
             onClick={() => {
               try {
                 removeSceneDraft(latest.current.doc.id, draftName.current);
               } catch {
-                setProblem("無法移除復原草稿，請稍後重試。");
+                setProblem(tr("m4dfdff0138eb"));
                 return;
               }
               latest.current.onClose(scope.current);
             }}
           >
-            捨棄未提交內容並結束
+            {tr("m30050116822b")}
           </button>
         </div>
       )}

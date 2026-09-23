@@ -1,18 +1,26 @@
+import { t as tr, locale } from "./i18n/index.ts";
 let localeReady: Promise<void> | undefined;
 
 /** Monaco 0.56's language bundle is a plain script, not an AMD module. */
 export function loadEditorLocale(): Promise<void> {
   if (localeReady) return localeReady;
-  localeReady = new Promise(resolve => {
-    const script = document.createElement('script');
-    script.src = '/monaco/vs/nls/lang/zh-tw.js';
+  localeReady = new Promise((resolve) => {
+    const script = document.createElement("script");
+    if (locale() === "en") {
+      resolve();
+      return;
+    }
+    script.src =
+      "/monaco/vs/nls/lang/" +
+      (locale() === "zh-TW" ? "zh-tw" : "zh-cn") +
+      ".js";
     const finish = (loaded: boolean) => {
       window.clearTimeout(timeout);
       script.onload = null;
       script.onerror = null;
       if (!loaded) {
         script.remove();
-        console.warn('無法載入編輯器繁體中文語系，改用預設語系。');
+        console.warn(tr("mbe12f3fcb5e0"));
       }
       resolve();
     };

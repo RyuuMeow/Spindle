@@ -1,3 +1,5 @@
+import { APP_VERSION } from "../../app/version";
+import { t as tr } from "../../app/i18n";
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -46,7 +48,7 @@ export class McpRuntime {
           JSON.parse(fs.readFileSync(this.file, "utf8")),
         );
     } catch {
-      this.error = "MCP 設定無法讀取；請更改設定重新建立連線。";
+      this.error = tr("mc5ad7e16aca5");
     }
     this.application = new AgentApplication(
       service,
@@ -129,13 +131,13 @@ export class McpRuntime {
       }
       this.error = undefined;
       server.on("error", () => {
-        this.error = "MCP 連線服務發生錯誤，請重試。";
+        this.error = tr("m5b95941a2f00");
       });
     } catch (error) {
       this.error =
         (error as NodeJS.ErrnoException).code === "EADDRINUSE"
-          ? "連接埠已被使用，請更改連接埠。"
-          : "無法啟動 MCP：" + String(error);
+          ? tr("m53f7d9c2473c")
+          : tr("m59791211b3c2") + String(error);
       server.close();
       this.server = undefined;
     }
@@ -205,7 +207,7 @@ export class McpRuntime {
       res.end();
       return;
     }
-    const server = new McpServer({ name: "spindle", version: "1.0.0" });
+    const server = new McpServer({ name: "spindle", version: APP_VERSION });
     for (const name of Object.keys(schemas) as (keyof typeof schemas)[]) {
       const writes = [
         ...fileWriteTools,
@@ -277,3 +279,5 @@ export function createMcpRuntime(
 ) {
   return new McpRuntime(profile, service, host);
 }
+
+export { AgentInstaller } from "../agent-installation";

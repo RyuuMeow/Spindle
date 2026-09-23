@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { fontStack, type Typography } from "../appearance/model";
 import { Fragment } from "react";
 import { contextLabel, type Link } from "../parser";
@@ -18,24 +19,24 @@ export function SemanticText({ text }: { text: string }) {
   );
 }
 export function linkSummary(link: Link) {
-  if (link.unresolved) return "條件尚未解析完整";
+  if (link.unresolved) return tr("m318b45faed51");
   const context = link.context || [],
     branch = context.at(-1);
   if (branch)
     return branch.kind === "option"
       ? branch.text
       : branch.kind === "else"
-        ? "否則"
+        ? tr("m9be688476db3")
         : branch.kind === "elseif"
-          ? "否則若 " + branch.text
+          ? tr("m4b432a9ff88a") + branch.text
           : contextLabel(branch);
   return (
     link.label ||
     (link.dynamic
-      ? "動態目標"
+      ? tr("mbf033110d135")
       : link.kind === "detour"
-        ? "呼叫後返回"
-        : "直接轉場")
+        ? tr("mf59b6234a64a")
+        : tr("m40d2364fd1d1"))
   );
 }
 export function parentSummary(link: Link) {
@@ -45,11 +46,11 @@ export function parentSummary(link: Link) {
       c.kind === "option"
         ? c.text
         : c.kind === "else"
-          ? "否則"
+          ? tr("m9be688476db3")
           : c.kind === "elseif"
-            ? "否則若 " + c.text
+            ? tr("m4b432a9ff88a") + c.text
             : c.kind === "if"
-              ? "若 " + c.text
+              ? tr("mf94b903fd9bd") + c.text
               : contextLabel(c),
     )
     .join(" / ");

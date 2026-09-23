@@ -4,7 +4,7 @@
   "fileAssociations": [
     {
       "ext": "yarn",
-      "name": "Yarn 劇本",
+      "name": "Yarn \u5287\u672c",
       "role": "Editor"
     }
   ],
@@ -14,6 +14,7 @@
   },
   "files": [
     "desktop/main.cjs",
+    "desktop/i18n.cjs",
     "desktop/preload.cjs",
     "desktop/workspace-service.cjs",
     "dist-desktop/renderer/**/*",
@@ -24,7 +25,12 @@
     "desktop/mcp-windows.cjs",
     "desktop/mcp-runtime.cjs",
     "desktop/system-fonts.cjs",
-    "licenses/**/*"
+    "licenses/**/*",
+    "skills/spindle/**/*",
+    "desktop/restart.cjs",
+    "desktop/update-service.cjs",
+    "desktop/portable-update.ps1",
+    "desktop/installed-restart.ps1"
   ],
   "asar": true,
   "win": {
@@ -48,5 +54,13 @@
     "splashImage": "desktop/portable-splash.bmp",
     "artifactName": "Spindle-${version}-Portable-${arch}.${ext}"
   },
-  "npmRebuild": false
+  "npmRebuild": false,
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "RyuuMeow",
+      "repo": "Spindle",
+      "releaseType": "draft"
+    }
+  ]
 }

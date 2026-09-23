@@ -1,6 +1,20 @@
+# Historical development record
+
+This document describes an earlier milestone. Current behavior and release status are documented in the main architecture/UI guides and release verification report. Links to local verification outputs are retained as labels only; those artifacts are not distributed.
+
 # 桌面功能與即時渲染實作追蹤
 
-版本：Windows x64 **0.9.1 Portable**，2026-09-22。
+版本：Windows x64 **0.9.2 Portable**，2026-09-22。
+
+## 0.9.2 Agent 一鍵安裝與 Skill（2026-09-22）
+
+- 分支 `feat/agent-installation`。新增可独立安裝的 `skills/spindle/SKILL.md` 與 Codex／Claude Code 個人 MCP＋Skill 一鍵安裝、更新、移除、原生路徑選擇及握手測試。既有 20 個 MCP 工具契約不變。
+- 安裝只修改受管理 entry；保留其他設定、TOML 註解及使用者改過的 Skill。跨 profile 名稱隔離與 Skill 共用、提交前內容比對、持久操作意圖、部分失敗重試及損毀紀錄拒絕均有回歸。
+- **187 項既有單元測試、25 項 MCP 測試、12 項安裝服務測試**通過；型別、lint、Web build、desktop build 與 Portable 打包通過。
+- `實際 Portable 安裝驗證` (local verification artifact)：Codex 與 Claude Code 真實 CLI 可讀取已安裝設定；兩者設定均可取得 20 個工具、讀取框選、拒絕唯讀修改、允許版本化修改並一次 Undo。重設憑證、更新、重啟及移除通過。Codex app-server 的 `skills/list` 確認 Spindle Skill 可被發現。
+- `既有 MCP 全流程` (local verification artifact)與`三模式提示／Tab／歷史比較` (local verification artifact)於 **0.9.2 實際 Portable** 通過，頁面錯誤為零。測試專案、App profile 與 agent HOME 均隔離；未修改使用者既有設定或登入憑證。
+- 封裝共 **168 個檔案**；Skill 與 MCP runtime 雜湊符合 staging，Worker／WASM／授權檔存在，未包含測試資料、agent 設定或操作憑證。`交付核對與 SHA-256` (local verification artifact)。產物 `release/Spindle-0.9.2-Portable-x64.exe`，151,133,965 bytes；沒有 Setup。
+- 驗證界線：CLI 設定讀取、Codex Skill 發現與官方 SDK 工具交易均為實測；隔離環境未配置模型登入，未實測 Codex／Claude 模型工作階段自動採用 Skill，Claude Skill 的模型端載入亦未確認。未測原生 IME 候選視窗、混合 DPI／多螢幕、企業 agent 管制、安裝版、實際斷電與受限 ACL；不以故障注入替代上述實機驗收。
 
 ## 0.9.1 輸入診斷、MCP 文件管理與 Portable（2026-09-22）
 
@@ -10,8 +24,8 @@
 - 納入原生剪貼簿、歷史比較模式保留、空白位置參數提示修正。修正缺值 quick fix 的零長度 CodeMirror 裝飾範圍，避免整組診斷装飾停止更新。
 - The Last Light 範例移到測試 fixture，正式程式不再引用；新 profile／專案／Web 工作區無 demo，既有使用者資料不受影響。MCP、視窗、字型服務、Worker／WASM 及授權檔完整封裝。
 - 驗證：**185 項單元／服務測試、25 項 MCP 測試**、TypeScript、lint、Web build、desktop stage 通過。MCP 測試包含預覽無寫入、空資料夾、非 Yarn 檔案、失效快照、重送、唯讀、共享輸入保護與磁碟操作後 metadata 失敗注入。
-- **實際 0.9.1 Portable**：[三模式診斷與比較模式](../outputs/quiet-portable-hints/results.json)、[官方 SDK MCP client](../outputs/quiet-portable-mcp.log)、[24 項啟動／工作區驗收](../outputs/quiet-portable-launcher/run-1790017795826/results.json)通過，頁面錯誤為零；涵蓋乾淨啟動、原生剪貼簿、多工作階段、完整文件生命週期、重啟與離線 Worker／WASM。
-- [封裝核對及 SHA-256](../outputs/quiet-release-verification.json)：167 個封裝檔案，必要 runtime 與 staging 雜湊相同，沒有示範文字、測試 fixture／profile／驗證輸出。交付 `release/Spindle-0.9.1-Portable-x64.exe`（151,090,017 bytes），本輪未產生 Setup。
+- **實際 0.9.1 Portable**：`三模式診斷與比較模式` (local verification artifact)、`官方 SDK MCP client` (local verification artifact)、`24 項啟動／工作區驗收` (local verification artifact)通過，頁面錯誤為零；涵蓋乾淨啟動、原生剪貼簿、多工作階段、完整文件生命週期、重啟與離線 Worker／WASM。
+- `封裝核對及 SHA-256` (local verification artifact)：167 個封裝檔案，必要 runtime 與 staging 雜湊相同，沒有示範文字、測試 fixture／profile／驗證輸出。交付 `release/Spindle-0.9.1-Portable-x64.exe`（151,090,017 bytes），本輪未產生 Setup。
 - 未實測：原生中文 IME 候選視窗、混合 DPI、多螢幕、安裝精靈／檔案關聯註冊、實際斷電／磁碟滿／受限 ACL。組字與保存中斷採事件及錯誤注入；不將其宣稱為上述原生實機測試。
 
 ## MCP v1 基礎（2026-09-22，已納入 0.9.1 Portable）
@@ -22,8 +36,8 @@
 - 文字使用既有版本化交易及一次 Undo；快照、組字／草稿保護、operationId 去重、跨檔改名與提交後保存失敗區分已驗證。指令更新保留 UI 草稿，過期套用／刪除不能覆蓋新定義。
 - **180 項既有測試 + 20 項 MCP 測試通過**；TypeScript、lint、Web build、desktop build／stage 通過。兩個官方 SDK client 並行、唯讀、憑證撤銷、埠衝突、設定寫入失敗及大回應限制有測試。
 - 隔離 profile 實際桌面測試：並行開啟合併、不搶焦點、反向多選、失焦保留、CRLF／中文／emoji、原文選取後移游標仍修改原範圍、Undo、閱讀原文映射、圖表節點內編輯、工具 tab 不洩漏草稿、同專案多窗、合成組字與重啟 ID 失效。頁面錯誤為零。
-- 小型專案情境讀取約 14–41ms（每輪 10 次）；1,500 場景查詢測得首次約 137–179ms、後續分頁約 108–129ms。為本機量測，不保證所有硬體上限；[最新驗證索引](../outputs/mcp-validation.json)與測試 scripts 可重現。
-- 原生中文 IME、混合 DPI／多螢幕、所有第三方 client 的設定 UI、安裝包尚未實測；當時未打包；現已納入 0.9.1 Portable。完整工具與邊界見 [MCP 接入](mcp.md)。
+- 小型專案情境讀取約 14–41ms（每輪 10 次）；1,500 場景查詢測得首次約 137–179ms、後續分頁約 108–129ms。為本機量測，不保證所有硬體上限；`最新驗證索引` (local verification artifact)與測試 scripts 可重現。
+- 原生中文 IME、混合 DPI／多螢幕、所有第三方 client 的設定 UI、安裝包尚未實測；當時未打包；現已納入 0.9.1 Portable。完整工具與邊界見 [MCP 接入](../mcp.md)。
 
 ## 已納入 0.9.1：分頁狀態與指令草稿生命週期（2026-09-21）
 
@@ -44,72 +58,72 @@
 - 已知根路徑使用實際路徑及目錄邊界辨識，最深層專案優先；未知 Yarn 檔案使用獨立自動保存視窗。只有活動工作區載入及監看，切換／關閉只保存所屬工作區，包含跨窗組字與工作區快取失敗保護。
 - 專案內歷史及垃圾桶保存完整資料夾與非 Yarn 資源，操作日誌支援中斷重試；復原不導航、同名避讓、單筆永久刪除與清空已實作。舊歷史單次遷移，舊草稿可預覽後轉存。
 - 復原頁分類、查詢、選取、比較與捲動隨視圖保存。Project 分隔線與資料夾箭頭幾何已修正；非同步載入編輯器不再關閉已開啟的選單。
-- [單元／服務回歸](../outputs/launcher-unit.log) **157／157**、[TypeScript](../outputs/launcher-tsc.log)、[全來源 lint](../outputs/launcher-lint.log)通過。lint 以 Git 列出的來源檔檢查，0 errors／0 warnings；既有異常目錄仍會產生 Git 目錄列舉警告。
-- [桌面互動](../outputs/project-launcher-ui/run-1789918970715/results.json)與最終 [0.9.0 Portable 實包驗收](../outputs/project-launcher-portable-0.9.0/run-1789919485878/results.json)各 **24 項**通過，包含新啟動、建立／開啟、三模式離線資源、垃圾桶及完整資料夾復原、切 tab 狀態、重啟、單檔冷啟動、多視窗、即時編輯後關閉、最近清單及失效路徑；記錄到的頁面錯誤為零。實際 Portable 版本確認為 0.9.0。
-- [Web build](../outputs/launcher-web-build.log)、[桌面 build](../outputs/launcher-stage.log)、[服務打包](../outputs/launcher-stage-service.log)與 [Setup／Portable 封裝](../outputs/launcher-package.log)通過；[SHA256、離線資源與服務一致性核對](../outputs/launcher-release-verification.json)。兩種產物位於 release/，未簽章。
+- `單元／服務回歸` (local verification artifact) **157／157**、`TypeScript` (local verification artifact)、`全來源 lint` (local verification artifact)通過。lint 以 Git 列出的來源檔檢查，0 errors／0 warnings；既有異常目錄仍會產生 Git 目錄列舉警告。
+- `桌面互動` (local verification artifact)與最終 `0.9.0 Portable 實包驗收` (local verification artifact)各 **24 項**通過，包含新啟動、建立／開啟、三模式離線資源、垃圾桶及完整資料夾復原、切 tab 狀態、重啟、單檔冷啟動、多視窗、即時編輯後關閉、最近清單及失效路徑；記錄到的頁面錯誤為零。實際 Portable 版本確認為 0.9.0。
+- `Web build` (local verification artifact)、`桌面 build` (local verification artifact)、`服務打包` (local verification artifact)與 `Setup／Portable 封裝` (local verification artifact)通過；`SHA256、離線資源與服務一致性核對` (local verification artifact)。兩種產物位於 release/，未簽章。
 - 未實測：安裝精靈及 Windows Explorer 檔案關聯註冊、原生輸入法候選視窗、混合 DPI／多螢幕、真實斷電／滿磁碟／受限 ACL。組字保護使用 composition 事件驗證，檔案啟動使用實際啟動參數；磁碟失敗及操作中斷以注入錯誤驗證，不宣稱上述實機情境已完成。
 
 ## 0.8.4 同來源共用路段
 
 - 修正只豁免短幹線、導致同來源線路被推成多餘折返的問題；以連續共用前綴辨認可重疊路段，涵蓋轉彎及 pin。分岔後不同去向、反向通行及重新交疊仍需分線。
 - 0.8.3 保存的自動折線原位修整；節點、手動卡片、pin 與視野不移動，文字無變更。
-- [單元／服務測試](../outputs/shared-source-unit.log) **146／146**；包含水平／垂直出口、不同分支組、共線 pin、實際分岔邊界、Worker／預覽一致與舊折返遷移。
-- [TypeScript](../outputs/shared-source-typecheck.log)與 [20 檔圖表範圍 lint](../outputs/shared-source-lint.json)通過；全庫 lint 既有基線未清零。
-- [0.8.4 Portable 實包驗收](../outputs/shared-source-portable-0.8.4/result.json)通過：重啟載入 lanes=1 的來源折返後恢復直接路徑，節點、卡片、pin 保留；另驗證手動操作、Undo、模式切換、文字歷史及離線 Worker／WASM，頁面錯誤為零。[實際畫面](../outputs/shared-source-portable-0.8.4/shared-source.png)。
-- [網頁 build](../outputs/shared-source-web-build.log)、[桌面 build](../outputs/shared-source-stage.log)及[Setup／Portable 封裝](../outputs/shared-source-package.log)通過；[SHA256／離線資源核對](../outputs/shared-source-release-verification.json)。安裝精靈、混合 DPI、多螢幕未實測。
+- `單元／服務測試` (local verification artifact) **146／146**；包含水平／垂直出口、不同分支組、共線 pin、實際分岔邊界、Worker／預覽一致與舊折返遷移。
+- `TypeScript` (local verification artifact)與 `20 檔圖表範圍 lint` (local verification artifact)通過；全庫 lint 既有基線未清零。
+- `0.8.4 Portable 實包驗收` (local verification artifact)通過：重啟載入 lanes=1 的來源折返後恢復直接路徑，節點、卡片、pin 保留；另驗證手動操作、Undo、模式切換、文字歷史及離線 Worker／WASM，頁面錯誤為零。`實際畫面` (local verification artifact)。
+- `網頁 build` (local verification artifact)、`桌面 build` (local verification artifact)及`Setup／Portable 封裝` (local verification artifact)通過；`SHA256／離線資源核對` (local verification artifact)。安裝精靈、混合 DPI、多螢幕未實測。
 
 ## 0.8.3 吸附對齊與依目的地分線
 
 - 場景、卡片與 pin 的小幅錯位依相關接點吸附；混合選取保持相對位置，上下接點使用正確的對齊軸。自動卡片對齊仍遵守分支順序與間距。
 - 不同去向使用平行 16 單位線距；同目的地、同方向末段保留匯流，短幹線保留。只調整受影響自由折點，不搬動未選物件或刪除 pin。
 - 拖動預覽與 Worker 共用分線，舊布局及 Undo 歷史原位修線一次；不重新排版。
-- [單元／服務測試](../outputs/lanes-unit.log) **142／142**，TypeScript 與 [20 檔範圍 lint](../outputs/lanes-lint.json)通過；既有全庫 lint 基線未清零。測试涵蓋水平／垂直間距、三條去向、同向匯流與反向／卡片前禁止假匯流、避障、pin 保留、整組吸附、預覽／Worker 一致與遷移。
-- [桌面互動](../outputs/lanes-ui/result.json)與最終 [0.8.3 Portable 實包驗收](../outputs/lanes-portable-0.8.3/result.json)通過實際滑鼠吸附、一次 Undo、pin／卡片／多選操作、模式切換、舊版歷史及重啟恢復；頁面錯誤為零，離線 Worker／WASM 正常。
-- [網頁 build](../outputs/lanes-web-build.log)、[桌面 build](../outputs/lanes-stage.log)及[兩種 Windows 封裝](../outputs/lanes-package.log)通過；[SHA256／離線資源核對](../outputs/lanes-release-verification.json)。安裝精靈、混合 DPI、多螢幕未實測。
-- [效能記錄](../outputs/lanes-unit.log)包含 10／50／120 節點直線流程及 12／36／72 節點多分支的整理耗時、局部預覽耗時、交叉及轉折數；Node 幾何耗時不等於畫面輸入延遲，亦不代表任意圖全局最優。
+- `單元／服務測試` (local verification artifact) **142／142**，TypeScript 與 `20 檔範圍 lint` (local verification artifact)通過；既有全庫 lint 基線未清零。測试涵蓋水平／垂直間距、三條去向、同向匯流與反向／卡片前禁止假匯流、避障、pin 保留、整組吸附、預覽／Worker 一致與遷移。
+- `桌面互動` (local verification artifact)與最終 `0.8.3 Portable 實包驗收` (local verification artifact)通過實際滑鼠吸附、一次 Undo、pin／卡片／多選操作、模式切換、舊版歷史及重啟恢復；頁面錯誤為零，離線 Worker／WASM 正常。
+- `網頁 build` (local verification artifact)、`桌面 build` (local verification artifact)及`兩種 Windows 封裝` (local verification artifact)通過；`SHA256／離線資源核對` (local verification artifact)。安裝精靈、混合 DPI、多螢幕未實測。
+- `效能記錄` (local verification artifact)包含 10／50／120 節點直線流程及 12／36／72 節點多分支的整理耗時、局部預覽耗時、交叉及轉折數；Node 幾何耗時不等於畫面輸入延遲，亦不代表任意圖全局最優。
 
 ## 0.8.2 以可見控制點理線
 
 - 線段及幹線不可拖動，也不再產生隱藏固定線段；場景、卡片與 pin 決定路線，pin 可直接作為轉角。搬動來源時中心出口的短幹線隨之移動，不留在節點後方。
 - 舊快照與歷史中的固定線段、pin 軸向、幹線拖曳限制會遷移；保留節點、卡片、pin 位置。日常路線衝突橫幅與橙色標記已移除。
-- [單元／服務測試](../outputs/pin-only-unit.log) **131／131** 通過；TypeScript、[範圍 lint](../outputs/pin-only-lint.json)、[網頁 build](../outputs/pin-only-web-build.log)與[桌面 build](../outputs/pin-only-stage.log)通過。既有全庫 lint 基線未清零。
-- [桌面互動](../outputs/pin-only-ui/result.json)通過線段／幹線不可拖、卡片／pin 拖移、右鍵刪除、完整撤銷、跨模式與重啟恢復、舊版 Undo 快照即時遷移；離線 Worker／WASM 正常。
-- [0.8.2 Portable 實包驗收](../outputs/pin-only-portable-0.8.2/result.json)全部通過，包含舊版 Undo 還原；版本核對 0.8.2，頁面錯誤為零。[封裝核對](../outputs/pin-only-archive.json)確認兩種產物及離線資源。安裝精靈、混合 DPI 與多螢幕未實測。
+- `單元／服務測試` (local verification artifact) **131／131** 通過；TypeScript、`範圍 lint` (local verification artifact)、`網頁 build` (local verification artifact)與`桌面 build` (local verification artifact)通過。既有全庫 lint 基線未清零。
+- `桌面互動` (local verification artifact)通過線段／幹線不可拖、卡片／pin 拖移、右鍵刪除、完整撤銷、跨模式與重啟恢復、舊版 Undo 快照即時遷移；離線 Worker／WASM 正常。
+- `0.8.2 Portable 實包驗收` (local verification artifact)全部通過，包含舊版 Undo 還原；版本核對 0.8.2，頁面錯誤為零。`封裝核對` (local verification artifact)確認兩種產物及離線資源。安裝精靈、混合 DPI 與多螢幕未實測。
 
 ## 0.8.1 自由卡片與控制點
 
 - 線上卡片參與完整包含框選、Shift 加選、混合場景搬移與選取範圍整理；卡片單獨整理保持場景及未選卡片原位。
 - 卡片／pin 位置決定路徑；控制點順序持久保存，拖動不保留多餘自動折線，保留明確手動線段。pin 右鍵刪除與 Delete 共用一筆可撤銷交易，拖曳顯示抓手游標。
-- [桌面互動](../outputs/free-route-ui/result.json)通過自由拖曳、pin 右鍵刪除、卡片框選／整理、場景與卡片混合搬移、完整撤銷、離線 Worker／WASM、切換模式與重啟恢復。
-- [單元／服務測試](../outputs/free-route-unit.log) **128／128** 通過；TypeScript 與 [18 檔變更範圍 lint](../outputs/free-route-lint.json)通過。全 repo lint 的既有異常目錄／基線問題延續 0.8.0 限制。
-- 網頁／桌面 build 與 Setup／Portable 打包通過。[0.8.1 實際 Portable 驗收](../outputs/free-route-portable-0.8.1/result.json)完成卡片鍵盤／框選／混合搬移、自由路由、pin 右鍵刪除、離線 Worker／WASM 與重啟恢復，沒有頁面錯誤。
-- [封裝與 SHA256](../outputs/free-route-archive.json)、[發行驗收摘要](../outputs/free-route-release-verification.json)。安裝精靈、混合 DPI、多螢幕未實測；不宣稱任意手動限制都能得到無交叉路線。
+- `桌面互動` (local verification artifact)通過自由拖曳、pin 右鍵刪除、卡片框選／整理、場景與卡片混合搬移、完整撤銷、離線 Worker／WASM、切換模式與重啟恢復。
+- `單元／服務測試` (local verification artifact) **128／128** 通過；TypeScript 與 `18 檔變更範圍 lint` (local verification artifact)通過。全 repo lint 的既有異常目錄／基線問題延續 0.8.0 限制。
+- 網頁／桌面 build 與 Setup／Portable 打包通過。`0.8.1 實際 Portable 驗收` (local verification artifact)完成卡片鍵盤／框選／混合搬移、自由路由、pin 右鍵刪除、離線 Worker／WASM 與重啟恢復，沒有頁面錯誤。
+- `封裝與 SHA256` (local verification artifact)、`發行驗收摘要` (local verification artifact)。安裝精靈、混合 DPI、多螢幕未實測；不宣稱任意手動限制都能得到無交叉路線。
 
 ## 0.8.0 圖表排版與手動佈線
 
 - 一次性全圖／選取整理、中心接點、原文分支成組、局部避障、新節點不重排、手動 pin／線段／幹線／卡片與 50 筆完整布局 Undo／Redo 已實作。
-- [桌面互動](../outputs/graph-layout-ui/result.json)通過右鍵平移／單擊選單、框選／Shift 加選、整組搬移、局部整理、無關線路不變、pin 拖動／Delete／Esc、卡片及幹線移動、線段撤銷、模式切換、圖表關閉時的來源修改、重啟恢復與節點內文字 Undo。
-- 單元／磁碟服務測試 **125／125**，涵蓋獨立／巢狀／不完整分支、相同目的地、唯一身分匹配、CRLF／BOM、舊布局遷移、外部修改、無解 pin 保留、pin 不折返、卡片通道與來源節點搬移。[圖表測試及效能](../outputs/graph-all-unit.log)。
+- `桌面互動` (local verification artifact)通過右鍵平移／單擊選單、框選／Shift 加選、整組搬移、局部整理、無關線路不變、pin 拖動／Delete／Esc、卡片及幹線移動、線段撤銷、模式切換、圖表關閉時的來源修改、重啟恢復與節點內文字 Undo。
+- 單元／磁碟服務測試 **125／125**，涵蓋獨立／巢狀／不完整分支、相同目的地、唯一身分匹配、CRLF／BOM、舊布局遷移、外部修改、無解 pin 保留、pin 不折返、卡片通道與來源節點搬移。`圖表測試及效能` (local verification artifact)。
 - 直線流程基準（本機 Node）：10／50／120 節點，約 14／65／96ms，皆為零轉折。
 - 多分支基準（本機 Node，非拖動延遲）：12／36／72 節點，20／68／140 轉場，約 68／301／1364ms；嚴格內部交叉計數 9／33／69，轉折 104／368／764。這是壓力資料，不代表任意圖可無交叉或得到全局最優解。
-- TypeScript、[變更範圍 lint](../outputs/graph-changed-lint.json)、網頁及桌面 build 通過。根目錄既有異常目錄使一般 lint 掃描 ENOENT；改以 Git 追蹤來源掃描，共 177 檔、13 個既有錯誤及 4 個警告，未宣稱清零。
-- [0.8.0 Portable 圖表驗收](../outputs/graph-portable-0.8.0/result.json)通過離線 Worker／WASM、手動佈線、完整整理撤銷、來源映射與重啟恢復；最終封裝再次檢查 pin 不折返及卡片始終位於所屬水平通道。
-- [原生啟動](../outputs/graph-startup-0.8.0/results.json)在本機 225% DPI 自行顯示視窗，工作區 4.125 秒就緒；雙執行個體解壓資源及重複啟動喚回通過。另有[工作區回歸](../outputs/graph-workspace-0.8.0/results.json)，涵蓋大綱、資料夾、複製、閱讀、提示、選取與窄窗。
+- TypeScript、`變更範圍 lint` (local verification artifact)、網頁及桌面 build 通過。根目錄既有異常目錄使一般 lint 掃描 ENOENT；改以 Git 追蹤來源掃描，共 177 檔、13 個既有錯誤及 4 個警告，未宣稱清零。
+- `0.8.0 Portable 圖表驗收` (local verification artifact)通過離線 Worker／WASM、手動佈線、完整整理撤銷、來源映射與重啟恢復；最終封裝再次檢查 pin 不折返及卡片始終位於所屬水平通道。
+- `原生啟動` (local verification artifact)在本機 225% DPI 自行顯示視窗，工作區 4.125 秒就緒；雙執行個體解壓資源及重複啟動喚回通過。另有`工作區回歸` (local verification artifact)，涵蓋大綱、資料夾、複製、閱讀、提示、選取與窄窗。
 - Portable 拖動測試在 1440×960、scale 1 的範例圖採樣 69 筆 requestAnimationFrame 間隔，P95 8ms、最大 9ms；此數據包含等待收尾，僅代表幀間隔，不宣稱是輸入至繪製延遲。
-- 安裝版與 Portable 均已產生；ASAR 內含兩個圖表 Worker、WASM 與授權檔。[封裝核對](../outputs/graph-archive-verification.json)及[發行大小／SHA256／驗證摘要](../outputs/release-verification.json)。安裝精靈、多螢幕及混合 DPI 仍未實測。
+- 安裝版與 Portable 均已產生；ASAR 內含兩個圖表 Worker、WASM 與授權檔。`封裝核對` (local verification artifact)及`發行大小／SHA256／驗證摘要` (local verification artifact)。安裝精靈、多螢幕及混合 DPI 仍未實測。
 
 ## 0.7.1 拖移與路由修正
 
-- [0.7.1 Portable 拖移／圖表](../outputs/stable-routing-portable-0.7.1/results.json)及[完整工作區](../outputs/stable-routing-workspace-portable-0.7.1/results.json)皆通過；App 版本核對為 0.7.1，沒有頁面錯誤。樹拖移以 Chromium 滑鼠按下／移動／放開驗證，不再合成 DataTransfer；實體多螢幕與混合 DPI 仍未實測。
+- `0.7.1 Portable 拖移／圖表` (local verification artifact)及`完整工作區` (local verification artifact)皆通過；App 版本核對為 0.7.1，沒有頁面錯誤。樹拖移以 Chromium 滑鼠按下／移動／放開驗證，不再合成 DataTransfer；實體多螢幕與混合 DPI 仍未實測。
 
 - 穩定路由、壓縮間距、標籤不推線與受阻局部更新已加入幾何回歸。
-- [指標互動](../outputs/tree-drag-complete/results.json)：Shop、Untitled 2、深層文件移出，起拖門檻、Esc 取消、資料夾移動、混合診斷 12px 間距，以及圖上實際拖動無關節點的線路穩定性通過。
-- [工作區回歸](../outputs/stable-routing-workspace-ui/results.json)：完整七個分支標籤、大綱、純閱讀、複製、側欄與窄窗通過。
+- `指標互動` (local verification artifact)：Shop、Untitled 2、深層文件移出，起拖門檻、Esc 取消、資料夾移動、混合診斷 12px 間距，以及圖上實際拖動無關節點的線路穩定性通過。
+- `工作區回歸` (local verification artifact)：完整七個分支標籤、大綱、純閱讀、複製、側欄與窄窗通過。
 
 ## 0.7.0 工作區、閱讀與流程修訂
 
 - 最新回饋 14 項均已實作：閱讀大綱定位、白色拖移線、caption 提示避讓、單一垃圾桶入口、直接複製改名、純閱讀、資料夾與跨層操作、統計側欄、診斷數字、選單對齊、流程佈線與只選取連線。
-- [桌面互動](../outputs/workspace-navigation-ui/results.json)通過已收合場景定位、空資料夾／跨層拖移、直接複製與刪除、工具提示幾何、7 個流程標籤、800px 窄窗。
+- `桌面互動` (local verification artifact)通過已收合場景定位、空資料夾／跨層拖移、直接複製與刪除、工具提示幾何、7 個流程標籤、800px 窄窗。
 - 磁碟服務測試確認新 profile 重開後空資料夾、順序與文件 ID 保留；同名／循環／路徑拒絕、垃圾桶失敗不移走原件，BOM／CRLF 不變。
 - Windows 混合 DPI、Snap、原生滑鼠拖移及安裝精靈未實測。拖移 UI 使用合成 DataTransfer；垃圾桶 UI 用隔離目錄替身，磁碟服務另驗證失敗保護。
 
@@ -117,7 +131,7 @@
 
 - 自動參數提示只描述空位置；完整行判斷可避免游標位於既有值前方時誤彈窗。字串、未完成內容與完整運算式都算已有內容。
 - 三種編輯入口共用補全 → 空參數 → hover 優先順序；已有 hover 被較高優先提示接替，不並排堆疊。Esc、失焦、組字與模式切換清除浮窗。
-- [提示互動](../outputs/hint-priority-ui/results.json)及[編輯輔助回歸](../outputs/hint-priority-assistance/results.json)涵蓋三模式、已有值前／中／後、取代 hover、補全互斥、空白行、窄窗與 App 縮放；[參數與摺疊](../outputs/hint-priority-context/results.json)亦通過。
+- `提示互動` (local verification artifact)及`編輯輔助回歸` (local verification artifact)涵蓋三模式、已有值前／中／後、取代 hover、補全互斥、空白行、窄窗與 App 縮放；`參數與摺疊` (local verification artifact)亦通過。
 
 ## 0.6.4 修正
 
@@ -125,7 +139,7 @@
 - 行內新增／更名與套用定義不顯示轉圈，保留錯誤及重複提交防護。
 - 修復 Monaco 保留 model 在重新掛載時仍顯示舊稿；跨模式、節點與第一筆輸入／共用 Undo 已實測。
 - 補齊 14 個支援的內建指令說明；三種編輯入口共用專案變數補全與語義參數位置，候選不被提示遮擋。
-- [開發版互動](../outputs/sync-language-ui/results.json)包含 Windows 資源回收筒與 App 復原；[既有輔助回歸](../outputs/sync-language-assistance/results.json)包含窄窗、App 縮放、補全幾何與來源留白。
+- `開發版互動` (local verification artifact)包含 Windows 資源回收筒與 App 復原；`既有輔助回歸` (local verification artifact)包含窄窗、App 縮放、補全幾何與來源留白。
 
 ## 0.6.3 基線修正
 
@@ -133,7 +147,7 @@
 - 新增劇本在目前資料夾文件頂部完成，保留當下可見順序並同步切回手動排序；雙擊原位改名，反白主檔名，不新增或跳其他 tab。
 - 三個編輯入口的補全使用相同字型與 29px 列高；純文字取消重複的說明箭頭及 hover 截斷。
 - 純文字提示使用 Monaco 原生來源定位；100／125／150% App 縮放均量測提示與游標相鄰。
-- 本輪開發版證據：[編輯互動與幾何](../outputs/refinement-regression/results.json)、[導航／懸浮](../outputs/refinement-navigation/results.json)、[摺疊](../outputs/refinement-folds/results.json)。
+- 本輪開發版證據：`編輯互動與幾何` (local verification artifact)、`導航／懸浮` (local verification artifact)、`摺疊` (local verification artifact)。
 
 ## 累積完成
 
@@ -152,24 +166,24 @@
 
 ## 驗證證據
 
-- [0.7.0 Portable 工作區互動](../outputs/workspace-navigation-portable-0.7.0/results.json)全部通過，核對 App 版本為 0.7.0 且沒有頁面錯誤；[提示優先順序回歸](../outputs/workspace-navigation-hint-regression/results.json)涵蓋純文字、閱讀與節點編輯。
+- `0.7.0 Portable 工作區互動` (local verification artifact)全部通過，核對 App 版本為 0.7.0 且沒有頁面錯誤；`提示優先順序回歸` (local verification artifact)涵蓋純文字、閱讀與節點編輯。
 
-- [0.7.0 Portable 原生啟動](../outputs/workspace-navigation-startup-0.7.0/results.json)通過自行顯示視窗、兩個隔離執行個體、解壓資源存活與重複啟動喚回；本機 225% DPI，沒有用強制 show 取代啟動驗證。
-- TypeScript、修改範圍 lint、網頁及桌面 production build 通過；本輪六個模組見 [lint 報告](../outputs/stable-routing-lint.json)。全專案既有 lint 基線未清零。
+- `0.7.0 Portable 原生啟動` (local verification artifact)通過自行顯示視窗、兩個隔離執行個體、解壓資源存活與重複啟動喚回；本機 225% DPI，沒有用強制 show 取代啟動驗證。
+- TypeScript、修改範圍 lint、網頁及桌面 production build 通過；本輪六個模組見 `lint 報告` (local verification artifact)。全專案既有 lint 基線未清零。
 - 單元與服務回歸 **105／105**：來源交易、磁碟保存／復原、跨窗競爭、檔案建立失敗回滾、導航／排序、搜尋位置、閱讀裝飾及圖表來源範圍。
-- [0.6.5 Portable 提示互動](../outputs/hint-priority-portable-0.6.5/results.json)：空值判斷、hover 取代、候選互斥、Esc 與失焦，三種模式全數通過；安裝精靈及真正 IME／混合 DPI 未實測。
-- [0.6.4 Portable 互動](../outputs/sync-language-portable-0.6.4/results.json)：純文字／閱讀／圖表即時同步與共享 Undo、跨檔變數補全、內建指令參數說明、靜默更名、無確認刪除、Windows 資源回收筒與 App 復原，全數通過且無頁面錯誤。
-- [0.6.3 Portable 互動](../outputs/refinement-portable-0.6.3/results.json)：三個編輯入口、相同 29px 補全列高與參數文字寬度、空白行與 BOM／CRLF 保留、頂部新增與雙擊改名、800px 窄窗及 100／125／150% App 縮放提示定位，全數通過且無頁面錯誤。
-- [0.6.2 portable 基線互動](../outputs/assistance-portable-0.6.2/results.json)：三種編輯入口、補全／參數／Esc／貼上／Undo、失焦、模式切換、診斷數量與窄窗浮窗。
-- [0.6.0 品牌／導航／提示基線](../outputs/spindle-portable-0.6.0/results.json)：名稱、隔離 profile、Monaco／閱讀／節點 Ctrl 懸浮與釋放、分層提示、跨檔不增 tab。
-- [保存與關閉基線（0.5.1）](../outputs/quiet-autosave-portable-0.5.1/results.json)：持續輸入 tab 寬度穩定、無日常圓點／轉圈、關閉保存面板、磁碟衝突保留視窗、立即關閉寫入最後編輯。
-- [0.5.0 桌面互動基線](../outputs/command-display-portable-0.5.0/results.json)：目前分頁導航、行內新增／取消、排序、大綱、搜尋浮層、指令 tab／草稿／虛擬提示與懸浮說明、面板及實際節點共享來源。
-- [0.5.0 歷史與UI回歸基線](../outputs/command-ui-regression/results.json)：跨模式收合、草稿保存、歷史唯讀／差異／過期保護、設定輸入與 800／1100／1440px 面板。
-- [磁碟及多視窗工作流](../outputs/spindle-workspace-regression/results.json)：原檔自動寫回、BOM／CRLF、跨模式及跨窗 Undo／Redo、同名子路徑、外部衝突、圖表布局歷史、非法指令草稿與損毀布局重啟。
-- [0.6.0 Portable 啟動基線](../outputs/portable-startup-0.6.0/results.json)：原生可見性、兩個隔離執行個體、重複啟動喚回及解壓資源存活。測試不以強制 `show()` 取代自行顯示。
-- 0.4.0 基線證據：[節點獨立測試](../outputs/graph-inline-edit/results.json)：連續編輯、CRLF／BOM、共享歷史、未完成語法、外部位移、改名、跨檔、拒絕提交後重新載入取回草稿。
-- 0.4.0 基線證據：[閱讀幾何](../outputs/reading-refinement/harness/results.json)與[行內輸入](../outputs/inline-name-ui/results.json)：實際 CodeMirror 間距／對齊、跨場景貼上及 Undo／Redo、反白、Esc、衝突重試。組字事件為合成測試，不能替代原生 IME。
-- 發行包大小、SHA256 與驗證摘要：[release-verification.json](../outputs/release-verification.json)。Installer 和 portable 使用相同離線編輯器及主程序服務；安裝精靈未操作。
+- `0.6.5 Portable 提示互動` (local verification artifact)：空值判斷、hover 取代、候選互斥、Esc 與失焦，三種模式全數通過；安裝精靈及真正 IME／混合 DPI 未實測。
+- `0.6.4 Portable 互動` (local verification artifact)：純文字／閱讀／圖表即時同步與共享 Undo、跨檔變數補全、內建指令參數說明、靜默更名、無確認刪除、Windows 資源回收筒與 App 復原，全數通過且無頁面錯誤。
+- `0.6.3 Portable 互動` (local verification artifact)：三個編輯入口、相同 29px 補全列高與參數文字寬度、空白行與 BOM／CRLF 保留、頂部新增與雙擊改名、800px 窄窗及 100／125／150% App 縮放提示定位，全數通過且無頁面錯誤。
+- `0.6.2 portable 基線互動` (local verification artifact)：三種編輯入口、補全／參數／Esc／貼上／Undo、失焦、模式切換、診斷數量與窄窗浮窗。
+- `0.6.0 品牌／導航／提示基線` (local verification artifact)：名稱、隔離 profile、Monaco／閱讀／節點 Ctrl 懸浮與釋放、分層提示、跨檔不增 tab。
+- `保存與關閉基線（0.5.1）` (local verification artifact)：持續輸入 tab 寬度穩定、無日常圓點／轉圈、關閉保存面板、磁碟衝突保留視窗、立即關閉寫入最後編輯。
+- `0.5.0 桌面互動基線` (local verification artifact)：目前分頁導航、行內新增／取消、排序、大綱、搜尋浮層、指令 tab／草稿／虛擬提示與懸浮說明、面板及實際節點共享來源。
+- `0.5.0 歷史與UI回歸基線` (local verification artifact)：跨模式收合、草稿保存、歷史唯讀／差異／過期保護、設定輸入與 800／1100／1440px 面板。
+- `磁碟及多視窗工作流` (local verification artifact)：原檔自動寫回、BOM／CRLF、跨模式及跨窗 Undo／Redo、同名子路徑、外部衝突、圖表布局歷史、非法指令草稿與損毀布局重啟。
+- `0.6.0 Portable 啟動基線` (local verification artifact)：原生可見性、兩個隔離執行個體、重複啟動喚回及解壓資源存活。測試不以強制 `show()` 取代自行顯示。
+- 0.4.0 基線證據：`節點獨立測試` (local verification artifact)：連續編輯、CRLF／BOM、共享歷史、未完成語法、外部位移、改名、跨檔、拒絕提交後重新載入取回草稿。
+- 0.4.0 基線證據：`閱讀幾何` (local verification artifact)與`行內輸入` (local verification artifact)：實際 CodeMirror 間距／對齊、跨場景貼上及 Undo／Redo、反白、Esc、衝突重試。組字事件為合成測試，不能替代原生 IME。
+- 發行包大小、SHA256 與驗證摘要：`release-verification.json` (local verification artifact)。Installer 和 portable 使用相同離線編輯器及主程序服務；安裝精靈未操作。
 
 ## 保留契約與未驗證邊界
 
@@ -183,7 +197,7 @@
 
 ## 版本控制與文件
 
-已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪分支 `feat/graph-layout-editing`，前版基線 `v0.7.1`；四階段提交語義保存、引擎、互動歷史與交付，發行標記為 `v0.8.0`。現行規則見 [UI 規範](ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](workspace-architecture.md)。舊版盤點不作現行待辦。
+已初始化 Git，基線 `3c58477`／tag `baseline-v0.3.0`；0.4.0 已標記 `v0.4.0`；0.5.0 指令改版已完成；本輪分支 `feat/graph-layout-editing`，前版基線 `v0.7.1`；四階段提交語義保存、引擎、互動歷史與交付，發行標記為 `v0.8.0`。現行規則見 [UI 規範](../ui-design.md)，歷史意圖與取證見 [設計複審](desktop-design-review-2026-09-18.md)，保存／同步見 [架構契約](../workspace-architecture.md)。舊版盤點不作現行待辦。
 
 ### 已納入 0.9.1：Find／Replace 控制項（2026-09-21）
 

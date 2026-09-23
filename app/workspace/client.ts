@@ -1,3 +1,4 @@
+import { t as tr, validLanguage } from "../i18n/index.ts";
 import {
   migrateAppearance,
   normalizeAppearance,
@@ -58,6 +59,9 @@ class BrowserService {
       );
       this.preferences = {
         reopenLastProject: raw?.reopenLastProject === true,
+        language: validLanguage(raw?.language),
+        autoCheckUpdates: raw?.autoCheckUpdates !== false,
+        skippedVersion: raw?.skippedVersion,
         editorAppearance: raw?.editorAppearance
           ? normalizeAppearance(raw.editorAppearance)
           : migrateAppearance(
@@ -71,7 +75,7 @@ class BrowserService {
         JSON.stringify(this.preferences),
       );
     } catch (error) {
-      this.notices.push("風格設定無法讀取：" + String(error));
+      this.notices.push(tr("mc19a1b3c8242") + String(error));
     }
     const restored = readWorkspace(localStorage);
     if (restored.error) this.notices.push(restored.error);
@@ -85,10 +89,13 @@ class BrowserService {
       if (raw)
         this.preferences = {
           ...this.preferences,
+          language: validLanguage(raw.language),
+          autoCheckUpdates: raw.autoCheckUpdates !== false,
+          skippedVersion: raw.skippedVersion,
           editorAppearance: normalizeAppearance(raw.editorAppearance),
         };
     } catch (error) {
-      const message = "風格設定無法讀取：" + String(error);
+      const message = tr("mc19a1b3c8242") + String(error);
       if (!this.notices.includes(message)) this.notices.push(message);
     }
     return structuredClone({
@@ -109,12 +116,32 @@ class BrowserService {
     if (a.type === "bootstrap") {
       if (!this.engine.projects.length) {
         const p = makeProject(
-          this.notices.length ? "復原工作區" : a.legacy?.name || "未命名專案",
+          this.notices.length
+            ? tr("m3f208d8cb012")
+            : a.legacy?.name || tr("m9009ac5a2f2b"),
           this.notices.length ? [] : a.legacy?.documents || [],
           this.notices.length ? [] : a.legacy?.commands || [],
         );
         this.engine.projects.push(p);
       }
+    } else if (a.type === "preferences") {
+      this.snapshot();
+      this.preferences = {
+        ...this.preferences,
+        ...(a.language !== undefined
+          ? { language: validLanguage(a.language) }
+          : {}),
+        ...(typeof a.autoCheckUpdates === "boolean"
+          ? { autoCheckUpdates: a.autoCheckUpdates }
+          : {}),
+        ...(typeof a.reopenLastProject === "boolean"
+          ? { reopenLastProject: a.reopenLastProject }
+          : {}),
+      };
+      localStorage.setItem(
+        "spindle.preferences.v1",
+        JSON.stringify(this.preferences),
+      );
     } else if (a.type === "appearance") {
       this.snapshot();
       const next = {
@@ -158,7 +185,7 @@ class BrowserService {
                 .documents;
         this.engine.transaction(
           p.id,
-          a.type === "createScene" ? "新增場景" : "更名場景",
+          a.type === "createScene" ? tr("m0478321878a2") : tr("m4158d4fb045a"),
           documents,
         );
         documentId = a.documentId;
@@ -177,7 +204,7 @@ class BrowserService {
           withinFolder(d.name, a.name),
         );
         for (const d of children)
-          this.engine.checkpoint(p.id, d.id, "刪除資料夾", true);
+          this.engine.checkpoint(p.id, d.id, tr("md879a69d9c20"), true);
         p.documents = p.documents.filter((d) => !children.includes(d));
         p.folders = projectFolders(p).filter(
           (f) => f !== a.name && !withinFolder(f, a.name),
@@ -191,7 +218,12 @@ class BrowserService {
         p.documents = p.documents.filter((x) => x.id !== temporary.id);
         d.name = a.name;
       } else if (a.type === "commands" || a.type === "registerCommand") {
-        if (a.type === "commands" && a.expectedCommands !== undefined && a.expectedCommands !== JSON.stringify(p.commands)) throw Error("指令定義已變更，請重新載入後套用；草稿已保留。");
+        if (
+          a.type === "commands" &&
+          a.expectedCommands !== undefined &&
+          a.expectedCommands !== JSON.stringify(p.commands)
+        )
+          throw Error(tr("m261b382d83f9"));
         if (
           a.type === "registerCommand" &&
           findCommand(a.command.name, p.commands)
@@ -205,10 +237,10 @@ class BrowserService {
         p.recovery.push({
           id: uuid(),
           documentId: "@commands",
-          name: "指令定義",
+          name: tr("m7fc749991aed"),
           text: JSON.stringify(p.commands),
           at: Date.now(),
-          reason: "修改指令前",
+          reason: tr("m1c175d6668e0"),
         });
         p.commands = commands;
       } else if (a.type === "save") {
@@ -221,7 +253,7 @@ class BrowserService {
       } else if (a.type === "composition")
         this.engine.document(p.id, a.documentId).composing = a.active;
       else if (a.type === "removeDocument") {
-        this.engine.checkpoint(p.id, a.documentId, "移到垃圾桶", true);
+        this.engine.checkpoint(p.id, a.documentId, tr("m4a086dd00b9b"), true);
         p.documents = p.documents.filter((d) => d.id !== a.documentId);
       } else if (a.type === "purgeTrash") {
         p.recovery = p.recovery.filter(
@@ -230,13 +262,13 @@ class BrowserService {
         );
       } else if (a.type === "recover") {
         const e = p.recovery.find((e) => e.id === a.recoveryId);
-        if (!e) throw Error("找不到快照");
+        if (!e) throw Error(tr("maf5e595daf48"));
         if (e.documentId === "@commands") {
           if (
             a.expectedText !== undefined &&
             JSON.stringify(p.commands) !== a.expectedText
           )
-            throw Error("指令已變更，請重新比較後再還原");
+            throw Error(tr("m229a5ee8f544"));
           const previous = p.commands,
             next = JSON.parse(e.text);
           validateCommands(next);
@@ -244,10 +276,10 @@ class BrowserService {
           p.recovery.push({
             id: uuid(),
             documentId: "@commands",
-            name: "指令定義",
+            name: tr("m7fc749991aed"),
             text: JSON.stringify(previous),
             at: Date.now(),
-            reason: "恢復指令前",
+            reason: tr("m6ef7c4f577dc"),
           });
           documentId = "@commands";
         } else {
@@ -258,9 +290,9 @@ class BrowserService {
                 d.version !== a.expectedVersion) ||
               (a.expectedText !== undefined && d.text !== a.expectedText)
             )
-              throw Error("內容已變更，請重新比較後再還原");
-            this.engine.checkpoint(p.id, d.id, "恢復前");
-            this.engine.replace(p.id, d.id, e.text, "恢復");
+              throw Error(tr("m307249f61830"));
+            this.engine.checkpoint(p.id, d.id, tr("m89f97b459bc4"));
+            this.engine.replace(p.id, d.id, e.text, tr("m86f327fde856"));
             documentId = d.id;
           } else {
             let name = e.name,
@@ -296,8 +328,8 @@ class BrowserService {
                 2,
               ),
         );
-      } else throw Error("此操作僅適用桌面版");
-    } else throw Error("此操作僅適用桌面版");
+      } else throw Error(tr("m9a81fe2ac4bf"));
+    } else throw Error(tr("m9a81fe2ac4bf"));
     localStorage.setItem(
       storageKeys.workspace,
       JSON.stringify(this.engine.projects),
@@ -414,7 +446,7 @@ export class WorkspaceClient {
         ),
       );
     const input = {
-      name: legacy.config?.name || "復原工作區",
+      name: legacy.config?.name || tr("m3f208d8cb012"),
       documents: legacy.documents || [],
       commands: legacy.config?.commands || [],
     };
@@ -515,9 +547,16 @@ export class WorkspaceClient {
     void this.flush(projectId).catch((error) => this.fail(error));
   }
   pendingInputIds(projectId: string) {
-    return this.state.projects.filter(p => p.id === projectId).flatMap(p => p.documents)
-      .filter(d => this.composing.has(d.id) || (this.states.has(d.id) && sendableUpdates(this.states.get(d.id)!).length > 0))
-      .map(d => d.id);
+    return this.state.projects
+      .filter((p) => p.id === projectId)
+      .flatMap((p) => p.documents)
+      .filter(
+        (d) =>
+          this.composing.has(d.id) ||
+          (this.states.has(d.id) &&
+            sendableUpdates(this.states.get(d.id)!).length > 0),
+      )
+      .map((d) => d.id);
   }
   hasPendingWritesIn(projectId?: string) {
     return this.state.projects
@@ -542,7 +581,7 @@ export class WorkspaceClient {
         .flatMap((p) => p.documents.map((d) => d.id)),
     );
     if ([...this.composing].some((id) => ids.has(id)))
-      throw Error("文字仍在組字中，請完成輸入後再離開。");
+      throw Error(tr("m9e7c9b7b9d4e"));
     await this.flush(projectId);
   }
   async flush(projectId?: string): Promise<void> {

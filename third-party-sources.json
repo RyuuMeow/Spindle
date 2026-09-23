@@ -1,0 +1,30 @@
+[
+  {
+    "name": "libavoid-js-0.5.0-beta.5",
+    "repository": "Aksem/libavoid-js",
+    "commit": "5062a42fbd82fff562afeebcbb7b1ed45eed8e75",
+    "url": "https://codeload.github.com/Aksem/libavoid-js/zip/5062a42fbd82fff562afeebcbb7b1ed45eed8e75",
+    "sha256": "416627b2ff15ecfd21978a9f0fb7a6b2627372ee4acc1903a1cf2909f1b4a053"
+  },
+  {
+    "name": "elkjs-0.12.0",
+    "repository": "kieler/elkjs",
+    "commit": "ff5771d7165445c42c408bb8a090c8035272218c",
+    "url": "https://codeload.github.com/kieler/elkjs/zip/ff5771d7165445c42c408bb8a090c8035272218c",
+    "sha256": "b74af662afc204b48276566611b17f852034597d8d28f3ae6f9980e5f6d44aaa"
+  },
+  {
+    "name": "adaptagrams-1.0.5",
+    "repository": "Aksem/adaptagrams",
+    "commit": "0ab3467b4ed3523bb3e404a0dd7da7647d9eb13d",
+    "url": "https://codeload.github.com/Aksem/adaptagrams/zip/0ab3467b4ed3523bb3e404a0dd7da7647d9eb13d",
+    "sha256": "6969d70622838481697f86ae9af74ae69b5984d7428c8c32dcff975f36c87e8c"
+  },
+  {
+    "name": "elk-0.12.0",
+    "repository": "eclipse-elk/elk",
+    "commit": "323312916048544e4e594eab3303cdb0d01e2929",
+    "url": "https://codeload.github.com/eclipse-elk/elk/zip/323312916048544e4e594eab3303cdb0d01e2929",
+    "sha256": "786e564d8969ece2579471947b7116edcf0c08a2c39dc066bf1bafeba2c96911"
+  }
+]

@@ -36,8 +36,18 @@ exports.launch = async function (playwright, options) {
       `--remote-debugging-port=${cdpPort}`,
       ...options.args,
     ],
-    { windowsHide: true, stdio: "ignore" },
+    {
+      windowsHide: true,
+      stdio: options.logPath ? ["ignore", "pipe", "pipe"] : "ignore",
+      env: options.env || process.env,
+    },
   );
+  if (options.logPath) {
+    for (const stream of [child.stdout, child.stderr])
+      stream?.on("data", (chunk) =>
+        require("node:fs").appendFileSync(options.logPath, chunk),
+      );
+  }
   let socket, browser, spawnError;
   child.on("error", (error) => {
     spawnError = error;
@@ -117,13 +127,23 @@ exports.launch = async function (playwright, options) {
           { timeout: 1000 },
         );
         break;
-      } catch {
+      } catch (error) {
+        if (options.logPath)
+          require("node:fs").appendFileSync(
+            options.logPath,
+            String(error) + "\n",
+          );
         await delay(150);
       }
     }
     if (!browser) throw Error("Portable browser debugger did not start");
     const context = browser.contexts()[0];
     return {
+      disconnect: async () => {
+        socket.close();
+        await browser.close().catch(() => {});
+        child.unref();
+      },
       close: async () => {
         try {
           await evaluateExpression(

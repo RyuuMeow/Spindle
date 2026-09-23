@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import { useEffect, useMemo, useRef } from "react";
 import {
   ArrowDown,
@@ -90,8 +92,8 @@ export function SearchPanel({
   return (
     <div className="project-search">
       <div className="section-heading">
-        <strong>搜尋</strong>
-        <ChromeButton title="關閉搜尋" onClick={onClose}>
+        <strong>{tr("m03c481a6ab85")}</strong>
+        <ChromeButton title={tr("m32e6f93f6ca8")} onClick={onClose}>
           <X size={16} />
         </ChromeButton>
       </div>
@@ -99,8 +101,8 @@ export function SearchPanel({
         <Search size={15} />
         <input
           ref={input}
-          aria-label="搜尋全專案文字"
-          placeholder="台詞、角色、tag…"
+          aria-label={tr("mcf9e54061438")}
+          placeholder={tr("mf03bb59d64c1")}
           value={query}
           onChange={(e) => {
             onQuery(e.target.value);
@@ -124,7 +126,7 @@ export function SearchPanel({
         />
         {query && (
           <ChromeButton
-            title="清除搜尋"
+            title={tr("m0c2d1a3aeaff")}
             onClick={() => {
               onQuery("");
               input.current?.focus();
@@ -137,18 +139,18 @@ export function SearchPanel({
       {query.trim() ? (
         <div className="search-summary">
           <span role="status">
-            {matches.length} 筆命中
-            {matches.length > 300 ? " · 顯示前 300 筆，請縮小查詢" : ""}
+            {matches.length} {tr("m5ed51f4fccea")}
+            {matches.length > 300 ? tr("me38a4ecb543c") : ""}
           </span>
           <ChromeButton
-            title="上一筆"
+            title={tr("md6cd070e0b8f")}
             disabled={!results.length}
             onClick={() => choose(current - 1)}
           >
             <ArrowUp size={14} />
           </ChromeButton>
           <ChromeButton
-            title="下一筆"
+            title={tr("m42cc1364be21")}
             disabled={!results.length}
             onClick={() => choose(current + 1)}
           >
@@ -156,11 +158,11 @@ export function SearchPanel({
           </ChromeButton>
         </div>
       ) : (
-        <p className="empty-small">在專案中找出用法，結果會留在這裡。</p>
+        <p className="empty-small">{tr("m6fff1f8fa08d")}</p>
       )}
       {!query.trim() && viewState.recent.length > 0 && (
         <div className="recent-searches">
-          <small>最近搜尋</small>
+          <small>{tr("m37d3bd6e7520")}</small>
           {viewState.recent.map((value) => (
             <button
               key={value}
@@ -177,7 +179,7 @@ export function SearchPanel({
       )}
       <div
         className="project-search-results"
-        aria-label="搜尋結果"
+        aria-label={tr("m0cbcf954d0cc")}
         ref={scroll}
         onScroll={(event) =>
           onViewState({
@@ -226,7 +228,7 @@ export function SearchPanel({
                   </span>
                 </button>
                 <ChromeButton
-                  title="在純文字定位"
+                  title={tr("m243878462c69")}
                   onClick={() => choose(index, false, true)}
                 >
                   <TextCursorInput size={14} />
@@ -236,7 +238,7 @@ export function SearchPanel({
           );
         })}
         {!!query.trim() && !results.length && (
-          <p className="empty-small">沒有符合內容，試試其他詞。</p>
+          <p className="empty-small">{tr("m6edddff3a64f")}</p>
         )}
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 export const modes = ["source", "rendered", "reader", "graph"] as const;
 export type AppearanceMode = (typeof modes)[number];
 export type Typography = {
@@ -191,7 +192,7 @@ export function patchAppearance(
       next.widths[patch.reset] = "standard";
   }
   for (const [key, value] of Object.entries(patch.global || {})) {
-    if (!validStyle(key, value)) throw Error("風格設定值無效：" + key);
+    if (!validStyle(key, value)) throw Error(tr("mb1b0287571a1") + key);
     Object.assign(next.global, { [key]: value });
   }
   for (const mode of modes)
@@ -204,13 +205,13 @@ export function patchAppearance(
             !Object.hasOwn(globalDefaults, key) ||
             (value !== null && !validStyle(key, value))
           )
-            throw Error("風格設定值無效：" + key);
+            throw Error(tr("mb1b0287571a1") + key);
           if (value === null) delete next.modes[mode][key as keyof Typography];
           else Object.assign(next.modes[mode], { [key]: value });
         }
     }
   for (const [key, value] of Object.entries(patch.source || {})) {
-    if (!validSource(key, value)) throw Error("編輯設定值無效：" + key);
+    if (!validSource(key, value)) throw Error(tr("meb9967eeda4a") + key);
     Object.assign(next.source, { [key]: value });
   }
   for (const [key, value] of Object.entries(patch.syntax || {})) {
@@ -218,13 +219,14 @@ export function patchAppearance(
       !Object.hasOwn(syntaxDefaults, key) ||
       !/^#[0-9a-f]{6}$/i.test(String(value))
     )
-      throw Error("語法顏色無效");
+      throw Error(tr("m6b226d3eee00"));
     Object.assign(next.syntax, { [key]: value });
   }
   for (const mode of ["rendered", "reader"] as const)
     if (patch.widths?.[mode] !== undefined) {
       const value = patch.widths[mode];
-      if (value !== "standard" && value !== "wide") throw Error("閱讀寬度無效");
+      if (value !== "standard" && value !== "wide")
+        throw Error(tr("m533eac4921e3"));
       next.widths[mode] = value;
     }
   return next;

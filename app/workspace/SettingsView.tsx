@@ -1,4 +1,6 @@
 "use client";
+import { APP_VERSION, REPOSITORY_URL } from "../version";
+import { t as tr } from "../i18n/index.ts";
 
 import { useEffect, useId, useRef, useState } from "react";
 import {
@@ -10,13 +12,23 @@ import {
   Keyboard,
   RotateCcw,
   Save,
+  Globe,
+  ArchiveRestore,
+  Plug,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { WindowSession, AppPreferences } from "./types";
 import "./settings.css";
+import { UpdateButton } from "./UpdateDialog";
+import LanguageSettings from "./LanguageSettings";
 import McpSettings from "../mcp/McpSettings";
-import { Plug } from "lucide-react";
+import {
+  settingSections,
+  extraSettingLabels,
+  type SettingsSection,
+} from "./settings-registry";
+export type { SettingsSection } from "./settings-registry";
 import AppearanceSettings from "../appearance/AppearanceSettings";
 import type { AppearancePatch } from "../appearance/model";
 
@@ -26,15 +38,19 @@ export type WorkspacePreferences = Pick<
 > & {
   readingWidth?: "standard" | "wide";
 };
-export type SettingsSection = "reading" | "saving" | "shortcuts" | "about" | "mcp";
-
-const sections = [
-  { id: "reading", label: "編輯器風格", icon: BookOpen },
-  { id: "saving", label: "編輯與保存", icon: Save },
-  { id: "shortcuts", label: "快捷鍵", icon: Keyboard },
-  { id: "mcp", label: "MCP／Agent 整合", icon: Plug },
-  { id: "about", label: "關於", icon: Info },
-] as const;
+const sectionIcons = {
+  BookOpen,
+  Save,
+  Globe,
+  ArchiveRestore,
+  Keyboard,
+  Plug,
+  Info,
+};
+const sections = settingSections.map((s) => ({
+  ...s,
+  icon: sectionIcons[s.icon],
+}));
 
 function NumericSetting({
   label,
@@ -68,7 +84,7 @@ function NumericSetting({
       next < min ||
       next > max
     ) {
-      setError(`請輸入 ${min} 至 ${max} 的整數。`);
+      setError(tr("mf28dc4952b9c", [min, max]));
       return;
     }
     setError("");
@@ -128,18 +144,22 @@ export default function SettingsView({
   onResetLayout,
   onOpenData,
   onClose,
-  version,
+
   initialSection = "reading",
   focusOnMount = true,
-  returnLabel = "返回編輯",
+  returnLabel = tr("m9f2b484bc113"),
   appPreferences,
   onAppPreferences,
   onAppearance,
+  navigation,
+  rescue,
 }: {
+  navigation?: { section: SettingsSection; field?: string; nonce: number };
+  rescue?: React.ReactNode;
   onAppearance?: (patch: AppearancePatch) => void;
   workspaceSettings?: boolean;
   appPreferences?: AppPreferences;
-  onAppPreferences?: (reopen: boolean) => void;
+  onAppPreferences?: (patch: Partial<AppPreferences>) => void;
   returnLabel?: string;
   preferences: WorkspacePreferences;
   onChange: (next: WorkspacePreferences) => void;
@@ -152,16 +172,60 @@ export default function SettingsView({
 }) {
   const [section, setSection] = useState<SettingsSection>(initialSection);
   const [zoomResetVersion, setZoomResetVersion] = useState(0);
+  const workspaceRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (focusOnMount) headingRef.current?.focus();
   }, [focusOnMount]);
+  useEffect(() => {
+    if (!navigation) return;
+    let focusFrame = 0;
+    const frame = requestAnimationFrame(() => {
+      setSection(navigation.section);
+      const focusField = (attempt = 0) => {
+        if (!navigation.field) return;
+        const field = workspaceRef.current?.querySelector<HTMLElement>(
+          `[data-setting="${navigation.field}"]`,
+        );
+        for (
+          let parent = field?.parentElement;
+          parent;
+          parent = parent.parentElement
+        )
+          if (parent instanceof HTMLDetailsElement) parent.open = true;
+        const control = [
+          ...(field?.querySelectorAll<HTMLElement>(
+            'input:not([type="hidden"]),button,select,[tabindex="0"]',
+          ) || []),
+        ].find(
+          (el) =>
+            el.getClientRects().length > 0 && !el.hasAttribute("disabled"),
+        );
+        if (field?.getClientRects().length && control) {
+          field.scrollIntoView({ block: "center" });
+          control.focus();
+          if (field.contains(document.activeElement)) return;
+        }
+        if (attempt < 30)
+          focusFrame = requestAnimationFrame(() => focusField(attempt + 1));
+      };
+      focusFrame = requestAnimationFrame(() => focusField());
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(focusFrame);
+    };
+  }, [navigation]);
   const change = (patch: Partial<WorkspacePreferences>) =>
     onChange({ ...preferences, ...patch });
   return (
-    <section className="settings-workspace" aria-label="設定">
+    <section
+      ref={workspaceRef}
+      className="settings-workspace"
+      aria-label={tr("m0d8619aae051")}
+    >
       <div className="settings-layout">
-        <nav className="settings-navigation" aria-label="設定分類">
+        <nav className="settings-navigation" aria-label={tr("m55ce2decbed0")}>
           {sections.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -194,28 +258,35 @@ export default function SettingsView({
                   </Button>
                 )}
               </div>
+              {category === "rescue" && rescue}
               {category === "mcp" && <McpSettings />}
               {category === "reading" && (
                 <>
                   {onAppearance && (
                     <AppearanceSettings
+                      navigation={navigation}
                       value={appPreferences?.editorAppearance}
                       onChange={onAppearance}
                     />
                   )}
-                  <section className="settings-group" aria-label="工作區顯示">
-                    <h3>工作區</h3>
+                  <section
+                    className="settings-group"
+                    aria-label={tr("mabef6dc9562f")}
+                  >
+                    <h3>{tr("m1c5ab76e581d")}</h3>
                     {onOpenData && (
-                      <NumericSetting
-                        key={`zoom-${zoomResetVersion}`}
-                        label="App 縮放"
-                        description="調整整個介面的大小"
-                        value={Math.round(preferences.zoom * 100)}
-                        min={60}
-                        max={200}
-                        unit="%"
-                        onCommit={(zoom) => change({ zoom: zoom / 100 })}
-                      />
+                      <div data-setting="zoom">
+                        <NumericSetting
+                          key={`zoom-${zoomResetVersion}`}
+                          label={extraSettingLabels.zoom}
+                          description={tr("m322b9bdcd691")}
+                          value={Math.round(preferences.zoom * 100)}
+                          min={60}
+                          max={200}
+                          unit="%"
+                          onCommit={(zoom) => change({ zoom: zoom / 100 })}
+                        />
+                      </div>
                     )}
                     <div className="setting-reset-actions">
                       <Button
@@ -224,7 +295,7 @@ export default function SettingsView({
                         onClick={onResetLayout}
                       >
                         <RotateCcw size={14} />
-                        重設工作區布局
+                        {tr("m5832dd659949")}
                       </Button>
                       {onOpenData && (
                         <Button
@@ -235,91 +306,95 @@ export default function SettingsView({
                             setZoomResetVersion((current) => current + 1);
                           }}
                         >
-                          縮放回到 100%
+                          {tr("m858d2ba39ac8")}
                         </Button>
                       )}
                     </div>
-                    <p className="setting-help">
-                      重設布局會恢復面板位置與寬度，閱讀樣式不受影響。
-                    </p>
+                    <p className="setting-help">{tr("m878f3c18f46a")}</p>
                   </section>
                 </>
+              )}
+              {category === "language" && (
+                <LanguageSettings
+                  preferences={appPreferences}
+                  onChange={onAppPreferences}
+                />
               )}
               {category === "saving" && (
                 <>
                   {onAppPreferences && (
                     <section className="settings-group">
-                      <h3>啟動</h3>
-                      <label className="settings-check">
+                      <h3>{tr("mb9a3e0cf4dfa")}</h3>
+                      <label
+                        className="settings-check"
+                        data-setting="reopenLastProject"
+                      >
                         <Checkbox
                           checked={!!appPreferences?.reopenLastProject}
                           onCheckedChange={(value) =>
-                            onAppPreferences(value === true)
+                            onAppPreferences({
+                              reopenLastProject: value === true,
+                            })
                           }
                         />
-                        啟動時開啟上次專案
+                        {extraSettingLabels.reopenLastProject}
                       </label>
-                      <p className="setting-help">
-                        關閉專案後，下次啟動仍會顯示專案列表。
-                      </p>
+                      <p className="setting-help">{tr("m3ab17ab20e9c")}</p>
                     </section>
                   )}
                   <section className="settings-group">
-                    <h3>保存方式</h3>
+                    <h3>{tr("m8b8df20098d7")}</h3>
                     <dl className="settings-description-list">
                       <div>
                         <dt>
                           <Check size={15} />
-                          {onOpenData ? "磁碟專案" : "本機工作區"}
+                          {onOpenData
+                            ? tr("m6394530076ea")
+                            : tr("m31c69543d4ff")}
                         </dt>
                         <dd>
                           {onOpenData
-                            ? "停止輸入後自動寫回原檔。Ctrl+S 立即保存，離開工作區前會確認保存完成。"
-                            : "編輯內容保留在此瀏覽器的工作區。使用匯出功能下載劇本或專案備份。"}
+                            ? tr("mf09a394fa505")
+                            : tr("me9f66d84f809")}
                         </dd>
                       </div>
                       <div>
-                        <dt>本機草稿</dt>
+                        <dt>{tr("m562beac0934b")}</dt>
                         <dd>
                           {onOpenData
-                            ? "舊草稿保留在初始畫面的「待移轉草稿」，可預覽後轉存為正式專案。"
-                            : "草稿保留在本機工作區，匯出後可在其他工具開啟。"}
+                            ? tr("ma2f20cbc50f2")
+                            : tr("m162c9cfc9e49")}
                         </dd>
                       </div>
                       <div>
-                        <dt>版本歷史</dt>
+                        <dt>{tr("m4c3cec274391")}</dt>
                         <dd>
-                          {onOpenData &&
-                            "有變更時定期建立快照。專案歷史與垃圾桶保存在專案資料夾；單檔歷史保存在應用程式資料目錄。"}
-                          每份劇本保留最近 50 份快照，最近刪除保留 30 天。
+                          {onOpenData && tr("madecbb44f20d")}
+                          {tr("m98949af2f60c")}
                         </dd>
                       </div>
                     </dl>
-                    <p className="setting-help">
-                      指令定義需按「套用定義」才更新補全與檢查；未套用的內容會保留為草稿。
-                    </p>
+                    <p className="setting-help">{tr("me18763e86988")}</p>
                   </section>
                 </>
               )}
               {category === "shortcuts" && (
                 <section className="settings-group">
-                  <p className="setting-help">
-                    快捷鍵使用目前所在的文件或工作區。
-                  </p>
+                  <p className="setting-help">{tr("mc7a2019bbac8")}</p>
                   <dl className="settings-shortcuts">
                     {[
-                      ["快速開啟劇本", "Ctrl + P"],
-                      ["搜尋整個專案", "Ctrl + Shift + F"],
-                      ["立即保存", "Ctrl + S"],
+                      [tr("mb5dda496487b"), "Ctrl + P"],
+                      [tr("mc78fb5b77467"), "Ctrl + Shift + F"],
+                      [tr("ma92349e52eea"), "Ctrl + S"],
                       ...(!onOpenData
-                        ? [["保存全部", "Ctrl + Shift + S"]]
+                        ? [[tr("m10f830160cfd"), "Ctrl + Shift + S"]]
                         : []),
-                      ["新增分頁", "Ctrl + T"],
-                      ["關閉目前分頁", "Ctrl + W"],
-                      ["重開關閉的分頁", "Ctrl + Shift + T"],
-                      ["切換到下一個分頁", "Ctrl + Tab"],
-                      ["復原編輯", "Ctrl + Z"],
-                      ["重做編輯", "Ctrl + Shift + Z"],
+                      [tr("ma38d62ae74d4"), "Ctrl + T"],
+                      [tr("ma54d38ec178f"), "Ctrl + W"],
+                      [tr("m05623a8025fb"), "Ctrl + Shift + T"],
+                      [tr("m816858cda6c6"), "Ctrl + Tab"],
+                      [tr("ma62d4d9aada4"), "Ctrl + Z"],
+                      [tr("mcbbcc58cefd5"), "Ctrl + Shift + Z"],
                     ].map(([label, shortcut]) => (
                       <div key={label}>
                         <dt>{label}</dt>
@@ -343,26 +418,41 @@ export default function SettingsView({
                       height={56}
                     />
                     <h3>Spindle</h3>
-                    <p className="settings-version">{version || "Web"}</p>
-                    <p>本機 Yarn 劇本編輯器</p>
-                    <p className="setting-help">
-                      純文字、閱讀編輯與流程圖共用同一份劇本。雙擊流程圖節點可直接編輯；拖動節點只調整版面。
-                    </p>
+                    <p className="settings-version">{APP_VERSION}</p>
+                    <a href={REPOSITORY_URL} target="_blank" rel="noreferrer">
+                      GitHub
+                    </a>
+                    <a
+                      href={
+                        REPOSITORY_URL + "/blob/main/THIRD_PARTY_NOTICES.md"
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {tr("licenses.thirdParty")}
+                    </a>
+                    {typeof window !== "undefined" && window.yarnDesktop && (
+                      <UpdateButton />
+                    )}
+                    <p>{tr("m53587a1d8151")}</p>
+                    <p className="setting-help">{tr("m0bf3516b70a7")}</p>
                     {onOpenData && (
                       <Button variant="outline" size="sm" onClick={onOpenData}>
                         <FolderOpen size={15} />
-                        開啟資料與記錄位置
+                        {tr("m9b7d8b1e1c6e")}
                       </Button>
                     )}
                   </section>
                   <section className="settings-group">
-                    <h3>版本記錄</h3>
-                    <p>
-                      0.9.0：新增初始畫面與專案列表、獨立單檔編輯、專案內歷史與垃圾桶，並保存復原頁狀態。
-                    </p>
-                    <p className="setting-help">
-                      結構檢查協助找出劇本問題，不會執行遊戲命令。
-                    </p>
+                    <h3>{tr("m7aa63904a20a")}</h3>
+                    <a
+                      href={REPOSITORY_URL + "/releases"}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {tr("m7aa63904a20a")}
+                    </a>
+                    <p className="setting-help">{tr("m09f25e462ae2")}</p>
                   </section>
                 </>
               )}

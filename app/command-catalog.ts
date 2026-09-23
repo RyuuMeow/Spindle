@@ -1,3 +1,4 @@
+import { t as tr } from "./i18n/index.ts";
 import type { Command, Param } from "./parser";
 /** Presentation metadata only; never persisted as custom command definitions. */
 export type HelpParameter = Omit<Param, "type"> & { type: string };
@@ -30,124 +31,74 @@ const definition = (
 export const builtinCommands: CommandInfo[] = [
   definition(
     "jump",
-    "跳轉到另一個場景，離開目前內容；不會返回呼叫位置。",
-    "<<jump 場景>>",
+    tr("m330984eb1e78"),
+    tr("m37146a00c8c3"),
     "<<jump Village>>",
-    [p("場景", "node", "目的場景的 title；動態目的地使用大括號中的運算式。")],
+    [p(tr("mcb88dc73b257"), "node", tr("me0b841cf8635"))],
   ),
   definition(
     "detour",
-    "暫時執行另一個場景；結束或 return 後回到這裡繼續。",
-    "<<detour 場景>>",
+    tr("m24ce952bb0d9"),
+    tr("m1d8b34b6053d"),
     "<<detour Shop>>",
-    [p("場景", "node", "欲暫時執行的場景 title；也可使用大括號中的運算式。")],
+    [p(tr("mcb88dc73b257"), "node", tr("m37528fc2f532"))],
   ),
-  definition(
-    "return",
-    "提早返回最近的 detour 呼叫位置；沒有返回位置時結束對話。",
-    "<<return>>",
-    "<<return>>",
-  ),
-  definition("stop", "立即結束整段對話。", "<<stop>>", "<<stop>>"),
+  definition("return", tr("m3e705c1008d9"), "<<return>>", "<<return>>"),
+  definition("stop", tr("m74e93e95febf"), "<<stop>>", "<<stop>>"),
   definition(
     "if",
-    "條件成立時執行此分支，以 endif 結束整個條件區域。",
-    "<<if 條件>>",
+    tr("mc59469d4c0ea"),
+    tr("ma1331fc66027"),
     "<<if $gold >= 5>>",
-    [
-      p(
-        "條件",
-        "boolean",
-        "結果必須為 true 或 false；可組合變數、比較、函式及 and／or。",
-      ),
-    ],
+    [p(tr("me8ccaa17c328"), "boolean", tr("md655e182e111"))],
   ),
   definition(
     "elseif",
-    "前面的 if／elseif 皆未成立時，檢查這個條件。",
-    "<<elseif 條件>>",
+    tr("ma8509920cd28"),
+    tr("mdb306d8ecfb0"),
     "<<elseif $gold > 0>>",
-    [p("條件", "boolean", "此分支的布林運算式；整個運算式屬於同一個條件。")],
+    [p(tr("me8ccaa17c328"), "boolean", tr("m0d3141c1ec32"))],
   ),
-  definition(
-    "else",
-    "前面的條件未成立時執行；也可作為 once 已執行後的分支。",
-    "<<else>>",
-    "<<else>>",
-  ),
-  definition(
-    "endif",
-    "結束 if／elseif／else 區域，後續內容由所有分支共用。",
-    "<<endif>>",
-    "<<endif>>",
-  ),
+  definition("else", tr("ma68dc28ff185"), "<<else>>", "<<else>>"),
+  definition("endif", tr("mcb0ec319efa4"), "<<endif>>", "<<endif>>"),
   definition(
     "once",
-    "內容只執行一次；可加 if 條件，並以 endonce 結束區域。",
-    "<<once [if 條件]>>",
+    tr("m22c0c31d3751"),
+    tr("m1fddc22b55a1"),
     "<<once if $has_key>>",
-    [
-      p(
-        "條件",
-        "boolean",
-        "選填；加上 if 後，只有尚未執行且條件成立才進入。",
-        false,
-      ),
-    ],
+    [p(tr("me8ccaa17c328"), "boolean", tr("m207aa99e1615"), false)],
   ),
-  definition("endonce", "結束 once 區域。", "<<endonce>>", "<<endonce>>"),
+  definition("endonce", tr("m73462a1cc044"), "<<endonce>>", "<<endonce>>"),
   definition(
     "set",
-    "更新已存在變數的值，型別必須相容；不修改變數宣告。",
-    "<<set $變數 = 運算式>>",
+    tr("m92e49002a26f"),
+    tr("mbee1f58a653a"),
     "<<set $gold = $gold + 5>>",
     [
-      p(
-        "變數",
-        "variable",
-        "要更新的變數，以 $ 開頭；可選擇專案中已宣告或已指定的變數。",
-      ),
-      p(
-        "值",
-        "expression",
-        "使用 = 或 to 指定值；也支援 +=、-=、*=、/=、%=。整個右側是同一個運算式。",
-      ),
+      p(tr("m19b5ded2381d"), "variable", tr("m6f9e7fb1cb40")),
+      p(tr("mcda1d55c5231"), "expression", tr("mdab18310add7")),
     ],
   ),
   definition(
     "declare",
-    "宣告變數與初始值；不必執行所在場景，宣告就會生效。",
-    "<<declare $變數 = 初始值>>",
+    tr("m8256eea4b83a"),
+    tr("md987bfbd9bce"),
     "<<declare $gold = 12>>",
     [
-      p("變數", "variable", "以 $ 開頭的變數名稱；同一專案中應保持唯一。"),
-      p(
-        "初始值",
-        "expression",
-        "數字、字串或布林值；可用 as 指定型別。運算式宣告可建立唯讀的 smart variable。",
-      ),
+      p(tr("m19b5ded2381d"), "variable", tr("mc4c183cfe411")),
+      p(tr("mf2921e5b0707"), "expression", tr("m62ba472dbc03")),
     ],
   ),
   definition(
     "call",
-    "呼叫 Yarn 函式；使用函式名稱與括號中的引數。",
-    "<<call 函式(引數)>>",
+    tr("mf4368168493a"),
+    tr("m3c4026f0e89c"),
     '<<call visited("Village")>>',
-    [
-      p(
-        "函式呼叫",
-        "expression",
-        "例如 my_function(1, 2)；函式須由 Yarn 或遊戲端提供。",
-      ),
-    ],
+    [p(tr("mc96dc819988a"), "expression", tr("m6591017aa5ea"))],
   ),
-  definition(
-    "wait",
-    "暫停對話指定秒數，等待後繼續。由遊戲端的 Dialogue Runner 執行。",
-    "<<wait 秒數>>",
-    "<<wait 0.5>>",
-    [p("秒數", "number", "等待的秒數，可使用整數或小數。")],
-  ),
+  definition("wait", tr("mf2aa11ed5c78"), tr("m71ddd5abba88"), "<<wait 0.5>>", [
+    p(tr("m48363f106fae"), "number", tr("m4c8f3356461b")),
+  ]),
 ];
 export function findCommand(
   name: string,

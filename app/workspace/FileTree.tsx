@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import {
   useState,
   type MouseEvent,
@@ -127,7 +129,10 @@ export default function FileTree({
                     {isFolder && (
                       <button
                         className="folder-disclosure"
-                        aria-label={(open ? "收合 " : "展開 ") + entry.path}
+                        aria-label={
+                          (open ? tr("m32605db9ff7b") : tr("mccd4ff23f93b")) +
+                          entry.path
+                        }
                         aria-expanded={open}
                         onClick={() =>
                           setCollapsed((previous) => {
@@ -149,7 +154,9 @@ export default function FileTree({
                     <button
                       className="file-row"
                       title={doc?.path || entry.path}
-                      aria-label={isFolder ? "資料夾 " + entry.path : undefined}
+                      aria-label={
+                        isFolder ? tr("maabc6623539f") + entry.path : undefined
+                      }
                       onClick={(e) => {
                         if (e.detail > 1) return;
                         if (isFolder) {
@@ -188,7 +195,8 @@ export default function FileTree({
                     <button
                       className="file-options"
                       aria-label={
-                        (isFolder ? "資料夾選項 " : "劇本選項 ") + entry.path
+                        (isFolder ? tr("m139a6233b465") : tr("m006b92866492")) +
+                        entry.path
                       }
                       onClick={menu}
                     >

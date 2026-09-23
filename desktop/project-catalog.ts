@@ -1,4 +1,9 @@
-import { normalizeAppearance, migrateAppearance } from "../app/appearance/model";
+import { t as tr } from "../app/i18n";
+import {
+  normalizeAppearance,
+  migrateAppearance,
+} from "../app/appearance/model";
+import { validLanguage } from "../app/i18n";
 import fs from "node:fs";
 import path from "node:path";
 import type {
@@ -23,10 +28,10 @@ export function containsPath(root: string, file: string) {
 export function projectConfig(root: string) {
   const folder = path.join(root, ".spindle");
   if (fs.existsSync(folder) && fs.lstatSync(folder).isSymbolicLink())
-    throw Error("專案設定目錄不可為符號連結");
+    throw Error(tr("mee1e585bdb6f"));
   const file = path.join(folder, "project.json");
   if (fs.existsSync(file) && fs.lstatSync(file).isSymbolicLink())
-    throw Error("專案設定不可為符號連結");
+    throw Error(tr("m34bee8e0dfc6"));
   return file;
 }
 export function validProjectFolderName(name: string) {
@@ -59,12 +64,20 @@ export class ProjectCatalog {
             typeof e.name !== "string",
         )
       )
-        throw Error("專案清單格式損毀，原始資料已保留");
+        throw Error(tr("ma644ae5a81ba"));
       this.entries = value.entries;
       this.preferences = {
         reopenLastProject: value.preferences?.reopenLastProject === true,
         lastProjectId: value.preferences?.lastProjectId,
-        editorAppearance: value.preferences?.editorAppearance ? normalizeAppearance(value.preferences.editorAppearance) : undefined,
+        language: validLanguage(value.preferences?.language),
+        autoCheckUpdates: value.preferences?.autoCheckUpdates !== false,
+        skippedVersion:
+          typeof value.preferences?.skippedVersion === "string"
+            ? value.preferences.skippedVersion
+            : undefined,
+        editorAppearance: value.preferences?.editorAppearance
+          ? normalizeAppearance(value.preferences.editorAppearance)
+          : undefined,
       };
     } else {
       this.entries = legacy
@@ -85,9 +98,13 @@ export class ProjectCatalog {
     const file = path.join(profile, "windows-v2.json");
     if (fs.existsSync(file)) {
       try {
-        const entries = Object.values(JSON.parse(fs.readFileSync(file, "utf8"))) as { session?: Parameters<typeof migrateAppearance>[0] }[];
-        legacy = entries.reverse().find(e => e?.session)?.session;
-      } catch (error) { console.warn("Unable to migrate appearance from legacy session", error); }
+        const entries = Object.values(
+          JSON.parse(fs.readFileSync(file, "utf8")),
+        ) as { session?: Parameters<typeof migrateAppearance>[0] }[];
+        legacy = entries.reverse().find((e) => e?.session)?.session;
+      } catch (error) {
+        console.warn("Unable to migrate appearance from legacy session", error);
+      }
     }
     this.preferences.editorAppearance = migrateAppearance(legacy);
     this.persist();
@@ -107,16 +124,17 @@ export class ProjectCatalog {
       .map((e) => {
         let unavailable: string | undefined;
         try {
-          if (!fs.statSync(e.root).isDirectory()) throw Error("不是資料夾");
+          if (!fs.statSync(e.root).isDirectory())
+            throw Error(tr("m2aa0893b69b2"));
           fs.accessSync(e.root, fs.constants.R_OK);
           const file = projectConfig(e.root);
           if (fs.existsSync(file)) {
             const config = JSON.parse(fs.readFileSync(file, "utf8"));
             if (!config || Array.isArray(config) || typeof config !== "object")
-              throw Error("設定無效");
+              throw Error(tr("m51db334bbe7f"));
           }
         } catch {
-          unavailable = "專案路徑已失效或無法存取";
+          unavailable = tr("ma4560e5c19f4");
         }
         return { ...e, unavailable };
       })
@@ -159,11 +177,11 @@ export class ProjectCatalog {
   }
   rename(id: string, name: string) {
     const entry = this.entries.find((e) => e.id === id);
-    if (!entry || !name.trim()) throw Error("專案或名稱無效");
+    if (!entry || !name.trim()) throw Error(tr("m17a2c898fd71"));
     const file = projectConfig(entry.root);
     const config = JSON.parse(fs.readFileSync(file, "utf8"));
     if (!config || typeof config !== "object" || Array.isArray(config))
-      throw Error("專案設定無效");
+      throw Error(tr("mea4c13b8e473"));
     atomicWrite(
       file,
       JSON.stringify({ ...config, name: name.trim() }, null, 2),

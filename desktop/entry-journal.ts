@@ -1,3 +1,4 @@
+import { t as tr } from "../app/i18n";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID, createHash } from "node:crypto";
@@ -202,14 +203,13 @@ export class EntryJournal {
         fs.unlinkSync(file);
         continue;
       }
-      if (digest(existing) !== r.before)
-        throw Error("專案有待恢復的檔案操作，設定已另行修改，原始資料已保留");
+      if (digest(existing) !== r.before) throw Error(tr("m833dbd27ebe5"));
       if (!fs.existsSync(destination)) {
         if (!r.applied && (!source || fs.existsSync(source))) {
           fs.unlinkSync(file);
           continue;
         }
-        throw Error("檔案操作尚未恢復，目的位置不存在");
+        throw Error(tr("m68b0b3ddd90e"));
       }
       const stat = fs.statSync(destination);
       const moved =
@@ -224,8 +224,7 @@ export class EntryJournal {
           ? stat.isFile() &&
             digest(fs.readFileSync(destination, "utf8")) === r.contentHash
           : stat.isDirectory() && fs.readdirSync(destination).length === 0);
-      if (!moved && !created)
-        throw Error("檔案操作結果不明，保留操作紀錄以便重試");
+      if (!moved && !created) throw Error(tr("mf4276996c58f"));
       atomicWrite(config, JSON.stringify(r.next, null, 2));
       fs.unlinkSync(file);
     }

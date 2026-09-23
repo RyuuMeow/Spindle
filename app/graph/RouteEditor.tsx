@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { useRef } from "react";
 import {
   BaseEdge,
@@ -108,7 +109,7 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
         tabIndex={0}
         role="button"
         className="flow-edge-focus"
-        aria-label={"轉場，" + label}
+        aria-label={tr("mfec81f3100e8") + label}
         onContextMenu={data.context}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -192,7 +193,7 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
                 cx={pin.x}
                 cy={pin.y}
                 r={5 / Math.max(0.5, zoom)}
-                aria-label="線路控制點"
+                aria-label={tr("m9379440a42b4")}
                 role="button"
                 tabIndex={0}
                 onClick={(e) => {
@@ -250,7 +251,7 @@ export function RouteCard({ data, selected }: NodeProps<RouteCardNode>) {
       data-route-id={group.id}
       role="button"
       tabIndex={0}
-      aria-label={"轉場卡片，" + label}
+      aria-label={tr("macb61c287d7c") + label}
       aria-pressed={selected}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -273,10 +274,10 @@ export function RouteCard({ data, selected }: NodeProps<RouteCardNode>) {
       title={
         item.kind +
         ": " +
-        (item.label || "無條件") +
-        " · 第 " +
+        (item.label || tr("m9feace4f489d")) +
+        tr("mca0b53cf6fe3") +
         item.line +
-        " 行"
+        tr("m4cc7b00050cb")
       }
     >
       <Icon size={14} />

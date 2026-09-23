@@ -66,7 +66,7 @@ Workbench 組合 SettingsView、SearchOverlay、CommandManager、HistoryView 及
 
 `desktop/main.cjs` 管理視窗生命週期、位置限制與工作階段；preload 只暴露具名操作。移至新視窗需等待 renderer 回報就緒後才移除來源 tab。跨窗拖移沿用相同文件／分頁身分，不複製整份文字作為同步方式。視窗位置依目前可用螢幕 work area 限制。
 
-原生拖出／拖回、Snap、多螢幕拔除及不同 DPI 的最終狀態以 [實作追蹤](implementation-progress.md) 為準，程式存在不代表已完成實機驗收。
+原生拖出／拖回、Snap、多螢幕拔除及不同 DPI 的最終狀態以 [實作追蹤](history/implementation-progress.md) 為準，程式存在不代表已完成實機驗收。
 
 ## Portable 啟動
 
@@ -154,3 +154,22 @@ map-sources.ts 訂閱 WorkspaceClient 每筆共享文件交易。即使圖表未
 `project-entries` 共用 UI 與 MCP 的檔案操作規劃、路径與完整子樹驗證。`EntryJournal` 連接磁碟新增／移動與 project.json 身分資料；開始前保存意圖，保存來源後重新記錄檔案身分，metadata 成功後才清除紀錄。開啟時以設定摘要與磁碟證據恢復；不明狀態保留，拒絕默默覆寫。`RecoveryStore` 繼續負責完整垃圾桶資料與復原日誌。
 
 正式產品不再引用示範工作區；The Last Light 僅存於 scripts/fixtures。封裝白名單涵蓋 MCP runtime、視窗模組、系統字型查詢與 licenses，並以實際 Portable 驗證。
+
+
+## Agent 安裝服務（0.9.2）
+
+`AgentInstaller` 與客戶端設定 adapter 獨立於 WorkspaceService：只管理由設定頁選定的 agent 使用者設定及 Skill，不接觸劇本。可信 renderer 透過具名 IPC 檢查、安裝／更新、移除、選擇路徑及握手；憑證由主程序 MCP runtime 提供，renderer 不提交任意設定內容。Codex TOML 使用受管理區塊與解析前後的無關語義比對，Claude JSON 使用局部 edit；損毀或未知擁有權拒絕接管。
+
+每個 Spindle profile 的 `agent-targets-v1.json` 保存路徑選擇。使用者 `~/.spindle-agent/installations-v1.json` 記錄 profile、目標、資源版本、雜湊與共享 Skill 擁有者，不含憑證。安裝與移除使用跨程序鎖，先持久保存意圖／允許的前後雜湊，再逐檔原子替換；提交前重新檢查內容。部分失敗下次以紀錄核對現況續作，不還原整份第三方設定備份。失效程序鎖僅於確認程序不存在時清理。
+
+MCP entry 預設 `spindle`，非預設 profile 使用正規化 profile 路徑雜湊後綴。Skill 不含 profile 特定資訊並共用；最後一個擁有者移除時，只有檔案仍符合受管理雜湊且無額外檔案才移除。不同 client 可各自存放 Skill。連接埠／憑證更新只標示過期，使用者明確更新後同步 agent 設定。此安裝流程不建立額外 MCP 工具，也不修改 agent 的信任或工具批准設定。
+
+## 0.10.0 跨工作區整合
+
+- `app/workspace/search.ts` 定義統一結果；`settings-registry.ts` 與設定頁共用欄位 ID。暫存新增 tab 不對應文件，確認成功才接上 DocumentId。
+- `app/i18n/` 提供三語訊息與固定執行階段語言；診斷保留穩定 code/args，呈現文字不作為修正識別。`AppPreferences` 以 patch 保存語言與更新偏好。
+- `desktop/restart.cjs` 執行全視窗 prepare/commit；任一視窗失敗時取消全部，成功才寫一次性恢复清單。原有單窗關閉流程仍獨立。
+- `desktop/update-service.ts` 限制 GitHub 倉庫、SemVer、資產種類與 SHA-256；NSIS 使用 electron-updater，Portable 使用獨立 PowerShell helper 等待退出、保留原檔並確認新程式啟動。
+- `version.json` 為產品唯一人工版本來源。`releases/` 產生 App 說明與 GitHub 草稿內容；CI 限定發布 job 擁有寫入權限。
+
+舊資料 bootstrap 與救援操作使用持久遷移收據，避免刪除或转存後由舊 localStorage 復活。專案名稱不作為示範資料的刪除條件。

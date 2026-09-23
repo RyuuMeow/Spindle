@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n/index.ts";
 import { snapObjects } from "./route-snapping";
 import { moveObjects } from "./manual-routing";
 import {
@@ -169,7 +170,7 @@ export function useGraphLayout(settings: Settings) {
       )
         return;
       if (result.error) {
-        setError("圖表整理未完成，已保留原布局。" + result.error);
+        setError(tr("mf12d9f41f771") + result.error);
         return;
       }
       if (request.before) push(request.before);
@@ -185,7 +186,7 @@ export function useGraphLayout(settings: Settings) {
       worker.current = null;
       pending.current = null;
       setBusy(false);
-      setError("圖表引擎無法執行，已保留原布局。" + event.message);
+      setError(tr("me299c9ff85aa") + event.message);
     };
     return instance;
   }, [apply, persist, push, clearRequestTimer]);
@@ -219,7 +220,7 @@ export function useGraphLayout(settings: Settings) {
         worker.current = null;
         pending.current = null;
         setBusy(false);
-        setError("圖表整理逾時，已保留原布局。可按重試重新啟動引擎。");
+        setError(tr("ma1a8f0f0d553"));
       }, 30000);
       instance.postMessage({
         id,

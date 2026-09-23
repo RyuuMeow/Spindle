@@ -1,0 +1,33 @@
+name: Verify
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: windows-latest
+    env:
+      SPINDLE_LOCALE: zh-TW
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm version:check
+      - run: pnpm i18n:check
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm lint
+      - run: pnpm test:unit
+      - run: pnpm test:release
+      - run: pnpm test:mcp
+      - run: pnpm test:agent-installation
+      - run: pnpm build
+      - run: pnpm desktop:stage
+      - run: pnpm test:public-ui

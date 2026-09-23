@@ -1,4 +1,6 @@
 "use client";
+import { t as tr, locale } from "../i18n/index.ts";
+
 import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { loader } from "@monaco-editor/react";
@@ -104,7 +106,12 @@ function HistorySource({
   }, [original, text, compare, line]);
   return (
     <div className="history-source" ref={host}>
-      {error && <p role="alert">無法開啟版本預覽：{error}</p>}
+      {error && (
+        <p role="alert">
+          {tr("m6066c9a6c2b6")}
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -127,7 +134,7 @@ export function HistoryList({
   return (
     <aside
       className="document-side history-list"
-      aria-label="版本歷史"
+      aria-label={tr("m4c3cec274391")}
       style={{ width, flexBasis: width }}
     >
       <PanelResizeHandle
@@ -136,20 +143,18 @@ export function HistoryList({
         min={220}
         max={420}
         onResize={onWidth}
-        label="調整版本歷史寬度"
+        label={tr("m66f06b427838")}
       />
       <div className="section-heading">
         <strong>
           <Clock3 size={15} />
-          版本歷史
+          {tr("m4c3cec274391")}
         </strong>
-        <ChromeButton title="關閉版本歷史" onClick={onClose}>
+        <ChromeButton title={tr("mc4319d6fde7b")} onClick={onClose}>
           <X size={15} />
         </ChromeButton>
       </div>
-      <p className="panel-description">
-        選擇版本以預覽。還原前會保留目前內容。
-      </p>
+      <p className="panel-description">{tr("mf64ddf7d7854")}</p>
       <div className="history-entries">
         {[...entries]
           .sort((a, b) => b.at - a.at)
@@ -159,7 +164,7 @@ export function HistoryList({
                 new Date(sorted[index - 1].at).toDateString() !==
                   new Date(entry.at).toDateString()) && (
                 <h3 className="history-day">
-                  {new Date(entry.at).toLocaleDateString("zh-TW", {
+                  {new Date(entry.at).toLocaleDateString(locale(), {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
@@ -174,7 +179,7 @@ export function HistoryList({
                 <Clock3 size={14} />
                 <span>
                   <strong>
-                    {new Date(entry.at).toLocaleString("zh-TW", {
+                    {new Date(entry.at).toLocaleString(locale(), {
                       hour: "2-digit",
                       minute: "2-digit",
                       hour12: false,
@@ -186,9 +191,7 @@ export function HistoryList({
             </Fragment>
           ))}
       </div>
-      {!entries.length && (
-        <p className="empty-small">尚無歷史版本。編輯後會定期建立快照。</p>
-      )}
+      {!entries.length && <p className="empty-small">{tr("m291f10bd457e")}</p>}
     </aside>
   );
 }
@@ -235,23 +238,25 @@ export function HistoryPreview({
       }
     >
       {onReturn && (
-        <ChromeButton title="返回編輯" onClick={onReturn}>
+        <ChromeButton title={tr("m9f2b484bc113")} onClick={onReturn}>
           <ArrowLeft size={16} />
         </ChromeButton>
       )}
       <span>
         <strong>{entry.name}</strong>
-        <small>{new Date(entry.at).toLocaleString("zh-TW")} · 唯讀</small>
+        <small>
+          {new Date(entry.at).toLocaleString(locale())} {tr("m51f76a1414d4")}
+        </small>
       </span>
       <SegmentedControl
-        label="版本呈現"
+        label={tr("m7e3265d4022b")}
         value={compare}
         onChange={(value) =>
           onCompare ? onCompare(value as "preview" | "diff") : setCompare(value)
         }
         options={[
-          { value: "preview", label: "預覽" },
-          { value: "diff", label: "比較" },
+          { value: "preview", label: tr("m88638a3f4b7f") },
+          { value: "diff", label: tr("m2ddd4be2e164") },
         ]}
       />
       <button
@@ -260,26 +265,24 @@ export function HistoryPreview({
         onClick={onRestore}
       >
         <RotateCcw size={14} />
-        {entry.deleted ? "復原" : "還原此版本"}
+        {entry.deleted ? tr("m2abdcba8d536") : tr("mcd31b7281ae1")}
       </button>
     </div>
   );
   return (
-    <section className="history-preview" aria-label="唯讀版本預覽">
+    <section className="history-preview" aria-label={tr("m30464539bb09")}>
       {toolbarTarget ? createPortal(heading, toolbarTarget) : heading}
       {stale && (
         <p className="workspace-notice" role="alert">
-          目前內容已變更。請重新選取版本以比較最新內容。
+          {tr("m18cb7b54b6ad")}
         </p>
       )}
       {compare === "diff" && (
-        <p className="diff-legend">
-          紅色：目前版本移除的文字；綠色：還原後加入的文字。
-        </p>
+        <p className="diff-legend">{tr("m6fa78c4a5837")}</p>
       )}
       {entry.kind === "folder" && (
         <div className="recovery-folder-files">
-          <span>完整資料夾（包含其他檔案）</span>
+          <span>{tr("me32690155855")}</span>
           {entry.files?.map((file) => (
             <button
               key={file.id}

@@ -1,5 +1,20 @@
 # 版本記錄
 
+## 0.10.0 — 私有候選版
+
+統一搜尋、三語介面、資料救援、版本管理與更新流程。
+
+完整版本說明：[English](releases/0.10.0/en.md) · [繁體中文](releases/0.10.0/zh-TW.md) · [简体中文](releases/0.10.0/zh-CN.md)。
+驗證狀態與尚未通過的發布條件見[驗證報告](releases/0.10.0/verification.md)。
+
+## 0.9.2 — 2026-09-22
+
+- 新增 Codex／Claude Code 一鍵安裝：MCP 使用者設定、共用 Spindle Skill、原生路徑選擇、更新、握手測試及移除。
+- 設定合併保留其他 MCP／TOML 註解；多 profile 分別命名，Skill 共用；損毀、外部修改、同名及中斷操作皆保留紀錄與原內容。
+- 新增獨立 Skill 與完整接入指南；資源及安裝依賴離線封裝。
+- 納入 Tab 跳出配對引號、指令與括號；補全／snippet 優先，其他位置維持縮排。
+- 交付 Windows x64 Portable；不產出 Setup。驗證與未實測項目見實作追蹤。
+
 ## 0.9.0 — 2026-09-20
 
 - 新增獨立初始畫面、完整專案列表與精簡建立表單；專案名稱可行內改名，Project 選單顯示最近 5 筆。
@@ -148,7 +163,7 @@
 - 分頁排序／右鍵／固定／批次關閉／重開、輕量新分頁選擇器、多視窗轉移及工作階段恢復。
 - 全專案搜尋、來源返回、場景引用更新、跨檔交易、圖表布局 Undo／Redo 及指令草稿恢復。
 - 補齊獨立布局驗證、損毀救援、BOM／CRLF 來源映射及儲存錯誤狀態。
-- Windows x64 安裝版與 portable 包含離線編輯器；實測及原生 OS 驗證限制見 [實作追蹤](docs/implementation-progress.md)。
+- Windows x64 安裝版與 portable 包含離線編輯器；實測及原生 OS 驗證限制見 [實作追蹤](docs/history/implementation-progress.md)。
 
 ## 0.1.1
 

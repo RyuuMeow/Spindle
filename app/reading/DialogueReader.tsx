@@ -1,4 +1,6 @@
 "use client";
+import { t as tr } from "../i18n/index.ts";
+
 import { useEditorContext } from "../mcp/editor-context";
 import { readerRuns, readerSelection } from "../mcp/reader-context";
 import { sourceOffset } from "../workspace/engine";
@@ -30,18 +32,31 @@ export default function DialogueReader({
   const selection = useRef<SourceSelection | null>(null);
   useEffect(() => {
     selection.current = null;
-    const update = () => { if (host.current) selection.current = readerSelection(host.current) || selection.current; };
+    const update = () => {
+      if (host.current)
+        selection.current = readerSelection(host.current) || selection.current;
+    };
     document.addEventListener("selectionchange", update);
     return () => document.removeEventListener("selectionchange", update);
   }, [name, text]);
   useEditorContext("reader", () => {
     if (!host.current) return null;
     const bounds = host.current.getBoundingClientRect();
-    const visible = [...host.current.querySelectorAll<HTMLElement>("[data-source-from]")].filter(el => {
-      const r = el.getBoundingClientRect(); return r.bottom >= bounds.top && r.top <= bounds.bottom;
+    const visible = [
+      ...host.current.querySelectorAll<HTMLElement>("[data-source-from]"),
+    ].filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.bottom >= bounds.top && r.top <= bounds.bottom;
     });
-    return { documentName: name, source: text, selections: selection.current ? [selection.current] : [],
-      visibleRanges: visible.map(el => ({ from: Number(el.dataset.sourceFrom), to: Number(el.dataset.sourceTo) })) };
+    return {
+      documentName: name,
+      source: text,
+      selections: selection.current ? [selection.current] : [],
+      visibleRanges: visible.map((el) => ({
+        from: Number(el.dataset.sourceFrom),
+        to: Number(el.dataset.sourceTo),
+      })),
+    };
   });
   const lines = useMemo(
     () => readingStructure(text.replace(/\r\n/g, "\n")),
@@ -64,7 +79,7 @@ export default function DialogueReader({
       ref={host}
       className="dialogue-reader"
       tabIndex={0}
-      aria-label="純閱讀模式"
+      aria-label={tr("m2a5dc861fb26")}
       style={
         {
           ...appearanceVariables(style),
@@ -77,15 +92,38 @@ export default function DialogueReader({
     >
       <article>
         {content.map((l) => {
-          const spans = readerRuns(l.text, l.kind).map(run => {
+          const spans = readerRuns(l.text, l.kind).map((run) => {
             const Tag = run.strong ? "strong" : "span";
-            return <Tag key={run.from} data-source-from={sourceOffset(text, l.from + run.from)} data-source-to={sourceOffset(text, l.from + run.to)}>{run.text}</Tag>;
+            return (
+              <Tag
+                key={run.from}
+                data-source-from={sourceOffset(text, l.from + run.from)}
+                data-source-to={sourceOffset(text, l.from + run.to)}
+              >
+                {run.text}
+              </Tag>
+            );
           });
-          if (l.kind === "title") return <h2 key={l.line} data-line={l.line}>{spans}</h2>;
-          if (l.kind === "blank") return <div key={l.line} className="reader-blank" aria-hidden="true" />;
-          return <p key={l.line} data-line={l.line} className={l.kind === "option" ? "reader-option" : undefined}>
-            {l.kind === "option" && <CornerDownRight size={16} />}<span>{spans}</span>
-          </p>;
+          if (l.kind === "title")
+            return (
+              <h2 key={l.line} data-line={l.line}>
+                {spans}
+              </h2>
+            );
+          if (l.kind === "blank")
+            return (
+              <div key={l.line} className="reader-blank" aria-hidden="true" />
+            );
+          return (
+            <p
+              key={l.line}
+              data-line={l.line}
+              className={l.kind === "option" ? "reader-option" : undefined}
+            >
+              {l.kind === "option" && <CornerDownRight size={16} />}
+              <span>{spans}</span>
+            </p>
+          );
         })}
       </article>
     </div>
