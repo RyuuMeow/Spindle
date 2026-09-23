@@ -12,14 +12,36 @@ fs.mkdirSync(base, { recursive: true });
     fs.mkdirSync(profile, { recursive: true });
     fs.writeFileSync(
       path.join(root, "Harbour.yarn"),
-      "title: Arrival\n---\nMira: The lantern is still burning.\nNarrator: A quiet harbour waits beyond the rain.\n-> Follow the light\n    <<jump Lighthouse>>\n-> Stay by the shore\n    <<jump Shore>>\n===\ntitle: Lighthouse\n---\nMira: Someone has been here before us.\n===\ntitle: Shore\n---\nNarrator: The tide carries a letter to your feet.\n===\n",
+      'title: Arrival\n---\n\nMira: The lantern is still burning.\n<<play_sound "harbour_rain" 0.6>>\nNarrator: A quiet harbour waits beyond the rain.\n-> Follow the light\n    <<jump Lighthouse>>\n-> Stay by the shore\n    <<jump Shore>>\n===\ntitle: Lighthouse\n---\nMira: Someone has been here before us.\n===\ntitle: Shore\n---\nNarrator: The tide carries a letter to your feet.\n===\n',
     );
     fs.writeFileSync(
       path.join(root, ".spindle/project.json"),
       JSON.stringify({
         id: "public-demo",
         name: "The Quiet Harbour",
-        commands: [],
+        commands: [
+          {
+            name: "play_sound",
+            description: "Play a sound cue; set its volume for this scene.",
+            params: [
+              {
+                name: "clip",
+                type: "string",
+                required: true,
+                defaultValue: "",
+                description: "Sound asset to play",
+              },
+              {
+                name: "volume",
+                type: "number",
+                required: false,
+                defaultValue: "1",
+                description: "Playback volume",
+              },
+            ],
+            example: '<<play_sound "harbour_rain" 0.6>>',
+          },
+        ],
         files: [{ id: "harbour", name: "Harbour.yarn" }],
         excluded: [],
       }),
@@ -106,7 +128,79 @@ fs.mkdirSync(base, { recursive: true });
       if (language === "en") {
         const shots = path.resolve("docs/images");
         fs.mkdirSync(shots, { recursive: true });
-        await page.screenshot({ path: path.join(shots, "source.png") });
+        const sourceText = await page.evaluate(() =>
+          window.monaco.editor
+            .getEditors()
+            .find((editor) => editor.getDomNode()?.isConnected)
+            .getModel()
+            .getValue(),
+        );
+        const commandPoint = await page
+          .locator(".view-line")
+          .filter({ hasText: "play_sound" })
+          .first()
+          .evaluate((line) => {
+            const walker = document.createTreeWalker(
+              line,
+              NodeFilter.SHOW_TEXT,
+            );
+            let textNode;
+            while ((textNode = walker.nextNode())) {
+              const index = textNode.textContent.indexOf("play_sound");
+              if (index < 0) continue;
+              const range = document.createRange();
+              range.setStart(textNode, index);
+              range.setEnd(textNode, index + "play_sound".length);
+              const rect = range.getBoundingClientRect();
+              return {
+                x: rect.x + rect.width / 2,
+                y: rect.y + rect.height / 2,
+              };
+            }
+            throw Error("Custom command is not visible");
+          });
+        await page.mouse.move(commandPoint.x, commandPoint.y);
+        await page
+          .locator(
+            ".source-command-popup:not([hidden]) .command-tip-parameters",
+          )
+          .waitFor();
+        assert.match(
+          await page.locator(".source-command-popup:not([hidden])").innerText(),
+          /Play a sound cue/,
+        );
+        await page.screenshot({
+          path: path.join(shots, "assistance.png"),
+          clip: { x: 0, y: 0, width: 1080, height: 590 },
+        });
+        await page.mouse.move(1450, 130);
+        await page.evaluate(() => {
+          const editor = window.monaco.editor
+            .getEditors()
+            .find((item) => item.getDomNode()?.isConnected);
+          editor.focus();
+          editor.setPosition({ lineNumber: 3, column: 1 });
+        });
+        await page.keyboard.type("<<play", { delay: 85 });
+        await page.locator(".suggest-widget.visible").waitFor();
+        await page.locator(".source-completion-info:not([hidden])").waitFor();
+        assert.match(
+          await page
+            .locator(".source-completion-info:not([hidden])")
+            .innerText(),
+          /Play a sound cue/,
+        );
+        await page.screenshot({
+          path: path.join(shots, "source.png"),
+          clip: { x: 0, y: 0, width: 1080, height: 500 },
+        });
+        await page.keyboard.press("Escape");
+        await page.evaluate((text) => {
+          const editor = window.monaco.editor
+            .getEditors()
+            .find((item) => item.getDomNode()?.isConnected);
+          editor.getModel().setValue(text);
+        }, sourceText);
         await page
           .getByRole("radio", { name: "Reading editor", exact: true })
           .click();
@@ -192,7 +286,7 @@ fs.mkdirSync(base, { recursive: true });
           .first()
           .hover();
         await page.waitForTimeout(600);
-        await page.screenshot({ path: path.join(shots, "assistance.png") });
+        await page.screenshot({ path: path.join(base, "unknown-command.png") });
         await page.keyboard.press("Escape");
         await page
           .getByRole("button", { name: "Version history", exact: true })

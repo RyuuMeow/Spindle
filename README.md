@@ -12,21 +12,33 @@ A local-first Yarn Spinner dialogue editor for writers and game developers. Writ
 
 ## Your story, three views
 
+### Source
+
+Write Yarn directly with completion, diagnostics and quick fixes. Completion suggests built-in and project commands with their parameters; hovering a registered custom command shows its description and signature.
+
+![Source command completion](docs/images/source.png)
+
+![Custom command help](docs/images/assistance.png)
+
+### Reading editor
+
+Edit dialogue in a more readable layout, or switch to a dialogue-only reading mode.
+
 ![Reading editor](docs/images/reading.png)
 
-- **Source** — completion, parameter help, diagnostics, quick fixes and project-wide search.
-- **Reading editor** — readable dialogue with inline editing and a dialogue-only reading mode.
-- **Flowchart** — automatic arrangement when requested, movable cards, pins and saved manual layouts.
-- **Local projects** — quiet autosave, multiple windows, per-document history and a recoverable project trash.
-- **Your workspace** — shared style defaults with per-mode overrides, English / 繁體中文 / 简体中文.
+### Flowchart
 
-| Follow the branches | Find anything |
-|---|---|
-| ![Flowchart](docs/images/graph.png) | ![Unified search](docs/images/search.png) |
+Arrange scenes when you choose, then move cards and pins to keep a manual layout.
 
-| Make it yours | Connect an agent |
+| Follow the branches | Compare revisions |
 |---|---|
-| ![Appearance](docs/images/appearance.png) | ![Agent integration](docs/images/agent.png) |
+| ![Flowchart](docs/images/graph.png) | ![Version comparison](docs/images/history.png) |
+
+Local projects provide quiet autosave, multiple windows, document history and a recoverable trash. Shared style defaults can be overridden per mode in English, 繁體中文 or 简体中文.
+
+| Find anything | Make it yours |
+|---|---|
+| ![Unified search](docs/images/search.png) | ![Editor appearance](docs/images/appearance.png) |
 
 ## Start writing
 
@@ -39,6 +51,8 @@ Projects store configuration, history and trash in `.spindle/`. Existing `.yarn`
 ## MCP and Skill
 
 Enable read-only or editing access in **Settings → MCP / Agent integration**. Install the user-level Codex or Claude Code connection and Skill from the same page. Spindle must remain running. The agent can inspect selections, validate scripts, manage commands and perform version-protected edits.
+
+![Agent integration](docs/images/agent.png)
 
 Read the [connection guide](docs/mcp.md) and [portable Skill](skills/spindle/SKILL.md). Agent installation does not change its approval policy.
 
@@ -62,9 +76,3 @@ pnpm desktop:pack        # Portable + NSIS
 Spindle is licensed under [GPL-3.0-only](LICENSE). Third-party components retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md). [Contribution guide](CONTRIBUTING.md).
 
 [Architecture](docs/workspace-architecture.md) · [UI conventions](docs/ui-design.md) · [Release notes](releases/0.10.0/en.md)
-
-## Assistance and history
-
-| Editor assistance | Version comparison |
-|---|---|
-| ![Assistance](docs/images/assistance.png) | ![History](docs/images/history.png) |

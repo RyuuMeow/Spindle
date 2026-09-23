@@ -12,21 +12,33 @@
 
 ## 三种视角，同一份故事
 
+### 纯文本
+
+直接编写 Yarn，搭配补全、诊断与快速修复。补全列表提供内置与项目自定义命令及参数；将鼠标移到已注册的自定义命令上，可以查看说明和参数。
+
+![纯文本命令补全](docs/images/source.png)
+
+![自定义命令提示](docs/images/assistance.png)
+
+### 阅读编辑
+
+在易读的版面中直接编辑对话，也可以切换到只显示台词的阅读模式。
+
 ![阅读编辑](docs/images/reading.png)
 
-- **纯文字**：补全、参数提示、诊断、快速修正与全局搜寻。
-- **阅读编辑**：直接编辑易读的对话，亦可切换只显示台词的阅读模式。
-- **流程图**：主动整理、自订节点与卡片位置、pin 理线及持久布局。
-- **本机专案**：安静自动保存、多视窗、文件版本历史及专案垃圾桶。
-- **个人风格**：全局预设与模式覆写，支援 English／繁体中文／简体中文。
+### 流程图
 
-| 故事分支 | 统一搜寻 |
-|---|---|
-| ![流程图](docs/images/graph.png) | ![搜寻](docs/images/search.png) |
+需要时主动整理场景，再移动卡片和 pin，保存手动布局。
 
-| 编辑器风格 | Agent 整合 |
+| 故事分支 | 版本比较 |
 |---|---|
-| ![风格](docs/images/appearance.png) | ![Agent](docs/images/agent.png) |
+| ![流程图](docs/images/graph.png) | ![版本比较](docs/images/history.png) |
+
+本地项目支持安静的自动保存、多窗口、文档历史和可恢复的回收站。编辑器风格可设置全局默认值与模式覆盖，并支持 English、繁體中文和简体中文。
+
+| 统一搜索 | 编辑器风格 |
+|---|---|
+| ![搜索](docs/images/search.png) | ![风格](docs/images/appearance.png) |
 
 ## 开始撰写
 
@@ -39,6 +51,8 @@
 ## MCP 与 Skill
 
 在「设定 → MCP／Agent 整合」启用唯读或修改存取，并安装 Codex／Claude Code 使用者层级设定与 Skill。Spindle 需要持续执行。Agent 可读取框选、验证剧本、管理指令并进行有版本保护的修改。
+
+![Agent 整合](docs/images/agent.png)
 
 详见 [接入指南](docs/mcp.md) 与 [Skill](skills/spindle/SKILL.md)。安装不改变 Agent 的批准规则。
 
@@ -62,9 +76,3 @@ pnpm desktop:pack
 采 [GPL-3.0-only](LICENSE)；第三方资源保留各自授权，见 [第三方声明](THIRD_PARTY_NOTICES.md)。[贡献指南](CONTRIBUTING.md)。
 
 [架构](docs/workspace-architecture.md) · [UI 规范](docs/ui-design.md) · [版本记录](releases/0.10.0/zh-CN.md)
-
-## 提示与版本历史
-
-| Editor assistance | Version comparison |
-|---|---|
-| ![Assistance](docs/images/assistance.png) | ![History](docs/images/history.png) |
