@@ -132,6 +132,10 @@
 .reading-editor .reading-assignment {
   padding: 0 7px;
 }
+.reading-editor .reading-character-name,
+.reading-editor .reading-character-name * {
+  color: var(--character-name-color) !important;
+}
 .reading-editor .reading-role {
   color: #c2beb5;
   font-weight: 500;

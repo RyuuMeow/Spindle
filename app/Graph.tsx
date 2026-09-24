@@ -2,7 +2,12 @@
 import { t as tr } from "./i18n/index.ts";
 
 import { useEditorContext } from "./mcp/editor-context";
-import { usePreview } from "./play/context";
+import { usePreview, ReadingPortrait } from "./play/context";
+import {
+  characterColor,
+  colorSurface,
+  speakerSpan,
+} from "./play/character-presentation";
 import { pt } from "./play/messages";
 import { useAppearance, appearanceVariables } from "./appearance/context";
 
@@ -140,7 +145,13 @@ const sidePosition = {
 };
 
 function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
-  const { visited } = usePreview();
+  const { visited, resources, presentation } = usePreview();
+  const { style } = useAppearance("graph");
+  const summary = data.node?.summary || "";
+  const speaker = data.kind === "scene" ? speakerSpan(summary) : null;
+  const actor =
+    speaker &&
+    resources?.config.characters.find((c) => c.name === speaker.name);
   const played =
     data.node &&
     visited.some(
@@ -241,10 +252,33 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
               className="flow-card-summary"
               title={data.node?.summary || undefined}
             >
-              {data.node?.summary ||
+              {speaker ? (
+                <>
+                  <ReadingPortrait speaker={speaker.name} />
+                  {summary.slice(0, speaker.from)}
+                  <span
+                    style={
+                      presentation.useNameColors
+                        ? {
+                            color: characterColor(
+                              speaker.name,
+                              actor || undefined,
+                              colorSurface(style.background),
+                            ),
+                          }
+                        : undefined
+                    }
+                  >
+                    {summary.slice(speaker.from, speaker.to)}
+                  </span>
+                  {summary.slice(speaker.to)}
+                </>
+              ) : (
+                data.node?.summary ||
                 (data.kind === "missing"
                   ? tr("m57496d36d567")
-                  : tr("md8d9bccf322b"))}
+                  : tr("md8d9bccf322b"))
+              )}
             </p>
           ) : null}
           <button

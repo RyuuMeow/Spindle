@@ -35,6 +35,9 @@ import type { DocumentRecord, TextEdit } from "../workspace/types";
 import { difference } from "../workspace/engine";
 import { readingStructure } from "../reading/structure";
 import { readingDecorations } from "../reading/decorations";
+import { usePreview } from "../play/context";
+import { colorSurface } from "../play/character-presentation";
+import { readingLengthWarnings } from "../diagnostics/reading-length";
 import {
   mapSceneScope,
   sceneEdits,
@@ -100,6 +103,15 @@ export default function SceneEditor(props: Props) {
     "graph",
     collectVariables(props.documents),
   );
+  const preview = usePreview();
+  const previewRef = useRef(preview);
+  const surfaceRef = useRef(colorSurface(appearanceConfig.style.background));
+  useEffect(() => {
+    previewRef.current = preview;
+    surfaceRef.current = colorSurface(appearanceConfig.style.background);
+    const view = viewRef.current;
+    if (view && !view.composing) view.dispatch({ effects: refresh.of(null) });
+  }, [preview, appearanceConfig.style.background]);
   latest.current = props;
   const [recovered] = useState(() =>
     loadSceneDraft(props.doc.id, props.node.name),
@@ -199,6 +211,10 @@ export default function SceneEditor(props: Props) {
           state,
           latest.current.commands,
           bodyStructure(state.doc.toString()),
+          state.readOnly,
+          previewRef.current.resources,
+          previewRef.current.presentation,
+          surfaceRef.current,
         ),
       update: (value, tr) =>
         composing.current
@@ -210,6 +226,10 @@ export default function SceneEditor(props: Props) {
                 tr.state,
                 latest.current.commands,
                 bodyStructure(tr.state.doc.toString()),
+                tr.state.readOnly,
+                previewRef.current.resources,
+                previewRef.current.presentation,
+                surfaceRef.current,
               )
             : value,
       provide: (field) => EditorView.decorations.from(field),
@@ -233,6 +253,19 @@ export default function SceneEditor(props: Props) {
             (file, line) => latest.current.onVariableNavigate?.(file, line),
           ),
           decorations,
+          readingLengthWarnings(() => {
+            const offset =
+              source.current.slice(0, scope.current.from).split("\n").length -
+              1;
+            return (latest.current.issues || [])
+              .filter(
+                (i) =>
+                  i.file === latest.current.doc.name &&
+                  i.line > offset &&
+                  !quietDiagnostic(i.file, i.line),
+              )
+              .map((i) => ({ ...i, line: i.line - offset }));
+          }),
           editable.of([
             EditorView.editable.of(!recovered),
             EditorState.readOnly.of(!!recovered),

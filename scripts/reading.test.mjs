@@ -47,6 +47,63 @@ function decorations(text, cursor = text.length, readOnly = false) {
   return { state, ranges, widgets: ranges.filter((r) => r.spec.widget) };
 }
 
+test("character colors decorate Chinese names in active and inactive dialogue without editing source", () => {
+  const text = source("小明: 你好。\nMira: Hello.");
+  const preview = {
+    config: {
+      characters: [
+        { name: "小明", displayName: "Different", color: "#abc123" },
+      ],
+    },
+    images: {},
+  };
+  for (const anchor of [0, text.indexOf("你好")]) {
+    const state = EditorState.create({ doc: text, selection: { anchor } });
+    const result = [];
+    readingDecorations(state, [], undefined, false, preview, {
+      showPortraits: false,
+      useNameColors: true,
+      sourceNameColors: false,
+    }).between(0, text.length, (from, to, value) =>
+      result.push({ from, to, spec: value.spec }),
+    );
+    const name = result.find(
+      (r) =>
+        r.spec.attributes?.class === "reading-character-name" &&
+        text.slice(r.from, r.to) === "小明",
+    );
+    assert.ok(name);
+    assert.equal(name.spec.attributes.style, "--character-name-color:#abc123");
+    assert.equal(state.doc.toString(), text);
+    assert.equal(state.selection.main.head, anchor);
+    assert.equal(
+      result.some((r) => r.spec.widget?.constructor.name === "PortraitWidget"),
+      false,
+    );
+  }
+});
+
+test("portrait and name-color switches are independent and portraits use a solid fallback", () => {
+  const text = source("小明: 你好。");
+  const state = EditorState.create({ doc: text });
+  const result = [];
+  readingDecorations(state, [], undefined, false, null, {
+    showPortraits: true,
+    useNameColors: false,
+    sourceNameColors: false,
+  }).between(0, text.length, (from, to, value) => result.push(value.spec));
+  assert.equal(
+    result.some((s) => s.attributes?.class === "reading-character-name"),
+    false,
+  );
+  const portrait = result.find(
+    (s) => s.widget?.constructor.name === "PortraitWidget",
+  ).widget;
+  assert.equal(portrait.name, "小明");
+  assert.match(portrait.color, /^#[\da-f]{6}$/i);
+  assert.equal(portrait.image, undefined);
+});
+
 test("variables distinguish command expressions from quoted strings and comments", () => {
   const line = bodyLine("<<set $score = $base + 1>> // $comment");
   assert.deepEqual(
@@ -246,7 +303,11 @@ test("semantic groups add breathing room even when the source has no blank lines
           ],
     );
   }
-  assert.equal(groupGaps(spaced).find(line => line.text.startsWith("<<play_sound")).before, 0);
+  assert.equal(
+    groupGaps(spaced).find((line) => line.text.startsWith("<<play_sound"))
+      .before,
+    0,
+  );
   const gaps = groupGaps(compact);
   assert.equal(
     gaps.find((line) => line.text.startsWith("<<play_sound")).before,
@@ -418,11 +479,15 @@ test("display command metadata adds virtual labels without changing Yarn or sele
   assert.equal(activeHints.length, 0);
 });
 
-
 test("blank spacing keeps condition and option border padding", () => {
-  const lines = readingStructure(source("Mira: before\n\n<<if $key>>\n\nMira: branch\n\n<<endif>>\n\n-> Pick\n    <<jump Next>>"));
+  const lines = readingStructure(
+    source(
+      "Mira: before\n\n<<if $key>>\n\nMira: branch\n\n<<endif>>\n\n-> Pick\n    <<jump Next>>",
+    ),
+  );
   const layout = readingLayout(lines);
-  const item = value => layout[lines.findIndex(line => line.text === value)];
+  const item = (value) =>
+    layout[lines.findIndex((line) => line.text === value)];
   assert.equal(item("<<if $key>>").before, 16);
   assert.equal(item("Mira: before").after, 0);
   assert.equal(item("Mira: branch").before, 0);

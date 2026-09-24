@@ -16,7 +16,8 @@ import { commandEnd, readingVariables } from "./tokens";
 import { readingLayout } from "./layout";
 import { readingIcon, type ReadingIcon } from "./icons";
 import type { PreviewResources } from "../play/types";
-import { dialogueText } from "../play/presentation";
+import { characterColor, speakerSpan } from "../play/character-presentation";
+import { resolvePresentation } from "../workspace/presentation-preferences";
 
 class PortraitWidget extends WidgetType {
   constructor(
@@ -37,13 +38,13 @@ class PortraitWidget extends WidgetType {
     const span = document.createElement("span");
     span.className = "reading-portrait";
     span.setAttribute("aria-hidden", "true");
-    if (this.color) span.style.borderColor = this.color;
+    if (!this.image && this.color) span.style.backgroundColor = this.color;
     if (this.image) {
       const image = document.createElement("img");
       image.src = this.image;
       image.alt = "";
       span.appendChild(image);
-    } else span.textContent = [...this.name].slice(0, 2).join("");
+    }
     return span;
   }
   ignoreEvent() {
@@ -103,6 +104,8 @@ export function readingDecorations(
   lines: ReadingLine[] = readingStructure(state.doc.toString()),
   readOnly = false,
   preview?: PreviewResources | null,
+  presentation = resolvePresentation().editorCharacters,
+  surface: "dark" | "light" = "dark",
 ) {
   const definitions = commands.filter(
     (c): c is Command => typeof c !== "string",
@@ -156,6 +159,20 @@ export function readingDecorations(
         names.includes(line.command),
       rhythm = layout[index],
       classes = ["reading-line", ...rhythm.classes];
+    const speaker = line.kind === "dialogue" ? speakerSpan(line.text) : null;
+    const actor =
+      speaker &&
+      preview?.config.characters.find((c) => c.name === speaker.name);
+    if (speaker && presentation.useNameColors) {
+      ranges.push(
+        Decoration.mark({
+          attributes: {
+            class: "reading-character-name",
+            style: `--character-name-color:${characterColor(speaker.name, actor || undefined, surface)}`,
+          },
+        }).range(line.from + speaker.from, line.from + speaker.to),
+      );
+    }
     if (active) {
       ranges.push(
         Decoration.line({
@@ -231,15 +248,13 @@ export function readingDecorations(
     );
     let rawInline: { from: number; to: number } | undefined;
     if (line.kind === "dialogue") {
-      const speaker = dialogueText(trim).speaker,
-        actor = preview?.config.characters.find((c) => c.name === speaker);
-      if (speaker)
+      if (speaker && presentation.showPortraits)
         ranges.push(
           Decoration.widget({
             widget: new PortraitWidget(
-              actor?.displayName || speaker,
+              speaker.name,
               actor?.portrait ? preview?.images[actor.portrait] : undefined,
-              actor?.color,
+              characterColor(speaker.name, actor || undefined, surface),
             ),
             side: -1,
           }).range(from),

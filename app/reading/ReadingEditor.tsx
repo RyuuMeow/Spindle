@@ -12,6 +12,8 @@ import { appearanceVariables } from "../appearance/context";
 import type { YarnVariable } from "../variable-completion";
 import { commandEditing } from "./command-input";
 import { readingLengthWarnings } from "../diagnostics/reading-length";
+import { colorSurface } from "../play/character-presentation";
+import { useAppearance } from "../appearance/context";
 import { sceneLinks } from "./scene-links";
 
 import { useEffect, useRef } from "react";
@@ -113,14 +115,19 @@ export default function ReadingEditor(props: Props) {
     "rendered",
     props.variables,
   );
-  const { resources } = usePreview();
+  const { resources, presentation } = usePreview();
+  const { style: characterStyle } = useAppearance("rendered");
+  const presentationRef = useRef(presentation);
+  const surfaceRef = useRef(colorSurface(characterStyle.background));
   const previewRef = useRef(resources);
   useEffect(() => {
     previewRef.current = resources;
+    presentationRef.current = presentation;
+    surfaceRef.current = colorSurface(characterStyle.background);
     const view = viewRef.current;
     if (view && !view.composing)
       view.dispatch({ effects: refreshDecorations.of(null) });
-  }, [resources]);
+  }, [resources, presentation, characterStyle.background]);
   useEffect(() => {
     latest.current = props;
   });
@@ -169,6 +176,8 @@ export default function ReadingEditor(props: Props) {
           state.field(structure),
           state.readOnly,
           previewRef.current,
+          presentationRef.current,
+          surfaceRef.current,
         ),
       update: (value, tr) =>
         composing
@@ -183,6 +192,8 @@ export default function ReadingEditor(props: Props) {
                 tr.state.field(structure),
                 tr.state.readOnly,
                 previewRef.current,
+                presentationRef.current,
+                surfaceRef.current,
               )
             : value,
       provide: (field) => EditorView.decorations.from(field),

@@ -7,6 +7,8 @@ import { useEditorContext } from "./mcp/editor-context";
 import { offsetAt, positionAt } from "./mcp/coordinates";
 import { variableQuickFix } from "./variable-quick-fix";
 import { sourceHighlights } from "./appearance/monaco-highlights";
+import { sourceCharacters } from "./play/source-characters";
+import { usePreview } from "./play/context";
 import { unregisteredCommand } from "./command-quick-fix";
 import { sourceCommandAssistance } from "./source-command-assistance";
 import { sceneLink } from "./scene-link";
@@ -120,6 +122,25 @@ export default function CodeEditor({
     },
   );
   const { appearance, style } = useAppearance("source");
+  const preview = usePreview();
+  const characters = useRef<ReturnType<typeof sourceCharacters> | null>(null);
+  const characterSettings = useRef({
+    enabled: preview.presentation.sourceNameColors,
+    background: style.background,
+    resources: preview.resources,
+  });
+  useLayoutEffect(() => {
+    characterSettings.current = {
+      enabled: preview.presentation.sourceNameColors,
+      background: style.background,
+      resources: preview.resources,
+    };
+    characters.current?.refresh();
+  }, [
+    preview.presentation.sourceNameColors,
+    preview.resources,
+    style.background,
+  ]);
   const selectionInset =
     Math.max(0, (style.fontSize * style.lineHeight - style.fontSize - 2) / 2) +
     "px";
@@ -476,6 +497,11 @@ export default function CodeEditor({
           }
         };
         syncModel();
+        characters.current = sourceCharacters(
+          editor,
+          () => characterSettings.current,
+        );
+        editor.onDidDispose(() => characters.current?.dispose());
         highlights.current = sourceHighlights(
           editor,
           () => highlightStyle.current,

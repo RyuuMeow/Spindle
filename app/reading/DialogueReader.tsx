@@ -10,8 +10,12 @@ import { useEffect, useMemo, useRef } from "react";
 import { CornerDownRight } from "lucide-react";
 import { readingStructure } from "./structure";
 import "./dialogue-reader.css";
-import { ReadingPortrait } from "../play/context";
-import { dialogueText } from "../play/presentation";
+import { ReadingPortrait, usePreview } from "../play/context";
+import {
+  characterColor,
+  colorSurface,
+  speakerSpan,
+} from "../play/character-presentation";
 
 /** A source-linked reading surface. It never evaluates branches or edits the script. */
 export default function DialogueReader({
@@ -29,6 +33,7 @@ export default function DialogueReader({
   width?: "standard" | "wide";
 }) {
   const { style, appearance } = useAppearance("reader");
+  const { resources, presentation } = usePreview();
   const host = useRef<HTMLDivElement>(null);
   const initialLine = useRef(line);
   const selection = useRef<SourceSelection | null>(null);
@@ -94,11 +99,26 @@ export default function DialogueReader({
     >
       <article>
         {content.map((l) => {
+          const speaker = l.kind === "dialogue" ? speakerSpan(l.text) : null;
+          const actor =
+            speaker &&
+            resources?.config.characters.find((c) => c.name === speaker.name);
           const spans = readerRuns(l.text, l.kind).map((run) => {
             const Tag = run.strong ? "strong" : "span";
             return (
               <Tag
                 key={run.from}
+                style={
+                  run.strong && speaker && presentation.useNameColors
+                    ? {
+                        color: characterColor(
+                          speaker.name,
+                          actor || undefined,
+                          colorSurface(style.background),
+                        ),
+                      }
+                    : undefined
+                }
                 data-source-from={sourceOffset(text, l.from + run.from)}
                 data-source-to={sourceOffset(text, l.from + run.to)}
               >
@@ -124,9 +144,7 @@ export default function DialogueReader({
             >
               {l.kind === "option" && <CornerDownRight size={16} />}
               {l.kind === "dialogue" && (
-                <ReadingPortrait
-                  speaker={dialogueText(l.text.trim()).speaker}
-                />
+                <ReadingPortrait speaker={speaker?.name || ""} />
               )}
               <span>{spans}</span>
             </p>
