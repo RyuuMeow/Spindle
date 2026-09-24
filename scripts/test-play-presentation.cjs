@@ -41,6 +41,19 @@ fs.writeFileSync(
     `Mira: ${second}`,
     ...options,
     "===",
+    "title: AutoChoice",
+    "---",
+    "Mira: Choose a route.",
+    "-> Left",
+    "    Mira: Left route.",
+    "-> Right",
+    "    Mira: Right route.",
+    "===",
+    "title: Short",
+    "---",
+    "Mira: The ferry is here. Shall we go?",
+    "Rowan: 我們一起走吧。",
+    "===",
     "title: Novel",
     "---",
     ...novelLines,
@@ -274,29 +287,151 @@ async function screenshot(name) {
     "Splitter arrows resize without advancing or rewinding the runtime",
   );
 
-  // Real pointer clicks on dialogue, not direct calls to next(), exercise gesture guards.
+  const dialogue = play.locator(".play-vn-dialogue");
+  const advance = play.locator(".play-vn-advance");
+  async function assertAdvanceCue(visible) {
+    assert.equal(
+      await play.locator(".play-vn-page-indicator").count(),
+      0,
+      "Local pagination has no visible page counter",
+    );
+    assert.equal(
+      (await advance.textContent()).trim(),
+      "",
+      "Advance has no visible Continue/page label",
+    );
+    assert(
+      (await advance.getAttribute("aria-label"))?.length > 0,
+      "Icon-only advance retains an accessible name",
+    );
+    const cue = await advance.evaluate((el) => {
+      const glyph = el.querySelector("svg");
+      const rect = el.getBoundingClientRect();
+      return {
+        visibility: glyph && getComputedStyle(glyph).visibility,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+    assert.equal(cue.visibility, visible ? "visible" : "hidden");
+    assert(
+      cue.width >= 35.5 && cue.height >= 35.5,
+      "Small glyph keeps a 36 CSS px hit target",
+    );
+  }
+  async function pageInfo() {
+    return dialogue.evaluate((el) => ({
+      page: Number(el.dataset.page),
+      count: Number(el.dataset.pageCount),
+    }));
+  }
+  async function assertTwoLinePage() {
+    const geometry = await text.evaluate((el) => ({
+      client: el.clientHeight,
+      scroll: el.scrollHeight,
+      line: parseFloat(getComputedStyle(el).lineHeight),
+      overflow: getComputedStyle(el).overflowY,
+    }));
+    assert(geometry.client <= geometry.line * 2 + 2, JSON.stringify(geometry));
+    assert(
+      geometry.scroll <= geometry.client + 2,
+      "No hidden third line: " + JSON.stringify(geometry),
+    );
+    assert(
+      !["auto", "scroll"].includes(geometry.overflow),
+      "VN dialogue is paginated, not scrollable",
+    );
+  }
+  const initialPage = await pageInfo();
+  assert.equal(initialPage.page, 1);
+  assert(initialPage.count > 2);
+  await assertAdvanceCue(false);
   await text.click({ position: { x: 12, y: 12 } });
+  await frames();
+  const firstPageText = await text.textContent();
+  assert(firstPageText.length > 0 && firstPageText.length < first.length);
+  assert(first.startsWith(firstPageText));
+  assert.equal((await pageInfo()).page, 1);
   assert.equal((await state()).state.revision, s.state.revision);
+  await assertAdvanceCue(true);
+  await assertTwoLinePage();
+  await screenshot("vn-long-dialogue-page-1");
+  await text.click({ position: { x: 12, y: 12 } });
+  await frames();
+  assert.equal((await pageInfo()).page, 2);
+  assert.equal((await state()).state.revision, s.state.revision);
+  await assertAdvanceCue(false);
+  checks.push(
+    "VN pointer click reveals one page then advances locally without runtime mutation",
+  );
+
+  const previousRun = s.runId;
+  s = await act({ action: "start", scene: "Start" });
+  assert(s.runId && s.runId !== previousRun);
+  assert.equal((await pageInfo()).page, 1);
+  assert((await text.textContent()).length < firstPageText.length);
+  checks.push("Restart resets run identity, local page and typewriter");
+  await play.emulateMedia({ reducedMotion: "reduce" });
+  await frames();
   assert.equal(
     await text.textContent(),
-    first,
-    "First click completes the same sentence",
+    firstPageText,
+    "Reduced motion reveals only the current page",
   );
-  const overflow = await text.evaluate((el) => ({
-    scroll: el.scrollHeight,
-    client: el.clientHeight,
-    top: el.scrollTop,
-  }));
+  assert.equal((await state()).state.revision, s.state.revision);
+  checks.push(
+    "Reduced motion reveals the current page without exceeding two lines",
+  );
+
+  // Resizing preserves the source anchor rather than resetting to the first page.
+  await advance.click();
+  await frames();
+  const beforeResize = await pageInfo();
+  const resizeText = await text.textContent();
+  const sourceAnchor = firstPageText.length;
+  assert.equal(
+    first.slice(sourceAnchor, sourceAnchor + resizeText.length),
+    resizeText,
+  );
+  await resize(760, 540);
+  await frames();
+  const narrowPage = await pageInfo();
+  const narrowText = await text.textContent();
+  assert(narrowPage.count >= beforeResize.count);
+  assert(narrowPage.page >= beforeResize.page);
   assert(
-    overflow.scroll > overflow.client,
-    "Fixture must really overflow the VN dialogue",
+    narrowText.includes(resizeText.slice(0, 10)),
+    "Narrow page contains the previous source anchor",
   );
+  await assertTwoLinePage();
+  assert.equal((await state()).state.revision, s.state.revision);
+  await resize(1200, 800);
+  await frames();
+  assert.deepEqual(await pageInfo(), beforeResize);
+  assert.equal(await text.textContent(), resizeText);
+  checks.push(
+    "Narrow/wide reflow retains the source anchor without runtime mutation",
+  );
+  s = await act({ action: "start", scene: "Start" });
+  const pageCount = (await pageInfo()).count;
+  const rendered = [];
+  for (let page = 1; page <= pageCount; page++) {
+    assert.equal((await pageInfo()).page, page);
+    assert.equal((await state()).state.revision, s.state.revision);
+    rendered.push(await text.textContent());
+    await assertTwoLinePage();
+    if (page < pageCount) {
+      await advance.click();
+      await frames();
+    }
+  }
+  assert.equal(rendered.join(""), first, "All content survives pagination");
   assert(
-    overflow.top >= overflow.scroll - overflow.client - 3,
-    "Revealed text follows to its end",
+    rendered.some((value) => value.includes("👨‍👩‍👧‍👦")),
+    "Family emoji stays on one page",
   );
-  await screenshot("vn-long-dialogue");
-  await text.click({ position: { x: 12, y: 12 } });
+  await screenshot("vn-long-dialogue-final-page");
+  await advance.click();
   await play.waitForFunction(
     async (revision) =>
       (await window.yarnDesktop.play.action({ action: "state" })).state
@@ -307,99 +442,53 @@ async function screenshot(name) {
   s = await state();
   assert(
     s.state.events
-      .filter((e) => e.kind === "line")
+      .filter((event) => event.kind === "line")
       .at(-1)
       .text.includes("Second passage."),
   );
-  assert.equal(
-    await text.evaluate((el) => el.scrollTop),
-    0,
-    "Next line starts at its top",
-  );
+  assert.equal((await pageInfo()).page, 1);
+  assert(second.startsWith(await text.textContent()));
+  await assertTwoLinePage();
   checks.push(
-    "VN click first reveals, then advances; overflowing dialogue follows and resets",
+    "Every local page preserves text; only leaving the final page advances runtime",
   );
-
-  // Restart while the first sentence is already fully revealed must get a new run key.
-  s = await act({ action: "start", scene: "Start" });
-  await text.click({ position: { x: 12, y: 12 } });
-  assert.equal(await text.textContent(), first);
-  const previousRun = s.runId;
-  s = await act({ action: "start", scene: "Start" });
-  assert(s.runId && s.runId !== previousRun, "Restart changes run identity");
-  assert(
-    (await text.textContent()).length < first.length,
-    "Restart begins a fresh typewriter pass",
-  );
-  checks.push(
-    "Restart changes runId and replays typewriter even for identical first dialogue",
-  );
-
-  await play.emulateMedia({ reducedMotion: "reduce" });
-  await frames();
-  assert.equal(
-    await text.textContent(),
-    first,
-    "Reduced motion exposes the complete line",
-  );
-  assert.equal((await state()).state.revision, s.state.revision);
-  const animation = await play
-    .locator(".play-stage-shade")
-    .evaluate((el) => getComputedStyle(el).animationName);
-  assert.equal(animation, "none");
-  checks.push("Reduced motion shows full dialogue without runtime mutation");
-
-  // The VN paragraph must retain keyboard scrollability; wheel scrolling isn't an advance.
-  await text.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-  });
-  const currentRevision = s.state.revision;
+  const wheelPage = await pageInfo();
   await text.hover();
   await play.mouse.wheel(0, -200);
   await frames();
-  assert.equal((await state()).state.revision, currentRevision);
-  await act({ action: "next" });
-  assert.equal(await text.textContent(), second);
-  assert.equal(await text.evaluate((el) => el.scrollTop), 0);
-  checks.push(
-    "Wheel reading does not advance; a complete following long line resets to its top",
-  );
+  assert.deepEqual(await pageInfo(), wheelPage);
+  assert.equal((await state()).state.revision, s.state.revision);
+  checks.push("Wheel does not navigate fixed message pages or runtime");
 
-  // Backreading a long VN paragraph must pause Auto before its next deadline.
   const autoButton = play.locator(".play-vn-quick button").nth(0);
-  await text.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-  });
-  await frames();
   await autoButton.click();
-  const scrollRevision = (await state()).state.revision;
-  await text.evaluate((el) => {
-    el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight - 100);
-    el.dispatchEvent(new Event("scroll", { bubbles: true }));
-  });
-  await frames();
-  assert.equal(
-    await autoButton.getAttribute("aria-pressed"),
-    "false",
-    "VN backreading pauses Auto",
+  await play.waitForFunction(
+    () =>
+      Number(
+        document.querySelector(".play-vn-dialogue")?.getAttribute("data-page"),
+      ) > 1,
+    null,
+    { timeout: 8000 },
   );
-  await play.waitForTimeout(5300);
-  assert.equal((await state()).state.revision, scrollRevision);
-  checks.push("Scrolling back within a long VN paragraph pauses Auto");
-
-  // Auto must stop while reviewing backlog, including beyond the auto-advance deadline.
-  await autoButton.click();
-  assert.equal(await autoButton.getAttribute("aria-pressed"), "true");
+  assert.equal(
+    (await state()).state.revision,
+    s.state.revision,
+    "Auto consumes local pages first",
+  );
   await play.locator(".play-vn-quick button").nth(1).click();
   await play.locator(".play-backlog").waitFor();
   const backlogRevision = (await state()).state.revision;
+  const backlogPage = await pageInfo();
   assert.equal(await autoButton.getAttribute("aria-pressed"), "false");
-  await play.waitForTimeout(5300); // Deliberately exceeds the production 5s maximum Auto delay.
+  await play.waitForTimeout(5300);
   assert.equal((await state()).state.revision, backlogRevision);
+  assert.deepEqual(await pageInfo(), backlogPage);
   await screenshot("vn-backlog");
   await play.keyboard.press("Escape");
   await play.locator(".play-backlog").waitFor({ state: "hidden" });
-  checks.push("Opening backlog turns Auto off and prevents hidden progression");
+  checks.push(
+    "Auto traverses pages; backlog stops local and runtime progression past the deadline",
+  );
 
   await act({ action: "start", scene: "Novel" });
   for (let i = 0; i < 20; i++) await act({ action: "next" });
@@ -475,6 +564,51 @@ async function screenshot(name) {
     "Fourteen long choices scroll independently at 760×540 without obscuring dialogue",
   );
 
+  // Entering VN at a pending choice can have unread local pages from the previous line.
+  // Local page controls must remain usable without selecting an option or running the VM.
+  const waitingPages = await pageInfo();
+  if (waitingPages.page < waitingPages.count) {
+    assert(
+      await advance.isEnabled(),
+      "Pending options cannot strand unread dialogue pages",
+    );
+    await advance.click();
+    await frames();
+    assert.equal((await pageInfo()).page, waitingPages.page + 1);
+    assert.equal((await state()).state.revision, s.state.revision);
+    assert.equal((await state()).state.status, "options");
+    if ((await pageInfo()).page < waitingPages.count) {
+      await play.evaluate(() => document.activeElement?.blur());
+      const beforeArrow = (await pageInfo()).page;
+      await play.keyboard.press("ArrowRight");
+      await frames();
+      assert.equal(
+        (await pageInfo()).page,
+        beforeArrow + 1,
+        "Keyboard matches local-page click behavior",
+      );
+      assert.equal((await state()).state.revision, s.state.revision);
+    }
+    while ((await pageInfo()).page < waitingPages.count) {
+      await advance.click();
+      await frames();
+      assert.equal((await state()).state.revision, s.state.revision);
+    }
+    assert.equal(
+      await advance.isEnabled(),
+      false,
+      "Final waiting page prompts a choice instead of advancing VM",
+    );
+    assert.equal((await state()).state.status, "options");
+    await assertAdvanceCue(false);
+  }
+  checks.push(
+    "Pending choices preserve usable local paging without runtime advancement",
+  );
+  checks.push(
+    "VN uses only a named triangle cue: hidden while typing or waiting for choices, visible when ready; no page counter or Continue label",
+  );
+
   const enter = play.getByRole("button", {
     name: /^(Enter game view|進入遊戲畫面|进入游戏画面)$/,
   });
@@ -507,7 +641,9 @@ async function screenshot(name) {
   await act({ action: "start", scene: "Art" });
   await frames();
   assert.equal(await play.locator(".play-stage .play-actor img").count(), 3);
-  assert.equal(await text.textContent(), cjk);
+  assert(cjk.startsWith(await text.textContent()));
+  assert((await pageInfo()).count > 1);
+  await assertTwoLinePage();
   assert.equal(
     await play
       .locator(".play-actor-center")
@@ -533,6 +669,57 @@ async function screenshot(name) {
     "Generated bright-background / three-actor / long-CJK contrast fixtures rendered for visual review",
   );
 
+  await resize(1200, 800);
+  await act({ action: "start", scene: "Short" });
+  assert.equal((await pageInfo()).count, 1);
+  assert.equal(await text.textContent(), "The ferry is here. Shall we go?");
+  await assertTwoLinePage();
+  await screenshot("vn-short-dialogue");
+  await enter.click();
+  await frames();
+  await screenshot("vn-game-short-dialogue");
+  await play.keyboard.press("Escape");
+  await advance.click();
+  await frames();
+  await play.waitForFunction(
+    () =>
+      document.querySelector(".play-vn-text")?.textContent === "我們一起走吧。",
+  );
+  assert.equal(await text.textContent(), "我們一起走吧。");
+  await screenshot("vn-short-cjk");
+  checks.push(
+    "Short English and CJK dialogue remain one page in normal and immersive VN",
+  );
+  await act({ action: "start", scene: "AutoChoice" });
+  await autoButton.click();
+  await play.waitForFunction(
+    async () =>
+      (await window.yarnDesktop.play.action({ action: "state" })).state
+        .status === "options",
+    null,
+    { timeout: 8000 },
+  );
+  // The host can answer state before the renderer receives and commits its event.
+  // Wait for the actual UI contract, with a short bound that still fails a stuck Auto.
+  await play.waitForFunction(
+    () =>
+      document
+        .querySelector(".play-vn-quick button")
+        ?.getAttribute("aria-pressed") === "false",
+    null,
+    { timeout: 2000 },
+  );
+  assert.equal(await autoButton.getAttribute("aria-pressed"), "false");
+  const autoStopped = await state();
+  assert.equal(
+    autoStopped.state.events.some((event) => event.kind === "choice"),
+    false,
+  );
+  await play.waitForTimeout(1200);
+  assert.equal((await state()).state.revision, autoStopped.state.revision);
+  checks.push(
+    "Normal Auto reaches a choice then stops without selecting or changing the waiting revision",
+  );
   assert.deepEqual(errors, []);
   fs.writeFileSync(
     path.join(out, "result.json"),

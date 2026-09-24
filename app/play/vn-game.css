@@ -6,8 +6,8 @@
   --vn-accent: #c8c4d8;
   --vn-line: #c8c4d844;
   --vn-story-font:
-    "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Noto Serif CJK TC",
-    "PMingLiU", Georgia, serif;
+    "Yu Gothic UI", "Microsoft JhengHei UI", "Microsoft YaHei UI",
+    "Noto Sans CJK TC", system-ui, sans-serif;
   flex: 1;
   min-height: 0;
   isolation: isolate;
@@ -41,12 +41,7 @@
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(
-    #11131d55,
-    transparent 25%,
-    #11131d22 55%,
-    #11131daa
-  );
+  background: linear-gradient(#10192822, transparent 32%, #1023310d);
 }
 .play-scene-caption {
   position: absolute;
@@ -116,7 +111,7 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 28px;
-  padding: 56px 0 0;
+  padding: 48px clamp(20px, 8cqw, 120px) clamp(16px, 3vh, 28px);
 }
 .play-vn-choices {
   min-height: 0;
@@ -137,69 +132,61 @@
   min-height: 44px;
   justify-content: center;
   text-align: center;
-  padding: 13px 28px;
-  border: 0;
-  border-top: 1px solid var(--vn-line);
-  border-bottom: 1px solid var(--vn-line);
-  border-radius: 0;
-  color: var(--vn-paper);
-  background: linear-gradient(
-    90deg,
-    #181b2900,
-    #181b29e8 12%,
-    #181b29ed 88%,
-    #181b2900
-  );
-  box-shadow: none;
-  font: 18px/1.6 var(--vn-story-font);
-  text-shadow: 0 1px 3px #0009;
+  padding: 11px 24px;
+  border: 1px solid #d7eef9b3;
+  border-radius: 26px;
+  color: #fff;
+  background: linear-gradient(100deg, #245c7fea, #377c9fe8);
+  box-shadow:
+    0 3px 12px #102b4130,
+    inset 0 1px #ffffff26;
+  font: 17px/1.6 var(--vn-story-font);
+  text-shadow: 0 1px 2px #173d58;
   transition:
     background 0.15s,
     border-color 0.15s;
 }
 .play-stage .play-options > div > button:hover:not(:disabled) {
-  background: linear-gradient(
-    90deg,
-    #55516d00,
-    #55516dcc 12%,
-    #55516dcc 88%,
-    #55516d00
-  );
-  border-color: var(--vn-accent);
+  background: linear-gradient(100deg, #337c9ff5, #4c96b6f5);
+  border-color: #fff;
 }
 .play-stage .play-options > div > button:focus-visible {
   outline-color: var(--vn-paper);
   outline-offset: -4px;
 }
 .play-stage .play-options > div > button:disabled {
-  opacity: 0.6;
-  color: var(--vn-muted);
+  opacity: 0.75;
+  color: #d4dfe5;
+  background: #344b60ed;
   border-style: dashed;
 }
 .play-vn-dialogue {
   min-width: 0;
   position: relative;
-  padding: 18px clamp(28px, 6cqw, 100px) 52px;
-  border: 0;
-  background: linear-gradient(180deg, #111320c9, #10111eea 45%, #0c0e18f7);
-  box-shadow: 0 -12px 40px #11132022;
-  max-height: min(44vh, 330px);
+  padding: 32px clamp(18px, 3cqw, 40px) 42px;
+  border: 1px solid #effaffba;
+  border-radius: 12px;
+  background: linear-gradient(115deg, #f3f9f5ed, #e7f3f9e8);
+  box-shadow:
+    0 4px 18px #122b442a,
+    inset 0 1px #fff9;
+  color: #263d4b;
   display: flex;
   flex-direction: column;
 }
 .play-vn-dialogue::before {
   content: "";
   position: absolute;
-  top: 0;
-  left: 4%;
-  right: 4%;
+  left: 16px;
+  right: 16px;
+  bottom: 38px;
   height: 1px;
   background: linear-gradient(
     90deg,
-    transparent,
-    var(--vn-accent) 12%,
-    var(--vn-line) 65%,
-    transparent
+    #78aeca00,
+    #78aeca40 12%,
+    #78aeca40 88%,
+    #78aeca00
   );
   pointer-events: none;
 }
@@ -207,92 +194,104 @@
   cursor: pointer;
 }
 .play-nameplate {
-  align-self: flex-start;
+  position: absolute;
+  left: 20px;
+  top: -18px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 0 8px;
-  margin: 0 0 5px;
-  background: transparent;
-  border: 0;
-  max-width: 100%;
-  text-shadow: 0 2px 6px #000;
+  justify-content: center;
+  gap: 9px;
+  min-width: 100px;
+  max-width: min(65%, 320px);
+  height: 34px;
+  padding: 0 20px;
+  margin: 0;
+  border: 1px solid #d5effcba;
+  border-radius: 18px 18px 18px 4px;
+  color: #fff;
+  background: linear-gradient(100deg, #2b6486f5, #427c9cf5);
+  box-shadow: 0 2px 6px #173b4e26;
 }
 .play-nameplate strong {
-  font: 20px/1.5 var(--vn-story-font);
-  font-weight: 600;
-  color: var(--vn-paper);
+  font: 600 15px/1.4 var(--vn-story-font);
+  color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.play-nameplate.is-narration {
+  visibility: hidden;
+}
 .play-character-mark {
-  width: 18px;
-  height: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
   flex-shrink: 0;
-  background: var(--vn-accent);
+  background: #d1eafd;
+  box-shadow: 0 0 0 2px #ffffff24;
 }
 .play-vn-text {
-  font: clamp(18px, 1.8cqw, 22px)/1.8 var(--vn-story-font);
-  text-shadow: 0 1px 3px #000b;
+  font: 500 clamp(17px, 1.9cqw, 21px)/1.7 var(--vn-story-font);
+  text-shadow: none;
   min-width: 0;
-  flex: 1;
-  min-height: 0;
-  height: 5.4em;
+  flex: none;
+  height: 3.4em;
+  min-height: 3.4em;
+  max-height: 3.4em;
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #c8c4d855 transparent;
-  overscroll-behavior: contain;
+  overflow: hidden;
   cursor: text;
 }
 .play-vn-quick {
   position: absolute;
-  bottom: 8px;
-  left: clamp(28px, 6cqw, 100px);
+  bottom: 2px;
+  left: 20px;
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 .play-app .play-vn-quick button {
   min-height: 36px;
-  padding: 4px 6px;
+  padding: 3px 5px;
   border: 0;
-  border-radius: 0;
+  border-radius: 4px;
   background: transparent;
-  color: var(--vn-muted);
-  font-size: 11px;
+  color: #526d7c;
+  font-size: 10px;
 }
 .play-app .play-vn-quick button[aria-pressed="true"] {
-  color: var(--vn-paper);
-  box-shadow: inset 0 -1px var(--vn-accent);
+  color: #154e72;
+  box-shadow: inset 0 -2px #397a9c;
 }
 .play-app .play-vn-quick button:hover:not(:disabled) {
-  color: white;
-  background: #c8c4d810;
+  color: #153f5b;
+  background: #276c8f12;
 }
 .play-app .play-vn-advance {
   position: absolute;
-  bottom: 8px;
-  right: clamp(28px, 6cqw, 100px);
-  padding: 4px 8px;
+  bottom: 2px;
+  right: 18px;
+  padding: 3px 6px;
   border: 0;
   min-height: 36px;
-  color: var(--vn-accent);
-  font-size: 11px;
+  width: 36px;
+  justify-content: center;
+  color: #365f76;
+  font-size: 10px;
   background: transparent;
-  gap: 8px;
+  gap: 5px;
 }
 .play-app .play-vn-advance:hover:not(:disabled) {
-  background: #d1b78a18;
+  background: transparent;
+  color: #153f5b;
 }
 .play-app .play-vn-advance:disabled {
   opacity: 0.85;
-  color: var(--vn-muted);
+  color: #587382;
 }
 .play-app .play-vn-advance:focus-visible {
-  outline-color: var(--vn-paper);
+  outline-color: #195578;
 }
 .play-exit-immersive {
   position: absolute;
@@ -375,14 +374,7 @@
     padding: 12px;
   }
   .play-game-content {
-    padding: 52px 0 0;
     gap: 24px;
-  }
-  .play-vn-dialogue {
-    padding-top: 16px;
-  }
-  .play-nameplate {
-    margin-top: 0;
   }
   .characters-layout {
     flex-direction: column;
@@ -391,31 +383,48 @@
     flex-basis: auto;
   }
 }
-@container (max-width: 460px) {
+
+/* Two-line pagination is a presentation rule, not inferred from source games. */
+.play-app .play-vn-quick button:focus-visible {
+  outline-color: #195578;
+}
+@container (max-width:560px) {
+  .play-game-content {
+    padding-inline: 16px;
+    gap: 22px;
+  }
   .play-vn-choices {
-    padding-inline: 12px;
+    padding-inline: 5px;
   }
   .play-vn-choices .play-options {
     width: 100%;
   }
   .play-stage .play-options > div > button {
-    font-size: 16px;
-    padding: 10px 16px;
+    font-size: 15px;
+    padding: 9px 16px;
   }
   .play-vn-dialogue {
-    padding-inline: 20px;
-    padding-bottom: 88px;
-    max-height: 52vh;
+    padding-inline: 18px;
+  }
+  .play-nameplate {
+    left: 16px;
   }
   .play-vn-quick {
-    left: 20px;
-    bottom: 8px;
+    left: 12px;
+    gap: 3px;
   }
   .play-app .play-vn-advance {
-    right: 14px;
-    bottom: 44px;
+    right: 10px;
   }
-  .play-nameplate strong {
-    font-size: 18px;
+}
+@container (max-width:380px) {
+  .play-vn-dialogue {
+    padding-bottom: 74px;
+  }
+  .play-vn-dialogue::before {
+    bottom: 70px;
+  }
+  .play-app .play-vn-advance {
+    bottom: 36px;
   }
 }

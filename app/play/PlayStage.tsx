@@ -1,9 +1,10 @@
 "use client";
-import { ChevronDown, ChevronRight, History, Pause, Play } from "lucide-react";
+import { History, Pause, Play } from "lucide-react";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { Stage } from "./presentation";
 import type { PlaySession } from "./types";
 import { pt } from "./messages";
+import { measureDialoguePages } from "./dialogue-pages";
 import "./vn-game.css";
 
 /** Game presentation deliberately contains no editor/source navigation controls. */
@@ -22,7 +23,9 @@ export function PlayStage({
   auto,
   onAuto,
   onBacklog,
-  onUserScrollAway,
+  onMeasure,
+  page,
+  pageCount,
 }: {
   session: PlaySession | null;
   stage: Stage;
@@ -38,23 +41,29 @@ export function PlayStage({
   auto: boolean;
   onAuto(): void;
   onBacklog(): void;
-  onUserScrollAway(): void;
+  onMeasure(key: string, ends: number[]): void;
+  page: number;
+  pageCount: number;
 }) {
   const textArea = useRef<HTMLParagraphElement>(null);
-  const follow = useRef(true);
-  const previousLine = useRef("");
   const gesture = useRef<{ x: number; y: number; scroll: number } | null>(null);
   useLayoutEffect(() => {
     const el = textArea.current;
     if (!el) return;
-    if (previousLine.current !== lineKey) {
-      previousLine.current = lineKey;
-      follow.current = true;
-      el.scrollTop = 0;
-    } else if (follow.current) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [lineKey, text]);
+    let active = true;
+    const measure = () => {
+      if (active && el.clientWidth > 0)
+        onMeasure(lineKey, measureDialoguePages(el, fullText));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    void document.fonts.ready.then(measure);
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [lineKey, fullText, onMeasure, hasLine]);
   const character = session?.resources.config.characters.find(
     (c) => c.name === speaker,
   );
@@ -110,7 +119,9 @@ export function PlayStage({
         <div className="play-vn-choices">{choices}</div>
         {hasLine && (
           <section
-            className={`play-vn-dialogue ${canAdvance ? "can-advance" : ""}`}
+            className={`play-vn-dialogue play-vn-page ${canAdvance ? "can-advance" : ""}`}
+            data-page={page}
+            data-page-count={pageCount}
             aria-label={pt("line")}
             onPointerDown={(event) => {
               gesture.current =
@@ -145,33 +156,27 @@ export function PlayStage({
               next();
             }}
           >
-            {speaker && (
-              <div className="play-nameplate">
-                <span
-                  className="play-character-mark"
-                  style={{ background: character?.color }}
-                />
-                <strong>{character?.displayName || speaker}</strong>
-              </div>
-            )}
-            <p
-              ref={textArea}
-              className="play-vn-text"
-              aria-hidden="true"
-              onScroll={() => {
-                const el = textArea.current!;
-                follow.current =
-                  el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-                if (!follow.current) onUserScrollAway();
-              }}
+            <div
+              className={`play-nameplate ${speaker ? "" : "is-narration"}`}
+              aria-hidden={!speaker}
             >
+              <span
+                className="play-character-mark"
+                style={{ background: character?.color }}
+              />
+              <strong title={character?.displayName || speaker}>
+                {character?.displayName || speaker}
+              </strong>
+            </div>
+            <p ref={textArea} className="play-vn-text" aria-hidden="true">
               {text}
             </p>
-            <span className="sr-only">{fullText}</span>
             <div className="play-vn-quick" aria-label={pt("play")}>
               <button
                 aria-pressed={auto}
-                disabled={!auto && !canAdvance}
+                disabled={
+                  !auto && (!canAdvance || session?.state.status !== "line")
+                }
                 onClick={onAuto}
               >
                 {auto ? <Pause size={12} /> : <Play size={12} />}
@@ -185,22 +190,27 @@ export function PlayStage({
             {["line", "options"].includes(session?.state.status || "") && (
               <button
                 className="play-vn-advance"
-                aria-label={revealing ? pt("revealLine") : pt("continueStory")}
+                aria-label={
+                  revealing
+                    ? pt("revealPage")
+                    : page < pageCount
+                      ? pt("nextPage")
+                      : pt("continueStory")
+                }
                 disabled={!canAdvance}
                 onClick={next}
               >
-                <span>
-                  {canAdvance
-                    ? revealing
-                      ? pt("revealLine")
-                      : pt("continueStory")
-                    : pt("chooseOption")}
-                </span>
-                {canAdvance ? (
-                  <ChevronRight size={18} />
-                ) : (
-                  <ChevronDown size={18} />
-                )}
+                <svg
+                  width="12"
+                  height="8"
+                  viewBox="0 0 12 8"
+                  aria-hidden="true"
+                  style={{
+                    visibility: canAdvance && !revealing ? "visible" : "hidden",
+                  }}
+                >
+                  <path d="M1 1h10L6 7z" fill="currentColor" />
+                </svg>
               </button>
             )}
           </section>

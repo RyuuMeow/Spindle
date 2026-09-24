@@ -1,5 +1,6 @@
 "use client";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -201,31 +202,58 @@ export default function PlayApp() {
     ].map((s) => s.segment);
   const segmentCount = segments.length;
   const lineKey = session?.runId + ":" + lastLine?.id + ":" + lastLine?.text;
+  const [pagination, setPagination] = useState({ key: "", ends: [0] });
+  const [pageAnchor, setPageAnchor] = useState({ key: "", offset: 0 });
+  const measurePages = useCallback((key: string, ends: number[]) => {
+    setPagination((previous) =>
+      previous.key === key && previous.ends.join() === ends.join()
+        ? previous
+        : { key, ends },
+    );
+  }, []);
+  const pageEnds =
+    pagination.key === lineKey ? pagination.ends : [segmentCount];
+  const pageIndex = Math.max(
+    0,
+    pageEnds.findIndex(
+      (end) => end > (pageAnchor.key === lineKey ? pageAnchor.offset : 0),
+    ),
+  );
+  const pageStart =
+    mode === "vn" && pageIndex > 0 ? pageEnds[pageIndex - 1] : 0;
+  const pageEnd = mode === "vn" ? pageEnds[pageIndex] : segmentCount;
+  const pageReady = mode !== "vn" || pagination.key === lineKey;
   const animateText = typewriter && !reducedMotion;
   const shown = animateText
     ? progress.key === lineKey
-      ? progress.count
-      : 0
-    : segmentCount;
+      ? Math.max(pageStart, Math.min(pageEnd, progress.count))
+      : pageStart
+    : pageEnd;
+  const canAdvancePresentation =
+    pageReady &&
+    !busy &&
+    (state?.status === "line" ||
+      (state?.status === "options" &&
+        (shown < pageEnd || (mode === "vn" && pageEnd < segmentCount))));
   useEffect(() => {
-    if (!animateText) return;
+    if (!animateText || !pageReady) return;
     const timer = setInterval(
       () =>
         setProgress((p) =>
-          p.key === lineKey && p.count >= segmentCount
+          p.key === lineKey && p.count >= pageEnd
             ? p
             : {
                 key: lineKey,
                 count: Math.min(
-                  segmentCount,
-                  (p.key === lineKey ? p.count : 0) + 1,
+                  pageEnd,
+                  Math.max(pageStart, p.key === lineKey ? p.count : 0) + 1,
                 ),
               },
         ),
       1000 / Math.max(5, speed),
     );
     return () => clearInterval(timer);
-  }, [lineKey, animateText, speed, segmentCount]);
+  }, [lineKey, animateText, speed, pageStart, pageEnd, pageReady]);
   useEffect(() => {
     if (mode === "novel" && follow.current && transcript.current)
       transcript.current.scrollTop = transcript.current.scrollHeight;
@@ -245,9 +273,12 @@ export default function PlayApp() {
     }
   }
   function next() {
-    if (shown < segmentCount)
-      setProgress({ key: lineKey, count: segmentCount });
-    else if (state?.status === "line") void act({ action: "next" });
+    if (!canAdvancePresentation) return;
+    if (shown < pageEnd) setProgress({ key: lineKey, count: pageEnd });
+    else if (mode === "vn" && pageEnd < segmentCount) {
+      setPageAnchor({ key: lineKey, offset: pageEnd });
+      setProgress({ key: lineKey, count: pageEnd });
+    } else if (state?.status === "line") void act({ action: "next" });
   }
   useEffect(() => {
     if (
@@ -259,12 +290,12 @@ export default function PlayApp() {
       state?.status !== "line"
     )
       return;
-    if (shown < segmentCount) return;
+    if (!pageReady || shown < pageEnd) return;
     const timer = setTimeout(
       () => {
-        void act({ action: "next" });
+        next();
       },
-      Math.max(900, Math.min(5000, segmentCount * 35)),
+      Math.max(900, Math.min(5000, (pageEnd - pageStart) * 35)),
     );
     return () => clearTimeout(timer);
   });
@@ -463,7 +494,7 @@ export default function PlayApp() {
         <button
           title={pt("next")}
           aria-label={pt("next")}
-          disabled={busy || state?.status !== "line"}
+          disabled={!canAdvancePresentation}
           onClick={next}
         >
           <ArrowRight size={18} />
@@ -615,7 +646,9 @@ export default function PlayApp() {
               session={session}
               lineKey={lineKey}
               auto={auto}
-              onUserScrollAway={() => setAuto(false)}
+              onMeasure={measurePages}
+              page={pageIndex + 1}
+              pageCount={pageEnds.length}
               onAuto={() => setAuto(!auto)}
               onBacklog={() => {
                 setAuto(false);
@@ -623,11 +656,11 @@ export default function PlayApp() {
               }}
               stage={stage}
               speaker={line.speaker}
-              text={segments.slice(0, shown).join("")}
+              text={segments.slice(pageStart, shown).join("")}
               fullText={line.text}
               hasLine={!!lastLine}
-              revealing={shown < segmentCount}
-              canAdvance={!busy && state?.status === "line"}
+              revealing={shown < pageEnd}
+              canAdvance={canAdvancePresentation}
               next={next}
               choices={choices}
             />
@@ -885,9 +918,11 @@ export default function PlayApp() {
         aria-live="polite"
         aria-atomic="true"
       >
-        <span key={lineKey}>
-          {session?.runId && lastLine
-            ? displayName(line.speaker) + ": " + line.text
+        <span key={lineKey + ":" + pageStart}>
+          {session?.runId && lastLine && pageReady
+            ? displayName(line.speaker) +
+              ": " +
+              segments.slice(pageStart, pageEnd).join("")
             : ""}
         </span>
       </span>

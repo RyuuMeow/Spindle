@@ -26,6 +26,8 @@ const messages = {
   novel: ["Novel", "小說", "小说"],
   vn: ["VN", "VN", "VN"],
   revealLine: ["Show full line", "顯示完整台詞", "显示完整台词"],
+  revealPage: ["Show this page", "顯示當頁全文", "显示当页全文"],
+  nextPage: ["Next page", "下一頁", "下一页"],
   continueStory: ["Continue", "繼續", "继续"],
   chooseOption: ["Choose a response", "選擇回應", "选择回应"],
   returnLatest: ["Return to latest", "回到最新台詞", "回到最新台词"],
