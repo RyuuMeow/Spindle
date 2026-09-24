@@ -405,6 +405,23 @@ async function screenshot(name) {
     "VN pointer click reveals one page then advances locally without runtime mutation",
   );
 
+  const rapidStart = await act({ action: "start", scene: "Short" });
+  const rapidRect = await text.boundingBox();
+  const rapidPoint = { x: rapidRect.x + 18, y: rapidRect.y + 12 };
+  await play.mouse.click(rapidPoint.x, rapidPoint.y, { clickCount: 1 });
+  assert.equal(await text.textContent(), "The ferry is here. Shall we go?");
+  assert.equal((await state()).state.revision, rapidStart.state.revision);
+  await play.mouse.click(rapidPoint.x, rapidPoint.y, { clickCount: 2 });
+  await waitForState((value) => value.revision > rapidStart.state.revision);
+  assert(
+    (await state()).state.events.some(
+      (event) => event.kind === "line" && event.text.includes("我們一起走吧。"),
+    ),
+  );
+  checks.push(
+    "A real double-click sequence reveals VN text on the first click and advances on the second",
+  );
+
   const previousRun = s.runId;
   s = await act({ action: "start", scene: "Start" });
   assert(s.runId && s.runId !== previousRun);
@@ -549,6 +566,163 @@ async function screenshot(name) {
   assert.equal((await state()).state.revision, novelRevision);
   checks.push(
     "Novel backreading position and runtime remain stable across presentation switches",
+  );
+
+  const novelAdvance = play.locator(".play-novel-advance");
+  const novelCue = play.locator(".play-novel-advance-cue");
+  assert.equal(
+    await novelAdvance.getAttribute("aria-disabled"),
+    "true",
+    "Backreading disables the novel advance surface",
+  );
+  const backreadRect = await transcript.boundingBox();
+  await play.mouse.click(backreadRect.x + 8, backreadRect.y + 25);
+  assert.equal(
+    (await state()).state.revision,
+    novelRevision,
+    "Clicking backread whitespace does not advance",
+  );
+
+  await play.locator(".play-return-latest").click();
+  const novelStart = await act({ action: "start", scene: "Short" });
+  await frames();
+  await novelAdvance.waitFor({ state: "visible" });
+  assert.equal(await novelAdvance.getAttribute("aria-disabled"), "false");
+  const tailStyle = await novelAdvance.evaluate((el) => ({
+    color: getComputedStyle(el).backgroundColor,
+    height: el.getBoundingClientRect().height,
+  }));
+  assert.equal(
+    tailStyle.color,
+    "rgba(0, 0, 0, 0)",
+    "Novel advance space has no button surface",
+  );
+  assert(
+    tailStyle.height >= 90,
+    "Novel has a usable trailing blank advance surface",
+  );
+  const tailRect = await novelAdvance.boundingBox();
+  await play.mouse.move(tailRect.x + 25, tailRect.y + 25);
+  await play.mouse.down();
+  await play.mouse.move(tailRect.x + 100, tailRect.y + 40, { steps: 8 });
+  await play.mouse.up();
+  assert.equal(
+    (await state()).state.revision,
+    novelStart.state.revision,
+    "Dragging across the tail is not a story advance",
+  );
+  await novelAdvance.click({ position: { x: 25, y: 25 } });
+  await waitForState((value) => value.revision > novelStart.state.revision);
+  assert(
+    (await state()).state.events.some(
+      (event) => event.kind === "line" && event.text.includes("我們一起走吧。"),
+    ),
+  );
+  await screenshot("novel-transparent-advance-ready");
+  const cueMotion = await novelCue.evaluate(
+    (el) => getComputedStyle(el).animationName,
+  );
+  assert.equal(
+    cueMotion,
+    "none",
+    "Reduced motion suppresses the novel cue blink",
+  );
+  await play.emulateMedia({ reducedMotion: "no-preference" });
+  await frames();
+  assert.notEqual(
+    await novelCue.evaluate((el) => getComputedStyle(el).animationName),
+    "none",
+    "The ready novel cue has a blink affordance",
+  );
+  await novelAdvance.focus();
+  await play.keyboard.press("Space");
+  // With typewriter enabled the first key completes the line; the next leaves it.
+  if ((await state()).state.status === "line")
+    await play.keyboard.press("Enter");
+  await waitForState((value) => value.status === "completed");
+  await play.emulateMedia({ reducedMotion: "reduce" });
+  await act({ action: "start", scene: "AutoChoice" });
+  const novelChoices = await act({ action: "next" });
+  assert.equal(novelChoices.state.status, "options");
+  assert.equal(await novelAdvance.getAttribute("aria-disabled"), "true");
+  await novelAdvance.click({ position: { x: 20, y: 20 }, force: true });
+  await novelAdvance.focus();
+  await play.keyboard.press("Enter");
+  assert.equal((await state()).state.revision, novelChoices.state.revision);
+  checks.push(
+    "Novel transparent tail supports click and keyboard with an accessible motion-aware cue; drag, backreading and waiting choices never advance",
+  );
+  const novelSelectionStart = await act({ action: "start", scene: "Short" });
+  await novelAdvance.focus();
+  const selectedStory = await play
+    .locator(".play-transcript-content .play-line p")
+    .first()
+    .evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return (
+        !selection.isCollapsed && selection.getRangeAt(0).intersectsNode(el)
+      );
+    });
+  assert(
+    selectedStory,
+    "A real DOM range intersects the story content without modifying CSS",
+  );
+  await play.keyboard.press("Enter");
+  assert.equal(
+    (await state()).state.revision,
+    novelSelectionStart.state.revision,
+    "A story selection protects against keyboard advance",
+  );
+  await play.evaluate(() => window.getSelection().removeAllRanges());
+  const novelDebugSearch = play.locator(".play-debug input[placeholder]");
+  await novelDebugSearch.fill("qa");
+  assert.equal(
+    await novelDebugSearch.evaluate((el) => {
+      el.select();
+      return el.value.slice(el.selectionStart, el.selectionEnd);
+    }),
+    "qa",
+  );
+  await novelAdvance.focus();
+  const debugSelectionScope = await play.evaluate(() => {
+    const selection = window.getSelection();
+    // Native focus may collapse the input selection. In that case exercise the
+    // range ownership rule explicitly, without changing user-select styles.
+    if (selection.isCollapsed || !selection.rangeCount) {
+      const range = document.createRange();
+      range.selectNodeContents(document.querySelector(".play-debug-current p"));
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    const content = document.querySelector(".play-transcript-content");
+    return {
+      active: !selection.isCollapsed && selection.rangeCount > 0,
+      intersectsStory: Array.from({ length: selection.rangeCount }, (_, i) =>
+        selection.getRangeAt(i).intersectsNode(content),
+      ).some(Boolean),
+    };
+  });
+  assert.deepEqual(debugSelectionScope, {
+    active: true,
+    intersectsStory: false,
+  });
+  await play.keyboard.press("Enter");
+  await waitForState(
+    (value) => value.revision > novelSelectionStart.state.revision,
+  );
+  assert(
+    (await state()).state.events.some(
+      (event) => event.kind === "line" && event.text.includes("我們一起走吧。"),
+    ),
+  );
+  await play.evaluate(() => window.getSelection().removeAllRanges());
+  await novelDebugSearch.fill("");
+  checks.push(
+    "Novel protects a story selection range while a retained debug selection range does not block keyboard advance",
   );
 
   await act({ action: "start", scene: "Start" });

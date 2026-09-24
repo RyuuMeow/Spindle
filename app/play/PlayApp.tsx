@@ -40,6 +40,7 @@ import type { PlayAction, PlayEvent, PlaySession, PlaySource } from "./types";
 import "./play.css";
 import { Portrait } from "./Portrait";
 import { PlayStage } from "./PlayStage";
+import { NovelAdvance } from "./NovelAdvance";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 function subscribeViewport(callback: () => void) {
@@ -99,6 +100,7 @@ export default function PlayApp() {
     [error, setError] = useState("");
   const [busy, setBusy] = useState(false),
     [auto, setAuto] = useState(false);
+  const actionPending = useRef(false);
   const [mode, setMode] = useState<"novel" | "vn">(() =>
     stored("mode", "novel"),
   );
@@ -282,7 +284,8 @@ export default function PlayApp() {
   }, [events.length, shown, mode]);
   async function act(action: PlayAction) {
     const s = current.current;
-    if (!s || busy) return;
+    if (!s || actionPending.current) return;
+    actionPending.current = true;
     setBusy(true);
     setError("");
     try {
@@ -291,6 +294,7 @@ export default function PlayApp() {
       setError(String(e));
       setAuto(false);
     } finally {
+      actionPending.current = false;
       setBusy(false);
     }
   }
@@ -663,27 +667,37 @@ export default function PlayApp() {
               if (!follow.current) setAuto(false);
             }}
           >
-            {events.map((event, i) => {
-              if (event.kind === "command" && events[i - 1]?.kind === "command")
-                return null;
-              if (
-                event.kind === "command" &&
-                events[i + 1]?.kind === "command"
-              ) {
-                let end = i + 1;
-                while (events[end]?.kind === "command") end++;
-                return (
-                  <details className="play-command" key={event.id}>
-                    <summary>
-                      {pt("command")} · {end - i}
-                    </summary>
-                    {events.slice(i, end).map((e) => renderEvent(e))}
-                  </details>
-                );
-              }
-              return renderEvent(event, events[i - 1]);
-            })}
-            {choices}
+            <div className="play-transcript-content">
+              {events.map((event, i) => {
+                if (
+                  event.kind === "command" &&
+                  events[i - 1]?.kind === "command"
+                )
+                  return null;
+                if (
+                  event.kind === "command" &&
+                  events[i + 1]?.kind === "command"
+                ) {
+                  let end = i + 1;
+                  while (events[end]?.kind === "command") end++;
+                  return (
+                    <details className="play-command" key={event.id}>
+                      <summary>
+                        {pt("command")} · {end - i}
+                      </summary>
+                      {events.slice(i, end).map((e) => renderEvent(e))}
+                    </details>
+                  );
+                }
+                return renderEvent(event, events[i - 1]);
+              })}
+              {choices}
+            </div>
+            <NovelAdvance
+              enabled={canAdvancePresentation && !away && !backlog && !snapshot}
+              revealing={shown < pageEnd}
+              next={next}
+            />
           </div>
           {mode === "vn" && (
             <PlayStage

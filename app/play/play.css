@@ -122,11 +122,51 @@
   position: relative;
 }
 .play-transcript {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 32px clamp(20px, 5vw, 72px) 96px;
+  padding: 32px clamp(20px, 5vw, 72px) 0;
   scrollbar-gutter: stable;
+}
+.play-transcript-content {
+  flex: 0 0 auto;
+}
+.play-novel-advance {
+  flex: 1 0 96px;
+  min-height: 96px;
+  display: grid;
+  place-items: center;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+}
+.play-novel-advance[aria-disabled="true"] {
+  cursor: default;
+}
+.play-novel-advance:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -4px;
+}
+.play-novel-advance-cue {
+  pointer-events: none;
+  animation: play-novel-cue 1.4s ease-in-out infinite;
+}
+@keyframes play-novel-cue {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .play-novel-advance-cue {
+    animation: none;
+  }
 }
 .play-line {
   display: flex;

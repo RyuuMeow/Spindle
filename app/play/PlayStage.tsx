@@ -141,7 +141,6 @@ export function PlayStage({
               if (
                 (event.detail !== 0 && !start) ||
                 !canAdvance ||
-                event.detail > 1 ||
                 (event.target as HTMLElement).closest(
                   "button,a,input,select",
                 ) ||
