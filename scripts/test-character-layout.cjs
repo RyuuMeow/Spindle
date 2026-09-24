@@ -259,6 +259,14 @@ async function create(name) {
           .evaluate((e) => getComputedStyle(e).borderTopWidth),
         "0px",
       );
+      const previewText = await page
+        .locator(".appearance-mode:visible .appearance-preview")
+        .innerText();
+      assert.match(previewText, /Follow the path/);
+      assert.match(
+        previewText,
+        /The lighthouse is just ahead; The lighthouse is still shining/,
+      );
       await page.screenshot({ path: path.join(out, "appearance.png") });
     });
     await check("zoom-responsive-workspace", async () => {
@@ -380,6 +388,58 @@ async function create(name) {
         true,
         "Close did not restore focus",
       );
+      const snapshot = await page.evaluate(() =>
+        window.yarnDesktop.request({ type: "snapshot" }),
+      );
+      const currentProject = snapshot.snapshot.projects.find(
+        (p) => p.root === root,
+      );
+      const doc = currentProject.documents.find((d) => d.name === "Story.yarn");
+      const { ChangeSet } = require("@codemirror/state");
+      const changes = ChangeSet.of(
+        {
+          from: 0,
+          to: doc.text.length,
+          insert: "title: Start\n---\n<<if>>\n===\n",
+        },
+        doc.text.length,
+      ).toJSON();
+      await page.evaluate((action) => window.yarnDesktop.request(action), {
+        type: "edit",
+        projectId: currentProject.id,
+        documentId: doc.id,
+        version: doc.version,
+        updates: [{ clientID: "character-layout-test", changes }],
+      });
+      await play.evaluate(async () => {
+        const s = await window.yarnDesktop.play.action({ action: "state" });
+        await window.yarnDesktop.play.action(
+          { action: "latest" },
+          s.state.revision,
+        );
+      });
+      await play.locator(".play-compile-panel").waitFor();
+      assert(
+        (
+          await play.evaluate(() =>
+            window.yarnDesktop.play.action({ action: "state" }),
+          )
+        ).state.diagnostics.some((d) => d.severity.toLowerCase() === "error"),
+      );
+      await play.locator(".play-compile-panel header button").click();
+      await play.evaluate(() =>
+        window.yarnDesktop.play.action({ action: "state" }),
+      );
+      await sleep(150);
+      assert.equal(
+        await play.locator(".play-compile-panel").count(),
+        0,
+        "State read reopened dismissed compile results",
+      );
+      results.checks.push({
+        name: "compile-error-auto-open-once",
+        passed: true,
+      });
     });
     assert.deepEqual(results.errors, []);
   } finally {
