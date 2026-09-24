@@ -1,0 +1,72 @@
+.characters-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.characters-view > header,
+.characters-view > .play-notice {
+  flex-shrink: 0;
+}
+.characters-view .characters-layout {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.characters-view .characters-layout nav {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.characters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+.characters-view .characters-list button {
+  justify-content: flex-start;
+  text-align: left;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
+}
+.characters-view .characters-content {
+  overflow: auto;
+  padding-right: 8px;
+}
+.characters-view .characters-layout nav form {
+  flex-shrink: 0;
+}
+.characters-view .characters-layout nav input {
+  width: 100%;
+}
+.characters-view .characters-content label > .compact-select {
+  width: 55%;
+}
+.characters-view .characters-content label > input[type="color"] {
+  max-width: 120px;
+}
+@media (max-width: 720px) {
+  .characters-view {
+    padding: 16px;
+  }
+  .characters-view .characters-layout {
+    gap: 14px;
+    flex-direction: row;
+  }
+  .characters-view .characters-layout nav {
+    flex-basis: 155px;
+  }
+  .characters-view .characters-content section {
+    padding: 14px;
+  }
+  .characters-view .characters-content label {
+    flex-wrap: wrap;
+  }
+  .characters-view .characters-content label > .compact-select,
+  .characters-view .characters-content label input:not([type="checkbox"]) {
+    width: 100%;
+  }
+}

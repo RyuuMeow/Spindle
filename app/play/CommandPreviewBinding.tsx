@@ -1,94 +1,71 @@
 "use client";
-import { useEffect, useState } from "react";
+import { CompactSelect } from "@/components/CompactSelect";
+import { usePreviewAutosave } from "./use-preview-autosave";
 import { pt } from "./messages";
 import type { PreviewConfig } from "./types";
 export default function CommandPreviewBinding({
   command,
   disabled,
+  projectId,
 }: {
   command: string;
+  projectId: string;
   disabled: boolean;
 }) {
-  const [config, setConfig] = useState<PreviewConfig | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const [binding, setBinding] = useState<
-    PreviewConfig["bindings"][number] | null
-  >(null);
-  useEffect(() => {
-    let cancelled = false;
-    void window.yarnDesktop?.play
-      .resources()
-      .then((r) => {
-        if (!cancelled) {
-          setConfig(r.config);
-          setBinding(
-            r.config.bindings.find((b) => b.command === command) || null,
-          );
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(String(e));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [command]);
-  async function save() {
-    if (!config || busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      const result = await window.yarnDesktop!.play.save({
-        ...config,
-        bindings: [
-          ...config.bindings.filter((b) => b.command !== command),
-          ...(binding ? [binding] : []),
-        ],
-      });
-      setConfig(result.config);
-      window.dispatchEvent(new Event("spindle-preview-changed"));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const {
+    draft: config,
+    error,
+    busy,
+    controller,
+  } = usePreviewAutosave(projectId);
+  const binding = config?.bindings.find((b) => b.command === command) || null;
+  const setBinding = (value: PreviewConfig["bindings"][number] | null) =>
+    controller?.update((c) => {
+      c.bindings = [
+        ...c.bindings.filter((b) => b.command !== command),
+        ...(value ? [value] : []),
+      ];
+    });
   return (
     <fieldset
       className="preview-binding"
-      disabled={disabled || !config || busy}
+      disabled={disabled || !config}
+      onCompositionStart={() => controller?.composition(true)}
+      onCompositionEnd={() => controller?.composition(false)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget))
+          void controller?.flush();
+      }}
     >
       <legend>{pt("effects")}</legend>
       <p>{pt("effectHelp")}</p>
       <label>
         {pt("effect")}
-        <select
+        <CompactSelect
           value={binding?.effect || "none"}
-          onChange={(e) =>
+          label={pt("effect")}
+          disabled={disabled || !config}
+          options={[
+            { value: "none", label: "—" },
+            ...(["background", "show", "hide", "expression"] as const).map(
+              (kind) => ({ value: kind, label: pt(kind) }),
+            ),
+          ]}
+          onChange={(value) =>
             setBinding(
-              e.target.value === "none"
+              value === "none"
                 ? null
                 : {
                     command,
-                    effect: e.target.value as "background",
-                    assetArgument: e.target.value === "background" ? 0 : 1,
+                    effect: value as "background",
+                    assetArgument: value === "background" ? 0 : 1,
                     characterArgument: 0,
                     position: "center",
                     fade: true,
                   },
             )
           }
-        >
-          <option value="none">—</option>
-          {(["background", "show", "hide", "expression"] as const).map(
-            (kind) => (
-              <option key={kind} value={kind}>
-                {pt(kind)}
-              </option>
-            ),
-          )}
-        </select>
+        />
       </label>
       {binding && (
         <>
@@ -124,18 +101,18 @@ export default function CommandPreviewBinding({
           </label>
           <label>
             {pt("position")}
-            <select
+            <CompactSelect
               value={binding.position}
-              onChange={(e) =>
-                setBinding({ ...binding, position: e.target.value as "center" })
+              label={pt("position")}
+              disabled={disabled || !config}
+              options={(["left", "center", "right"] as const).map((value) => ({
+                value,
+                label: pt(value),
+              }))}
+              onChange={(value) =>
+                setBinding({ ...binding, position: value as "center" })
               }
-            >
-              {(["left", "center", "right"] as const).map((position) => (
-                <option key={position} value={position}>
-                  {pt(position)}
-                </option>
-              ))}
-            </select>
+            />
           </label>
           <label>
             <input
@@ -149,10 +126,25 @@ export default function CommandPreviewBinding({
           </label>
         </>
       )}
-      <button type="button" onClick={() => void save()}>
-        {pt("save")}
-      </button>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <div role="alert">
+          <p>{error}</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void controller?.flush()}
+          >
+            {pt("retry")}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void controller?.reload()}
+          >
+            {pt("reloadSaved")}
+          </button>
+        </div>
+      )}
     </fieldset>
   );
 }

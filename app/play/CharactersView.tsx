@@ -1,67 +1,59 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Plus, Trash2, ImagePlus, Save } from "lucide-react";
+import { useState } from "react";
+import { CompactSelect } from "@/components/CompactSelect";
+import { usePreviewAutosave } from "./use-preview-autosave";
+
+import { Plus, Trash2, ImagePlus } from "lucide-react";
 import { pt } from "./messages";
-import {
-  previewSchema,
-  type PreviewResources,
-  type PreviewConfig,
-} from "./types";
+import type { PreviewConfig } from "./types";
 import "./play.css";
+import "./characters.css";
+import { characterColor } from "./character-presentation";
 
 export default function CharactersView({ projectId }: { projectId: string }) {
-  const [resources, setResources] = useState<PreviewResources | null>(null),
-    [draft, setDraft] = useState<PreviewConfig | null>(null);
+  return <CharactersEditor key={projectId} projectId={projectId} />;
+}
+function CharactersEditor({ projectId }: { projectId: string }) {
+  const {
+    resources,
+    draft,
+    error: saveError,
+    busy,
+    controller,
+  } = usePreviewAutosave(projectId);
   const [selected, setSelected] = useState(""),
+    [query, setQuery] = useState(""),
     [newName, setNewName] = useState(""),
     [variant, setVariant] = useState("default");
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
   const bridge =
     typeof window !== "undefined" ? window.yarnDesktop?.play : undefined;
-  useEffect(() => {
-    let cancelled = false;
-    void bridge
-      ?.resources()
-      .then((r) => {
-        if (!cancelled) {
-          setResources(r);
-          setDraft(r.config);
-          setSelected(r.config.characters[0]?.name || "");
+  const activeName =
+    selected || draft?.characters[0]?.name || resources?.speakers[0] || "";
+  const character =
+    draft && activeName
+      ? draft.characters.find((c) => c.name === activeName) || {
+          name: activeName,
+          displayName: activeName,
+          color: "#b9ccd7",
+          colorMode: "auto" as const,
+          portraits: {},
+          sprites: {},
         }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(String(e));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, bridge]);
-  const character = draft?.characters.find((c) => c.name === selected);
-  const update = (change: (config: PreviewConfig) => void) => {
-    if (!draft) return;
-    const next = structuredClone(draft);
-    change(next);
-    setDraft(next);
-    setSaved(false);
-  };
-  const save = async () => {
-    if (!bridge || !draft) return;
-    setBusy(true);
-    setError("");
-    try {
-      const result = await bridge.save(previewSchema.parse(draft));
-      setResources(result);
-      setDraft(result.config);
-      setSaved(true);
-      window.dispatchEvent(new Event("spindle-preview-changed"));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+      : undefined;
+  const update = (change: (config: PreviewConfig) => void) =>
+    controller?.update((c) => {
+      const provisional =
+        character && !c.characters.some((x) => x.name === activeName);
+      if (provisional) c.characters.push(structuredClone(character));
+      change(c);
+      if (
+        provisional &&
+        JSON.stringify(c.characters.find((x) => x.name === activeName)) ===
+          JSON.stringify(character)
+      )
+        c.characters = c.characters.filter((x) => x.name !== activeName);
+    });
   const importImage = async (
     kind: "portrait" | "portraits" | "sprites" | "backgrounds",
   ) => {
@@ -70,13 +62,11 @@ export default function CharactersView({ projectId }: { projectId: string }) {
     try {
       const asset = await bridge.importImage();
       if (!asset) return;
-      setResources(
-        (r) => r && { ...r, images: { ...r.images, [asset.id]: asset.data } },
-      );
+      controller?.addImage(asset.id, asset.data);
       update((c) => {
         if (kind === "backgrounds") c.backgrounds[variant.trim()] = asset.id;
         else {
-          const actor = c.characters.find((x) => x.name === selected)!;
+          const actor = c.characters.find((x) => x.name === activeName)!;
           if (kind === "portrait") actor.portrait = asset.id;
           else actor[kind][variant.trim()] = asset.id;
         }
@@ -87,51 +77,65 @@ export default function CharactersView({ projectId }: { projectId: string }) {
   };
   if (!bridge) return <p>{pt("projectOnly")}</p>;
   return (
-    <div className="characters-view">
+    <div
+      className="characters-view"
+      onCompositionStart={() => controller?.composition(true)}
+      onCompositionEnd={() => controller?.composition(false)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget))
+          void controller?.flush();
+      }}
+    >
       <header>
         <div>
           <h1>{pt("characters")}</h1>
           <p>{pt("characterHelp")}</p>
         </div>
-        <button disabled={!draft || busy} onClick={() => void save()}>
-          <Save size={16} />
-          {saved ? pt("saved") : pt("save")}
-        </button>
       </header>
-      {error && (
-        <p className="play-notice error" role="alert">
-          {error}
-        </p>
+      {(error || saveError) && (
+        <div className="play-notice error" role="alert">
+          <p>{error || saveError}</p>
+          <button disabled={busy} onClick={() => void controller?.flush()}>
+            {pt("retry")}
+          </button>
+          <button disabled={busy} onClick={() => void controller?.reload()}>
+            {pt("reloadSaved")}
+          </button>
+        </div>
       )}
       {draft && (
         <div className="characters-layout">
           <nav aria-label={pt("characters")}>
-            {[
-              ...new Set([
-                ...draft.characters.map((c) => c.name),
-                ...(resources?.speakers || []),
-              ]),
-            ].map((name) => (
-              <button
-                key={name}
-                aria-pressed={selected === name}
-                onClick={() => {
-                  if (!draft.characters.some((c) => c.name === name))
-                    update((c) =>
-                      c.characters.push({
-                        name,
-                        displayName: name,
-                        color: "#b9ccd7",
-                        portraits: {},
-                        sprites: {},
-                      }),
-                    );
-                  setSelected(name);
-                }}
-              >
-                {name}
-              </button>
-            ))}
+            <input
+              aria-label={pt("searchCharacters")}
+              placeholder={pt("searchCharacters")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <div className="characters-list">
+              {[
+                ...new Set([
+                  ...draft.characters.map((c) => c.name),
+                  ...(resources?.speakers || []),
+                ]),
+              ]
+                .filter((name) =>
+                  name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+                )
+                .map((name) => (
+                  <button
+                    key={name}
+                    aria-pressed={activeName === name}
+                    onClick={() => {
+                      void controller?.flush().then((ok) => {
+                        if (ok) setSelected(name);
+                      });
+                    }}
+                  >
+                    {name}
+                  </button>
+                ))}
+            </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -143,6 +147,7 @@ export default function CharactersView({ projectId }: { projectId: string }) {
                     name,
                     displayName: name,
                     color: "#b9ccd7",
+                    colorMode: "auto",
                     portraits: {},
                     sprites: {},
                   }),
@@ -177,8 +182,26 @@ export default function CharactersView({ projectId }: { projectId: string }) {
                     onChange={(e) =>
                       update((c) => {
                         c.characters.find(
-                          (x) => x.name === selected,
+                          (x) => x.name === activeName,
                         )!.displayName = e.target.value;
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  {pt("colorMode")}
+                  <CompactSelect
+                    value={character.colorMode || "custom"}
+                    label={pt("colorMode")}
+                    options={[
+                      { value: "auto", label: pt("autoColor") },
+                      { value: "custom", label: pt("customColor") },
+                    ]}
+                    onChange={(value) =>
+                      update((c) => {
+                        c.characters.find(
+                          (x) => x.name === activeName,
+                        )!.colorMode = value as "auto" | "custom";
                       })
                     }
                   />
@@ -186,12 +209,16 @@ export default function CharactersView({ projectId }: { projectId: string }) {
                 <label>
                   {pt("color")}
                   <input
+                    disabled={character.colorMode === "auto"}
                     type="color"
-                    value={character.color}
+                    value={characterColor(activeName, character)}
                     onChange={(e) =>
                       update((c) => {
-                        c.characters.find((x) => x.name === selected)!.color =
+                        c.characters.find((x) => x.name === activeName)!.color =
                           e.target.value;
+                        c.characters.find(
+                          (x) => x.name === activeName,
+                        )!.colorMode = "custom";
                       })
                     }
                   />
@@ -237,7 +264,7 @@ export default function CharactersView({ projectId }: { projectId: string }) {
                             onClick={() =>
                               update((c) => {
                                 delete c.characters.find(
-                                  (x) => x.name === selected,
+                                  (x) => x.name === activeName,
                                 )![kind][name];
                               })
                             }
@@ -257,7 +284,7 @@ export default function CharactersView({ projectId }: { projectId: string }) {
                   onClick={() => {
                     update((c) => {
                       c.characters = c.characters.filter(
-                        (x) => x.name !== selected,
+                        (x) => x.name !== activeName,
                       );
                     });
                     setSelected("");
@@ -327,23 +354,18 @@ export default function CharactersView({ projectId }: { projectId: string }) {
                   </label>
                   <label>
                     {pt("effect")}
-                    <select
+                    <CompactSelect
                       value={binding.effect}
-                      onChange={(e) =>
+                      label={pt("effect")}
+                      options={(
+                        ["background", "show", "hide", "expression"] as const
+                      ).map((kind) => ({ value: kind, label: pt(kind) }))}
+                      onChange={(value) =>
                         update((c) => {
-                          c.bindings[i].effect = e.target
-                            .value as typeof binding.effect;
+                          c.bindings[i].effect = value as typeof binding.effect;
                         })
                       }
-                    >
-                      {(
-                        ["background", "show", "hide", "expression"] as const
-                      ).map((kind) => (
-                        <option key={kind} value={kind}>
-                          {pt(kind)}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
                   {binding.effect !== "background" && (
                     <label>
@@ -384,21 +406,19 @@ export default function CharactersView({ projectId }: { projectId: string }) {
                   {binding.effect === "show" && (
                     <label>
                       {pt("position")}
-                      <select
+                      <CompactSelect
                         value={binding.position}
-                        onChange={(e) =>
+                        label={pt("position")}
+                        options={(["left", "center", "right"] as const).map(
+                          (value) => ({ value, label: pt(value) }),
+                        )}
+                        onChange={(value) =>
                           update((c) => {
-                            c.bindings[i].position = e.target
-                              .value as typeof binding.position;
+                            c.bindings[i].position =
+                              value as typeof binding.position;
                           })
                         }
-                      >
-                        {(["left", "center", "right"] as const).map((value) => (
-                          <option key={value} value={value}>
-                            {pt(value)}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </label>
                   )}
                   <label>

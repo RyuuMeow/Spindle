@@ -98,6 +98,7 @@ function commandIssue(
 }
 
 export default function CommandManager({
+  projectId,
   commands,
   onChange,
   notify,
@@ -107,6 +108,7 @@ export default function CommandManager({
   revealName,
   revealNonce,
 }: {
+  projectId?: string;
   commands: Command[];
   onChange: (
     commands: Command[],
@@ -827,11 +829,11 @@ export default function CommandManager({
             />
           </label>
         </div>
-        {window.yarnDesktop && index >= 0 && commands[index] && (
+        {window.yarnDesktop && projectId && (
           <CommandPreviewBinding
-            key={commands[index].name}
-            command={commands[index].name}
-            disabled={dirty}
+            projectId={projectId}
+            command={commands[index]?.name || ""}
+            disabled={dirty || index < 0}
           />
         )}
       </form>

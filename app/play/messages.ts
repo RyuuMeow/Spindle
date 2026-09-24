@@ -1,5 +1,15 @@
 import { locale } from "../i18n";
 const messages = {
+  retry: ["Retry", "重試", "重试"],
+  reloadSaved: [
+    "Discard changes and reload saved values",
+    "捨棄變更並重新載入",
+    "舍弃更改并重新加载",
+  ],
+  searchCharacters: ["Search characters", "搜尋角色", "搜索角色"],
+  colorMode: ["Name color", "姓名顏色", "姓名颜色"],
+  autoColor: ["Automatic", "自動", "自动"],
+  customColor: ["Custom", "自訂", "自定义"],
   backlog: ["Dialogue history", "對話紀錄", "对话记录"],
   noScenes: [
     "No runnable scenes. Return to the editor to add a scene.",
