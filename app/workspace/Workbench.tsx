@@ -284,7 +284,7 @@ function WorkbenchContent({
               .dialogueLength,
           })
         : { nodes: [], issues: [], links: [] },
-    [project, snapshot.preferences?.dialogueLength],
+    [project, snapshot.preferences],
   );
   const diagnostics = useDiagnostics(
     project,
