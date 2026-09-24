@@ -138,6 +138,38 @@
   max-width: 824px;
   padding: 24px 28px 40px;
 }
+.command-workspace .command-detail .command-preview-binding {
+  min-width: 0;
+  margin: 4px 0 0;
+  padding: 20px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+.command-preview-binding legend {
+  padding: 0 12px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.command-preview-binding > p {
+  margin: 0 0 16px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.command-workspace .command-detail .command-preview-binding label {
+  flex-wrap: wrap;
+}
+.command-preview-binding label > .compact-select,
+.command-preview-binding label > input:not([type="checkbox"]) {
+  width: min(100%, 320px);
+  min-width: 0;
+}
+.command-workspace .command-detail .command-preview-binding .preview-check {
+  justify-content: flex-start;
+  gap: 9px;
+}
 .command-workspace .command-field {
   display: flex;
   flex-direction: column;

@@ -828,14 +828,14 @@ export default function CommandManager({
               }
             />
           </label>
+          {window.yarnDesktop && projectId && (
+            <CommandPreviewBinding
+              projectId={projectId}
+              command={commands[index]?.name || ""}
+              disabled={dirty || index < 0}
+            />
+          )}
         </div>
-        {window.yarnDesktop && projectId && (
-          <CommandPreviewBinding
-            projectId={projectId}
-            command={commands[index]?.name || ""}
-            disabled={dirty || index < 0}
-          />
-        )}
       </form>
 
       <AlertDialog open={remove} onOpenChange={setRemove}>

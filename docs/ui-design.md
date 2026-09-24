@@ -6,6 +6,8 @@
 
 ## Character presentation and writing advice
 
+Characters & preview follows the command workspace layout: a full-height character list separated from a flat, independently scrolling editor, with a drawer at narrow widths. Preview effects share the command form’s content inset and width. Character presentation toggles occupy separate rows rather than adjoining inline labels.
+
 Editor portraits default off; reading and graph character-name colors default on. Source-mode character colors are separately opt-in. Play portraits and name colors default on. Automatic colors are stable by source character name; explicit existing colors remain custom. Missing portraits use a solid color placeholder with a neutral border. Display names never replace Yarn source text or alter selection offsets.
 
 Character and preview-effect edits save after 400 ms of valid, non-composing input. Selecting a discovered speaker does not register or save it. Independent fields merge with newer project metadata; conflicting edits remain visible for retry. Closing a tool tab or leaving its project first flushes these drafts. Command-definition drafts still require their existing Apply/Discard flow.

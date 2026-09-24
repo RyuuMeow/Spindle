@@ -3,6 +3,9 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  padding: 0;
+  height: 100%;
+  min-width: 0;
 }
 .characters-view > header,
 .characters-view > .play-notice {
@@ -12,11 +15,58 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  gap: 0;
+  margin-top: 0;
 }
 .characters-view .characters-layout nav {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  flex-basis: 208px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--border);
+  background: var(--sidebar);
+}
+.characters-list-heading {
+  margin: 0;
+  padding: 4px 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.characters-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  max-width: 824px;
+}
+.characters-view .characters-heading h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.characters-heading p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+.characters-heading > div {
+  min-width: 0;
+}
+.characters-view .characters-content > section {
+  margin: 0 28px;
+  padding: 24px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  max-width: 768px;
+}
+.characters-view .characters-content > section:last-child {
+  border-bottom: 0;
+}
+.characters-view .characters-content h2 {
+  font-size: 16px;
 }
 .characters-list {
   display: flex;
@@ -31,13 +81,19 @@
   text-align: left;
   overflow-wrap: anywhere;
   flex-shrink: 0;
+  border-color: transparent;
+  padding: 8px 10px;
 }
 .characters-view .characters-content {
   overflow: auto;
-  padding-right: 8px;
+  padding: 0;
+  max-width: none;
 }
 .characters-view .characters-layout nav form {
   flex-shrink: 0;
+  margin-top: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
 .characters-view .characters-layout nav input {
   width: 100%;
@@ -61,7 +117,7 @@
 .characters-view .characters-layout nav[hidden] {
   display: none;
 }
-.characters-view.characters-narrow > header {
+.characters-view.characters-narrow .characters-heading {
   justify-content: flex-start;
   gap: 12px;
 }
@@ -99,8 +155,12 @@
   max-width: none;
   padding-right: 0;
 }
-.characters-view.characters-narrow .characters-content section {
+.characters-view.characters-narrow .characters-heading {
   padding: 14px;
+}
+.characters-view.characters-narrow .characters-content > section {
+  margin-inline: 14px;
+  padding-block: 20px;
 }
 .characters-view.characters-narrow .characters-content label {
   flex-wrap: wrap;
@@ -111,4 +171,8 @@
   label
   input:not([type="checkbox"]) {
   width: 100%;
+}
+.characters-view .characters-content .preview-check {
+  justify-content: flex-start;
+  gap: 9px;
 }

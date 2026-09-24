@@ -180,6 +180,34 @@ async function create(name) {
       );
       await page.screenshot({ path: path.join(out, "characters.png") });
     });
+    await check("characters-flat-layout", async () => {
+      const geometry = await page
+        .locator(".characters-view")
+        .evaluate((host) => {
+          const nav = host.querySelector("nav").getBoundingClientRect();
+          const content = host
+            .querySelector(".characters-content")
+            .getBoundingClientRect();
+          const section = host.querySelector(".characters-content > section");
+          const css = getComputedStyle(section);
+          return {
+            navTop: nav.top,
+            contentTop: content.top,
+            gap: content.left - nav.right,
+            radius: css.borderRadius,
+            background: css.backgroundColor,
+            border: css.borderLeftWidth,
+          };
+        });
+      assert(
+        Math.abs(geometry.navTop - geometry.contentTop) < 2,
+        JSON.stringify(geometry),
+      );
+      assert(Math.abs(geometry.gap) < 2, JSON.stringify(geometry));
+      assert.equal(geometry.radius, "0px");
+      assert.equal(geometry.border, "0px");
+      assert.equal(geometry.background, "rgba(0, 0, 0, 0)");
+    });
     await check("characters-narrow-overlay", async () => {
       await win.evaluate((w) => w.setContentSize(800, 650));
       await page.evaluate(() => window.yarnDesktop.zoom(1.5));
@@ -233,11 +261,63 @@ async function create(name) {
         "Wide sidebar not restored",
       );
     });
+    await check("command-preview-alignment", async () => {
+      await page.evaluate(() => window.yarnDesktop.zoom(1));
+      await win.evaluate((w) => w.setContentSize(1280, 800));
+      await menu("Custom commands");
+      const metrics = await page.locator(".command-detail").evaluate((form) => {
+        const field = form
+          .querySelector(".command-form-body > .command-field")
+          .getBoundingClientRect();
+        const preview = form
+          .querySelector(".command-preview-binding")
+          .getBoundingClientRect();
+        return {
+          fieldLeft: field.left,
+          fieldRight: field.right,
+          previewLeft: preview.left,
+          previewRight: preview.right,
+          formLeft: form.getBoundingClientRect().left,
+        };
+      });
+      assert(
+        Math.abs(metrics.fieldLeft - metrics.previewLeft) < 2,
+        JSON.stringify(metrics),
+      );
+      assert(
+        Math.abs(metrics.fieldRight - metrics.previewRight) < 2,
+        JSON.stringify(metrics),
+      );
+      assert(
+        metrics.previewLeft > metrics.formLeft + 10,
+        JSON.stringify(metrics),
+      );
+      await page.locator(".command-preview-binding").scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: path.join(out, "command-preview-aligned.png"),
+      });
+    });
     await check("appearance-mode-scroll", async () => {
+      await page.evaluate(() => window.yarnDesktop.zoom(1));
+      await win.evaluate((w) => w.setContentSize(1280, 800));
       await menu("Settings…");
       await page
         .getByRole("button", { name: "Editor appearance", exact: true })
         .click();
+      const rows = await page
+        .locator(".settings-character-switches:visible .settings-check")
+        .evaluateAll((elements) =>
+          elements.map((e) => {
+            const r = e.getBoundingClientRect();
+            return { top: r.top, bottom: r.bottom, left: r.left };
+          }),
+        );
+      assert.equal(rows.length, 2);
+      assert(rows[1].top >= rows[0].bottom + 7, JSON.stringify(rows));
+      assert(Math.abs(rows[1].left - rows[0].left) < 1, JSON.stringify(rows));
+      await page.screenshot({
+        path: path.join(out, "appearance-character-switches.png"),
+      });
       const switcher = page.locator(
         ".appearance-settings > .segmented-control",
       );
@@ -318,7 +398,9 @@ async function create(name) {
           "Active tab label clipped: " + JSON.stringify(dimensions),
         );
         if (zoom === 2) {
-          await page.getByRole("button", {name:"Toggle script sidebar",exact:true}).click();
+          await page
+            .getByRole("button", { name: "Toggle script sidebar", exact: true })
+            .click();
           await sleep(100);
         }
         const native = await win.evaluate(async (w) => ({

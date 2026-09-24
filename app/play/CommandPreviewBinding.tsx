@@ -28,7 +28,7 @@ export default function CommandPreviewBinding({
     });
   return (
     <fieldset
-      className="preview-binding"
+      className="preview-binding command-preview-binding"
       disabled={disabled || !config}
       onCompositionStart={() => controller?.composition(true)}
       onCompositionEnd={() => controller?.composition(false)}
@@ -114,7 +114,7 @@ export default function CommandPreviewBinding({
               }
             />
           </label>
-          <label>
+          <label className="preview-check">
             <input
               type="checkbox"
               checked={binding.fade}

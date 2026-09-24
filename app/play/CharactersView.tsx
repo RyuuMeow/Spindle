@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { CompactSelect } from "@/components/CompactSelect";
 import { usePreviewAutosave } from "./use-preview-autosave";
 
@@ -17,6 +17,7 @@ function CharactersEditor({ projectId }: { projectId: string }) {
   const host = useRef<HTMLDivElement>(null);
   const sidebar = useRef<HTMLElement>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
+  const restoreSidebarFocus = useRef(false);
   const sidebarId = useId();
   const [narrow, setNarrow] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,9 +33,15 @@ function CharactersEditor({ projectId }: { projectId: string }) {
     return () => observer.disconnect();
   }, []);
   const closeSidebar = () => {
+    restoreSidebarFocus.current = true;
     setSidebarOpen(false);
-    sidebarToggle.current?.focus();
   };
+  useLayoutEffect(() => {
+    if (!sidebarOpen && restoreSidebarFocus.current) {
+      restoreSidebarFocus.current = false;
+      sidebarToggle.current?.focus();
+    }
+  }, [sidebarOpen]);
   useEffect(() => {
     if (narrow && sidebarOpen)
       sidebar.current?.querySelector<HTMLInputElement>("input")?.focus();
@@ -140,24 +147,6 @@ function CharactersEditor({ projectId }: { projectId: string }) {
         void controller?.flush();
       }}
     >
-      <header>
-        {narrow && (
-          <button
-            ref={sidebarToggle}
-            type="button"
-            aria-label={pt("characters")}
-            aria-expanded={sidebarOpen}
-            aria-controls={sidebarId}
-            onClick={() => setSidebarOpen((value) => !value)}
-          >
-            <PanelLeft size={18} />
-          </button>
-        )}
-        <div>
-          <h1>{pt("characters")}</h1>
-          <p>{pt("characterHelp")}</p>
-        </div>
-      </header>
       {(error || saveError) && (
         <div className="play-notice error" role="alert">
           <p>{error || saveError}</p>
@@ -203,39 +192,13 @@ function CharactersEditor({ projectId }: { projectId: string }) {
                 <X size={16} />
               </button>
             )}
+            <h2 className="characters-list-heading">{pt("characters")}</h2>
             <input
               aria-label={pt("searchCharacters")}
               placeholder={pt("searchCharacters")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <div className="characters-list">
-              {[
-                ...new Set([
-                  ...draft.characters.map((c) => c.name),
-                  ...(resources?.speakers || []),
-                ]),
-              ]
-                .filter((name) =>
-                  name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-                )
-                .map((name) => (
-                  <button
-                    key={name}
-                    aria-pressed={activeName === name}
-                    onClick={() => {
-                      void controller?.flush().then((ok) => {
-                        if (ok) {
-                          setSelected(name);
-                          if (narrow) closeSidebar();
-                        }
-                      });
-                    }}
-                  >
-                    {name}
-                  </button>
-                ))}
-            </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -271,8 +234,53 @@ function CharactersEditor({ projectId }: { projectId: string }) {
                 <Plus size={16} />
               </button>
             </form>
+            <div className="characters-list">
+              {[
+                ...new Set([
+                  ...draft.characters.map((c) => c.name),
+                  ...(resources?.speakers || []),
+                ]),
+              ]
+                .filter((name) =>
+                  name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+                )
+                .map((name) => (
+                  <button
+                    key={name}
+                    aria-pressed={activeName === name}
+                    onClick={() => {
+                      void controller?.flush().then((ok) => {
+                        if (ok) {
+                          setSelected(name);
+                          if (narrow) closeSidebar();
+                        }
+                      });
+                    }}
+                  >
+                    {name}
+                  </button>
+                ))}
+            </div>
           </nav>
           <div className="characters-content" inert={narrow && sidebarOpen}>
+            <header className="characters-heading">
+              {narrow && (
+                <button
+                  ref={sidebarToggle}
+                  type="button"
+                  aria-label={pt("characters")}
+                  aria-expanded={sidebarOpen}
+                  aria-controls={sidebarId}
+                  onClick={() => setSidebarOpen((value) => !value)}
+                >
+                  <PanelLeft size={18} />
+                </button>
+              )}
+              <div>
+                <h1>{pt("characters")}</h1>
+                <p>{pt("characterHelp")}</p>
+              </div>
+            </header>
             {character && (
               <section>
                 <h2>{character.name}</h2>
@@ -522,7 +530,7 @@ function CharactersEditor({ projectId }: { projectId: string }) {
                       />
                     </label>
                   )}
-                  <label>
+                  <label className="preview-check">
                     <input
                       type="checkbox"
                       checked={binding.fade}
