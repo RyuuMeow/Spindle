@@ -52,11 +52,11 @@
   color: var(--vn-paper);
   font-size: 11px;
   letter-spacing: 0.12em;
-  text-shadow: 0 1px 4px #000;
+  text-shadow: 0 1px 2px #101722, 0 0 4px #101722;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0.8;
+  opacity: 1;
 }
 .play-cast {
   position: absolute;
@@ -121,6 +121,7 @@
   justify-content: safe center;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+  scrollbar-color: #b5cbd680 transparent;
   padding: 0 24px;
 }
 .play-vn-choices .play-options {
@@ -209,7 +210,7 @@
   border: 1px solid #d5effcba;
   border-radius: 18px 18px 18px 4px;
   color: #fff;
-  background: linear-gradient(100deg, #2b6486f5, #427c9cf5);
+  background: linear-gradient(100deg, #17384ff8, #21455bf8);
   box-shadow: 0 2px 6px #173b4e26;
 }
 .play-nameplate strong {
@@ -231,7 +232,7 @@
   box-shadow: 0 0 0 2px #ffffff24;
 }
 .play-vn-text {
-  font: 500 clamp(17px, 1.9cqw, 21px)/1.7 var(--vn-story-font);
+  font: 400 clamp(17px, 1.9cqw, 21px)/1.7 var(--vn-story-font);
   text-shadow: none;
   min-width: 0;
   flex: none;
@@ -251,47 +252,50 @@
   display: flex;
   gap: 8px;
 }
-.play-app .play-vn-quick button {
+.play-app .play-vn-quick button,
+.play-app .play-vn-quick button[aria-pressed="true"],
+.play-app .play-vn-quick button:hover:not(:disabled) {
   min-height: 36px;
-  padding: 3px 5px;
+  padding: 3px 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 0;
   background: transparent;
+  box-shadow: none;
   color: #526d7c;
-  font-size: 10px;
+  font:
+    400 11px/1.4 "Yu Gothic UI",
+    "Microsoft JhengHei UI",
+    "Microsoft YaHei UI",
+    sans-serif;
+  letter-spacing: 0.035em;
 }
 .play-app .play-vn-quick button[aria-pressed="true"] {
-  color: #154e72;
-  box-shadow: inset 0 -2px #397a9c;
+  color: #174a69;
 }
 .play-app .play-vn-quick button:hover:not(:disabled) {
   color: #153f5b;
-  background: #276c8f12;
 }
-.play-app .play-vn-advance {
+.play-app .play-vn-quick button:focus-visible,
+.play-vn-advance-area:focus-visible {
+  outline: 2px solid #397a9c;
+  outline-offset: 3px;
+}
+.play-vn-advance-area {
+  min-width: 0;
+  outline: none;
+}
+.play-vn-advance {
   position: absolute;
-  bottom: 2px;
-  right: 18px;
-  padding: 3px 6px;
-  border: 0;
-  min-height: 36px;
-  width: 36px;
-  justify-content: center;
+  bottom: 16px;
+  right: 24px;
+  display: flex;
   color: #365f76;
-  font-size: 10px;
-  background: transparent;
-  gap: 5px;
+  pointer-events: none;
 }
-.play-app .play-vn-advance:hover:not(:disabled) {
-  background: transparent;
-  color: #153f5b;
-}
-.play-app .play-vn-advance:disabled {
-  opacity: 0.85;
-  color: #587382;
-}
-.play-app .play-vn-advance:focus-visible {
-  outline-color: #195578;
+.play-nameplate .play-avatar {
+  width: 24px;
+  height: 24px;
+  border-color: #d8e1e8;
 }
 .play-exit-immersive {
   position: absolute;

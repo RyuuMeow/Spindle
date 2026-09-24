@@ -2,16 +2,16 @@ import { t as tr } from "../i18n/index.ts";
 import type { SettingEntry } from "./search";
 export const settingSections = [
   {
-    id: "play",
-    label: tr("settings.play"),
-    keywords: "play character portrait avatar 試跑 试跑 角色 頭貼 头像",
-    icon: "Play",
-  },
-  {
     id: "reading",
     label: tr("mc127821f4d8a"),
     keywords: "appearance style font editor 字型 字体 风格",
     icon: "BookOpen",
+  },
+  {
+    id: "play",
+    label: tr("settings.play"),
+    keywords: "play character portrait avatar 試跑 试跑 角色 頭貼 头像",
+    icon: "Play",
   },
   {
     id: "saving",

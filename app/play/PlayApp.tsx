@@ -22,8 +22,14 @@ import {
   Maximize2,
   Minimize2,
   ChevronDown,
+  PanelBottom,
 } from "lucide-react";
 import { pt } from "./messages";
+import { t as tr } from "../i18n";
+import { CompactSelect } from "@/components/CompactSelect";
+import { CompilePanel } from "./CompilePanel";
+import { resolvePresentation } from "../workspace/presentation-preferences";
+import { characterColor } from "./character-presentation";
 import {
   commandArguments,
   dialogueText,
@@ -32,6 +38,7 @@ import {
 } from "./presentation";
 import type { PlayAction, PlayEvent, PlaySession, PlaySource } from "./types";
 import "./play.css";
+import { Portrait } from "./Portrait";
 import { PlayStage } from "./PlayStage";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -54,37 +61,40 @@ function stored<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
-export function Portrait({
-  name,
-  session,
-  expression,
-}: {
-  name: string;
-  session: PlaySession;
-  expression?: string;
-}) {
-  const character = session.resources.config.characters.find(
-      (c) => c.name === name,
-    ),
-    id =
-      (expression && character?.portraits[expression]) || character?.portrait;
-  const image = id && session.resources.images[id];
-  return (
-    <span
-      className="play-avatar"
-      style={{ borderColor: character?.color }}
-      aria-hidden="true"
-    >
-      {image ? (
-        <img src={image} alt="" />
-      ) : (
-        [...(character?.displayName || name || "…")].slice(0, 2).join("")
-      )}
-    </span>
-  );
-}
 export default function PlayApp() {
   const bridge = window.yarnDesktop!.play;
+  const [presentation, setPresentation] = useState(
+    () => resolvePresentation().playPresentation,
+  );
+  const [compileOpen, setCompileOpen] = useState(() =>
+    stored("compileOpen", false),
+  );
+  const [compileHeight, setCompileHeight] = useState(() =>
+    stored("compileHeight", 200),
+  );
+  const compileSeen = useRef("");
+  const compileToggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    let alive = true,
+      generation = 0;
+    const off = bridge.onPreferences((value) => {
+      generation++;
+      if (alive) setPresentation(value);
+    });
+    const ticket = generation;
+    void bridge
+      .preferences()
+      .then((value) => {
+        if (alive && ticket === generation) setPresentation(value);
+      })
+      .catch((error) =>
+        console.error("Play presentation unavailable", String(error)),
+      );
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [bridge]);
   const [session, setSession] = useState<PlaySession | null>(null),
     [error, setError] = useState("");
   const [busy, setBusy] = useState(false),
@@ -153,6 +163,16 @@ export default function PlayApp() {
         : value,
     );
     if (value.state.status !== "line") setAuto(false);
+    const compileKey = value.runId + ":" + value.capturedAt;
+    if (
+      value.state.diagnostics.some(
+        (d) => d.severity.toLowerCase() === "error",
+      ) &&
+      compileSeen.current !== compileKey
+    ) {
+      compileSeen.current = compileKey;
+      setCompileOpen(true);
+    }
   }
   useEffect(() => {
     current.current = session;
@@ -174,9 +194,11 @@ export default function PlayApp() {
       width,
       typewriter,
       speed,
+      compileOpen,
+      compileHeight,
     }))
       localStorage.setItem("spindle.play." + key, JSON.stringify(value));
-  }, [mode, panel, width, typewriter, speed]);
+  }, [mode, panel, width, typewriter, speed, compileOpen, compileHeight]);
   const state = session?.state,
     events = state?.events || [],
     lastLine = [...events].reverse().find((e) => e.kind === "line");
@@ -301,7 +323,17 @@ export default function PlayApp() {
   });
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && immersive && !snapshot && !backlog) {
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229)
+        return;
+      if (
+        event.key === "Escape" &&
+        immersive &&
+        !snapshot &&
+        !backlog &&
+        !(event.target as HTMLElement).closest(
+          "input,textarea,select,[role=listbox],[role=combobox],[role=dialog]",
+        )
+      ) {
         leaveGame();
         return;
       }
@@ -316,7 +348,7 @@ export default function PlayApp() {
         return;
       if (
         (event.target as HTMLElement).closest(
-          "input,select,textarea,button,summary,[role=dialog],[contenteditable=true]",
+          "input,select,textarea,button,summary,[role=dialog],[role=separator],[role=listbox],[role=option],[role=combobox],[contenteditable=true]",
         ) ||
         snapshot ||
         backlog
@@ -360,7 +392,12 @@ export default function PlayApp() {
     session?.resources.config.characters.find((c) => c.name === speaker)
       ?.displayName || speaker;
   const color = (speaker: string) =>
-    session?.resources.config.characters.find((c) => c.name === speaker)?.color;
+    presentation.useNameColors
+      ? characterColor(
+          speaker,
+          session?.resources.config.characters.find((c) => c.name === speaker),
+        )
+      : "#cbbb9d";
   const renderEvent = (event: PlayEvent, previous?: PlayEvent) => {
     if (event.kind === "line") {
       const text = dialogueText(event.text),
@@ -370,9 +407,9 @@ export default function PlayApp() {
       return (
         <article
           key={event.id}
-          className={`play-line ${joined ? "joined" : ""} ${event.id === lastLine?.id ? "current" : ""}`}
+          className={`play-line ${joined && presentation.showPortraits && text.speaker ? "joined" : ""} ${event.id === lastLine?.id ? "current" : ""}`}
         >
-          {!joined && session && (
+          {!joined && session && text.speaker && presentation.showPortraits && (
             <Portrait
               name={text.speaker}
               session={session}
@@ -452,22 +489,20 @@ export default function PlayApp() {
       <header className="play-toolbar" aria-label={pt("play")}>
         <label>
           <span>{pt("start")}</span>
-          <select
-            aria-label={pt("start")}
+          <CompactSelect
+            label={pt("start")}
+            placeholder={pt("chooseStart")}
             value={session?.startScene || ""}
-            disabled={busy}
-            onChange={(e) => {
+            disabled={busy || !state?.scenes.length}
+            options={(state?.scenes || []).map((scene) => ({
+              value: scene,
+              label: scene,
+            }))}
+            onChange={(scene) => {
               setAuto(false);
-              void act({ action: "start", scene: e.target.value });
+              void act({ action: "start", scene });
             }}
-          >
-            <option value="" disabled>
-              {pt("chooseStart")}
-            </option>
-            {state?.scenes.map((scene) => (
-              <option key={scene}>{scene}</option>
-            ))}
-          </select>
+          />
         </label>
         <button
           title={pt("rerun")}
@@ -571,6 +606,15 @@ export default function PlayApp() {
         >
           <PanelRight size={18} />
         </button>
+        <button
+          ref={compileToggle}
+          title={tr("play.compileResults")}
+          aria-label={tr("play.compileResults")}
+          aria-pressed={compileOpen}
+          onClick={() => setCompileOpen(!compileOpen)}
+        >
+          <PanelBottom size={18} />
+        </button>
       </header>
       {immersive && (
         <button
@@ -644,6 +688,7 @@ export default function PlayApp() {
           {mode === "vn" && (
             <PlayStage
               session={session}
+              presentation={presentation}
               lineKey={lineKey}
               auto={auto}
               onMeasure={measurePages}
@@ -709,16 +754,28 @@ export default function PlayApp() {
                 )}
               </div>
             )}
-          {!!state?.diagnostics?.length && (
-            <section className="play-diagnostics">
-              <h3>{pt("compile")}</h3>
-              {state.diagnostics.map((d, i) => (
-                <p key={i}>
-                  {d.message}
-                  {sourceButton(d.source)}
-                </p>
-              ))}
-            </section>
+          {!immersive && compileOpen && (
+            <CompilePanel
+              diagnostics={state?.diagnostics || []}
+              height={compileHeight}
+              onHeight={setCompileHeight}
+              onClose={() => {
+                setCompileOpen(false);
+                compileToggle.current?.focus();
+              }}
+              sourceButton={sourceButton}
+            />
+          )}
+          {immersive && !!state?.diagnostics?.length && (
+            <button
+              className="play-view-compile"
+              onClick={() => {
+                leaveGame();
+                setCompileOpen(true);
+              }}
+            >
+              {tr("play.viewCompileResults")}
+            </button>
           )}
         </section>
         {panelVisible && (
@@ -1003,15 +1060,16 @@ function VariableInput({
   const [draft, setDraft] = useState(String(value));
   if (typeof value === "boolean")
     return (
-      <select
-        aria-label={pt("override")}
+      <CompactSelect
+        label={pt("override")}
         value={String(value)}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.value === "true")}
-      >
-        <option>true</option>
-        <option>false</option>
-      </select>
+        options={[
+          { value: "true", label: "true" },
+          { value: "false", label: "false" },
+        ]}
+        onChange={(value) => onChange(value === "true")}
+      />
     );
   const submit = () => {
     if (draft === String(value)) return;
@@ -1030,8 +1088,15 @@ function VariableInput({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={submit}
       onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") setDraft(String(value));
+        if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+        if (e.key === "Enter") {
+          e.stopPropagation();
+          e.currentTarget.blur();
+        }
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          setDraft(String(value));
+        }
       }}
     />
   );

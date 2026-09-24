@@ -1,5 +1,6 @@
 "use client";
-import { History, Pause, Play } from "lucide-react";
+import { characterColor } from "./character-presentation";
+import { Portrait } from "./Portrait";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { Stage } from "./presentation";
 import type { PlaySession } from "./types";
@@ -10,6 +11,7 @@ import "./vn-game.css";
 /** Game presentation deliberately contains no editor/source navigation controls. */
 export function PlayStage({
   session,
+  presentation,
   stage,
   speaker,
   text,
@@ -28,6 +30,7 @@ export function PlayStage({
   pageCount,
 }: {
   session: PlaySession | null;
+  presentation: { showPortraits: boolean; useNameColors: boolean };
   stage: Stage;
   speaker: string;
   text: string;
@@ -140,16 +143,19 @@ export function PlayStage({
               const start = gesture.current;
               gesture.current = null;
               if (
-                !start ||
+                (event.detail !== 0 && !start) ||
                 !canAdvance ||
                 event.detail > 1 ||
                 (event.target as HTMLElement).closest(
                   "button,a,input,select",
                 ) ||
-                Math.hypot(event.clientX - start.x, event.clientY - start.y) >
-                  5 ||
-                Math.abs((textArea.current?.scrollTop || 0) - start.scroll) >
-                  2 ||
+                Math.hypot(
+                  event.clientX - (start?.x ?? event.clientX),
+                  event.clientY - (start?.y ?? event.clientY),
+                ) > 5 ||
+                Math.abs(
+                  (textArea.current?.scrollTop || 0) - (start?.scroll ?? 0),
+                ) > 2 ||
                 window.getSelection()?.toString()
               )
                 return;
@@ -157,20 +163,61 @@ export function PlayStage({
             }}
           >
             <div
-              className={`play-nameplate ${speaker ? "" : "is-narration"}`}
-              aria-hidden={!speaker}
+              className="play-vn-advance-area"
+              role="button"
+              tabIndex={0}
+              aria-disabled={!canAdvance}
+              aria-label={revealing ? pt("revealPage") : pt("continueStory")}
+              onKeyDown={(event) => {
+                if (
+                  !["Enter", " "].includes(event.key) ||
+                  event.repeat ||
+                  event.nativeEvent.isComposing
+                )
+                  return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (canAdvance && !window.getSelection()?.toString()) next();
+              }}
             >
+              <div
+                className={`play-nameplate ${speaker ? "" : "is-narration"}`}
+                aria-hidden={!speaker}
+              >
+                {presentation.showPortraits && session && speaker && (
+                  <Portrait
+                    name={speaker}
+                    session={session}
+                    expression={stage.expressions[speaker]}
+                  />
+                )}
+                <strong
+                  style={{
+                    color:
+                      presentation.useNameColors && speaker
+                        ? characterColor(speaker, character)
+                        : undefined,
+                  }}
+                  title={character?.displayName || speaker}
+                >
+                  {character?.displayName || speaker}
+                </strong>
+              </div>
+              <p ref={textArea} className="play-vn-text" aria-hidden="true">
+                {text}
+              </p>
               <span
-                className="play-character-mark"
-                style={{ background: character?.color }}
-              />
-              <strong title={character?.displayName || speaker}>
-                {character?.displayName || speaker}
-              </strong>
+                className="play-vn-advance"
+                aria-hidden="true"
+                style={{
+                  visibility: canAdvance && !revealing ? "visible" : "hidden",
+                }}
+              >
+                <svg width="12" height="8" viewBox="0 0 12 8">
+                  <path d="M1 1h10L6 7z" fill="currentColor" />
+                </svg>
+              </span>
             </div>
-            <p ref={textArea} className="play-vn-text" aria-hidden="true">
-              {text}
-            </p>
             <div className="play-vn-quick" aria-label={pt("play")}>
               <button
                 aria-pressed={auto}
@@ -179,40 +226,10 @@ export function PlayStage({
                 }
                 onClick={onAuto}
               >
-                {auto ? <Pause size={12} /> : <Play size={12} />}
                 {pt("auto")}
               </button>
-              <button onClick={onBacklog}>
-                <History size={13} />
-                {pt("backlog")}
-              </button>
+              <button onClick={onBacklog}>{pt("backlog")}</button>
             </div>
-            {["line", "options"].includes(session?.state.status || "") && (
-              <button
-                className="play-vn-advance"
-                aria-label={
-                  revealing
-                    ? pt("revealPage")
-                    : page < pageCount
-                      ? pt("nextPage")
-                      : pt("continueStory")
-                }
-                disabled={!canAdvance}
-                onClick={next}
-              >
-                <svg
-                  width="12"
-                  height="8"
-                  viewBox="0 0 12 8"
-                  aria-hidden="true"
-                  style={{
-                    visibility: canAdvance && !revealing ? "visible" : "hidden",
-                  }}
-                >
-                  <path d="M1 1h10L6 7z" fill="currentColor" />
-                </svg>
-              </button>
-            )}
           </section>
         )}
       </div>

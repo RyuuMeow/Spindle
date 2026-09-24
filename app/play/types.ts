@@ -118,6 +118,13 @@ export type PlayAction =
   | { action: "choose"; optionId: number }
   | { action: "setVariable"; name: string; value: string | number | boolean };
 export type PlayBridge = {
+  preferences(): Promise<{ showPortraits: boolean; useNameColors: boolean }>;
+  onPreferences(
+    callback: (value: {
+      showPortraits: boolean;
+      useNameColors: boolean;
+    }) => void,
+  ): () => void;
   isWindow: boolean;
   open(): Promise<void>;
   action(action: PlayAction, revision?: number): Promise<PlaySession>;

@@ -15,12 +15,14 @@ export function CompactSelect({
   options,
   id,
   disabled,
+  placeholder,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
   id?: string;
   disabled?: boolean;
+  placeholder?: string;
   options: { value: string; label: string }[];
 }) {
   return (
@@ -31,7 +33,7 @@ export function CompactSelect({
         className="compact-select"
         size="sm"
       >
-        <SelectValue />
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent
         className="compact-select-menu"

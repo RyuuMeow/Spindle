@@ -18,6 +18,7 @@ import type { WorkspaceService } from "./workspace-service";
 import { PreviewResourcesStore } from "./preview-resources";
 import { PlayProcess } from "./play-process";
 import { atomicWrite } from "./disk-io";
+import { resolvePresentation } from "../app/workspace/presentation-preferences";
 
 type EditorWindow = { id: string; projectId: string; window: BrowserWindow };
 type Record = {
@@ -307,6 +308,10 @@ export function createPlayService(options: {
     }
     return request;
   });
+  ipcMain.handle("play:preferences", (event) => {
+    get(event);
+    return resolvePresentation(service.catalog.preferences).playPresentation;
+  });
   ipcMain.handle("play:action", async (event, input, revision) => {
     const record = get(event),
       action = actionSchema.parse(input);
@@ -423,13 +428,25 @@ export function createPlayService(options: {
       result.filePaths[0],
     );
   });
+  let presentationStamp = "";
   function changed() {
+    const presentation = resolvePresentation(
+      service.catalog.preferences,
+    ).playPresentation;
+    const stamp = JSON.stringify(presentation);
+    const preferencesChanged = stamp !== presentationStamp;
+    presentationStamp = stamp;
     for (const record of records.values()) {
       if (!alive(record)) {
         dispose(record);
         continue;
       }
       const p = service.engine.project(record.session.projectId);
+      if (preferencesChanged)
+        record.window.webContents.send(
+          "play:preferences-changed",
+          presentation,
+        );
       let stale =
         p.documents.filter(
           (d) => !p.excluded.includes(d.id) && !p.excluded.includes(d.name),

@@ -6,6 +6,9 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld("yarnDesktop", {
   play: {
+    preferences: () => ipcRenderer.invoke("play:preferences"),
+    onPreferences: (callback) =>
+      subscribe("play:preferences-changed", callback),
     isWindow: process.argv.includes("--spindle-play=true"),
     open: () => ipcRenderer.invoke("play:open"),
     action: (action, revision) =>
