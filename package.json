@@ -31,7 +31,7 @@
     "test:command-context-ui": "node scripts/test-command-context-ui.cjs",
     "test:editor-assistance": "node scripts/test-editor-assistance.cjs",
     "test:sync-language": "node scripts/test-sync-and-language.cjs",
-    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs scripts/project-lifecycle.test.mjs scripts/appearance.test.mjs scripts/diagnostic-presentation.test.mjs",
+    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs scripts/project-lifecycle.test.mjs scripts/appearance.test.mjs scripts/diagnostic-presentation.test.mjs scripts/dialogue-length.test.mjs scripts/source-characters.test.mjs scripts/preview-autosave.test.mjs scripts/character-presentation.test.mjs scripts/panel-layout.test.mjs scripts/presentation-preferences.test.mjs",
     "test:hint-priority": "node scripts/test-hint-priority.cjs",
     "desktop:stage": "pnpm desktop:build && node scripts/prepare-desktop.mjs",
     "test:workspace-navigation": "node scripts/test-workspace-navigation.cjs",

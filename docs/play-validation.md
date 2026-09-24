@@ -90,3 +90,31 @@ Validation below concerns local staging; no Portable, installer, CI or Release w
 User review then identified a presentation mismatch that role reviews had missed: a visible page counter and Continue/Next page labels exposed tool mechanics inside the VN. The visible counter and advance labels are removed. A small filled continuation triangle appears only when the message can advance and its current text is fully revealed. The transparent 36px hit target and accessible action name remain; no button background or visible pagination is added. Local pagination data remains internal for tests. This correction supersedes the screenshots reviewed before it.
 
 Final user-correction build: `outputs/play-presentation/1790259220286/` passed 16 checks with no renderer errors. Added assertions confirm no visible page counter or advance text, a preserved accessible name and 36px hit target, and hidden/visible continuation glyph states during typing, ready text and the final options page. Desktop staging was rebuilt for these screenshots. TypeScript passed after the cue change.
+
+## Character, layout and Play corrections — 2026-09-25
+
+Branch: `feat/character-presentation-and-play-fixes`. This round supersedes the earlier manual character Save workflow and the 36px VN advance button. It does not change the product version or build a release package.
+
+Implemented independent editor/Source/Play character display preferences; stable automatic versus exact custom name colors; neutral portrait borders and solid missing-image placeholders; per-field preview autosave with revision checks, disjoint-field merge and explicit conflict resubmission; responsive character list drawers; provisional filename blur/cancel/background completion; stable appearance-mode scroll; container-aware editor widths and overflow tools; shared weighted static dialogue-length warnings; decorative VN continuation cues and plain text controls; and a persistent, resizable compiler-results dock. Play preferences use a dedicated authenticated read-only IPC channel, not the editor-only workspace request channel.
+
+### Review and corrections
+
+Subagents reviewed actual screenshots and behavior as Desktop UI/UX, game-art UI/UX, PM and adversarial QA. Desktop and PM were separate passes by one agent. These are role reviews, not independent human sign-off or user art approval.
+
+- Desktop/PM found separator shortcuts advancing the story, lost focus after closing compiler results, and an unreadable active tab at 200% zoom. These were fixed and exercised in Electron.
+- Game art found low automatic-name contrast on the previous blue nameplate and an intrusive native option scrollbar. The nameplate was darkened and the game scrollbar styled; text controls have no hover background, border or active underline. The continuation triangle is a decorative span; its location remains within the message area's delegated click surface.
+- QA found missing spaces in English style previews and IME Enter/Escape reaching Play actions. Preview spacing and composition guards were corrected. Live preference tests then exposed an editor-only IPC scope failure; the restricted Play channel was added and preference updates passed without changing runtime revision.
+- Conflicting character changes now offer explicit resubmission of only locally changed fields. Ordinary autosave never silently chooses a conflicting local value. Tests cover typing during an in-flight save, invalid values, composition, merge, conflict and resubmission.
+
+### Local evidence
+
+- `SPINDLE_LOCALE=zh-TW node --test scripts/*.test.mjs`: **276/276 passed**; includes MCP, installation services, weighted length, quiet diagnostic timing, character presentation, autosave and preference persistence.
+- TypeScript passed. Lint: zero errors, seven existing local-raster image warnings. Three-language catalog: 1,038 keys verified. Web and desktop builds passed with existing large-chunk and upstream .NET documentation warnings.
+- Real Electron/MCP flow: `outputs/play-ui/1790268283181/` passed.
+- Character/layout native run: `outputs/character-layout/1790268847213/`, **10/10**, no renderer errors. Covers blur, cancellation, background tab creation, synthetic composition, autosave/character switching, character drawer focus, style scrolling, compiler failure auto-open once and keyboard resizing/focus return.
+- At an approximately 800-DIP window, 100/125/150/200% App zoom produced central editor widths of 563/403/320/388 CSS px, respectively. Native `capturePage` was used for zoom evidence; ordinary Playwright screenshots were found to crop high-zoom content and were not treated as evidence of product clipping.
+- Play presentation run: `outputs/play-presentation/1790268968663/`, **20/20**, no renderer errors. Includes two-line page fidelity, pointer/keyboard/Auto boundaries, pending choices, novel backreading, bright synthetic assets, live Play preference isolation, borderless normal/hover/active controls and synthetic IME guards.
+
+No CI, Release, Portable or installer was produced. Physical Windows IME, screen-reader speech, mixed-DPI/multi-monitor operation, real game artwork composition and prolonged large-project use remain unverified. Synthetic composition and generated art probes are explicitly narrower evidence. Existing frozen-run behavior remains: character configuration changes require latest restart; display switches apply immediately without runtime mutation.
+
+Final three-language native UI run: `outputs/public-ui-1790268969854/` passed English, Traditional Chinese and Simplified Chinese. The test-generated README screenshots were restored afterward; this round does not refresh public marketing assets.

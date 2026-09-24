@@ -37,6 +37,7 @@ fs.writeFileSync(
   [
     "title: Start",
     "---",
+    '<<declare $qa_text = "initial">>',
     `Mira: ${first}`,
     `Mira: ${second}`,
     ...options,
@@ -289,6 +290,10 @@ async function screenshot(name) {
 
   const dialogue = play.locator(".play-vn-dialogue");
   const advance = play.locator(".play-vn-advance");
+  async function clickCue() {
+    const rect = await advance.boundingBox();
+    await play.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  }
   async function assertAdvanceCue(visible) {
     assert.equal(
       await play.locator(".play-vn-page-indicator").count(),
@@ -300,9 +305,11 @@ async function screenshot(name) {
       "",
       "Advance has no visible Continue/page label",
     );
+    assert.equal(await advance.getAttribute("aria-hidden"), "true");
+    assert.equal(await advance.evaluate((el) => el.tagName), "SPAN");
     assert(
-      (await advance.getAttribute("aria-label"))?.length > 0,
-      "Icon-only advance retains an accessible name",
+      (await play.locator(".play-vn-advance-area").getAttribute("aria-label"))
+        ?.length > 0,
     );
     const cue = await advance.evaluate((el) => {
       const glyph = el.querySelector("svg");
@@ -315,8 +322,8 @@ async function screenshot(name) {
     });
     assert.equal(cue.visibility, visible ? "visible" : "hidden");
     assert(
-      cue.width >= 35.5 && cue.height >= 35.5,
-      "Small glyph keeps a 36 CSS px hit target",
+      cue.width <= 16 && cue.height <= 12,
+      "Decorative glyph has no standalone button hit target",
     );
   }
   async function pageInfo() {
@@ -384,7 +391,7 @@ async function screenshot(name) {
   );
 
   // Resizing preserves the source anchor rather than resetting to the first page.
-  await advance.click();
+  await clickCue();
   await frames();
   const beforeResize = await pageInfo();
   const resizeText = await text.textContent();
@@ -421,7 +428,7 @@ async function screenshot(name) {
     rendered.push(await text.textContent());
     await assertTwoLinePage();
     if (page < pageCount) {
-      await advance.click();
+      await clickCue();
       await frames();
     }
   }
@@ -431,7 +438,7 @@ async function screenshot(name) {
     "Family emoji stays on one page",
   );
   await screenshot("vn-long-dialogue-final-page");
-  await advance.click();
+  await clickCue();
   await play.waitForFunction(
     async (revision) =>
       (await window.yarnDesktop.play.action({ action: "state" })).state
@@ -569,10 +576,12 @@ async function screenshot(name) {
   const waitingPages = await pageInfo();
   if (waitingPages.page < waitingPages.count) {
     assert(
-      await advance.isEnabled(),
+      (await play
+        .locator(".play-vn-advance-area")
+        .getAttribute("aria-disabled")) !== "true",
       "Pending options cannot strand unread dialogue pages",
     );
-    await advance.click();
+    await clickCue();
     await frames();
     assert.equal((await pageInfo()).page, waitingPages.page + 1);
     assert.equal((await state()).state.revision, s.state.revision);
@@ -590,12 +599,14 @@ async function screenshot(name) {
       assert.equal((await state()).state.revision, s.state.revision);
     }
     while ((await pageInfo()).page < waitingPages.count) {
-      await advance.click();
+      await clickCue();
       await frames();
       assert.equal((await state()).state.revision, s.state.revision);
     }
     assert.equal(
-      await advance.isEnabled(),
+      (await play
+        .locator(".play-vn-advance-area")
+        .getAttribute("aria-disabled")) !== "true",
       false,
       "Final waiting page prompts a choice instead of advancing VM",
     );
@@ -625,6 +636,40 @@ async function screenshot(name) {
       .evaluate((el) => el === document.activeElement),
   );
   await screenshot("vn-immersive-long-options");
+  await play.locator(".play-exit-immersive").evaluate((el) => {
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        isComposing: true,
+      }),
+    );
+  });
+  await frames();
+  assert.equal(
+    await play.locator(".play-app.immersive").count(),
+    1,
+    "IME Escape must not leave the game view",
+  );
+  await play.locator(".play-exit-immersive").evaluate((el) => {
+    const event = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    event.preventDefault();
+    el.dispatchEvent(event);
+  });
+  await frames();
+  assert.equal(
+    await play.locator(".play-app.immersive").count(),
+    1,
+    "A control-consumed Escape must not leave the game view",
+  );
+  assert.equal((await state()).state.revision, s.state.revision);
+  checks.push(
+    "IME and control-consumed Escape preserve immersive mode and runtime",
+  );
   await play.keyboard.press("Escape");
   await play.locator(".play-app.immersive").waitFor({ state: "hidden" });
   await frames();
@@ -675,11 +720,129 @@ async function screenshot(name) {
   assert.equal(await text.textContent(), "The ferry is here. Shall we go?");
   await assertTwoLinePage();
   await screenshot("vn-short-dialogue");
+  const preferenceRevision = (await state()).state.revision;
+  const patchPreferences = (patch) =>
+    editor.evaluate(
+      (value) => window.yarnDesktop.request({ type: "preferences", ...value }),
+      patch,
+    );
+  const nameplate = play.locator(".play-nameplate strong");
+  assert.equal(
+    await play.locator("select").count(),
+    0,
+    "Play uses app selectors instead of native select controls",
+  );
+  await patchPreferences({
+    playPresentation: { showPortraits: false, useNameColors: false },
+  });
+  await play.waitForFunction(
+    () =>
+      !document.querySelector(".play-nameplate .play-avatar") &&
+      document.querySelector(".play-nameplate strong")?.style.color === "",
+  );
+  assert.equal(await nameplate.textContent(), "Mira");
+  assert.equal((await state()).state.revision, preferenceRevision);
+  await patchPreferences({
+    editorCharacters: {
+      showPortraits: true,
+      useNameColors: true,
+      sourceNameColors: true,
+    },
+  });
+  await frames();
+  assert.equal(
+    await play.locator(".play-nameplate .play-avatar").count(),
+    0,
+    "Editor portrait settings do not change Play settings",
+  );
+  assert.equal(await nameplate.evaluate((el) => el.style.color), "");
+  await patchPreferences({
+    playPresentation: { showPortraits: true, useNameColors: true },
+  });
+  await play.waitForFunction(
+    () =>
+      !!document.querySelector(".play-nameplate .play-avatar") &&
+      !!document.querySelector(".play-nameplate strong")?.style.color,
+  );
+  assert.equal((await state()).state.revision, preferenceRevision);
+  await patchPreferences({
+    editorCharacters: {
+      showPortraits: false,
+      useNameColors: true,
+      sourceNameColors: false,
+    },
+  });
+  checks.push(
+    "Live Play portrait/name toggles preserve runtime and remain independent of editor preferences",
+  );
+  const quickButtons = play.locator(".play-vn-quick button");
+  async function assertQuickChrome() {
+    for (const button of await quickButtons.all()) {
+      const chrome = await button.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return {
+          border: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          shadow: style.boxShadow,
+          background: style.backgroundColor,
+        };
+      });
+      assert.deepEqual(chrome.border, ["0px", "0px", "0px", "0px"]);
+      assert.equal(chrome.shadow, "none");
+      assert.equal(chrome.background, "rgba(0, 0, 0, 0)");
+    }
+  }
+  await assertQuickChrome();
+  for (const button of await quickButtons.all()) {
+    await button.hover();
+    await assertQuickChrome();
+  }
+  await quickButtons.first().click();
+  assert.equal(await quickButtons.first().getAttribute("aria-pressed"), "true");
+  await assertQuickChrome();
+  await quickButtons.first().click();
+  assert.equal(await advance.evaluate((el) => el.tagName), "SPAN");
+  assert.equal((await state()).state.revision, preferenceRevision);
+  checks.push(
+    "VN quick actions retain transparent borderless chrome in normal, hover and active states; cue is decorative",
+  );
+  const variableInput = play.locator('.play-variable input[type="text"]');
+  await variableInput.fill("測試");
+  await variableInput.evaluate((el) =>
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        code: "Enter",
+        bubbles: true,
+        isComposing: true,
+      }),
+    ),
+  );
+  await frames();
+  assert(
+    await variableInput.evaluate((el) => el === document.activeElement),
+    "IME confirmation must not blur the variable input",
+  );
+  assert.equal(
+    (await state()).state.revision,
+    preferenceRevision,
+    "IME confirmation must not commit a runtime override",
+  );
+  // Return to the original value before leaving; this test isolates composition handling.
+  await variableInput.fill("initial");
+  await variableInput.press("Escape");
+  checks.push(
+    "IME Enter in a string variable retains focus without submitting an override",
+  );
   await enter.click();
   await frames();
   await screenshot("vn-game-short-dialogue");
   await play.keyboard.press("Escape");
-  await advance.click();
+  await clickCue();
   await frames();
   await play.waitForFunction(
     () =>

@@ -14,7 +14,7 @@ Back restores the previous dialogue/choice/override checkpoint, including the of
 
 ## Characters and effects
 
-Open Characters and preview from the Project menu, search or Play. Speaker names are discovered from dialogue; display names do not rename source text. Import PNG, JPEG or WebP, assign a default portrait and named portrait/sprite variants, then save. Missing media uses a name fallback.
+Open Characters and preview from the Project menu, search or Play. Speaker names are discovered from dialogue; display names do not rename source text. Import PNG, JPEG or WebP, assign a default portrait and named portrait/sprite variants, with automatic saving. Missing portraits use a colored placeholder.
 
 Project data lives in `.spindle/preview.json`; content-addressed images live in `.spindle/preview-assets/`. References are project-relative. Imports are limited to 20 MB each and a loaded snapshot to 100 MB. Configuration updates validate the revision; malformed configuration is preserved.
 
@@ -46,3 +46,11 @@ See [acceptance evidence](play-validation.md) for actual checks and remaining ma
 The shell and scrolling novel use Spindle's shared color, type and control tokens. VN has a separate game presentation: an inset translucent message window, attached speaker label, sans-serif story text and centered choices. Source links stay in the debug panel, outside the VN stage. Game view hides editor controls; Escape returns focus to its entry button. At narrow widths the debug panel opens over the stage only when requested.
 
 The message window reserves two lines. VN shows no page counter or Continue label: a small continuation triangle appears when ready; clicking the message or using the keyboard advances. Clicking completes the current display page, then moves to the next page; only the final page advances the runtime. Overflow uses measured grapheme-safe pages, not scrolling or reduced font size. Resizing retains the source character anchor. Pointer, keyboard and Auto share this progression. Selecting text, dragging or scrolling does not advance. Auto pauses when opening history or following a source link, at choices/errors, and when reading earlier novel text. Novel scroll position survives switching modes. OS reduced-motion preference disables typewriter animation without rewriting the saved preference. Restarting creates a new run identity so identical first lines animate again.
+
+## Presentation and saving
+
+Characters save valid changes after 400 ms and flush when leaving a field or character. Composition and invalid input retain the draft. Disjoint remote changes merge; a conflicting field offers reload or explicit resubmission of local changes. There is no daily Save button. Merely selecting a scanned speaker does not create project data.
+
+Editor appearance has separate portrait and name-color switches; Source name colors have their own opt-in. Settings → Play independently controls Play portraits and name colors, live across windows without changing the run. Automatic name colors are stable by source name; custom colors remain exact. Missing portraits use a colored placeholder, and disabling portraits removes their space. VN sprites and backgrounds remain visible.
+
+Compile results have a bottom panel with a toolbar toggle, close button and draggable/keyboard-resizable separator. Height and visibility persist. A new compilation failure opens it once; ordinary updates do not reopen a closed panel. In immersion, View compile results returns to the tool view. The VN triangle is decorative; click the dialogue area or use Enter/Space to advance. Auto and history are plain text game controls.
