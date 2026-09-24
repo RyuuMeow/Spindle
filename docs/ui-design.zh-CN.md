@@ -1,5 +1,7 @@
 [English](ui-design.md) · [繁體中文](ui-design.zh-TW.md) · [简体中文](ui-design.zh-CN.md)
 
+> **Play 试跑 (A–D)** — 验收版新增两个只读工具：`list_play_sessions` 指定 `editorSessionId`；`get_play_context` 另指定 `playSessionId`，共 22 个工具。Play 情境与编辑器选区分离，包括固定文件版本、当前台词、选项、变量及有限的近期事件。A–D 不提供 MCP 试跑修改。详见 [Play](play.zh-CN.md)。
+
 # Spindle 界面规范
 
 以下是当前深色 Windows 桌面和 Web 工作区的设计规则。旧评审保存在 [history/](history/)；[验证报告](../releases/0.10.0/verification.md) 区分已实现功能和未实测设备场景。界面支持 English、繁體中文、简体中文；Yarn 原文、用户剧本和自定义命令内容不翻译。

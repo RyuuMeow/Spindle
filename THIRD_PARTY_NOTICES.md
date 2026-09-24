@@ -2,6 +2,8 @@
 
 Spindle source is GPL-3.0-only. Dependency copyrights and licenses remain with their owners. Packaging copies notices into `licenses/`; the pnpm lockfile records exact dependencies.
 
+The Play acceptance build additionally bundles MIT-licensed Yarn Spinner 3.2.1 (source and debug extensions in `vendor/yarn-spinner`), the MIT-licensed .NET 10.0.12 runtime with its third-party notices, ANTLR 4.13.1 (BSD-3-Clause), Google.Protobuf 3.25.2 (BSD-3-Clause), and CsvHelper 12.2.2 (Apache-2.0 option). Exact NuGet resolution is recorded in `desktop/play-runtime/packages.lock.json`. Notices are included under `licenses/play/`; helper source and build instructions are in the repository. See `vendor/play-licenses/README.md` and [Play](docs/play.md).
+
 | Component | License | Source |
 |---|---|---|
 | Electron | MIT and bundled Chromium/Node notices | https://github.com/electron/electron |

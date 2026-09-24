@@ -1,5 +1,7 @@
 [English](workspace-architecture.md) · [繁體中文](workspace-architecture.zh-TW.md) · [简体中文](workspace-architecture.zh-CN.md)
 
+> **Play 試跑 (A–D)** — 驗收版新增兩個唯讀工具：`list_play_sessions` 指定 `editorSessionId`；`get_play_context` 另指定 `playSessionId`，共 22 個工具。Play 情境與編輯器框選分離，包含固定文件版本、目前台詞、選項、變數及有限的近期事件。A–D 不提供 MCP 試跑修改。詳見 [Play](play.zh-TW.md)。
+
 # 文件、保存與同步契約
 
 ## 邊界

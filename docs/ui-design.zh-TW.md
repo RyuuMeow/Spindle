@@ -1,5 +1,7 @@
 [English](ui-design.md) · [繁體中文](ui-design.zh-TW.md) · [简体中文](ui-design.zh-CN.md)
 
+> **Play 試跑 (A–D)** — 驗收版新增兩個唯讀工具：`list_play_sessions` 指定 `editorSessionId`；`get_play_context` 另指定 `playSessionId`，共 22 個工具。Play 情境與編輯器框選分離，包含固定文件版本、目前台詞、選項、變數及有限的近期事件。A–D 不提供 MCP 試跑修改。詳見 [Play](play.zh-TW.md)。
+
 # Spindle UI 規範
 
 狀態：**0.10.0 統一搜尋、三語介面與更新準備。** 更新日期：2026-09-22。適用於深色 Windows 桌面與網頁工作區。

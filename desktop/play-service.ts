@@ -497,6 +497,14 @@ export function createPlayService(options: {
           version: d.version,
         })),
         ...s.state,
+        diagnostics: s.state.diagnostics
+          .slice(0, 200)
+          .map((d) => ({
+            ...d,
+            message: d.message.slice(0, 4000),
+            messageTruncated: d.message.length > 4000,
+          })),
+        diagnosticsTruncated: s.state.diagnostics.length > 200,
         currentDialogue: dialogue ? bounded(dialogue) : null,
         events: s.state.events.slice(-100).map(bounded),
         eventsTruncated: s.state.events.length > 100,
@@ -508,6 +516,12 @@ export function createPlayService(options: {
         optionsTruncated: s.state.options.length > 200,
         variables: s.state.variables.slice(0, 500).map((v) => ({
           ...v,
+          initial:
+            typeof v.initial === "string"
+              ? v.initial.slice(0, 4000)
+              : v.initial,
+          initialTruncated:
+            typeof v.initial === "string" && v.initial.length > 4000,
           value: typeof v.value === "string" ? v.value.slice(0, 4000) : v.value,
           valueTruncated: typeof v.value === "string" && v.value.length > 4000,
         })),

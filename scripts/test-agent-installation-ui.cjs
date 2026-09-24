@@ -210,7 +210,7 @@ let app;
           assert.ok(!result.isError, "MCP call failed: " + name);
           return result.structuredContent;
         };
-        assert.equal((await sdk.listTools()).tools.length, 20);
+        assert.equal((await sdk.listTools()).tools.length, 22);
         const session = (
           await call("open_project", { projectId: "installation-test" })
         ).sessions[0];

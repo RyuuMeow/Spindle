@@ -13,6 +13,8 @@
     "output": "release"
   },
   "files": [
+    "desktop/play-service.cjs",
+    "desktop/play-runtime/**/*",
     "desktop/main.cjs",
     "desktop/i18n.cjs",
     "desktop/preload.cjs",
@@ -33,6 +35,7 @@
     "desktop/installed-restart.ps1"
   ],
   "asar": true,
+  "asarUnpack": ["desktop/play-runtime/**/*"],
   "win": {
     "target": [
       "nsis",

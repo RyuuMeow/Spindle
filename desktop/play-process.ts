@@ -39,6 +39,7 @@ export class PlayProcess {
       }
     });
     this.child.stderr.resume(); // No story text is written to logs.
+    this.child.stdin.on("error", () => this.fail("PLAY_HELPER_CLOSED"));
     this.child.on("error", () => {
       this.fail("PLAY_HELPER_UNAVAILABLE");
       onFailure("PLAY_HELPER_UNAVAILABLE");

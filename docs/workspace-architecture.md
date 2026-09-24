@@ -1,5 +1,7 @@
 [English](workspace-architecture.md) · [繁體中文](workspace-architecture.zh-TW.md) · [简体中文](workspace-architecture.zh-CN.md)
 
+> **Play preview (A–D)** — Two read-only Play tools are available in the acceptance build: `list_play_sessions` requires `editorSessionId`; `get_play_context` also requires `playSessionId`. There are 22 tools. Play state is separate from editor selection and includes fixed program versions, current dialogue, choices, variables and bounded recent events. No MCP playback mutation is exposed in A–D. See [Play](play.md).
+
 # Workspace architecture
 
 Spindle keeps Yarn text as the content authority. Source, reading, graph node editors, tabs, and windows share stable `DocumentId`s and versioned text transactions. Layout, preferences, command definitions and project history have separate persistence and Undo boundaries. Historical design notes live under [history/](history/); they are not current implementation contracts.

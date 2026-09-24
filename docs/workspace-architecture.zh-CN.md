@@ -1,5 +1,7 @@
 [English](workspace-architecture.md) · [繁體中文](workspace-architecture.zh-TW.md) · [简体中文](workspace-architecture.zh-CN.md)
 
+> **Play 试跑 (A–D)** — 验收版新增两个只读工具：`list_play_sessions` 指定 `editorSessionId`；`get_play_context` 另指定 `playSessionId`，共 22 个工具。Play 情境与编辑器选区分离，包括固定文件版本、当前台词、选项、变量及有限的近期事件。A–D 不提供 MCP 试跑修改。详见 [Play](play.zh-CN.md)。
+
 # 工作区架构
 
 Yarn 原文是内容的权威来源。纯文本、阅读、图表节点、标签页和多个窗口共用稳定的 `DocumentId` 与有版本的文字交易。布局、偏好、命令定义和项目历史分别保存并拥有独立的撤销边界。[history/](history/) 保存旧设计记录，不代表当前实现契约。

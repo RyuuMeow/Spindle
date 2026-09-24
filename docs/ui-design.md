@@ -1,5 +1,7 @@
 [English](ui-design.md) · [繁體中文](ui-design.zh-TW.md) · [简体中文](ui-design.zh-CN.md)
 
+> **Play preview (A–D)** — Two read-only Play tools are available in the acceptance build: `list_play_sessions` requires `editorSessionId`; `get_play_context` also requires `playSessionId`. There are 22 tools. Play state is separate from editor selection and includes fixed program versions, current dialogue, choices, variables and bounded recent events. No MCP playback mutation is exposed in A–D. See [Play](play.md).
+
 # Spindle interface conventions
 
 These rules describe the current dark Windows desktop and Web workspace. Historical reviews are archived under [history/](history/); the [verification report](../releases/0.10.0/verification.md) distinguishes implemented behavior from device cases not tested. UI copy is available in English, Traditional Chinese and Simplified Chinese; Yarn source, user stories and custom command content are never translated.

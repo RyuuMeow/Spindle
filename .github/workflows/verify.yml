@@ -19,6 +19,9 @@ jobs:
         with:
           node-version: 22.22.0
           cache: pnpm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.401
       - run: pnpm install --frozen-lockfile
       - run: pnpm version:check
       - run: pnpm i18n:check
@@ -31,4 +34,6 @@ jobs:
       - run: pnpm test:agent-installation
       - run: pnpm build
       - run: pnpm desktop:stage
+      - run: node scripts/build-play-runtime.mjs
+      - run: node --test scripts/play-runtime.test.mjs scripts/play.test.mjs
       - run: pnpm test:public-ui

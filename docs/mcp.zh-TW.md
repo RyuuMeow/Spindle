@@ -1,5 +1,7 @@
 [English](mcp.md) · [繁體中文](mcp.zh-TW.md) · [简体中文](mcp.zh-CN.md)
 
+> **Play 試跑 (A–D)** — 驗收版新增兩個唯讀工具：`list_play_sessions` 指定 `editorSessionId`；`get_play_context` 另指定 `playSessionId`，共 22 個工具。Play 情境與編輯器框選分離，包含固定文件版本、目前台詞、選項、變數及有限的近期事件。A–D 不提供 MCP 試跑修改。詳見 [Play](play.zh-TW.md)。
+
 # Spindle MCP v1
 
 Windows 桌面版執行期間提供本機 Streamable HTTP MCP。預設停用，不包含遠端服務、無介面編輯、任意檔案系統操作或圖表布局修改。介面使用官方 TypeScript SDK，僅提供 Tools。
@@ -164,4 +166,4 @@ Claude Code 使用前述 JSON 的 `mcpServers`，每個 entry 包含 `type: "htt
 
 ## 0.10.0 語系及版本
 
-MCP server 與 Agent 安裝資源版本取自 `version.json`。工具名稱、工作階段 ID、snapshot／operation ID、文件識別與錯誤類別不翻譯；介面及診斷說明依本次 App 啟動語言顯示。更新或語言重啟會使執行期間工作階段失效，Agent 必須重新列出工作階段。仍為 20 個工具，預設停用，憑證不包含於發行資源。
+MCP server 與 Agent 安裝資源版本取自 `version.json`。工具名稱、工作階段 ID、snapshot／operation ID、文件識別與錯誤類別不翻譯；介面及診斷說明依本次 App 啟動語言顯示。更新或語言重啟會使執行期間工作階段失效，Agent 必須重新列出工作階段。本驗收版為 22 個工具，預設停用，憑證不包含於發行資源。

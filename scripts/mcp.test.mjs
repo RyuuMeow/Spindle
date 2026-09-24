@@ -448,7 +448,7 @@ test("official MCP client, authentication, readonly, revocation and stable port 
     }),
   );
   t.after(() => client.close());
-  assert.equal((await client.listTools()).tools.length, 20);
+  assert.equal((await client.listTools()).tools.length, 22);
   const context = (
     await client.callTool({
       name: "get_editor_context",

@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 await import("./prepare-brand-assets.mjs");
+execFileSync(
+  process.execPath,
+  ["scripts/build-play-runtime.mjs", "--publish"],
+  { stdio: "inherit", windowsHide: true },
+);
 
 const root = new URL("../", import.meta.url);
 for (const file of [
@@ -18,6 +23,14 @@ for (const file of [
     fileURLToPath(new URL("desktop/" + file, root)),
   ]);
 const destination = new URL("dist-desktop/app/", root);
+await build({
+  entryPoints: [fileURLToPath(new URL("desktop/play-service.ts", root))],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  external: ["electron"],
+  outfile: fileURLToPath(new URL("desktop/play-service.cjs", destination)),
+});
 await build({
   entryPoints: [fileURLToPath(new URL("app/i18n/index.ts", root))],
   bundle: true,
@@ -47,7 +60,10 @@ await cp(
   new URL("desktop/portable-update.ps1", root),
   new URL("desktop/portable-update.ps1", destination),
 );
-await cp(new URL("desktop/installed-restart.ps1",root),new URL("desktop/installed-restart.ps1",destination));
+await cp(
+  new URL("desktop/installed-restart.ps1", root),
+  new URL("desktop/installed-restart.ps1", destination),
+);
 const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
 await mkdir(new URL("desktop/", destination), { recursive: true });
 await cp(
@@ -138,6 +154,19 @@ for (const input of Object.keys({
   }
 }
 await mkdir(new URL("licenses/", destination), { recursive: true });
+await cp(
+  new URL("vendor/play-licenses/", root),
+  new URL("licenses/play/", destination),
+  { recursive: true },
+);
+await cp(
+  new URL("vendor/yarn-spinner/LICENSE.md", root),
+  new URL("licenses/yarn-spinner.txt", destination),
+);
+await cp(
+  new URL("vendor/yarn-spinner/UPSTREAM.md", root),
+  new URL("licenses/yarn-spinner-source.txt", destination),
+);
 for (const file of ["LICENSE", "THIRD_PARTY_NOTICES.md"])
   await cp(new URL(file, root), new URL("licenses/" + file, destination));
 await writeFile(

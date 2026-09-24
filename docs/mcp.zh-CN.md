@@ -1,5 +1,7 @@
 [English](mcp.md) · [繁體中文](mcp.zh-TW.md) · [简体中文](mcp.zh-CN.md)
 
+> **Play 试跑 (A–D)** — 验收版新增两个只读工具：`list_play_sessions` 指定 `editorSessionId`；`get_play_context` 另指定 `playSessionId`，共 22 个工具。Play 情境与编辑器选区分离，包括固定文件版本、当前台词、选项、变量及有限的近期事件。A–D 不提供 MCP 试跑修改。详见 [Play](play.zh-CN.md)。
+
 # Spindle MCP 与 Agent 接入
 
 Windows 桌面版运行时提供本地 Streamable HTTP MCP，**默认停用**。在「设置 → MCP／Agent 集成」选择只读或允许修改。服务只监听 `127.0.0.1`，不提供远程连接、无界面后台编辑或任意文件系统访问；Web 版不提供此服务。
@@ -40,7 +42,7 @@ Project 是共享内容；Editor Session 是绑定工作区的窗口；Context S
 
 原文范围采用 **UTF-16、从零起算、右边界不包含**的 offset，包含 CRLF 与 BOM；显示的行／列从 1 起算。快照标记截断、同步及输入法组字状态。若 `composing:true`、`synchronized:false` 或有 pendingDocumentIds，不要将画面坐标套用到假定版本。完整内容用 `read_document` 分页读取。
 
-## 20 个工具
+## 22 个工具
 
 | 类别 | 工具 |
 | --- | --- |
