@@ -1,6 +1,5 @@
 "use client";
 import { characterColor } from "./character-presentation";
-import { Portrait } from "./Portrait";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { Stage } from "./presentation";
 import type { PlaySession } from "./types";
@@ -85,9 +84,6 @@ export function PlayStage({
         />
       )}
       <div className="play-stage-shade" aria-hidden="true" />
-      <div className="play-scene-caption">
-        {session?.state.scene || session?.projectName}
-      </div>
       <div className="play-cast" aria-hidden="true">
         {session &&
           Object.entries({ ...stage.exits, ...stage.cast }).map(
@@ -155,8 +151,7 @@ export function PlayStage({
                 ) > 5 ||
                 Math.abs(
                   (textArea.current?.scrollTop || 0) - (start?.scroll ?? 0),
-                ) > 2 ||
-                window.getSelection()?.toString()
+                ) > 2
               )
                 return;
               next();
@@ -177,20 +172,13 @@ export function PlayStage({
                   return;
                 event.preventDefault();
                 event.stopPropagation();
-                if (canAdvance && !window.getSelection()?.toString()) next();
+                if (canAdvance) next();
               }}
             >
               <div
                 className={`play-nameplate ${speaker ? "" : "is-narration"}`}
                 aria-hidden={!speaker}
               >
-                {presentation.showPortraits && session && speaker && (
-                  <Portrait
-                    name={speaker}
-                    session={session}
-                    expression={stage.expressions[speaker]}
-                  />
-                )}
                 <strong
                   style={{
                     color:
@@ -220,13 +208,17 @@ export function PlayStage({
             </div>
             <div className="play-vn-quick" aria-label={pt("play")}>
               <button
+                aria-label={pt("auto")}
                 aria-pressed={auto}
                 disabled={
-                  !auto && (!canAdvance || session?.state.status !== "line")
+                  !["line", "options"].includes(session?.state.status || "")
                 }
                 onClick={onAuto}
               >
                 {pt("auto")}
+                <span className="play-vn-auto-state" aria-hidden="true">
+                  {auto ? "ON" : "OFF"}
+                </span>
               </button>
               <button onClick={onBacklog}>{pt("backlog")}</button>
             </div>

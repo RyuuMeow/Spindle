@@ -194,7 +194,9 @@ export default function SettingsView({
           />
           {tr(
             field === "showPortraits"
-              ? "characters.showPortraits"
+              ? scope === "playPresentation"
+                ? "characters.showNovelPortraits"
+                : "characters.showPortraits"
               : "characters.useNameColors",
           )}
         </label>

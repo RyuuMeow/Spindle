@@ -118,3 +118,17 @@ Subagents reviewed actual screenshots and behavior as Desktop UI/UX, game-art UI
 No CI, Release, Portable or installer was produced. Physical Windows IME, screen-reader speech, mixed-DPI/multi-monitor operation, real game artwork composition and prolonged large-project use remain unverified. Synthetic composition and generated art probes are explicitly narrower evidence. Existing frozen-run behavior remains: character configuration changes require latest restart; display switches apply immediately without runtime mutation.
 
 Final three-language native UI run: `outputs/public-ui-1790268969854/` passed English, Traditional Chinese and Simplified Chinese. The test-generated README screenshots were restored afterward; this round does not refresh public marketing assets.
+
+## VN controls and choice waiting — 2026-09-25
+
+This follow-up removes portraits from VN nameplates and scene captions from both story surfaces. Scene and last-dialogue source are labeled separately in the debug sidebar. VN text uses a game pointer and cannot be selected; Novel presentation preferences remain independent. Auto uses distinct ON/OFF text and colors, stays enabled while waiting for choices, and resumes after manual selection. Stop ends execution without closing the window or losing event records.
+
+Validation on the final staged desktop renderer:
+
+- `node --test scripts/*.test.mjs` with `SPINDLE_LOCALE=zh-TW`: 276 passed.
+- TypeScript, translation completeness (1039 keys in three locales), lint (zero errors; seven existing local-image warnings), Web build and desktop build/stage passed.
+- `node scripts/test-play-presentation.cjs`: 23 actual Electron checks passed, no renderer errors. Evidence: `outputs/play-presentation/1790277068449/`; log: `outputs/vn-polish-test-bounded-final.log`.
+- Choice waiting is verified for 5.3 seconds with unchanged revision, no automatic choice, OFF/ON toggling, then automatic continuation after a manual choice. Stop is checked for stopped state, a surviving window and unchanged event history.
+- The test harness now uses bounded, awaited native-state polling. Earlier async `waitForFunction` checks returned before native state reached options; the before/after capture confirmed a normal line-to-options transition, not an Auto mutation while waiting. A second incorrect test assumption about selectable static debug labels was replaced with a real input selection. Neither failure was relabeled as a product pass.
+
+Desktop UI/UX, game-art UI/UX and PM subagent reviews inspected actual normal, narrow, bright-background and ON/OFF screenshots; adversarial QA inspected behavior and executed the desktop regressions. Existing faint option-scrollbar contrast on very bright artwork remains a future art-polish observation, outside this controls change. Reviews do not replace the user's art direction. Physical IME, screen-reader speech and mixed-DPI/multi-monitor behavior were not newly tested. No CI, release or installer/Portable packaging was performed.

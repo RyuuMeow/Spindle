@@ -162,7 +162,7 @@ export default function PlayApp() {
           }
         : value,
     );
-    if (value.state.status !== "line") setAuto(false);
+    if (!["line", "options"].includes(value.state.status)) setAuto(false);
     const compileKey = value.runId + ":" + value.capturedAt;
     if (
       value.state.diagnostics.some(
@@ -536,7 +536,7 @@ export default function PlayApp() {
         </button>
         <button
           aria-pressed={auto}
-          disabled={state?.status !== "line"}
+          disabled={!["line", "options"].includes(state?.status || "")}
           onClick={() => setAuto(!auto)}
         >
           {auto ? <Pause size={16} /> : <Play size={16} />}
@@ -826,6 +826,22 @@ export default function PlayApp() {
               </button>
               <section className="play-debug-current">
                 <h2>{pt("currentLine")}</h2>
+                <div className="play-current-location">
+                  <span>
+                    {pt("scene")}: {state?.scene || "—"}
+                  </span>
+                  {lastLine?.source && (
+                    <span>
+                      {pt("lastLineSource")}:{" "}
+                      {
+                        session?.documents.find(
+                          (d) => d.id === lastLine.source?.documentId,
+                        )?.name
+                      }{" "}
+                      · {lastLine.source.line}
+                    </span>
+                  )}
+                </div>
                 <p>{line.text || "—"}</p>
                 {sourceButton(lastLine?.source)}
               </section>
@@ -959,16 +975,6 @@ export default function PlayApp() {
           </>
         )}
       </div>
-      {mode === "novel" && (
-        <footer className="play-footer">
-          <span>{state?.scene || session?.projectName}</span>
-          <span>
-            {lastLine?.source &&
-              `${session?.documents.find((d) => d.id === lastLine.source?.documentId)?.name} · ${lastLine.source.line}`}
-          </span>
-          {sourceButton(lastLine?.source)}
-        </footer>
-      )}
       <span
         className="sr-only"
         role="status"

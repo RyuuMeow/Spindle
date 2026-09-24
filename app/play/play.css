@@ -377,24 +377,13 @@
   padding: 0;
   min-width: 80px;
 }
-.play-footer {
+.play-current-location {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 30px;
-  padding: 2px 12px;
-  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 4px 12px;
   color: var(--muted-foreground);
   font-size: 11px;
-  flex-shrink: 0;
-}
-.play-footer span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.play-footer span:first-child {
-  margin-right: auto;
+  overflow-wrap: anywhere;
 }
 .play-diagnostics {
   padding: 16px 24px;

@@ -1025,6 +1025,7 @@
   "mcp.guide": "Connection guide",
   "diagnostic.dialogueLength": "Static dialogue length {0} exceeds the suggested limit {1} (full-width 1 / half-width 0.5; dynamic content excluded)",
   "characters.showPortraits": "Show character portraits",
+  "characters.showNovelPortraits": "Show portraits in Novel mode",
   "characters.useNameColors": "Use character name colors",
   "characters.sourceNameColors": "Use character name colors in Source",
   "settings.play": "Play",

@@ -54,6 +54,7 @@ const messages = {
   ],
   presentation: ["Presentation", "呈現方式", "呈现方式"],
   currentLine: ["Current dialogue", "目前台詞", "当前台词"],
+  lastLineSource: ["Last dialogue source", "最近台詞來源", "最近台词来源"],
   noVariables: ["No matching variables", "沒有符合的變數", "没有符合的变量"],
   variables: ["Variables", "變數", "变量"],
   search: ["Search variables…", "搜尋變數…", "搜索变量…"],

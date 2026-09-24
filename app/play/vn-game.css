@@ -8,6 +8,8 @@
   --vn-story-font:
     "Yu Gothic UI", "Microsoft JhengHei UI", "Microsoft YaHei UI",
     "Noto Sans CJK TC", system-ui, sans-serif;
+  user-select: none;
+  cursor: default;
   flex: 1;
   min-height: 0;
   isolation: isolate;
@@ -43,21 +45,7 @@
   pointer-events: none;
   background: linear-gradient(#10192822, transparent 32%, #1023310d);
 }
-.play-scene-caption {
-  position: absolute;
-  top: 20px;
-  left: 24px;
-  right: 72px;
-  z-index: 2;
-  color: var(--vn-paper);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-shadow: 0 1px 2px #101722, 0 0 4px #101722;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 1;
-}
+
 .play-cast {
   position: absolute;
   inset: 0;
@@ -243,7 +231,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   overflow: hidden;
-  cursor: text;
+  cursor: inherit;
 }
 .play-vn-quick {
   position: absolute;
@@ -261,7 +249,7 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  color: #526d7c;
+  color: #5c6c76;
   font:
     400 11px/1.4 "Yu Gothic UI",
     "Microsoft JhengHei UI",
@@ -269,11 +257,16 @@
     sans-serif;
   letter-spacing: 0.035em;
 }
-.play-app .play-vn-quick button[aria-pressed="true"] {
-  color: #174a69;
+.play-app .play-vn-quick button[aria-pressed="true"],
+.play-app .play-vn-quick button[aria-pressed="true"]:hover:not(:disabled) {
+  color: #003b59;
 }
-.play-app .play-vn-quick button:hover:not(:disabled) {
-  color: #153f5b;
+.play-vn-auto-state {
+  margin-left: 0.55em;
+  display: inline-block;
+  min-width: 2.4em;
+  font-size: 0.9em;
+  letter-spacing: 0.08em;
 }
 .play-app .play-vn-quick button:focus-visible,
 .play-vn-advance-area:focus-visible {
@@ -292,11 +285,7 @@
   color: #365f76;
   pointer-events: none;
 }
-.play-nameplate .play-avatar {
-  width: 24px;
-  height: 24px;
-  border-color: #d8e1e8;
-}
+
 .play-exit-immersive {
   position: absolute;
   top: 12px;

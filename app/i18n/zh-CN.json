@@ -1025,6 +1025,7 @@
   "mcp.guide": "接入指南",
   "diagnostic.dialogueLength": "台词静态长度 {0}，超过建议上限 {1}（全角 1／半角 0.5；动态内容不计）",
   "characters.showPortraits": "显示角色头像",
+  "characters.showNovelPortraits": "小说模式显示角色头像",
   "characters.useNameColors": "使用角色名字色",
   "characters.sourceNameColors": "Source 使用角色名字色",
   "settings.play": "试跑",

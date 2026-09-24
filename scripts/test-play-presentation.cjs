@@ -47,8 +47,10 @@ fs.writeFileSync(
     "Mira: Choose a route.",
     "-> Left",
     "    Mira: Left route.",
+    "    Mira: Left route continues.",
     "-> Right",
     "    Mira: Right route.",
+    "    Mira: Right route continues.",
     "===",
     "title: Short",
     "---",
@@ -101,6 +103,16 @@ async function state() {
   return play.evaluate(() =>
     window.yarnDesktop.play.action({ action: "state" }),
   );
+}
+async function waitForState(predicate, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  let current;
+  do {
+    current = await state();
+    if (predicate(current.state)) return current;
+    await play.waitForTimeout(50);
+  } while (Date.now() < deadline);
+  assert.fail("Runtime state wait timed out: " + current.state.status);
 }
 async function act(input) {
   const result = await play.evaluate(async (value) => {
@@ -268,6 +280,27 @@ async function screenshot(name) {
   let s = await act({ action: "start", scene: "Start" });
   await mode("vn");
   const text = play.locator(".play-vn-text");
+  assert.equal(
+    await play.locator(".play-stage .play-avatar").count(),
+    0,
+    "VN does not render portraits",
+  );
+  assert.equal(
+    await play.locator(".play-scene-caption").count(),
+    0,
+    "The VN stage has no scene caption",
+  );
+  assert.equal(
+    await play.locator(".play-footer").count(),
+    0,
+    "Scene/debug location is not a stage footer",
+  );
+  const vnTextStyle = await text.evaluate((el) => ({
+    cursor: getComputedStyle(el).cursor,
+    select: getComputedStyle(el).userSelect,
+  }));
+  assert.notEqual(vnTextStyle.cursor, "text");
+  assert.equal(vnTextStyle.select, "none");
   assert(
     (await text.textContent()).length < first.length,
     "Typewriter starts incomplete",
@@ -439,12 +472,7 @@ async function screenshot(name) {
   );
   await screenshot("vn-long-dialogue-final-page");
   await clickCue();
-  await play.waitForFunction(
-    async (revision) =>
-      (await window.yarnDesktop.play.action({ action: "state" })).state
-        .revision > revision,
-    s.state.revision,
-  );
+  await waitForState((value) => value.revision > s.state.revision);
   await frames();
   s = await state();
   assert(
@@ -720,6 +748,33 @@ async function screenshot(name) {
   assert.equal(await text.textContent(), "The ferry is here. Shall we go?");
   await assertTwoLinePage();
   await screenshot("vn-short-dialogue");
+  const panelToggle = play.getByRole("button", {
+    name: /^(Toggle debug panel|切換除錯面板|切换调试面板)$/,
+  });
+  if (!(await play.locator(".play-debug-current p").isVisible()))
+    await panelToggle.click();
+  const debugSearch = play.locator(".play-debug input[placeholder]");
+  await debugSearch.fill("qa");
+  const selectedDebug = await debugSearch.evaluate((el) => {
+    el.select();
+    return el.value.slice(el.selectionStart, el.selectionEnd);
+  });
+  assert(
+    selectedDebug.length > 0,
+    "Debug search input is actually selected before clicking VN",
+  );
+  await clickCue();
+  await frames();
+  assert.equal(
+    await text.textContent(),
+    "我們一起走吧。",
+    "A selection in the debug panel must not block VN advance",
+  );
+  await debugSearch.fill("");
+  await act({ action: "start", scene: "Short" });
+  checks.push(
+    "Selecting a debug search input does not block a subsequent VN click",
+  );
   const preferenceRevision = (await state()).state.revision;
   const patchPreferences = (patch) =>
     editor.evaluate(
@@ -761,9 +816,25 @@ async function screenshot(name) {
   });
   await play.waitForFunction(
     () =>
-      !!document.querySelector(".play-nameplate .play-avatar") &&
+      !document.querySelector(".play-nameplate .play-avatar") &&
       !!document.querySelector(".play-nameplate strong")?.style.color,
   );
+  await mode("novel");
+  assert.equal(
+    await play.locator(".play-footer,.play-scene-caption").count(),
+    0,
+  );
+  assert.equal(await play.locator(".play-transcript .play-avatar").count(), 1);
+  await patchPreferences({ playPresentation: { showPortraits: false } });
+  await play.waitForFunction(
+    () => !document.querySelector(".play-transcript .play-avatar"),
+  );
+  await patchPreferences({ playPresentation: { showPortraits: true } });
+  await play.waitForFunction(
+    () => !!document.querySelector(".play-transcript .play-avatar"),
+  );
+  await mode("vn");
+  assert.equal(await play.locator(".play-stage .play-avatar").count(), 0);
   assert.equal((await state()).state.revision, preferenceRevision);
   await patchPreferences({
     editorCharacters: {
@@ -773,7 +844,25 @@ async function screenshot(name) {
     },
   });
   checks.push(
-    "Live Play portrait/name toggles preserve runtime and remain independent of editor preferences",
+    "VN omits portraits; Novel portrait and live name-color settings are independent of editor preferences and preserve runtime",
+  );
+  await play.evaluate(() => window.getSelection()?.removeAllRanges());
+  const proseBounds = await text.boundingBox();
+  await play.mouse.move(proseBounds.x + 8, proseBounds.y + 12);
+  await play.mouse.down();
+  await play.mouse.move(
+    proseBounds.x + Math.min(200, proseBounds.width - 8),
+    proseBounds.y + 12,
+    { steps: 8 },
+  );
+  await play.mouse.up();
+  assert.equal(
+    await play.evaluate(() => window.getSelection()?.toString() || ""),
+    "",
+  );
+  assert.equal((await state()).state.revision, preferenceRevision);
+  checks.push(
+    "VN prose is not selectable and never uses an I-beam; both stages omit scene labels",
   );
   const quickButtons = play.locator(".play-vn-quick button");
   async function assertQuickChrome() {
@@ -803,8 +892,17 @@ async function screenshot(name) {
   }
   await quickButtons.first().click();
   assert.equal(await quickButtons.first().getAttribute("aria-pressed"), "true");
+  assert.equal(await play.locator(".play-vn-auto-state").textContent(), "ON");
+  const onColor = await quickButtons
+    .first()
+    .evaluate((el) => getComputedStyle(el).color);
   await assertQuickChrome();
   await quickButtons.first().click();
+  assert.equal(await play.locator(".play-vn-auto-state").textContent(), "OFF");
+  assert.notEqual(
+    await quickButtons.first().evaluate((el) => getComputedStyle(el).color),
+    onColor,
+  );
   assert.equal(await advance.evaluate((el) => el.tagName), "SPAN");
   assert.equal((await state()).state.revision, preferenceRevision);
   checks.push(
@@ -855,33 +953,59 @@ async function screenshot(name) {
   );
   await act({ action: "start", scene: "AutoChoice" });
   await autoButton.click();
-  await play.waitForFunction(
-    async () =>
-      (await window.yarnDesktop.play.action({ action: "state" })).state
-        .status === "options",
-    null,
-    { timeout: 8000 },
-  );
-  // The host can answer state before the renderer receives and commits its event.
-  // Wait for the actual UI contract, with a short bound that still fails a stuck Auto.
+  await waitForState((value) => value.status === "options");
+  // Auto stays armed at options but never chooses them itself.
   await play.waitForFunction(
     () =>
       document
         .querySelector(".play-vn-quick button")
-        ?.getAttribute("aria-pressed") === "false",
+        ?.getAttribute("aria-pressed") === "true",
     null,
     { timeout: 2000 },
   );
-  assert.equal(await autoButton.getAttribute("aria-pressed"), "false");
+  assert.equal(await autoButton.getAttribute("aria-pressed"), "true");
+  assert.equal(await play.locator(".play-vn-auto-state").textContent(), "ON");
   const autoStopped = await state();
+  assert.equal(autoStopped.state.status, "options");
+  await screenshot("vn-auto-on-waiting-choice");
   assert.equal(
     autoStopped.state.events.some((event) => event.kind === "choice"),
     false,
   );
-  await play.waitForTimeout(1200);
-  assert.equal((await state()).state.revision, autoStopped.state.revision);
+  await play.waitForTimeout(5300);
+  const autoAfterWait = await state();
+  fs.writeFileSync(
+    path.join(out, "auto-choice-states.json"),
+    JSON.stringify(
+      { before: autoStopped.state, after: autoAfterWait.state },
+      null,
+      2,
+    ),
+  );
+  assert.equal(autoAfterWait.state.revision, autoStopped.state.revision);
+  await autoButton.click();
+  assert.equal(await autoButton.getAttribute("aria-pressed"), "false");
+  assert.equal(await play.locator(".play-vn-auto-state").textContent(), "OFF");
+  await screenshot("vn-auto-off-waiting-choice");
+  await autoButton.click();
+  assert.equal(await autoButton.getAttribute("aria-pressed"), "true");
+  await play.locator(".play-stage .play-options button").first().click();
+  await waitForState((value) =>
+    value.events.some(
+      (event) =>
+        event.kind === "line" && event.text.includes("Left route continues."),
+    ),
+  );
   checks.push(
-    "Normal Auto reaches a choice then stops without selecting or changing the waiting revision",
+    "Auto stays visibly armed at options without choosing, can toggle while waiting, and resumes after a user choice",
+  );
+  const beforeStop = await state();
+  await play.getByRole("button", { name: /^(Stop|停止)$/ }).click();
+  await waitForState((value) => value.status === "stopped");
+  assert.equal(play.isClosed(), false);
+  assert.deepEqual((await state()).state.events, beforeStop.state.events);
+  checks.push(
+    "Stop ends execution while preserving the Play window and event history",
   );
   assert.deepEqual(errors, []);
   fs.writeFileSync(

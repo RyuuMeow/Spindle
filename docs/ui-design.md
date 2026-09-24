@@ -1,6 +1,6 @@
 [English](ui-design.md) · [繁體中文](ui-design.zh-TW.md) · [简体中文](ui-design.zh-CN.md)
 
-> **Play preview (A–D)** — Two read-only Play tools are available in the acceptance build: `list_play_sessions` requires `editorSessionId`; `get_play_context` also requires `playSessionId`. There are 22 tools. Play state is separate from editor selection and includes fixed program versions, current dialogue, choices, variables and bounded recent events. No MCP playback mutation is exposed in A–D. See [Play](play.md).
+> **Play preview (A–D)** — Two read-only Play tools are available in the acceptance build: `list_play_sessions` requires `editorSessionId`; `get_play_context` also requires `playSessionId`. There are 22 tools. Play state is separate from editor selection and includes fixed program versions, current dialogue, choices, variables and bounded recent events. No MCP playback mutation is exposed in A–D. VN nameplates omit portraits. Auto uses distinct ON/OFF labels and colors, retaining its enabled state while waiting for a choice. Scene/location status belongs in the debug sidebar. See [Play](play.md).
 
 # Spindle interface conventions
 
@@ -50,4 +50,4 @@ Surfaces have four levels: shell, docked panels, editor and floating layers. Doc
 
 ## Play presentation
 
-Desktop Play uses the same shell/novel typography, surfaces, focus and control tokens as the editor. VN is an intentionally separate game-art surface with an inset translucent message window, attached name label and restrained choices. Game content never includes source-link icons; debugging stays in the side panel. Dialogue uses a fixed two-line capacity and local display pages; only long option lists scroll, text selection never advances, and reduced motion also disables the JavaScript typewriter. See [Play](play.md) for interaction and mode-switch rules.
+Desktop Play uses the same shell/novel typography, surfaces, focus and control tokens as the editor. VN is an intentionally separate game-art surface with an inset translucent message window, attached name label and restrained choices. Game content never includes source-link icons; debugging stays in the side panel. Dialogue uses a fixed two-line capacity and local display pages; only long option lists scroll, VN text is not selectable (Novel reading interactions are unchanged), and reduced motion also disables the JavaScript typewriter. See [Play](play.md) for interaction and mode-switch rules.
