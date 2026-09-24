@@ -1,5 +1,10 @@
 import { locale } from "../i18n";
 const messages = {
+  resubmitChanges: [
+    "Submit my changes again",
+    "重新提交我的變更",
+    "重新提交我的更改",
+  ],
   retry: ["Retry", "重試", "重试"],
   reloadSaved: [
     "Discard changes and reload saved values",

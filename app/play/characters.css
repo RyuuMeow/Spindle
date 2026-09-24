@@ -48,25 +48,61 @@
 .characters-view .characters-content label > input[type="color"] {
   max-width: 120px;
 }
-@media (max-width: 720px) {
-  .characters-view {
-    padding: 16px;
-  }
-  .characters-view .characters-layout {
-    gap: 14px;
-    flex-direction: row;
-  }
-  .characters-view .characters-layout nav {
-    flex-basis: 155px;
-  }
-  .characters-view .characters-content section {
-    padding: 14px;
-  }
-  .characters-view .characters-content label {
-    flex-wrap: wrap;
-  }
-  .characters-view .characters-content label > .compact-select,
-  .characters-view .characters-content label input:not([type="checkbox"]) {
-    width: 100%;
-  }
+
+.characters-view .characters-layout {
+  position: relative;
+}
+.characters-view .characters-layout nav[hidden] {
+  display: none;
+}
+.characters-view.characters-narrow > header {
+  justify-content: flex-start;
+  gap: 12px;
+}
+.characters-view.characters-narrow .characters-layout {
+  gap: 0;
+}
+.characters-view.characters-narrow .characters-layout nav {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 4;
+  width: min(300px, calc(100% - 32px));
+  max-width: 100%;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 5px);
+  background: var(--popover);
+  box-shadow: 10px 0 30px #0005;
+}
+.characters-view .characters-sidebar-close {
+  align-self: flex-end;
+  flex-shrink: 0;
+}
+.characters-view .characters-sidebar-backdrop,
+.characters-view .characters-sidebar-backdrop:hover:not(:disabled) {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 0;
+  border-radius: 0;
+  background: #0006;
+  padding: 0;
+  cursor: default;
+}
+.characters-view.characters-narrow .characters-content {
+  max-width: none;
+  padding-right: 0;
+}
+.characters-view.characters-narrow .characters-content section {
+  padding: 14px;
+}
+.characters-view.characters-narrow .characters-content label {
+  flex-wrap: wrap;
+}
+.characters-view.characters-narrow .characters-content label > .compact-select,
+.characters-view.characters-narrow
+  .characters-content
+  label
+  input:not([type="checkbox"]) {
+  width: 100%;
 }

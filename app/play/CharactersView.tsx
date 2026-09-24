@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CompactSelect } from "@/components/CompactSelect";
 import { usePreviewAutosave } from "./use-preview-autosave";
 
-import { Plus, Trash2, ImagePlus } from "lucide-react";
+import { Plus, Trash2, ImagePlus, PanelLeft, X } from "lucide-react";
 import { pt } from "./messages";
 import type { PreviewConfig } from "./types";
 import "./play.css";
@@ -14,6 +14,31 @@ export default function CharactersView({ projectId }: { projectId: string }) {
   return <CharactersEditor key={projectId} projectId={projectId} />;
 }
 function CharactersEditor({ projectId }: { projectId: string }) {
+  const host = useRef<HTMLDivElement>(null);
+  const sidebar = useRef<HTMLElement>(null);
+  const sidebarToggle = useRef<HTMLButtonElement>(null);
+  const sidebarId = useId();
+  const [narrow, setNarrow] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => {
+    const element = host.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const compact = entry.contentRect.width < 720;
+      setNarrow(compact);
+      if (!compact) setSidebarOpen(false);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+    sidebarToggle.current?.focus();
+  };
+  useEffect(() => {
+    if (narrow && sidebarOpen)
+      sidebar.current?.querySelector<HTMLInputElement>("input")?.focus();
+  }, [narrow, sidebarOpen]);
   const {
     resources,
     draft,
@@ -78,15 +103,56 @@ function CharactersEditor({ projectId }: { projectId: string }) {
   if (!bridge) return <p>{pt("projectOnly")}</p>;
   return (
     <div
-      className="characters-view"
+      ref={host}
+      className={`characters-view ${narrow ? "characters-narrow" : ""}`}
+      onKeyDown={(event) => {
+        if (!narrow || !sidebarOpen || event.nativeEvent.isComposing) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          closeSidebar();
+        }
+        if (event.key === "Tab") {
+          const items = [
+            ...(sidebar.current?.querySelectorAll<HTMLElement>(
+              'button:not(:disabled), input:not(:disabled), [tabindex="0"]',
+            ) || []),
+          ].filter((item) => item.getClientRects().length > 0);
+          const first = items[0],
+            last = items.at(-1);
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }
+      }}
       onCompositionStart={() => controller?.composition(true)}
       onCompositionEnd={() => controller?.composition(false)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget))
-          void controller?.flush();
+      onBlur={(event) => {
+        if (
+          event.relatedTarget instanceof HTMLElement &&
+          event.relatedTarget.closest('[role="alert"]')
+        )
+          return;
+        void controller?.flush();
       }}
     >
       <header>
+        {narrow && (
+          <button
+            ref={sidebarToggle}
+            type="button"
+            aria-label={pt("characters")}
+            aria-expanded={sidebarOpen}
+            aria-controls={sidebarId}
+            onClick={() => setSidebarOpen((value) => !value)}
+          >
+            <PanelLeft size={18} />
+          </button>
+        )}
         <div>
           <h1>{pt("characters")}</h1>
           <p>{pt("characterHelp")}</p>
@@ -98,6 +164,11 @@ function CharactersEditor({ projectId }: { projectId: string }) {
           <button disabled={busy} onClick={() => void controller?.flush()}>
             {pt("retry")}
           </button>
+          {saveError.includes("PREVIEW_FIELD_CONFLICT") && (
+            <button disabled={busy} onClick={() => void controller?.resubmit()}>
+              {pt("resubmitChanges")}
+            </button>
+          )}
           <button disabled={busy} onClick={() => void controller?.reload()}>
             {pt("reloadSaved")}
           </button>
@@ -105,7 +176,33 @@ function CharactersEditor({ projectId }: { projectId: string }) {
       )}
       {draft && (
         <div className="characters-layout">
-          <nav aria-label={pt("characters")}>
+          {narrow && sidebarOpen && (
+            <button
+              className="characters-sidebar-backdrop"
+              type="button"
+              tabIndex={-1}
+              aria-label={pt("close")}
+              onClick={closeSidebar}
+            />
+          )}
+          <nav
+            ref={sidebar}
+            id={sidebarId}
+            hidden={narrow && !sidebarOpen}
+            role={narrow && sidebarOpen ? "dialog" : undefined}
+            aria-modal={narrow && sidebarOpen ? true : undefined}
+            aria-label={pt("characters")}
+          >
+            {narrow && (
+              <button
+                className="characters-sidebar-close"
+                type="button"
+                aria-label={pt("close")}
+                onClick={closeSidebar}
+              >
+                <X size={16} />
+              </button>
+            )}
             <input
               aria-label={pt("searchCharacters")}
               placeholder={pt("searchCharacters")}
@@ -128,7 +225,10 @@ function CharactersEditor({ projectId }: { projectId: string }) {
                     aria-pressed={activeName === name}
                     onClick={() => {
                       void controller?.flush().then((ok) => {
-                        if (ok) setSelected(name);
+                        if (ok) {
+                          setSelected(name);
+                          if (narrow) closeSidebar();
+                        }
                       });
                     }}
                   >
@@ -154,6 +254,7 @@ function CharactersEditor({ projectId }: { projectId: string }) {
                 );
                 setSelected(name);
                 setNewName("");
+                if (narrow) closeSidebar();
               }}
             >
               <input
@@ -171,7 +272,7 @@ function CharactersEditor({ projectId }: { projectId: string }) {
               </button>
             </form>
           </nav>
-          <div className="characters-content">
+          <div className="characters-content" inert={narrow && sidebarOpen}>
             {character && (
               <section>
                 <h2>{character.name}</h2>

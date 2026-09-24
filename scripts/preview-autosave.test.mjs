@@ -209,3 +209,19 @@ test("two concurrent editors merge independent changes across the read-save race
   h.controller.dispose();
   second.dispose();
 });
+
+test("explicit resubmit chooses local conflict fields while retaining unrelated remote changes", async () => {
+  const h = harness();
+  await h.controller.load();
+  h.controller.update((c) => {
+    c.characters[0].displayName = "Mine";
+  });
+  h.saved.characters[0].displayName = "Other";
+  h.saved.characters[0].color = "#ffeedd";
+  h.saved.revision++;
+  assert.equal(await h.controller.flush(), false);
+  assert.equal(await h.controller.resubmit(), true);
+  assert.equal(h.saved.characters[0].displayName, "Mine");
+  assert.equal(h.saved.characters[0].color, "#ffeedd");
+  h.controller.dispose();
+});

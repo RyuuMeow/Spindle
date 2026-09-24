@@ -136,6 +136,15 @@ export default function CommandPreviewBinding({
           >
             {pt("retry")}
           </button>
+          {error.includes("PREVIEW_FIELD_CONFLICT") && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void controller?.resubmit()}
+            >
+              {pt("resubmitChanges")}
+            </button>
+          )}
           <button
             type="button"
             disabled={busy}

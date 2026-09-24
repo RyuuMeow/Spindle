@@ -221,6 +221,37 @@ export class PreviewAutosave {
     if (this.flight) await this.flight;
     await this.load();
   }
+  resubmit(): Promise<boolean> {
+    clearTimeout(this.timer);
+    if (this.composing || this.disposed) return Promise.resolve(false);
+    if (this.flight) return this.flight.then(() => this.resubmit());
+    this.flight = this.rebaseAndCommit().finally(() => {
+      this.flight = undefined;
+    });
+    return this.flight;
+  }
+  private async rebaseAndCommit() {
+    if (!this.base || !this.state.draft) return false;
+    this.publish({ busy: true, error: "" });
+    try {
+      const remote = await this.bridge.resources();
+      if (this.composing || this.disposed) return false;
+      // This explicit user action chooses local values only at changed fields.
+      // Ordinary autosave never takes this path and still rejects collisions.
+      const chosen = mergePreview(this.base, this.state.draft!, remote.config);
+      this.base = remote.config;
+      this.publish({
+        draft: chosen.value,
+        dirty: !equal(chosen.value, remote.config),
+      });
+      return await this.commit();
+    } catch (error) {
+      this.publish({ error: String(error) });
+      return false;
+    } finally {
+      this.publish({ busy: false });
+    }
+  }
   dispose() {
     this.disposed = true;
     ++this.loadGeneration;
