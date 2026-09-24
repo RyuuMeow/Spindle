@@ -3,6 +3,12 @@ import {
   message as renderMessage,
   type LocalizedMessage,
 } from "./i18n/index.ts";
+import {
+  dialogueLengthFindings,
+  DIALOGUE_LENGTH_CODE,
+  type DialogueLengthPreference,
+} from "./diagnostics/dialogue-length";
+export type AnalysisOptions = { dialogueLength?: DialogueLengthPreference };
 export type Param = {
   displayName?: string;
   description?: string;
@@ -23,6 +29,7 @@ export type Issue = {
   file: string;
   line: number;
   column: number;
+  endColumn?: number;
   message: string;
   code?: string;
   args?: readonly (string | number)[];
@@ -263,7 +270,11 @@ function uncomment(s: string) {
   }
   return s;
 }
-export function parse(docs: Doc[], commands: Command[]) {
+export function parse(
+  docs: Doc[],
+  commands: Command[],
+  options: AnalysisOptions = {},
+) {
   const nodes: Node[] = [],
     links: Link[] = [],
     issues: Issue[] = [];
@@ -695,6 +706,24 @@ export function parse(docs: Doc[], commands: Command[]) {
         code: "diagnostic.cf6241ad8a25",
         args: [link.target],
       });
+  }
+  for (const doc of docs) {
+    for (const finding of dialogueLengthFindings(
+      doc.text,
+      options.dialogueLength,
+    )) {
+      const args = [finding.length, finding.limit];
+      issues.push({
+        file: doc.name,
+        line: finding.line,
+        column: finding.column,
+        endColumn: finding.endColumn,
+        code: DIALOGUE_LENGTH_CODE,
+        args,
+        message: renderMessage({ code: DIALOGUE_LENGTH_CODE, args }),
+        severity: "warning",
+      });
+    }
   }
   return {
     nodes,

@@ -219,10 +219,12 @@ export default function CodeEditor({
             startLineNumber: i.line,
             startColumn: i.column,
             endLineNumber: i.line,
-            endColumn: Math.max(
-              i.column + 2,
-              m.getLineMaxColumn(Math.min(i.line, m.getLineCount())),
-            ),
+            endColumn:
+              i.endColumn ??
+              Math.max(
+                i.column + 2,
+                m.getLineMaxColumn(Math.min(i.line, m.getLineCount())),
+              ),
             message: i.message,
             severity: i.severity === "error" ? 8 : 4,
           })),

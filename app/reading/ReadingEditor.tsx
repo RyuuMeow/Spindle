@@ -11,6 +11,7 @@ import { useCodeMirrorAppearance } from "../appearance/codemirror";
 import { appearanceVariables } from "../appearance/context";
 import type { YarnVariable } from "../variable-completion";
 import { commandEditing } from "./command-input";
+import { readingLengthWarnings } from "../diagnostics/reading-length";
 import { sceneLinks } from "./scene-links";
 
 import { useEffect, useRef } from "react";
@@ -343,6 +344,13 @@ export default function ReadingEditor(props: Props) {
           });
           return effects.length ? { effects } : null;
         }),
+        readingLengthWarnings(() =>
+          (latest.current.issues || []).filter(
+            (i) =>
+              i.file === latest.current.doc.name &&
+              !quietDiagnostic(i.file, i.line),
+          ),
+        ),
         commandEditing(
           () => latest.current.commands,
           () => latest.current.scenes || [],

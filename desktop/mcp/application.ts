@@ -1,4 +1,5 @@
 import { t as tr } from "../../app/i18n";
+import { resolvePresentation } from "../../app/workspace/presentation-preferences";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import type { z } from "zod";
@@ -77,10 +78,14 @@ export class AgentApplication {
     { stamp: string; data: ReturnType<typeof semantics> }
   >();
   private analyze(p: Project) {
-    const stamp = projectStamp(p),
+    const options = {
+      dialogueLength: resolvePresentation(this.service.catalog.preferences)
+        .dialogueLength,
+    };
+    const stamp = digest([projectStamp(p), options]),
       cached = this.analyses.get(p.id);
     if (cached?.stamp === stamp) return cached.data;
-    const data = semantics(p);
+    const data = semantics(p, options);
     this.analyses.set(p.id, { stamp, data });
     while (this.analyses.size > 16)
       this.analyses.delete(this.analyses.keys().next().value!);

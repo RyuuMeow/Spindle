@@ -1,5 +1,6 @@
 import { t as tr } from "../../app/i18n";
-import { parse } from "../../app/parser";
+import { parse, type AnalysisOptions } from "../../app/parser";
+import { DIALOGUE_LENGTH_CODE } from "../../app/diagnostics/dialogue-length";
 import {
   collectVariables,
   variableReferenceAt,
@@ -19,8 +20,8 @@ export type Fix = {
   edit?: TextEdit;
   command?: Command;
 };
-export function semantics(p: Project) {
-  const parsed = parse(p.documents, p.commands),
+export function semantics(p: Project, options: AnalysisOptions = {}) {
+  const parsed = parse(p.documents, p.commands, options),
     variables = collectVariables(p.documents);
   const file = (name: string) => p.documents.find((d) => d.name === name);
   const calls = parsed.nodes.flatMap((n) =>
@@ -36,7 +37,7 @@ export function semantics(p: Project) {
   const issues = parsed.issues.map((issue, index) => {
     const d = file(issue.file),
       fixIds: string[] = [];
-    if (d) {
+    if (d && issue.code !== DIALOGUE_LENGTH_CODE) {
       const from = lineOffset(d.text, issue.line),
         line = d.text.slice(from).split(/\r?\n/, 1)[0];
       const fix = variableQuickFix(
