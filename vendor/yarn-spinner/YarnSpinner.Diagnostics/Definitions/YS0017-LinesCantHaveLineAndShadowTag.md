@@ -1,0 +1,18 @@
+---
+name: LinesCantHaveLineAndShadowTag
+code: YS0017
+tags: ["line-ids","semantic"]
+description: Lines cannot have both a '#line' tag and a '#shadow' tag.
+messageTemplate: "Lines cannot have both a '#line' tag and a '#shadow' tag."
+summary: |
+    Shadow tags represent copies of another line elsewhere, and don't get their own line ID.
+defaultSeverity: error
+published: v3.2.0
+examples:
+    - script: |
+        title: Start
+        -=-
+        this is the line for the shadow line to refer #line:def123
+        this is the line for the shadow line to refer #line:abc123 #shadow:def123
+        ===
+---

@@ -1,0 +1,98 @@
+// Copyright Yarn Spinner Pty Ltd
+// Licensed under the MIT License. See LICENSE.md in project root for license information.
+
+namespace Yarn.Compiler
+{
+    using Antlr4.Runtime.Misc;
+    using System.Collections.Generic;
+
+    class NodeTrackingVisitor : YarnSpinnerParserBaseVisitor<string?>
+    {
+        readonly HashSet<string> TrackingNode;
+        readonly HashSet<string> NeverVisitNodes;
+
+        public NodeTrackingVisitor(HashSet<string> ExistingTrackedNodes, HashSet<string> ExistingBlockedNodes)
+        {
+            this.TrackingNode = ExistingTrackedNodes;
+            this.NeverVisitNodes = ExistingBlockedNodes;
+        }
+
+        public override string? VisitFunction_call([NotNull] YarnSpinnerParser.Function_callContext context)
+        {
+            var functionName = context.FUNC_ID().GetText();
+
+            if (functionName.Equals("visited") || functionName.Equals("visited_count"))
+            {
+                var parameters = context.expression();
+                if (parameters.Length < 1)
+                {
+                    // No actual parameter provided to this function call -
+                    // that's a semantic error, and there'll be a diagnostic for
+                    // this issued elsewhere. For our purposes here, there's
+                    // nothing to do.
+                }
+                else
+                {
+                    // We aren't bothering to test anything about the value
+                    // itself. If it isn't a static string we'll get back null
+                    // so we can ignore it; if the func has more than one
+                    // parameter later on it will cause an error so again, can
+                    // ignore.
+                    var result = Visit(parameters[0]);
+
+                    if (result != null)
+                    {
+                        TrackingNode.Add(result);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        public override string? VisitValueString([NotNull] YarnSpinnerParser.ValueStringContext context)
+        {
+            return context.STRING()?.GetText().Trim('"');
+        }
+
+        public override string? VisitNode([NotNull] YarnSpinnerParser.NodeContext context)
+        {
+            string? title = context.NodeTitle;
+            string? tracking = null;
+
+            foreach (var header in context.header())
+            {
+                if (header.header_key.Text.Equals("tracking"))
+                {
+                    tracking = header.header_value?.Text;
+                }
+            }
+
+            if (title != null && tracking != null)
+            {
+                if (tracking.Equals("always"))
+                {
+                    TrackingNode.Add(title);
+                    // If we're in a node group, 'title' is actually our
+                    // rewritten individual node title. We'll track that, but we
+                    // also need to track the hub node, so we'll also add that
+                    // to the tracking list.
+                    if (string.IsNullOrEmpty(context.NodeGroup) == false)
+                    {
+                        TrackingNode.Add(context.NodeGroup);
+                    }
+                }
+                else if (tracking.Equals("never"))
+                {
+                    NeverVisitNodes.Add(title);
+                }
+            }
+
+            if (context.body() != null)
+            {
+                return Visit(context.body());
+            }
+            return null;
+        }
+    }
+}

@@ -50,3 +50,7 @@ next-env.d.ts
 /dist-desktop/
 /release/
 /.openai/
+
+# Official Play helper build outputs
+**/bin/
+**/obj/

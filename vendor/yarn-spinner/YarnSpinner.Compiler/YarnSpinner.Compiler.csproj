@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!--  '...' does not need a CLSCompliant attribute because the assembly does
+    not have a CLSCompliant attribute -->
+    <NoWarn>3021</NoWarn>
+
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Nullable>enable</Nullable>
+    <LangVersion>9.0</LangVersion>
+
+    <PackageId>YarnSpinner.Compiler</PackageId>
+    <Version>0.0.0</Version>
+    <Title>Yarn Spinner Compiler</Title>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Authors>Secret Lab Pty. Ltd. and Yarn Spinner contributors</Authors>
+    <Company>Secret Lab Pty. Ltd.</Company>
+    <RepositoryUrl>https://github.com/YarnSpinnerTool/YarnSpinner</RepositoryUrl>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <PackageDescription><![CDATA[Yarn Spinner is a tool for creating interactive dialogue for games.
+
+This package provides support for compiling Yarn source code, so that you can execute it using the YarnSpinner package.]]></PackageDescription>
+
+    <YarnSpinnerDiagnostics_GenerateDescriptors>enable</YarnSpinnerDiagnostics_GenerateDescriptors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <PackageReference Include="CsvHelper" Version="12.2.2" />
+    <PackageReference Include="Google.Protobuf" Version="3.25.2" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\YarnSpinner\YarnSpinner.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\YarnSpinner.Diagnostics\YarnSpinner.Diagnostics.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false" />
+    <AdditionalFiles Include="..\YarnSpinner.Diagnostics\Definitions\*.md" />
+    <AdditionalFiles Include="..\YarnSpinner.Diagnostics\*.txt" />
+
+    <!-- Make our 'generate descriptors' property visible to the compiler, so
+    that it can know whether or not to generate descriptors  -->
+    <CompilerVisibleProperty Include="YarnSpinnerDiagnostics_GenerateDescriptors" />
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+</Project>
