@@ -1021,6 +1021,20 @@
   "updates.checking": "检查中…",
   "updates.unsigned": "此版本未经代码签名；下载完整性会以版本校验码验证。",
   "updates.cancel": "取消下载",
-  "licenses.thirdParty": "第三方许可",
-  "mcp.guide": "接入指南"
+  "licenses.thirdParty": "第三方许可",
+  "mcp.guide": "接入指南",
+  "diagnostic.dialogueLength": "台词静态长度 {0}，超过建议上限 {1}（全角 1／半角 0.5；动态内容不计）",
+  "characters.showPortraits": "显示角色头像",
+  "characters.useNameColors": "使用角色名字色",
+  "characters.sourceNameColors": "Source 使用角色名字色",
+  "settings.play": "试跑",
+  "dialogueLength.enabled": "台词长度提醒",
+  "dialogueLength.limit": "台词建议长度",
+  "dialogueLength.description": "静态文字估计：中日韩／emoji 为 1，其余字符为 0.5。不阻止保存或试跑。",
+  "dialogueLength.unit": "加权字符",
+  "play.compileResults": "编译结果",
+  "play.viewCompileResults": "查看编译结果",
+  "play.resizeCompile": "调整编译面板高度",
+  "workspace.moreTools": "更多编辑工具",
+  "play.noCompileResults": "没有编译诊断"
 }

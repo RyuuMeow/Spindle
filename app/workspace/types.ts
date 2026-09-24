@@ -33,14 +33,15 @@ export type ProjectCatalogEntry = {
   recent: boolean;
   unavailable?: string;
 };
-export type AppPreferences = {
-  language?: import("../i18n").LanguagePreference;
-  autoCheckUpdates?: boolean;
-  skippedVersion?: string;
-  editorAppearance?: import("../appearance/model").EditorAppearance;
-  reopenLastProject: boolean;
-  lastProjectId?: string;
-};
+export type AppPreferences =
+  import("./presentation-preferences").PresentationPreferences & {
+    language?: import("../i18n").LanguagePreference;
+    autoCheckUpdates?: boolean;
+    skippedVersion?: string;
+    editorAppearance?: import("../appearance/model").EditorAppearance;
+    reopenLastProject: boolean;
+    lastProjectId?: string;
+  };
 export type RecoveryViewState = {
   scope: "deleted" | "commands";
   query: string;
@@ -209,6 +210,9 @@ export type WorkspaceAction =
       language?: import("../i18n").LanguagePreference;
       autoCheckUpdates?: boolean;
       skippedVersion?: string;
+      editorCharacters?: import("./presentation-preferences").PresentationPreferences["editorCharacters"];
+      playPresentation?: import("./presentation-preferences").PresentationPreferences["playPresentation"];
+      dialogueLength?: import("./presentation-preferences").PresentationPreferences["dialogueLength"];
     }
   | { type: "closeProject"; projectId: string }
   | { type: "purgeTrash"; projectId: string; recoveryId?: string }

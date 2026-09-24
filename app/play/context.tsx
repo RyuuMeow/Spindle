@@ -7,19 +7,28 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Project } from "../workspace/types";
+import type { Project, AppPreferences } from "../workspace/types";
+import { resolvePresentation } from "../workspace/presentation-preferences";
+import { characterColor } from "./character-presentation";
 import type { PlaySession, PreviewResources } from "./types";
 import { mapPlaySource } from "./presentation";
 const PreviewContext = createContext<{
   resources: PreviewResources | null;
+  presentation: ReturnType<typeof resolvePresentation>["editorCharacters"];
   visited: { file: string; line: number; kind: string }[];
-}>({ resources: null, visited: [] });
+}>({
+  resources: null,
+  visited: [],
+  presentation: resolvePresentation().editorCharacters,
+});
 export const usePreview = () => useContext(PreviewContext);
 export function PreviewProvider({
   project,
+  preferences,
   children,
 }: {
   project: Project;
+  preferences?: AppPreferences;
   children: ReactNode;
 }) {
   const [resources, setResources] = useState<PreviewResources | null>(null),
@@ -71,26 +80,32 @@ export function PreviewProvider({
     });
   }, [session, project]);
   return (
-    <PreviewContext value={{ resources, visited }}>{children}</PreviewContext>
+    <PreviewContext
+      value={{
+        resources,
+        visited,
+        presentation: resolvePresentation(preferences).editorCharacters,
+      }}
+    >
+      {children}
+    </PreviewContext>
   );
 }
 export function ReadingPortrait({ speaker }: { speaker: string }) {
-  const { resources } = usePreview(),
+  const { resources, presentation } = usePreview(),
     actor = resources?.config.characters.find((c) => c.name === speaker);
-  if (!speaker) return null;
+  if (!speaker || !presentation.showPortraits) return null;
   const image = actor?.portrait && resources?.images[actor.portrait];
   return (
     <span
       className="reading-portrait"
       aria-hidden="true"
-      style={{ borderColor: actor?.color }}
+      style={{
+        backgroundColor: image ? undefined : characterColor(speaker, actor),
+      }}
       contentEditable={false}
     >
-      {image ? (
-        <img src={image} alt="" />
-      ) : (
-        [...(actor?.displayName || speaker)].slice(0, 2).join("")
-      )}
+      {image ? <img src={image} alt="" /> : null}
     </span>
   );
 }

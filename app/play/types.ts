@@ -54,6 +54,7 @@ export const characterSchema = z.object({
   name,
   displayName: z.string().max(160),
   color: z.string().regex(/^#[a-fA-F0-9]{6}$/),
+  colorMode: z.enum(["auto", "custom"]).optional(),
   portrait: assetId.optional(),
   portraits: z.record(name, assetId),
   sprites: z.record(name, assetId),

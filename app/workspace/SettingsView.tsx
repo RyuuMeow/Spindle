@@ -15,6 +15,7 @@ import {
   Globe,
   ArchiveRestore,
   Plug,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,6 +32,7 @@ import {
 export type { SettingsSection } from "./settings-registry";
 import AppearanceSettings from "../appearance/AppearanceSettings";
 import type { AppearancePatch } from "../appearance/model";
+import { resolvePresentation } from "./presentation-preferences";
 
 export type WorkspacePreferences = Pick<
   WindowSession,
@@ -39,6 +41,7 @@ export type WorkspacePreferences = Pick<
   readingWidth?: "standard" | "wide";
 };
 const sectionIcons = {
+  Play,
   BookOpen,
   Save,
   Globe,
@@ -171,6 +174,33 @@ export default function SettingsView({
   focusOnMount?: boolean;
 }) {
   const [section, setSection] = useState<SettingsSection>(initialSection);
+  const presentation = resolvePresentation(appPreferences);
+  const characterSwitches = (
+    scope: "editorCharacters" | "playPresentation",
+  ) => (
+    <div className="settings-character-switches">
+      {(["showPortraits", "useNameColors"] as const).map((field) => (
+        <label
+          className="settings-check"
+          data-setting={`${scope}.${field}`}
+          key={field}
+        >
+          <Checkbox
+            checked={presentation[scope][field]}
+            disabled={!onAppPreferences}
+            onCheckedChange={(value) =>
+              onAppPreferences?.({ [scope]: { [field]: value === true } })
+            }
+          />
+          {tr(
+            field === "showPortraits"
+              ? "characters.showPortraits"
+              : "characters.useNameColors",
+          )}
+        </label>
+      ))}
+    </div>
+  );
   const [zoomResetVersion, setZoomResetVersion] = useState(0);
   const workspaceRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -264,6 +294,28 @@ export default function SettingsView({
                 <>
                   {onAppearance && (
                     <AppearanceSettings
+                      globalExtras={characterSwitches("editorCharacters")}
+                      sourceExtras={
+                        <label
+                          className="settings-check"
+                          data-setting="source.sourceNameColors"
+                        >
+                          <Checkbox
+                            checked={
+                              presentation.editorCharacters.sourceNameColors
+                            }
+                            disabled={!onAppPreferences}
+                            onCheckedChange={(value) =>
+                              onAppPreferences?.({
+                                editorCharacters: {
+                                  sourceNameColors: value === true,
+                                },
+                              })
+                            }
+                          />
+                          {tr("characters.sourceNameColors")}
+                        </label>
+                      }
                       navigation={navigation}
                       value={appPreferences?.editorAppearance}
                       onChange={onAppearance}
@@ -314,6 +366,11 @@ export default function SettingsView({
                   </section>
                 </>
               )}
+              {category === "play" && (
+                <section className="settings-group">
+                  {characterSwitches("playPresentation")}
+                </section>
+              )}
               {category === "language" && (
                 <LanguageSettings
                   preferences={appPreferences}
@@ -322,6 +379,36 @@ export default function SettingsView({
               )}
               {category === "saving" && (
                 <>
+                  <section className="settings-group">
+                    <label
+                      className="settings-check"
+                      data-setting="dialogueLength.enabled"
+                    >
+                      <Checkbox
+                        checked={presentation.dialogueLength.enabled}
+                        disabled={!onAppPreferences}
+                        onCheckedChange={(value) =>
+                          onAppPreferences?.({
+                            dialogueLength: { enabled: value === true },
+                          })
+                        }
+                      />
+                      {tr("dialogueLength.enabled")}
+                    </label>
+                    <div data-setting="dialogueLength.limit">
+                      <NumericSetting
+                        label={tr("dialogueLength.limit")}
+                        description={tr("dialogueLength.description")}
+                        value={presentation.dialogueLength.limit}
+                        min={1}
+                        max={1000}
+                        unit={tr("dialogueLength.unit")}
+                        onCommit={(limit) =>
+                          onAppPreferences?.({ dialogueLength: { limit } })
+                        }
+                      />
+                    </div>
+                  </section>
                   {onAppPreferences && (
                     <section className="settings-group">
                       <h3>{tr("mb9a3e0cf4dfa")}</h3>

@@ -2,6 +2,12 @@ import { t as tr } from "../i18n/index.ts";
 import type { SettingEntry } from "./search";
 export const settingSections = [
   {
+    id: "play",
+    label: tr("settings.play"),
+    keywords: "play character portrait avatar 試跑 试跑 角色 頭貼 头像",
+    icon: "Play",
+  },
+  {
     id: "reading",
     label: tr("mc127821f4d8a"),
     keywords: "appearance style font editor 字型 字体 风格",
@@ -92,6 +98,23 @@ export const extraSettingLabels = {
   "mcp.port": tr("ma73bbb476e36"),
 };
 export const settingEntries: SettingEntry[] = [
+  ...(
+    [
+      ["editorCharacters.showPortraits", "characters.showPortraits", "reading"],
+      ["editorCharacters.useNameColors", "characters.useNameColors", "reading"],
+      ["source.sourceNameColors", "characters.sourceNameColors", "reading"],
+      ["playPresentation.showPortraits", "characters.showPortraits", "play"],
+      ["playPresentation.useNameColors", "characters.useNameColors", "play"],
+      ["dialogueLength.enabled", "dialogueLength.enabled", "saving"],
+      ["dialogueLength.limit", "dialogueLength.limit", "saving"],
+    ] as const
+  ).map(([id, key, section]) => ({
+    id,
+    field: id,
+    section,
+    label: tr(key),
+    keywords: id,
+  })),
   ...Object.entries(extraSettingLabels)
     .filter(([id]) => id !== "width")
     .map(([id, label]) => ({

@@ -1,3 +1,4 @@
+import { resolvePresentation } from "../app/workspace/presentation-preferences";
 import { t as tr } from "../app/i18n";
 import {
   normalizeAppearance,
@@ -67,6 +68,7 @@ export class ProjectCatalog {
         throw Error(tr("ma644ae5a81ba"));
       this.entries = value.entries;
       this.preferences = {
+        ...resolvePresentation(value.preferences),
         reopenLastProject: value.preferences?.reopenLastProject === true,
         lastProjectId: value.preferences?.lastProjectId,
         language: validLanguage(value.preferences?.language),

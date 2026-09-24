@@ -1021,6 +1021,20 @@
   "updates.checking": "Checking…",
   "updates.unsigned": "This build is not code-signed. Download integrity is verified with its release checksum.",
   "updates.cancel": "Cancel download",
-  "licenses.thirdParty": "Third-party licenses",
-  "mcp.guide": "Connection guide"
+  "licenses.thirdParty": "Third-party licenses",
+  "mcp.guide": "Connection guide",
+  "diagnostic.dialogueLength": "Static dialogue length {0} exceeds the suggested limit {1} (full-width 1 / half-width 0.5; dynamic content excluded)",
+  "characters.showPortraits": "Show character portraits",
+  "characters.useNameColors": "Use character name colors",
+  "characters.sourceNameColors": "Use character name colors in Source",
+  "settings.play": "Play",
+  "dialogueLength.enabled": "Warn about long dialogue",
+  "dialogueLength.limit": "Suggested dialogue length",
+  "dialogueLength.description": "Static text estimate: CJK / emoji 1, other characters 0.5. Does not block saving or Play.",
+  "dialogueLength.unit": "weighted characters",
+  "play.compileResults": "Compile results",
+  "play.viewCompileResults": "View compile results",
+  "play.resizeCompile": "Resize compile panel",
+  "workspace.moreTools": "More editor tools",
+  "play.noCompileResults": "No compiler diagnostics"
 }

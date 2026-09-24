@@ -1,3 +1,7 @@
+import {
+  resolvePresentation,
+  patchPresentation,
+} from "./presentation-preferences";
 import { t as tr, validLanguage } from "../i18n/index.ts";
 import {
   migrateAppearance,
@@ -58,6 +62,7 @@ class BrowserService {
         localStorage.getItem("spindle.preferences.v1") || "null",
       );
       this.preferences = {
+        ...resolvePresentation(raw),
         reopenLastProject: raw?.reopenLastProject === true,
         language: validLanguage(raw?.language),
         autoCheckUpdates: raw?.autoCheckUpdates !== false,
@@ -89,6 +94,7 @@ class BrowserService {
       if (raw)
         this.preferences = {
           ...this.preferences,
+          ...resolvePresentation(raw),
           language: validLanguage(raw.language),
           autoCheckUpdates: raw.autoCheckUpdates !== false,
           skippedVersion: raw.skippedVersion,
@@ -128,6 +134,7 @@ class BrowserService {
       this.snapshot();
       this.preferences = {
         ...this.preferences,
+        ...patchPresentation(this.preferences, a),
         ...(a.language !== undefined
           ? { language: validLanguage(a.language) }
           : {}),
@@ -388,7 +395,7 @@ export class WorkspaceClient {
       const browser = new BrowserService();
       this.adapter = {
         request: async (action) =>
-          action.type === "appearance" && navigator.locks
+          ["appearance", "preferences"].includes(action.type) && navigator.locks
             ? navigator.locks.request("spindle-appearance", () =>
                 browser.request(action),
               )

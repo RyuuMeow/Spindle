@@ -1,5 +1,6 @@
 import type { PlayEvent, PlaySource, PreviewConfig } from "./types";
 import { argumentSpans } from "../command-hints";
+import { speakerSpan } from "./character-presentation";
 
 /** Tokenize the already evaluated command; never evaluate Yarn expressions here. */
 export function commandArguments(text: string): string[] {
@@ -17,8 +18,11 @@ export function commandArguments(text: string): string[] {
     });
 }
 export function dialogueText(text: string) {
-  const match = /^([^:\n]{1,100}):\s*([\s\S]*)$/.exec(text);
-  return { speaker: match?.[1] || "", text: match?.[2] ?? text };
+  const span = speakerSpan(text);
+  return {
+    speaker: span?.name || "",
+    text: span ? text.slice(span.bodyFrom) : text,
+  };
 }
 export type Stage = {
   background?: string;

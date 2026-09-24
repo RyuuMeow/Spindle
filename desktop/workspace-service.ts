@@ -1,3 +1,4 @@
+import { patchPresentation } from "../app/workspace/presentation-preferences";
 import { t as tr, validLanguage } from "../app/i18n";
 import { EntryJournal, projectMetadata } from "./entry-journal";
 import { planProjectEntry, entryActions } from "./project-entries";
@@ -839,6 +840,10 @@ export class WorkspaceService {
       }
     } else if (a.type === "preferences") {
       const previous = structuredClone(this.catalog.preferences);
+      Object.assign(
+        this.catalog.preferences,
+        patchPresentation(this.catalog.preferences, a),
+      );
       if (typeof a.reopenLastProject === "boolean")
         this.catalog.preferences.reopenLastProject = a.reopenLastProject;
       if (a.language !== undefined)
