@@ -259,6 +259,7 @@ export function createPlayService(options: {
       busy: false,
       session: {
         id: randomUUID(),
+        runId: randomUUID(),
         editorSessionId: data.target.editorSessionId,
         projectId: data.target.projectId,
         projectName: data.projectName,
@@ -326,6 +327,7 @@ export function createPlayService(options: {
           documents: data.documents,
           resources: data.resources,
           capturedAt: Date.now(),
+          runId: randomUUID(),
           stale: false,
         });
         if (
@@ -338,7 +340,10 @@ export function createPlayService(options: {
           });
       } else {
         record.session.state = await record.runtime.request(action);
-        if (action.action === "start") record.session.startScene = action.scene;
+        if (action.action === "start") {
+          record.session.startScene = action.scene;
+          record.session.runId = randomUUID();
+        }
       }
       if (!alive(record)) throw Error("PLAY_SESSION_EXPIRED");
       send(record);
@@ -497,13 +502,11 @@ export function createPlayService(options: {
           version: d.version,
         })),
         ...s.state,
-        diagnostics: s.state.diagnostics
-          .slice(0, 200)
-          .map((d) => ({
-            ...d,
-            message: d.message.slice(0, 4000),
-            messageTruncated: d.message.length > 4000,
-          })),
+        diagnostics: s.state.diagnostics.slice(0, 200).map((d) => ({
+          ...d,
+          message: d.message.slice(0, 4000),
+          messageTruncated: d.message.length > 4000,
+        })),
         diagnosticsTruncated: s.state.diagnostics.length > 200,
         currentDialogue: dialogue ? bounded(dialogue) : null,
         events: s.state.events.slice(-100).map(bounded),

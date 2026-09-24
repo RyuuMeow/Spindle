@@ -161,6 +161,62 @@ async function launch() {
   );
   assert.deepEqual(afterMode.state, s.state);
   await play.screenshot({ path: path.join(out, "vn-options.png") });
+  assert.equal(
+    await play.locator(".play-stage .lucide-external-link").count(),
+    0,
+  );
+  assert((await play.locator(".play-debug .lucide-external-link").count()) > 0);
+  const beforeGame = s.state.revision;
+  await play
+    .getByRole("button", {
+      name: /^(Enter game view|進入遊戲畫面|进入游戏画面)$/,
+    })
+    .click();
+  await play.locator(".play-app.immersive").waitFor();
+  assert.equal(await play.locator(".play-debug").count(), 0);
+  await play.screenshot({ path: path.join(out, "vn-game.png") });
+  await play.keyboard.press("Escape");
+  assert.equal(
+    (
+      await play.evaluate(() =>
+        window.yarnDesktop.play.action({ action: "state" }),
+      )
+    ).state.revision,
+    beforeGame,
+  );
+  await app.evaluate(async ({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows())
+      if (
+        await w.webContents.executeJavaScript(
+          "window.yarnDesktop?.play.isWindow",
+        )
+      )
+        w.setSize(760, 540);
+  });
+  await play.waitForTimeout(100);
+  const geometry = await play.evaluate(() => {
+    const choices = document
+      .querySelector(".play-vn-choices")
+      .getBoundingClientRect();
+    const dialogue = document
+      .querySelector(".play-vn-dialogue")
+      .getBoundingClientRect();
+    return {
+      overlap: choices.bottom > dialogue.top,
+      overflow: document.documentElement.scrollWidth > innerWidth,
+    };
+  });
+  assert.deepEqual(geometry, { overlap: false, overflow: false });
+  await play.screenshot({ path: path.join(out, "vn-narrow.png") });
+  await app.evaluate(async ({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows())
+      if (
+        await w.webContents.executeJavaScript(
+          "window.yarnDesktop?.play.isWindow",
+        )
+      )
+        w.setSize(1200, 800);
+  });
   s = await act({ action: "choose", optionId: s.state.options[0].id });
   assert.equal(s.state.scene, "Room");
   const source = s.state.events.filter((e) => e.kind === "line").at(-1).source;

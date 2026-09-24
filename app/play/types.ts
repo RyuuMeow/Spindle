@@ -99,6 +99,7 @@ export type PreviewResources = {
   commandDefinitions: import("../parser").Command[];
 };
 export type PlaySession = {
+  runId: string;
   id: string;
   editorSessionId: string;
   projectId: string;

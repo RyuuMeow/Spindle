@@ -1,5 +1,11 @@
 import { locale } from "../i18n";
 const messages = {
+  backlog: ["Dialogue history", "對話紀錄", "对话记录"],
+  noScenes: [
+    "No runnable scenes. Return to the editor to add a scene.",
+    "沒有可試跑的場景，請回編輯器新增場景。",
+    "没有可试跑的场景，请回编辑器新增场景。",
+  ],
   play: ["Play current scene", "試跑目前場景", "试跑当前场景"],
   start: ["Start scene", "起始場景", "起始场景"],
   chooseStart: ["Choose a scene to start", "選擇起始場景", "选择起始场景"],
@@ -19,6 +25,19 @@ const messages = {
   auto: ["Auto", "自動", "自动"],
   novel: ["Novel", "小說", "小说"],
   vn: ["VN", "VN", "VN"],
+  revealLine: ["Show full line", "顯示完整台詞", "显示完整台词"],
+  continueStory: ["Continue", "繼續", "继续"],
+  chooseOption: ["Choose a response", "選擇回應", "选择回应"],
+  returnLatest: ["Return to latest", "回到最新台詞", "回到最新台词"],
+  immersive: ["Enter game view", "進入遊戲畫面", "进入游戏画面"],
+  exitImmersive: [
+    "Exit game view (Esc)",
+    "離開遊戲畫面（Esc）",
+    "离开游戏画面（Esc）",
+  ],
+  presentation: ["Presentation", "呈現方式", "呈现方式"],
+  currentLine: ["Current dialogue", "目前台詞", "当前台词"],
+  noVariables: ["No matching variables", "沒有符合的變數", "没有符合的变量"],
   variables: ["Variables", "變數", "变量"],
   search: ["Search variables…", "搜尋變數…", "搜索变量…"],
   events: ["Conditions & events", "條件與事件", "条件与事件"],

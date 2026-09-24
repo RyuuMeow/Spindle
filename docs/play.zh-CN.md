@@ -36,3 +36,9 @@ MCP 新增 `list_play_sessions(editorSessionId)` 与 `get_play_context(editorSes
 
 `node scripts/test-play-ui.cjs` 以隔离 profile 验证实际 Electron 与 MCP client；设置 `SPINDLE_PLAY_PORTABLE` 可直接测试最终 Portable。详见[验收记录](play-validation.md)。
 
+
+## 桌面呈现
+
+工具栏、调试区及逐行小说沿用 Spindle 的色彩、字体与控件 tokens。VN 使用独立游戏呈现：宽幅半透明底部对话带、独立角色姓名、明体叙事文字及居中选项带。原文外链只留在调试区，不进入 VN 舞台。游戏画面隐藏编辑控件；Esc 退出后焦点回到入口。窄窗口的调试区只在请求时覆盖打开，不挤压舞台。
+
+点击对话先补完台词，再次点击才推进；选择文字、拖动及滚动不推进。长句可滚动，只有停在底部才跟随新增文字。向上回读、打开对话记录或查看原文均停止 Auto，选项与错误也会停止。小说回读位置在切换模式后保留。系统减少动态效果设置会禁用打字机动画，但不改写原偏好；重跑建立新的本轮标识，即使第一句相同也会重新呈现。

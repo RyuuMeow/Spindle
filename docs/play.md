@@ -40,3 +40,9 @@ Install Node/pnpm from the repository configuration and .NET SDK 10.0.401. `SPIN
 
 See [acceptance evidence](play-validation.md) for actual checks and remaining manual scenarios.
 
+
+## Desktop presentation
+
+The shell and scrolling novel use Spindle's shared color, type and control tokens. VN has a separate game presentation: a wide translucent dialogue band, independent speaker name, serif story text and centered choice bands. Source links stay in the debug panel, outside the VN stage. Game view hides editor controls; Escape returns focus to its entry button. At narrow widths the debug panel opens over the stage only when requested.
+
+Clicking the dialogue completes the current line, then advances on the next click. Selecting text, dragging or scrolling does not advance. Long dialogue scrolls and follows new text only while at the bottom. Auto pauses when reading earlier text, opening dialogue history or following a source link, as well as at choices/errors. Novel scroll position survives switching modes. OS reduced-motion preference disables typewriter animation without rewriting the saved preference. Restarting creates a new run identity so identical first lines animate again.

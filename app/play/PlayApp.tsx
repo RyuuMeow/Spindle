@@ -1,5 +1,11 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,6 +18,9 @@ import {
   ExternalLink,
   Square,
   X,
+  Maximize2,
+  Minimize2,
+  ChevronDown,
 } from "lucide-react";
 import { pt } from "./messages";
 import {
@@ -22,8 +31,18 @@ import {
 } from "./presentation";
 import type { PlayAction, PlayEvent, PlaySession, PlaySource } from "./types";
 import "./play.css";
+import { PlayStage } from "./PlayStage";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
+function subscribeViewport(callback: () => void) {
+  window.addEventListener("resize", callback);
+  return () => window.removeEventListener("resize", callback);
+}
+function subscribeMotion(callback: () => void) {
+  const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
 function stored<T>(key: string, fallback: T): T {
   try {
     return (
@@ -72,8 +91,36 @@ export default function PlayApp() {
   const [mode, setMode] = useState<"novel" | "vn">(() =>
     stored("mode", "novel"),
   );
+  const viewportWidth = useSyncExternalStore(
+    subscribeViewport,
+    () => window.innerWidth,
+  );
+  const reducedMotion = useSyncExternalStore(
+    subscribeMotion,
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  const [backlog, setBacklog] = useState(false);
+  const [narrowPanel, setNarrowPanel] = useState(false);
+  const enterGame = useRef<HTMLButtonElement>(null),
+    exitGame = useRef<HTMLButtonElement>(null);
+  const [immersive, setImmersive] = useState(false);
+  const [away, setAway] = useState(false);
   const [panel, setPanel] = useState(() => stored("panel", true)),
     [width, setWidth] = useState(() => stored("width", 300));
+  const narrow = viewportWidth < 980 && mode === "vn";
+  const panelVisible = !immersive && (narrow ? narrowPanel : panel);
+  const maxWidth = Math.max(
+    240,
+    Math.min(520, Math.floor(viewportWidth * 0.42)),
+  );
+  const panelWidth = Math.min(width, maxWidth);
+  function leaveGame() {
+    setImmersive(false);
+    requestAnimationFrame(() => enterGame.current?.focus());
+  }
+  useEffect(() => {
+    if (immersive) exitGame.current?.focus();
+  }, [immersive]);
   const [typewriter, setTypewriter] = useState(() =>
       stored("typewriter", true),
     ),
@@ -153,14 +200,15 @@ export default function PlayApp() {
       ),
     ].map((s) => s.segment);
   const segmentCount = segments.length;
-  const lineKey = String(lastLine?.id) + ":" + lastLine?.text;
-  const shown = typewriter
+  const lineKey = session?.runId + ":" + lastLine?.id + ":" + lastLine?.text;
+  const animateText = typewriter && !reducedMotion;
+  const shown = animateText
     ? progress.key === lineKey
       ? progress.count
       : 0
     : segmentCount;
   useEffect(() => {
-    if (!typewriter) return;
+    if (!animateText) return;
     const timer = setInterval(
       () =>
         setProgress((p) =>
@@ -177,9 +225,9 @@ export default function PlayApp() {
       1000 / Math.max(5, speed),
     );
     return () => clearInterval(timer);
-  }, [lineKey, typewriter, speed, segmentCount]);
+  }, [lineKey, animateText, speed, segmentCount]);
   useEffect(() => {
-    if (follow.current && transcript.current)
+    if (mode === "novel" && follow.current && transcript.current)
       transcript.current.scrollTop = transcript.current.scrollHeight;
   }, [events.length, shown, mode]);
   async function act(action: PlayAction) {
@@ -202,7 +250,15 @@ export default function PlayApp() {
     else if (state?.status === "line") void act({ action: "next" });
   }
   useEffect(() => {
-    if (!auto || busy || state?.status !== "line") return;
+    if (
+      !auto ||
+      busy ||
+      snapshot ||
+      backlog ||
+      (mode === "novel" && away) ||
+      state?.status !== "line"
+    )
+      return;
     if (shown < segmentCount) return;
     const timer = setTimeout(
       () => {
@@ -214,9 +270,25 @@ export default function PlayApp() {
   });
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && immersive && !snapshot && !backlog) {
+        leaveGame();
+        return;
+      }
       if (
-        (event.target as HTMLElement).closest("input,select,textarea,button") ||
-        snapshot
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      )
+        return;
+      if (
+        (event.target as HTMLElement).closest(
+          "input,select,textarea,button,summary,[role=dialog],[contenteditable=true]",
+        ) ||
+        snapshot ||
+        backlog
       )
         return;
       if (event.code === "Space" || event.key === "ArrowRight") {
@@ -234,6 +306,7 @@ export default function PlayApp() {
   });
   async function reveal(source?: PlaySource | null) {
     if (!source) return;
+    setAuto(false);
     try {
       const value = await bridge.reveal(source);
       if (value.snapshot !== undefined) setSnapshot(value);
@@ -266,7 +339,7 @@ export default function PlayApp() {
       return (
         <article
           key={event.id}
-          className={`play-line ${joined ? "joined" : ""}`}
+          className={`play-line ${joined ? "joined" : ""} ${event.id === lastLine?.id ? "current" : ""}`}
         >
           {!joined && session && (
             <Portrait
@@ -335,7 +408,7 @@ export default function PlayApp() {
           >
             {option.text}
           </button>
-          {sourceButton(option.source)}
+          {mode === "novel" && sourceButton(option.source)}
         </div>
       ))}
     </div>
@@ -344,8 +417,8 @@ export default function PlayApp() {
     ? previewStage(events, session.resources.config)
     : { cast: {}, exits: {}, expressions: {} };
   return (
-    <main className="play-app">
-      <header className="play-toolbar">
+    <main className={`play-app mode-${mode} ${immersive ? "immersive" : ""}`}>
+      <header className="play-toolbar" aria-label={pt("play")}>
         <label>
           <span>{pt("start")}</span>
           <select
@@ -419,15 +492,34 @@ export default function PlayApp() {
           <Square size={16} />
         </button>
         <span className="play-separator" />
-        <button
-          aria-pressed={mode === "novel"}
-          onClick={() => setMode("novel")}
+        <div
+          className="play-mode-switch"
+          role="group"
+          aria-label={pt("presentation")}
         >
-          {pt("novel")}
-        </button>
-        <button aria-pressed={mode === "vn"} onClick={() => setMode("vn")}>
-          {pt("vn")}
-        </button>
+          <button
+            aria-pressed={mode === "novel"}
+            onClick={() => {
+              setMode("novel");
+              setImmersive(false);
+            }}
+          >
+            {pt("novel")}
+          </button>
+          <button aria-pressed={mode === "vn"} onClick={() => setMode("vn")}>
+            {pt("vn")}
+          </button>
+        </div>
+        {mode === "vn" && (
+          <button
+            title={pt("immersive")}
+            aria-label={pt("immersive")}
+            ref={enterGame}
+            onClick={() => setImmersive(true)}
+          >
+            <Maximize2 size={17} />
+          </button>
+        )}
         <button
           className="play-push"
           title={pt("characters")}
@@ -441,12 +533,26 @@ export default function PlayApp() {
         <button
           title={pt("panel")}
           aria-label={pt("panel")}
-          aria-pressed={panel}
-          onClick={() => setPanel(!panel)}
+          aria-pressed={panelVisible}
+          onClick={() =>
+            narrow ? setNarrowPanel(!narrowPanel) : setPanel(!panel)
+          }
         >
           <PanelRight size={18} />
         </button>
       </header>
+      {immersive && (
+        <button
+          className="play-exit-immersive"
+          ref={exitGame}
+          aria-label={pt("exitImmersive")}
+          title={pt("exitImmersive")}
+          onClick={leaveGame}
+        >
+          <Minimize2 size={17} />
+          <span>{pt("exitImmersive")}</span>
+        </button>
+      )}
       {session?.stale && (
         <div className="play-notice">
           {pt("stale")}
@@ -469,112 +575,105 @@ export default function PlayApp() {
       <div className="play-body">
         <section className={`play-story ${mode}`}>
           {!session && <p>{pt("loading")}</p>}
-          {mode === "novel" ? (
-            <div
-              className="play-transcript"
-              ref={transcript}
-              onScroll={() => {
-                const el = transcript.current!;
-                follow.current =
-                  el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+          <div
+            className="play-transcript"
+            hidden={mode !== "novel"}
+            ref={transcript}
+            onScroll={() => {
+              if (mode !== "novel") return;
+              const el = transcript.current!;
+              follow.current =
+                el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+              setAway(!follow.current);
+              if (!follow.current) setAuto(false);
+            }}
+          >
+            {events.map((event, i) => {
+              if (event.kind === "command" && events[i - 1]?.kind === "command")
+                return null;
+              if (
+                event.kind === "command" &&
+                events[i + 1]?.kind === "command"
+              ) {
+                let end = i + 1;
+                while (events[end]?.kind === "command") end++;
+                return (
+                  <details className="play-command" key={event.id}>
+                    <summary>
+                      {pt("command")} · {end - i}
+                    </summary>
+                    {events.slice(i, end).map((e) => renderEvent(e))}
+                  </details>
+                );
+              }
+              return renderEvent(event, events[i - 1]);
+            })}
+            {choices}
+          </div>
+          {mode === "vn" && (
+            <PlayStage
+              session={session}
+              lineKey={lineKey}
+              auto={auto}
+              onUserScrollAway={() => setAuto(false)}
+              onAuto={() => setAuto(!auto)}
+              onBacklog={() => {
+                setAuto(false);
+                setBacklog(true);
+              }}
+              stage={stage}
+              speaker={line.speaker}
+              text={segments.slice(0, shown).join("")}
+              fullText={line.text}
+              hasLine={!!lastLine}
+              revealing={shown < segmentCount}
+              canAdvance={!busy && state?.status === "line"}
+              next={next}
+              choices={choices}
+            />
+          )}
+          {mode === "novel" && away && (
+            <button
+              className="play-return-latest"
+              onClick={() => {
+                follow.current = true;
+                setAway(false);
+                transcript.current?.scrollTo({
+                  top: transcript.current.scrollHeight,
+                  behavior: "instant",
+                });
               }}
             >
-              {events.map((event, i) => {
-                if (
-                  event.kind === "command" &&
-                  events[i - 1]?.kind === "command"
-                )
-                  return null;
-                if (
-                  event.kind === "command" &&
-                  events[i + 1]?.kind === "command"
-                ) {
-                  let end = i + 1;
-                  while (events[end]?.kind === "command") end++;
-                  return (
-                    <details className="play-command" key={event.id}>
-                      <summary>
-                        {pt("command")} · {end - i}
-                      </summary>
-                      {events.slice(i, end).map((e) => renderEvent(e))}
-                    </details>
-                  );
-                }
-                return renderEvent(event, events[i - 1]);
-              })}
-              {choices}
-            </div>
-          ) : (
-            <div className="play-stage">
-              {session &&
-                stage.background &&
-                session.resources.images[stage.background] && (
-                  <img
-                    key={stage.background}
-                    className={`play-background ${stage.backgroundFade ? "fade" : ""}`}
-                    src={session.resources.images[stage.background]}
-                    alt=""
-                  />
-                )}
-              {session &&
-                Object.entries({ ...stage.exits, ...stage.cast }).map(
-                  ([position, actor]) => {
-                    const character = session.resources.config.characters.find(
-                        (c) => c.name === actor.character,
-                      ),
-                      image = character?.sprites[actor.expression];
-                    return (
-                      <div
-                        key={
-                          position +
-                          actor.character +
-                          actor.expression +
-                          ("hidden" in actor ? "exit" : "")
-                        }
-                        className={`play-actor ${position} ${"hidden" in actor ? "fade-out" : actor.fade ? "fade" : ""} ${line.speaker && line.speaker !== actor.character ? "dim" : ""}`}
-                      >
-                        {image && session.resources.images[image] ? (
-                          <img
-                            src={session.resources.images[image]}
-                            alt={character?.displayName || actor.character}
-                          />
-                        ) : (
-                          <div className="play-actor-fallback">
-                            {character?.displayName || actor.character}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  },
-                )}
-              {choices}
-              {lastLine && (
-                <div className="play-vn-dialogue">
-                  <strong style={{ color: color(line.speaker) }}>
-                    {displayName(line.speaker)}
-                  </strong>
-                  <p>{segments.slice(0, shown).join("")}</p>
-                  {sourceButton(lastLine.source)}
-                </div>
-              )}
-            </div>
-          )}
-          {mode === "vn" && events.findLast((e) => e.kind === "command") && (
-            <div
-              className="play-vn-event"
-              key={events.findLast((e) => e.kind === "command")!.id}
-            >
-              {pt("command")} ·{" "}
-              {events.findLast((e) => e.kind === "command")!.text}
-            </div>
+              <ChevronDown size={15} />
+              {pt("returnLatest")}
+            </button>
           )}
           {state?.status === "ready" && (
-            <div className="play-status">{pt("chooseStart")}</div>
+            <div className="play-status">
+              {pt(state.scenes.length ? "chooseStart" : "noScenes")}
+            </div>
           )}
           {state &&
             ["completed", "stopped", "error"].includes(state.status) && (
               <div className="play-status">
                 {pt(state.status as "completed" | "stopped" | "error")}
+                {state.status === "error" && (
+                  <p>{events.findLast((e) => e.kind === "error")?.text}</p>
+                )}
+                {session?.startScene && (
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      setAuto(false);
+                      void act({ action: "start", scene: session.startScene! });
+                    }}
+                  >
+                    {pt("rerun")}
+                  </button>
+                )}
+                {immersive && (
+                  <button onClick={leaveGame}>{pt("exitImmersive")}</button>
+                )}
               </div>
             )}
           {!!state?.diagnostics?.length && (
@@ -589,19 +688,30 @@ export default function PlayApp() {
             </section>
           )}
         </section>
-        {panel && (
+        {panelVisible && (
           <>
             <div
               className="play-resize"
               role="separator"
               aria-label={pt("panel")}
               aria-orientation="vertical"
+              aria-valuemin={240}
+              aria-valuemax={maxWidth}
+              aria-valuenow={panelWidth}
               tabIndex={0}
               onKeyDown={(e) => {
-                if (e.key === "ArrowLeft")
-                  setWidth((w) => Math.min(520, w + 16));
-                if (e.key === "ArrowRight")
-                  setWidth((w) => Math.max(240, w - 16));
+                if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setWidth(
+                  Math.max(
+                    240,
+                    Math.min(
+                      maxWidth,
+                      panelWidth + (e.key === "ArrowLeft" ? 16 : -16),
+                    ),
+                  ),
+                );
               }}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -609,11 +719,40 @@ export default function PlayApp() {
               onPointerMove={(e) => {
                 if (e.currentTarget.hasPointerCapture(e.pointerId))
                   setWidth(
-                    Math.max(240, Math.min(520, window.innerWidth - e.clientX)),
+                    Math.max(
+                      240,
+                      Math.min(maxWidth, window.innerWidth - e.clientX),
+                    ),
                   );
               }}
             />
-            <aside className="play-debug" style={{ width }}>
+            <aside className="play-debug" style={{ width: panelWidth }}>
+              <button
+                className="play-close-debug"
+                aria-label={pt("close")}
+                onClick={() => setNarrowPanel(false)}
+              >
+                <X size={16} />
+              </button>
+              <section className="play-debug-current">
+                <h2>{pt("currentLine")}</h2>
+                <p>{line.text || "—"}</p>
+                {sourceButton(lastLine?.source)}
+              </section>
+              {state?.status === "options" && (
+                <section>
+                  <h2>{pt("options")}</h2>
+                  {state.options.map((o) => (
+                    <div className="play-event" key={o.id}>
+                      <span>
+                        {o.text}
+                        {!o.available && <small>{pt("unavailable")}</small>}
+                      </span>
+                      {sourceButton(o.source)}
+                    </div>
+                  ))}
+                </section>
+              )}
               <section>
                 <h2>{pt("variables")}</h2>
                 <input
@@ -622,6 +761,9 @@ export default function PlayApp() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
+                {!state?.variables.some((v) =>
+                  v.name.toLowerCase().includes(query.toLowerCase()),
+                ) && <p>{pt("noVariables")}</p>}
                 {[...(state?.variables || [])]
                   .filter((v) =>
                     v.name.toLowerCase().includes(query.toLowerCase()),
@@ -727,14 +869,42 @@ export default function PlayApp() {
           </>
         )}
       </div>
-      <footer className="play-footer">
-        <span>{state?.scene || session?.projectName}</span>
-        <span>
-          {lastLine?.source &&
-            `${session?.documents.find((d) => d.id === lastLine.source?.documentId)?.name} · ${lastLine.source.line}`}
+      {mode === "novel" && (
+        <footer className="play-footer">
+          <span>{state?.scene || session?.projectName}</span>
+          <span>
+            {lastLine?.source &&
+              `${session?.documents.find((d) => d.id === lastLine.source?.documentId)?.name} · ${lastLine.source.line}`}
+          </span>
+          {sourceButton(lastLine?.source)}
+        </footer>
+      )}
+      <span
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <span key={lineKey}>
+          {session?.runId && lastLine
+            ? displayName(line.speaker) + ": " + line.text
+            : ""}
         </span>
-        {sourceButton(lastLine?.source)}
-      </footer>
+      </span>
+      {backlog && (
+        <Dialog open onOpenChange={setBacklog}>
+          <DialogContent className="play-backlog" aria-describedby={undefined}>
+            <DialogTitle>{pt("backlog")}</DialogTitle>
+            <div>
+              {events
+                .filter((e) => e.kind === "line" || e.kind === "choice")
+                .map((e) => (
+                  <p key={e.id}>{e.text}</p>
+                ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       {snapshot && (
         <Dialog
           open

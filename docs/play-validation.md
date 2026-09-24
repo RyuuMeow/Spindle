@@ -44,3 +44,29 @@ The acceptance Portable is built with `node scripts/package-desktop.mjs --portab
 - Official compiler/runtime messages retain upstream wording; surrounding Play controls, labels and guide text support all three UI languages.
 
 Local test logs and isolated profiles are under ignored `outputs/`; they are not distributed in the application or committed to the repository.
+
+## Desktop presentation polish — 2026-09-24
+
+Branch: `feat/play-presentation-polish`. This section describes the source/staging polish; the Portable hash above belongs to the earlier acceptance build and does **not** include this polish.
+
+The desktop shell/novel now reuse product tokens. A separate VN stage uses a wide translucent dialogue band, independent name treatment, serif dialogue, choice bands and an optional game view. Source controls remain in debugging. The renderer preserves novel backreading, pauses Auto during history/source/backreading, supports reduced motion, and uses a fresh run ID for restart presentation. Actor position classes are namespaced to prevent the editor's global center-panel CSS from painting behind a sprite.
+
+### Role review and corrections
+
+Reviews used subagents acting as Desktop UI/UX, game-art UI/UX, PM and adversarial QA; they were not external human reviews. The game-art role directly implemented the VN module. Desktop and PM were reviewed as separate passes by the same reviewer agent because of the concurrent agent limit.
+
+- Round 1: the desktop reviewer found splitter shortcut bubbling, typography mismatch, missing full-line announcements and focus restoration. PM found ambiguous empty/terminal states and loss of novel backreading. Game/QA found long-line scrolling, rerun identity and Auto interruption defects. These were corrected before the second visual pass.
+- Round 2: Desktop/PM identified identical-line announcements and VN Auto continuing during backreading. Both were corrected; source review closed these findings and the latter passed an actual timed desktop test. Game-art review approved the demonstrated VN direction, while requiring bright-background/actor/long-content evidence.
+- Final contrast review: QA and the implementation review detected the central actor's inherited `.center` background. All three position classes were isolated and a transparent-background regression assertion added. The final native rerun passed.
+
+### Evidence
+
+- `node node_modules/typescript/bin/tsc --noEmit`: passed.
+- `SPINDLE_LOCALE=zh-TW node --test scripts/*.test.mjs`: 247 passed, zero failures.
+- `node scripts/lint.mjs`: zero errors; seven existing local-image optimization warnings.
+- Web and desktop builds passed; existing chunk-size notices remain.
+- `node scripts/test-play-ui.cjs`: real Electron and MCP flow passed; evidence at ignored `outputs/play-ui/1790255311944/`.
+- `node scripts/test-play-presentation.cjs`: eleven scenarios passed at `outputs/play-presentation/1790255904250/`, including native splitter keys; first-click reveal/second-click advance; rerun identity; reduced-motion full text; overflowing dialogue and reset; VN Auto backreading and history pauses beyond 5.3 seconds; novel mode-switch scroll retention; fourteen long choices at 760 × 540; immersion Escape focus restoration; bright background, three transparent synthetic actor images and long CJK dialogue. Renderer errors were empty.
+- Synthetic PNGs are disposable contrast/layout probes generated inside the isolated test renderer, not bundled game artwork. Test measurements permit one CSS pixel at fractional Windows scale boundaries.
+
+Still unverified this round: final Portable packaging, real screen-reader output, physical IME/touchpad/touch interaction, other DPI/multiple monitors, full keyboard traversal, all fade transitions, localized long toolbar screenshots, and a dedicated normal-Auto-to-options timed test. No CI or Release was run. These limits do not invalidate the narrower checks above and are not presented as passes.
