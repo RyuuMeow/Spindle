@@ -318,7 +318,7 @@ async function create(name) {
           "Active tab label clipped: " + JSON.stringify(dimensions),
         );
         if (zoom === 2) {
-          await page.locator(".workspace-identity > button").click();
+          await page.getByRole("button", {name:"Toggle script sidebar",exact:true}).click();
           await sleep(100);
         }
         const native = await win.evaluate(async (w) => ({
