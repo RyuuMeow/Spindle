@@ -950,11 +950,18 @@ button.statistics-bar:hover { color:#fff; background:#ffffff05; }
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .workspace-header {
+  .workbench .workspace-header {
     min-width: 0;
+    padding-right: 8px;
+    gap: 6px;
   }
-  .workspace-identity {
+  .workbench .workspace-identity {
     width: 112px;
     flex-basis: 112px;
   }
+}
+@media (max-width: 460px) {
+  .workbench .workspace-identity { width:70px; flex-basis:70px; }
+  .workbench .project-switch strong,
+  .workbench .project-switch > svg:last-child { display:none; }
 }

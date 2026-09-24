@@ -19,7 +19,7 @@ fs.writeFileSync(
     preferences: { language: "en", autoCheckUpdates: false },
   }),
 );
-const results = { checks: [], errors: [] };
+const results = { checks: [], errors: [], zoom: [] };
 let app, page;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(fn, message) {
@@ -180,6 +180,59 @@ async function create(name) {
       );
       await page.screenshot({ path: path.join(out, "characters.png") });
     });
+    await check("characters-narrow-overlay", async () => {
+      await win.evaluate((w) => w.setContentSize(800, 650));
+      await page.evaluate(() => window.yarnDesktop.zoom(1.5));
+      await page.locator(".characters-narrow").waitFor();
+      const toggle = page
+        .locator(".characters-view header")
+        .getByRole("button", { name: "Characters & preview", exact: true });
+      assert.equal(
+        await page.locator(".characters-layout nav").isVisible(),
+        false,
+      );
+      await toggle.click();
+      await page
+        .getByRole("dialog", { name: "Characters & preview" })
+        .waitFor();
+      assert.equal(
+        await page.locator(".characters-content").evaluate((e) => e.inert),
+        true,
+      );
+      await page.keyboard.press("Escape");
+      assert.equal(
+        await page.locator(".characters-layout nav").isVisible(),
+        false,
+      );
+      assert.equal(
+        await toggle.evaluate((e) => e === document.activeElement),
+        true,
+      );
+      await toggle.click();
+      await page
+        .locator(".characters-list button")
+        .filter({ hasText: "Nia" })
+        .click();
+      await until(
+        async () => !(await page.locator(".characters-layout nav").isVisible()),
+        "Character switch did not close drawer",
+      );
+      fs.writeFileSync(
+        path.join(out, "characters-narrow.png"),
+        Buffer.from(
+          await win.evaluate(async (w) =>
+            (await w.webContents.capturePage()).toPNG().toString("base64"),
+          ),
+          "base64",
+        ),
+      );
+      await page.evaluate(() => window.yarnDesktop.zoom(1));
+      await win.evaluate((w) => w.setContentSize(1280, 800));
+      await until(
+        async () => await page.locator(".characters-layout nav").isVisible(),
+        "Wide sidebar not restored",
+      );
+    });
     await check("appearance-mode-scroll", async () => {
       await menu("Settings…");
       await page
@@ -221,7 +274,11 @@ async function create(name) {
             center = document
               .querySelector(".workspace-center")
               .getBoundingClientRect(),
-            toolbar = document.querySelector(".document-toolbar");
+            toolbar = document.querySelector(".document-toolbar"),
+            label = document
+              .querySelector(".tab-shell.active .tab-name")
+              .getBoundingClientRect(),
+            tabs = document.querySelector(".file-tabs").getBoundingClientRect();
           return {
             viewport: innerWidth,
             rootWidth: box.width,
@@ -229,6 +286,11 @@ async function create(name) {
             center: center.width,
             toolbarScroll: toolbar.scrollWidth,
             toolbarClient: toolbar.clientWidth,
+            visibleTabLabel: Math.max(
+              0,
+              Math.min(label.right, tabs.right) -
+                Math.max(label.left, tabs.left),
+            ),
           };
         });
         assert(
@@ -243,9 +305,29 @@ async function create(name) {
           dimensions.center >= Math.min(320, dimensions.viewport - 12) - 1,
           JSON.stringify(dimensions),
         );
-        await page.screenshot({
-          path: path.join(out, "workspace-" + zoom + ".png"),
+        assert(
+          dimensions.visibleTabLabel >= 24,
+          "Active tab label clipped: " + JSON.stringify(dimensions),
+        );
+        if (zoom === 2) {
+          await page.locator(".workspace-identity > button").click();
+          await sleep(100);
+        }
+        const native = await win.evaluate(async (w) => ({
+          bounds: w.getContentBounds(),
+          zoom: w.webContents.getZoomFactor(),
+          image: (await w.webContents.capturePage()).toPNG().toString("base64"),
+        }));
+        results.zoom.push({
+          zoom,
+          ...dimensions,
+          bounds: native.bounds,
+          actualZoom: native.zoom,
         });
+        fs.writeFileSync(
+          path.join(out, "workspace-" + zoom + ".png"),
+          Buffer.from(native.image, "base64"),
+        );
       }
       await page.evaluate(() => window.yarnDesktop.zoom(1));
       await win.evaluate((w) => w.setContentSize(1280, 800));
