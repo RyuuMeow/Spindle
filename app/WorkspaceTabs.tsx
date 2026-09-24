@@ -147,6 +147,7 @@ export default function WorkspaceTabs({
             return (
               <div
                 key={tab.id}
+                data-tab-id={tab.id}
                 draggable
                 className={
                   "tab-shell " +

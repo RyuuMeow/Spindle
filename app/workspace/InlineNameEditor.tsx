@@ -27,16 +27,39 @@ export function InlineNameEditor({
   onChange,
   onSubmit,
   onCancel,
+  onComposition,
 }: {
   draft: InlineDraft;
   onChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  onComposition?: (active: boolean) => void;
 }) {
   const input = useRef<HTMLInputElement>(null),
     composing = useRef(false),
     cancelled = useRef(false);
   const initialDraft = useRef(draft);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const submit = useRef(onSubmit);
+  useLayoutEffect(() => {
+    submit.current = onSubmit;
+  }, [onSubmit]);
+  useEffect(() => () => clearTimeout(blurTimer.current), []);
+  function commitAfterBlur() {
+    clearTimeout(blurTimer.current);
+    // Let a close/cancel click dispose of the draft before committing it.
+    blurTimer.current = setTimeout(() => {
+      if (
+        !composing.current &&
+        !cancelled.current &&
+        !draft.busy &&
+        document.activeElement !== input.current
+      )
+        submit.current();
+    }, 0);
+  }
   useLayoutEffect(() => {
     const draft = initialDraft.current;
     input.current?.scrollIntoView({ block: "nearest" });
@@ -87,9 +110,12 @@ export function InlineNameEditor({
           onChange={(e) => onChange(e.target.value)}
           onCompositionStart={() => {
             composing.current = true;
+            onComposition?.(true);
           }}
           onCompositionEnd={() => {
             composing.current = false;
+            onComposition?.(false);
+            if (document.activeElement !== input.current) commitAfterBlur();
           }}
           onKeyDown={(e) => {
             e.stopPropagation();
@@ -110,13 +136,7 @@ export function InlineNameEditor({
             }
           }}
           onBlur={() => {
-            if (
-              !draft.provisional &&
-              !composing.current &&
-              !cancelled.current &&
-              !draft.busy
-            )
-              onSubmit();
+            if (!composing.current) commitAfterBlur();
           }}
         />
       </div>

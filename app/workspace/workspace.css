@@ -678,36 +678,11 @@
   width: 100%;
 }
 @media (max-width: 1279px) {
-  .has-document-side .workspace-sidebar {
-    display: none;
-  }
-  .left-priority.has-document-side .workspace-sidebar {
-    display: flex;
-  }
-  .left-priority .document-side {
-    display: none;
-  }
   .save-status > span {
     display: none;
   }
 }
 @media (max-width: 999px) {
-  .document-side {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 20;
-    box-shadow: -10px 0 28px #0005;
-  }
-  .workspace-sidebar {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 20;
-    box-shadow: 10px 0 28px #0005;
-  }
   .document-icon-tools .draft-save span {
     display: none;
   }
@@ -853,12 +828,9 @@
 .problems-empty { display: flex; align-items: center; gap: 8px; margin: 0; padding: 13px 16px; color: #aaa; font-size: 12px; }
 @container diagnostics (max-width: 630px) { .problems-filters-wide { display: none; } .problems-filters-compact { display: flex; } .problems-note { display: none; } }
 @container diagnostics (max-width: 430px) { .problems-toolbar { gap: 5px; padding: 6px 8px; } .problems-filters-compact { gap: 5px; } .problems-heading { font-size: 11px; } }
-@media (max-width: 999px) {
-  .workspace-body > .workspace-sidebar { left: 6px; top: 6px; bottom: 6px; }
-  .workspace-body > .document-side { right: 6px; top: 6px; bottom: 6px; }
-}
 
-@media (max-width: 999px) { .workspace-body > .document-side { position: absolute; height: auto; } }
+
+
 
 /* Count badges belong inside the control, including its hit/hover area. */
 .document-icon-tools > .check-button { width:auto; min-width:32px; flex:0 0 auto; padding:0 7px; gap:12px; }
@@ -898,3 +870,91 @@ button.statistics-bar:hover { color:#fff; background:#ffffff05; }
 .retained-utility { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
 .retained-utility[hidden] { display: none; }
 .retained-utility > .command-workspace { flex: 1; min-height: 0; }
+
+/* Reserve 320 CSS px for content before switching side panels to drawers. */
+.workspace-body {
+  min-width: 0;
+  position: relative;
+}
+.workspace-body.compact-panels:not(.left-priority) > .workspace-sidebar,
+.workspace-body.compact-panels.left-priority > .document-side {
+  display: none;
+}
+.workspace-body.overlay-panels > .workspace-sidebar,
+.workspace-body.overlay-panels > .document-side {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  height: auto;
+  z-index: 20;
+  max-width: calc(100% - 24px);
+  box-shadow: 0 8px 24px #0005;
+}
+.workspace-body.overlay-panels > .workspace-sidebar {
+  left: 6px;
+}
+.workspace-body.overlay-panels > .document-side {
+  right: 6px;
+}
+.workspace-center > .editor-pane,
+.editor-surface {
+  min-width: 0;
+  max-width: 100%;
+}
+.document-tools-overflow {
+  display: none;
+}
+.document-tools-popover {
+  width: auto;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+}
+.document-tools-popover .document-icon-tools {
+  flex-wrap: wrap;
+  border: 0;
+  padding: 0;
+}
+@media (max-width: 900px) {
+  .document-actions .document-tools-expanded {
+    display: none;
+  }
+  .document-tools-overflow {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+  }
+  .document-toolbar {
+    min-width: 0;
+    gap: 6px;
+  }
+  .document-heading {
+    flex: 1;
+    min-width: 0;
+  }
+  .document-actions {
+    flex-shrink: 0;
+  }
+}
+@media (max-width: 600px) {
+  .document-heading > span {
+    display: none;
+  }
+  .document-actions > .segmented-control button {
+    padding: 5px 7px;
+  }
+  .document-actions > .segmented-control button > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .workspace-header {
+    min-width: 0;
+  }
+  .workspace-identity {
+    width: 112px;
+    flex-basis: 112px;
+  }
+}

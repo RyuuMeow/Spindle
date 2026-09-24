@@ -58,6 +58,7 @@ import {
   X,
   Check,
   Play,
+  MoreHorizontal,
 } from "lucide-react";
 import type { editor as MonacoEditor, Position } from "monaco-editor";
 import {
@@ -105,6 +106,11 @@ import {
   type ActionResult,
 } from "./types";
 import ActionMenu, { type MenuAction, type MenuState } from "./ActionMenu";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import SettingsView from "./SettingsView";
 import { settingEntries, type SettingsSection } from "./settings-registry";
@@ -117,10 +123,13 @@ import { orderedDocuments, uniqueDocumentName, folderOf } from "./file-order";
 import { InlineNameEditor, type InlineDraft } from "./InlineNameEditor";
 import FileTree from "./FileTree";
 import { projectFolders, uniqueCopyName } from "./file-tree";
+import { panelLayout } from "./panel-layout";
+import { resolvePresentation } from "./presentation-preferences";
 import "./workspace.css";
 import CharactersView from "../play/CharactersView";
 import { pt } from "../play/messages";
 import { PreviewProvider } from "../play/context";
+import { flushPreviewDrafts } from "../play/preview-autosave";
 
 type Prompt = {
   title: string;
@@ -197,6 +206,7 @@ function WorkbenchContent({
     [busy, setBusy] = useState(false);
   const [inlineDraft, setInlineDraft] = useState<InlineDraft | null>(null);
   const inlineSubmitting = useRef(false),
+    inlineComposing = useRef(false),
     inlineOrigin = useRef<HTMLElement | null>(null);
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
 
@@ -269,9 +279,12 @@ function WorkbenchContent({
   const analysis = useMemo(
     () =>
       project
-        ? parse(project.documents, project.commands)
+        ? parse(project.documents, project.commands, {
+            dialogueLength: resolvePresentation(snapshot.preferences)
+              .dialogueLength,
+          })
         : { nodes: [], issues: [], links: [] },
-    [project],
+    [project, snapshot.preferences?.dialogueLength],
   );
   const diagnostics = useDiagnostics(
     project,
@@ -310,18 +323,36 @@ function WorkbenchContent({
   );
   const commandHasDraft = commandDirty;
   const outlineOpen = !!session.outline?.[mode];
-  const [narrowPanels, setNarrowPanels] = useState(false);
+  const [workspaceBody, setWorkspaceBody] = useState<HTMLDivElement | null>(
+    null,
+  );
+  const [workspaceWidth, setWorkspaceWidth] = useState(() =>
+    typeof window === "undefined" ? 1280 : window.innerWidth,
+  );
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 1279px)");
-    const update = () => setNarrowPanels(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
+    if (!workspaceBody) return;
+    const observer = new ResizeObserver(() =>
+      setWorkspaceWidth(workspaceBody.clientWidth),
+    );
+    setWorkspaceWidth(workspaceBody.clientWidth);
+    observer.observe(workspaceBody);
+    return () => observer.disconnect();
+  }, [workspaceBody]);
   const [historyToolbar, setHistoryToolbar] = useState<HTMLDivElement | null>(
     null,
   );
   const [sideFocus, setSideFocus] = useState<"left" | "right">("left");
+  const panelSizes = panelLayout(
+    workspaceWidth,
+    session.left &&
+      !standalone &&
+      (!utility || !!inlineDraft?.kind.endsWith("document")),
+    !utility && (outlineOpen || historyOpen || statisticsOpen),
+    session.sidebarWidth,
+    session.rightPanelWidth ?? 260,
+    sideFocus,
+  );
+  const narrowPanels = panelSizes.compact;
   const showOutline =
     !!doc &&
     outlineOpen &&
@@ -442,6 +473,8 @@ function WorkbenchContent({
   } | null>(null);
   const leaving = useRef(false);
   async function saveBeforeLeaving() {
+    if (!(await flushPreviewDrafts(project.id)))
+      throw Error(tr("m8f52fe1c3c78"));
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
@@ -639,9 +672,10 @@ function WorkbenchContent({
     }
   }
   function activate(id: string) {
-    if (inlineSubmitting.current) return;
+    if (inlineSubmitting.current && !pendingDocument.current) return;
     if (pendingDocument.current?.tabId === id) return;
-    cancelInline();
+    if (pendingDocument.current) void submitInline();
+    else cancelInline();
     capture();
     resetTransient();
     setSession((s) => ({ ...s, activeId: id }));
@@ -656,8 +690,15 @@ function WorkbenchContent({
     record = true,
     forcedMode?: TabView["mode"],
   ) {
-    if (inlineSubmitting.current) return;
-    cancelInline();
+    if (inlineSubmitting.current && !pendingDocument.current) return;
+    if (pendingDocument.current) {
+      const pending = pendingDocument.current;
+      void submitInline();
+      setSession((s) => ({
+        ...s,
+        activeId: s.activeId === pending.tabId ? pending.origin : s.activeId,
+      }));
+    } else cancelInline();
     resetTransient();
     capture();
     const document = project.documents.find((d) => d.id === id);
@@ -743,6 +784,15 @@ function WorkbenchContent({
   }
   async function closeTabs(ids: string[], force = false) {
     if (inlineSubmitting.current) return;
+    if (
+      tabs.some(
+        (tab) =>
+          ids.includes(tab.id) &&
+          ["@characters", "@commands"].includes(tab.documentId),
+      ) &&
+      !(await flushPreviewDrafts(project.id))
+    )
+      return;
     if (pendingDocument.current && ids.includes(pendingDocument.current.tabId))
       cancelInline();
     if (!force) {
@@ -902,7 +952,7 @@ function WorkbenchContent({
       setSession((s) => ({
         ...s,
         tabs: s.tabs.filter((t) => t.id !== pending.tabId),
-        activeId: pending.origin,
+        activeId: s.activeId === pending.tabId ? pending.origin : s.activeId,
       }));
       pendingDocument.current = null;
     }
@@ -914,9 +964,11 @@ function WorkbenchContent({
   function beginInline(next: InlineDraft) {
     if (inlineSubmitting.current) return;
     inlineOrigin.current = document.activeElement as HTMLElement;
+    inlineComposing.current = false;
     setInlineDraft(next);
   }
   function createFromSearch(name?: string) {
+    if (inlineSubmitting.current || pendingDocument.current) return;
     const folder = activeFolder ?? (utility ? "" : folderOf(doc?.name || ""));
     capture();
     const tabId = uuid();
@@ -1110,7 +1162,7 @@ function WorkbenchContent({
   }
   async function submitInline() {
     const draft = inlineDraft;
-    if (!draft || inlineSubmitting.current) return;
+    if (!draft || inlineSubmitting.current || inlineComposing.current) return;
     const name = draft.value.trim();
     inlineSubmitting.current = true;
     setInlineDraft((previous) =>
@@ -1186,7 +1238,6 @@ function WorkbenchContent({
             pendingDocument.current = null;
             setSession((s) => ({
               ...s,
-              activeId: pending.tabId,
               tabs: s.tabs.map((t) =>
                 t.id === pending.tabId
                   ? { ...t, documentId: created.id, past: [], future: [] }
@@ -1259,6 +1310,9 @@ function WorkbenchContent({
         }
         onSubmit={() => void submitInline()}
         onCancel={cancelInline}
+        onComposition={(active) => {
+          inlineComposing.current = active;
+        }}
       />
     ) : null;
   }
@@ -1878,9 +1932,155 @@ function WorkbenchContent({
   }
   if (!project)
     return <div className="empty-editor">{tr("m54df28110c50")}</div>;
+  const documentTools = doc ? (
+    <>
+      {window.yarnDesktop && (
+        <ChromeButton
+          title={
+            pt("play") +
+            (analysis.nodes.find(
+              (n) =>
+                n.file === doc?.name &&
+                n.start <= active.line &&
+                n.end >= active.line,
+            )?.name
+              ? ": " +
+                analysis.nodes.find(
+                  (n) =>
+                    n.file === doc?.name &&
+                    n.start <= active.line &&
+                    n.end >= active.line,
+                )?.name
+              : "")
+          }
+          onClick={() =>
+            void window
+              .yarnDesktop!.play.open()
+              .catch((e) =>
+                notify(
+                  String(e).includes("PLAY_INPUT_PENDING")
+                    ? pt("pending")
+                    : String(e),
+                ),
+              )
+          }
+        >
+          <Play size={17} aria-hidden="true" />
+        </ChromeButton>
+      )}
+      <ChromeButton
+        title={tr("m9c633473d49a")}
+        aria-label={tr("mf40b96ff73c0")}
+        aria-pressed={!!active.dialogueOnly}
+        onClick={() => {
+          capture();
+          tabPatch({ dialogueOnly: !active.dialogueOnly });
+        }}
+      >
+        <BookText size={16} />
+      </ChromeButton>
+      <ChromeButton
+        title={tr("m4c3cec274391")}
+        aria-pressed={historyOpen}
+        onClick={() => {
+          capture();
+          setSideFocus("right");
+          setHistorySelection(null);
+          setStatisticsOpen(false);
+          setHistoryOpen(!historyOpen);
+        }}
+      >
+        <Clock3 size={16} />
+      </ChromeButton>
+      <ChromeButton
+        title={tr("m9c44f8a4637d")}
+        aria-pressed={showOutline}
+        onClick={() => {
+          setHistoryOpen(false);
+          setStatisticsOpen(false);
+          setSideFocus("right");
+          setHistorySelection(null);
+          setSession((s) => ({
+            ...s,
+            outline: { ...s.outline, [mode]: !showOutline },
+          }));
+        }}
+      >
+        <ListTree size={16} />
+      </ChromeButton>
+      <ChromeButton
+        title={
+          tr("m628f065501a2") +
+          errorCount +
+          tr("m3399917a26f3") +
+          warningCount +
+          tr("ma8b7a4480407")
+        }
+        aria-label={tr("mcf85ad10cef3")}
+        aria-pressed={problems}
+        className="check-button"
+        onClick={() => {
+          requestDiagnostics();
+          setProblems((v) => !v);
+        }}
+      >
+        {errorCount > 0 && (
+          <span className="diagnostic-count error">
+            <CircleAlert size={16} />
+            <b>{errorCount}</b>
+          </span>
+        )}
+        {warningCount > 0 && (
+          <span className="diagnostic-count warning">
+            <AlertTriangle size={16} />
+            <b>{warningCount}</b>
+          </span>
+        )}
+        {!errorCount && !warningCount && <Check size={16} />}
+      </ChromeButton>
+      <ChromeButton
+        title={tr("me3ca8ea79b91")}
+        aria-label={tr("me3ca8ea79b91")}
+        aria-pressed={statisticsOpen}
+        onClick={() => {
+          setStatisticsOpen(!statisticsOpen);
+          setHistoryOpen(false);
+          setHistorySelection(null);
+          setSideFocus("right");
+        }}
+      >
+        <BarChart3 size={16} />
+      </ChromeButton>
+      {!doc.path && (
+        <button
+          className="draft-save"
+          onClick={() =>
+            void perform({
+              type: window.yarnDesktop ? "saveAs" : "export",
+              projectId: project.id,
+              documentId: doc.id,
+            })
+          }
+        >
+          <FilePlus2 size={15} />
+          <span>{tr("mf0ce89ab17f9")}</span>
+        </button>
+      )}
+    </>
+  ) : null;
   return (
-    <PreviewProvider project={project}>
+    <PreviewProvider project={project} preferences={snapshot.preferences}>
       <main
+        onPointerDownCapture={(event) => {
+          const target = event.target as HTMLElement;
+          if (
+            pendingDocument.current &&
+            target.closest<HTMLElement>("[data-tab-id]")?.dataset.tabId ===
+              pendingDocument.current.tabId &&
+            (event.button === 1 || target.closest(".tab-close"))
+          )
+            cancelInline();
+        }}
         className={
           "workbench dark" +
           (window.yarnDesktop?.titleBarOverlay ? " desktop-overlay" : "")
@@ -2257,140 +2457,28 @@ function WorkbenchContent({
                         },
                       ]}
                     />
-                    <div className="document-icon-tools">
-                      {window.yarnDesktop && (
-                        <ChromeButton
-                          title={
-                            pt("play") +
-                            (analysis.nodes.find(
-                              (n) =>
-                                n.file === doc?.name &&
-                                n.start <= active.line &&
-                                n.end >= active.line,
-                            )?.name
-                              ? ": " +
-                                analysis.nodes.find(
-                                  (n) =>
-                                    n.file === doc?.name &&
-                                    n.start <= active.line &&
-                                    n.end >= active.line,
-                                )?.name
-                              : "")
-                          }
-                          onClick={() =>
-                            void window
-                              .yarnDesktop!.play.open()
-                              .catch((e) =>
-                                notify(
-                                  String(e).includes("PLAY_INPUT_PENDING")
-                                    ? pt("pending")
-                                    : String(e),
-                                ),
-                              )
-                          }
-                        >
-                          <Play size={17} aria-hidden="true" />
-                        </ChromeButton>
-                      )}
-                      <ChromeButton
-                        title={tr("m9c633473d49a")}
-                        aria-label={tr("mf40b96ff73c0")}
-                        aria-pressed={!!active.dialogueOnly}
-                        onClick={() => {
-                          capture();
-                          tabPatch({ dialogueOnly: !active.dialogueOnly });
-                        }}
-                      >
-                        <BookText size={16} />
-                      </ChromeButton>
-                      <ChromeButton
-                        title={tr("m4c3cec274391")}
-                        aria-pressed={historyOpen}
-                        onClick={() => {
-                          capture();
-                          setSideFocus("right");
-                          setHistorySelection(null);
-                          setStatisticsOpen(false);
-                          setHistoryOpen(!historyOpen);
-                        }}
-                      >
-                        <Clock3 size={16} />
-                      </ChromeButton>
-                      <ChromeButton
-                        title={tr("m9c44f8a4637d")}
-                        aria-pressed={showOutline}
-                        onClick={() => {
-                          setHistoryOpen(false);
-                          setStatisticsOpen(false);
-                          setSideFocus("right");
-                          setHistorySelection(null);
-                          setSession((s) => ({
-                            ...s,
-                            outline: { ...s.outline, [mode]: !showOutline },
-                          }));
-                        }}
-                      >
-                        <ListTree size={16} />
-                      </ChromeButton>
-                      <ChromeButton
-                        title={
-                          tr("m628f065501a2") +
-                          errorCount +
-                          tr("m3399917a26f3") +
-                          warningCount +
-                          tr("ma8b7a4480407")
-                        }
-                        aria-label={tr("mcf85ad10cef3")}
-                        aria-pressed={problems}
-                        className="check-button"
-                        onClick={() => {
-                          requestDiagnostics();
-                          setProblems((v) => !v);
-                        }}
-                      >
-                        {errorCount > 0 && (
-                          <span className="diagnostic-count error">
-                            <CircleAlert size={16} />
-                            <b>{errorCount}</b>
-                          </span>
-                        )}
-                        {warningCount > 0 && (
-                          <span className="diagnostic-count warning">
-                            <AlertTriangle size={16} />
-                            <b>{warningCount}</b>
-                          </span>
-                        )}
-                        {!errorCount && !warningCount && <Check size={16} />}
-                      </ChromeButton>
-                      <ChromeButton
-                        title={tr("me3ca8ea79b91")}
-                        aria-label={tr("me3ca8ea79b91")}
-                        aria-pressed={statisticsOpen}
-                        onClick={() => {
-                          setStatisticsOpen(!statisticsOpen);
-                          setHistoryOpen(false);
-                          setHistorySelection(null);
-                          setSideFocus("right");
-                        }}
-                      >
-                        <BarChart3 size={16} />
-                      </ChromeButton>
-                      {!doc.path && (
-                        <button
-                          className="draft-save"
-                          onClick={() =>
-                            void perform({
-                              type: window.yarnDesktop ? "saveAs" : "export",
-                              projectId: project.id,
-                              documentId: doc.id,
-                            })
-                          }
-                        >
-                          <FilePlus2 size={15} />
-                          <span>{tr("mf0ce89ab17f9")}</span>
-                        </button>
-                      )}
+                    <div className="document-icon-tools document-tools-expanded">
+                      {documentTools}
                     </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          className="document-tools-overflow"
+                          aria-label={tr("workspace.moreTools")}
+                        >
+                          <MoreHorizontal size={18} />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="document-tools-popover"
+                        align="end"
+                        aria-label={tr("workspace.moreTools")}
+                      >
+                        <div className="document-icon-tools">
+                          {documentTools}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </>
                 )}
                 <ChromeButton
@@ -2406,8 +2494,11 @@ function WorkbenchContent({
           )}
         </div>
         <div
+          ref={setWorkspaceBody}
           className={
             "workspace-body " +
+            (panelSizes.compact ? "compact-panels " : "") +
+            (panelSizes.overlay ? "overlay-panels " : "") +
             (sideFocus === "left" ? "left-priority " : "") +
             (utility ? "utility-surface" : "") +
             ((showOutline || historyOpen || statisticsOpen) && !utility
@@ -2420,7 +2511,7 @@ function WorkbenchContent({
             (!utility || inlineDraft?.kind.endsWith("document")) && (
               <aside
                 className="workspace-sidebar"
-                style={{ width: session.sidebarWidth }}
+                style={{ width: panelSizes.leftWidth }}
               >
                 <div className="section-heading">
                   <span>{tr("m627b75e6aced")}</span>
@@ -2544,9 +2635,9 @@ function WorkbenchContent({
                 </div>
                 <PanelResizeHandle
                   side="left"
-                  value={session.sidebarWidth}
+                  value={panelSizes.leftWidth}
                   min={180}
-                  max={420}
+                  max={panelSizes.leftMax}
                   label={tr("ma1f0112c8a95")}
                   onResize={(sidebarWidth) =>
                     setSession((s) => ({ ...s, sidebarWidth }))
@@ -2579,6 +2670,7 @@ function WorkbenchContent({
               >
                 <CommandManager
                   key={project.id}
+                  projectId={project.id}
                   revealName={commandTarget?.name}
                   revealNonce={commandTarget?.nonce}
                   commands={project.commands}
@@ -2995,15 +3087,15 @@ function WorkbenchContent({
               className="document-side workspace-scenes"
               aria-label={tr("m9c44f8a4637d")}
               style={{
-                width: session.rightPanelWidth ?? 260,
-                flexBasis: session.rightPanelWidth ?? 260,
+                width: panelSizes.rightWidth,
+                flexBasis: panelSizes.rightWidth,
               }}
             >
               <PanelResizeHandle
                 side="right"
-                value={session.rightPanelWidth ?? 260}
+                value={panelSizes.rightWidth}
                 min={220}
-                max={420}
+                max={panelSizes.rightMax}
                 label={tr("mc0a9957d0f32")}
                 onResize={(rightPanelWidth) =>
                   setSession((s) => ({ ...s, rightPanelWidth }))
@@ -3114,9 +3206,15 @@ function WorkbenchContent({
           {doc && statisticsOpen && !utility && (
             <StatisticsPanel
               doc={doc}
-              width={session.rightPanelWidth ?? 260}
+              width={panelSizes.rightWidth}
               onWidth={(rightPanelWidth) =>
-                setSession((s) => ({ ...s, rightPanelWidth }))
+                setSession((s) => ({
+                  ...s,
+                  rightPanelWidth: Math.min(
+                    rightPanelWidth,
+                    panelSizes.rightMax,
+                  ),
+                }))
               }
               onNavigate={(line) => {
                 openDocument(doc.id, false, line, 1, true, mode);
@@ -3132,9 +3230,15 @@ function WorkbenchContent({
           )}
           {doc && historyOpen && !utility && (
             <HistoryList
-              width={session.rightPanelWidth ?? 260}
+              width={panelSizes.rightWidth}
               onWidth={(rightPanelWidth) =>
-                setSession((s) => ({ ...s, rightPanelWidth }))
+                setSession((s) => ({
+                  ...s,
+                  rightPanelWidth: Math.min(
+                    rightPanelWidth,
+                    panelSizes.rightMax,
+                  ),
+                }))
               }
               entries={project.recovery.filter(
                 (entry) => entry.documentId === doc.id && !entry.deleted,

@@ -382,3 +382,73 @@
     grid-column: 1;
   }
 }
+
+/* Retained hidden modes must not create different separators. */
+.appearance-settings .appearance-mode.settings-group {
+  border-top: 0;
+  padding-top: 0;
+}
+.appearance-settings {
+  container-type: inline-size;
+  container-name: appearance;
+}
+@container appearance (max-width:580px) {
+  .appearance-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .appearance-controls {
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns: minmax(100px, 130px) minmax(0, 1fr);
+  }
+  .appearance-controls > .compact-select,
+  .appearance-font,
+  .appearance-value {
+    max-width: 100%;
+  }
+  .appearance-controls > .compact-select {
+    width: 100%;
+  }
+  .appearance-field--group {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .appearance-font-list {
+    max-width: 100%;
+  }
+}
+@container appearance (max-width:380px) {
+  .appearance-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .appearance-controls > :only-child {
+    grid-column: 1;
+  }
+  .appearance-controls > .compact-select {
+    width: 100%;
+  }
+  .appearance-field--group {
+    padding: 12px;
+  }
+  .appearance-field--group > label {
+    min-width: 0;
+  }
+  .appearance-field--group .appearance-controls > .compact-select {
+    max-width: 120px;
+  }
+  .appearance-field--group .appearance-input-row {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .appearance-color-label {
+    grid-column: 1 / -1;
+  }
+  .appearance-field--group .appearance-opacity {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .appearance-field--group .appearance-opacity > small {
+    grid-column: 1;
+  }
+  .appearance-settings > .segmented-control {
+    flex-wrap: wrap;
+  }
+}

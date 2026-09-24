@@ -1,7 +1,7 @@
 "use client";
 import { t as tr } from "../i18n/index.ts";
 
-import { useId, useRef, useState, useEffect } from "react";
+import { useId, useRef, useState, useEffect, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -643,8 +643,12 @@ export default function AppearanceSettings({
   value,
   onChange,
   navigation,
+  globalExtras,
+  sourceExtras,
 }: {
   navigation?: { field?: string; nonce: number };
+  globalExtras?: ReactNode;
+  sourceExtras?: ReactNode;
   value?: EditorAppearance;
   onChange: (p: AppearancePatch) => void;
 }) {
@@ -666,20 +670,22 @@ export default function AppearanceSettings({
     setResetKeys((keys) => ({ ...keys, [scope]: (keys[scope] || 0) + 1 }));
   };
   const container = useRef<HTMLDivElement>(null);
-  const scrolls = useRef<Partial<Record<AppearanceMode, number>>>({});
+  const scrollFrame = useRef<number | undefined>(undefined);
+  useEffect(() => () => cancelAnimationFrame(scrollFrame.current ?? 0), []);
   const changeMode = (value: string) => {
     const scroll = container.current?.closest(".settings-scroll");
-    if (scroll) scrolls.current[mode] = scroll.scrollTop;
+    const top = scroll?.scrollTop ?? 0;
+    cancelAnimationFrame(scrollFrame.current ?? 0);
     setMode(value as AppearanceMode);
-    requestAnimationFrame(() => {
-      if (scroll)
-        scroll.scrollTop = scrolls.current[value as AppearanceMode] ?? 0;
+    scrollFrame.current = requestAnimationFrame(() => {
+      if (scroll) scroll.scrollTop = top;
     });
   };
   return (
     <div className="appearance-settings" ref={container}>
       <details className="settings-group appearance-global" open>
         <summary>{tr("m657bc98f63bc")}</summary>
+        {globalExtras}
         <StyleFields
           key={resetKeys.global || 0}
           appearance={appearance}
@@ -708,6 +714,7 @@ export default function AppearanceSettings({
         >
           <Preview appearance={appearance} mode={m} />
           <StyleFields appearance={appearance} mode={m} onChange={onChange} />
+          {m === "source" && sourceExtras}
           {(m === "reader" || m === "rendered") && (
             <div className="setting-row" data-setting={m + ".width"}>
               <span>{extraSettingLabels["width"]}</span>

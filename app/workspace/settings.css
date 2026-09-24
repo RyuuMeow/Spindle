@@ -252,3 +252,56 @@
 .settings-scroll[hidden] {
   display: none;
 }
+
+/* React to the content pane, including application zoom and side panels. */
+.settings-workspace {
+  container-type: inline-size;
+  container-name: settings;
+}
+.settings-scroll {
+  container-type: inline-size;
+  container-name: settings-content;
+}
+@container settings (max-width:600px) {
+  .settings-layout {
+    flex-direction: column;
+  }
+  .settings-navigation {
+    width: 100%;
+    flex: 0 0 auto;
+    padding: 8px;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-navigation > button {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    white-space: nowrap;
+  }
+}
+@container settings-content (max-width:580px) {
+  .settings-content {
+    padding: 20px 16px;
+  }
+  .setting-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .setting-row > *,
+  .setting-field {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .settings-section-heading {
+    flex-wrap: wrap;
+  }
+  .settings-shortcuts > div {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+}
