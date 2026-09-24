@@ -15,8 +15,8 @@ fs.writeFileSync(
   "title: Room\n---\nMira: Inside\n===",
 );
 let app, client;
-(async () => {
-  app = process.env.SPINDLE_PLAY_PORTABLE
+async function launch() {
+  return process.env.SPINDLE_PLAY_PORTABLE
     ? await require("./portable-test-driver.cjs").launch(
         require("playwright"),
         {
@@ -33,6 +33,9 @@ let app, client;
         ],
         timeout: 30000,
       });
+}
+(async () => {
+  app = await launch();
   const page = await app.firstWindow(),
     errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -265,6 +268,52 @@ let app, client;
   const peerClosed = secondPlay.waitForEvent("close");
   await secondEditor.evaluate(() => window.close());
   await peerClosed;
+  await client.close();
+  client = null;
+  await app.close();
+  app = null;
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  app = await launch();
+  const reopened = await app.firstWindow();
+  reopened.on("pageerror", (e) => errors.push(e.message));
+  const openButton = reopened.getByRole("button", {
+    name: /^(開啟專案資料夾|Open project folder|打开项目文件夹)$/,
+  });
+  await openButton.waitFor();
+  await app.evaluate(({ dialog }, root) => {
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [root],
+    });
+  }, root);
+  await openButton.click();
+  await reopened.getByRole("tab").first().waitFor();
+  const persisted = await reopened.evaluate(() =>
+    window.yarnDesktop.play.resources(),
+  );
+  assert.equal(persisted.config.characters[0].displayName, "Mira Preview");
+  assert(Object.keys(persisted.images).length > 0);
+  assert(
+    fs.readFileSync(path.join(root, "Story.yarn"), "utf8").includes("Changed"),
+  );
+  const afterRestartOpened = app.waitForEvent("window");
+  await reopened.evaluate(() => window.yarnDesktop.play.open());
+  const freshPlay = await afterRestartOpened;
+  await freshPlay.locator(".play-app").waitFor();
+  let fresh = await freshPlay.evaluate(() =>
+    window.yarnDesktop.play.action({ action: "state" }),
+  );
+  if (fresh.state.status === "ready")
+    fresh = await freshPlay.evaluate(
+      (r) =>
+        window.yarnDesktop.play.action({ action: "start", scene: "Start" }, r),
+      fresh.state.revision,
+    );
+  assert.notEqual(fresh.id, original.id);
+  assert.equal(
+    fresh.state.variables.find((v) => v.name === "$key").value,
+    false,
+  );
   assert.deepEqual(errors, []);
   fs.writeFileSync(
     path.join(out, "result.json"),
@@ -286,6 +335,7 @@ let app, client;
           "actual-mcp-read-context",
           "same-project-two-window-isolation",
           "owner-close-disposes-play",
+          "restart-persists-resources-not-runtime",
         ],
         errors,
       },

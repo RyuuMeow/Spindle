@@ -26,7 +26,13 @@ Preview effects are pure event replay. Tests exercise declarative mappings, rewi
 
 The acceptance Portable is built with `node scripts/package-desktop.mjs --portable-only --config.directories.output=release/play-preview --config.portable.artifactName=Spindle-0.10.0-Play-preview-x64.exe`. It is unsigned. No installer, version tag, remote Release or public publication is produced.
 
-Final Portable execution, package inventory and SHA-256 are recorded below after verification.
+- Final Portable: `release/play-preview/Spindle-0.10.0-Play-preview-x64.exe` (187,603,478 bytes).
+- SHA-256: `c1ec8363f8b10656edab39b9931b524e25b33b4ffde72ee4fcccbcee61c22d1a`.
+- Actual final Portable passed the Electron/MCP workflow above using `SPINDLE_PLAY_PORTABLE`, including same-project dual-window isolation. `DOTNET_ROOT` pointed at a nonexistent runtime directory; no SDK launcher was used.
+- Closing and reopening that Portable with the same isolated profile preserves the imported portrait/configuration and saved edited script, creates a fresh Play ID and resets run variables. Reopening from the restored utility tab correctly requires an explicit start scene. The test navigates the restored page instead of assuming a particular document tab remains selected.
+- The packaged `app.asar.unpacked/desktop/play-runtime/Spindle.Play.exe` independently passed all seven runtime tests under the same invalid `DOTNET_ROOT`.
+- `node scripts/verify-play-package.mjs`: 406 ASAR inventory entries verified, with Play/MCP runtime, native runtime DLL, Worker/WASM and dependency notices. No test/profile/example/SDK directories, selected fixture dialogue or private-key markers were present. This inventory check is not a claim of an exhaustive security audit.
+- `Get-AuthenticodeSignature` reports `NotSigned`, regardless of electron-builder's generic “signing” progress messages.
 
 ## Remaining manual coverage and scope
 
