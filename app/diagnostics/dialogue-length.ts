@@ -1,4 +1,4 @@
-import { readingStructure } from "../reading/structure";
+import { readingStructure } from "../reading/structure.ts";
 
 export type DialogueLengthPreference = { enabled: boolean; limit: number };
 export const DEFAULT_DIALOGUE_LENGTH: DialogueLengthPreference = {

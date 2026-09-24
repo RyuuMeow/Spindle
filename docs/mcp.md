@@ -4,6 +4,12 @@
 
 # Spindle MCP and agent integration
 
+## Dialogue-length advice
+
+`validate_project` includes `diagnostic.dialogueLength` warnings using the same global enabled/limit preference as the editor (default enabled, limit 80). Arguments are the measured static weighted length and limit; source columns use UTF-16 offsets. CJK/full-width/emoji graphemes count as 1 and other graphemes as 0.5. Recognized syntax, speaker prefixes and unevaluated dynamic spans are excluded. This is writing advice, not runtime line capacity or a compiler failure.
+
+Changing the preference invalidates semantic-analysis cache entries without requiring a text edit. UI input suppression does not suppress MCP validation. Length warnings have no quick-fix IDs: agents must not automatically truncate, split or rewrite dialogue merely because a warning exists. Existing authorization, source-version and operation-ID rules still apply. Unit checks cover parser/MCP consistency and preference-cache invalidation; the current refinement's coordinated desktop acceptance is tracked separately.
+
 Spindle's Windows desktop app hosts a local Streamable HTTP MCP server while it is running. Access is **disabled by default**. Choose read-only or allow changes in **Settings → MCP / Agent integration**. It listens only on `127.0.0.1`; it is not a remote service or an unrestricted filesystem tool. The Web app does not host the server.
 
 ## Connect Codex or Claude Code

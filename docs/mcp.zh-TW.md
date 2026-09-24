@@ -4,6 +4,12 @@
 
 # Spindle MCP v1
 
+## 台詞長度提醒
+
+`validate_project` 依編輯器相同的全局開關／上限回傳 `diagnostic.dialogueLength` warning（預設開啟、上限 80）。參數為量測的靜態加權長度與上限，來源欄位採 UTF-16 offset。CJK／全形／emoji grapheme 計 1，其餘計 0.5；角色前綴、已辨識語法及未求值動態片段不計。這是撰寫提醒，不是 runtime 行容量或編譯失敗。
+
+修改偏好會使語義分析快取失效，不需修改原文。UI 輸入期間暫緩顯示不會隱藏 MCP 診斷。長度提醒沒有 quick-fix ID；agent 不應只因提醒而自動截斷、拆句或改寫台詞。既有授權、文件版本與 operationId 規則仍適用。單元測試已涵蓋 parser／MCP 一致性與偏好快取失效；本輪統一桌面驗收另外追蹤。
+
 Windows 桌面版執行期間提供本機 Streamable HTTP MCP。預設停用，不包含遠端服務、無介面編輯、任意檔案系統操作或圖表布局修改。介面使用官方 TypeScript SDK，僅提供 Tools。
 
 ## 啟用與連線

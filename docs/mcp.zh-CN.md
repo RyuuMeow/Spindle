@@ -4,6 +4,12 @@
 
 # Spindle MCP 与 Agent 接入
 
+## 台词长度提醒
+
+`validate_project` 根据编辑器相同的全局开关／上限返回 `diagnostic.dialogueLength` warning（默认开启、上限 80）。参数为测得的静态加权长度与上限，来源列采用 UTF-16 offset。CJK／全角／emoji grapheme 计 1，其余计 0.5；角色前缀、已识别语法及未求值动态片段不计。这是写作提醒，不是 runtime 行容量或编译失败。
+
+修改偏好会使语义分析缓存失效，无需修改原文。UI 输入期间暂缓显示不会隐藏 MCP 诊断。长度提醒没有 quick-fix ID；agent 不应仅因提醒而自动截断、拆句或改写台词。现有授权、文档版本与 operationId 规则仍适用。单元测试已覆盖 parser／MCP 一致性与偏好缓存失效；本轮统一桌面验收另行跟踪。
+
 Windows 桌面版运行时提供本地 Streamable HTTP MCP，**默认停用**。在「设置 → MCP／Agent 集成」选择只读或允许修改。服务只监听 `127.0.0.1`，不提供远程连接、无界面后台编辑或任意文件系统访问；Web 版不提供此服务。
 
 ## 安装与连接

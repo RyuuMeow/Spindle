@@ -4,6 +4,14 @@
 
 # 工作区架构
 
+## 呈现偏好与共享诊断
+
+`presentation-preferences.ts` 集中解析编辑器角色、Play 呈现及台词长度默认值并验证字段 patch。偏好保存在 App profile／Web storage，不写入项目。桌面主进程合并更新；支持 Web Lock 时，Web 偏好与风格更新使用同一锁。Monaco 使用可移除 decoration、CodeMirror 更新既有 decoration field、阅读模式保留来源 span；不重建文档 model 或修改 Yarn。
+
+`diagnostics/dialogue-length.ts` 使用已有 reading structure 计算静态 grapheme。`parse` 接受诊断选项，UI 结果经 `DiagnosticPresentation`，MCP 立即检查已同步内容。MCP 分析缓存包含规范化诊断偏好。提醒具有稳定 code、参数与 UTF-16 来源列，不附自动快速修复。详见 [UI 契约](ui-design.zh-CN.md) 与 [MCP 指南](mcp.zh-CN.md)。
+
+预览数据采用 400ms 自动保存控制器，具备三方字段合并、版本冲突重试与未保存输入保留；离开流程只保存当前项目的控制器。单元测试覆盖上述契约，桌面交互与最终封装仍须分别实机验收。
+
 Yarn 原文是内容的权威来源。纯文本、阅读、图表节点、标签页和多个窗口共用稳定的 `DocumentId` 与有版本的文字交易。布局、偏好、命令定义和项目历史分别保存并拥有独立的撤销边界。[history/](history/) 保存旧设计记录，不代表当前实现契约。
 
 ## 文档、标签页与同步

@@ -4,6 +4,16 @@
 
 # Spindle interface conventions
 
+## Character presentation and writing advice
+
+Editor portraits default off; reading and graph character-name colors default on. Source-mode character colors are separately opt-in. Play portraits and name colors default on. Automatic colors are stable by source character name; explicit existing colors remain custom. Missing portraits use a solid color placeholder with a neutral border. Display names never replace Yarn source text or alter selection offsets.
+
+Character and preview-effect edits save after 400 ms of valid, non-composing input. Selecting a discovered speaker does not register or save it. Independent fields merge with newer project metadata; conflicting edits remain visible for retry. Closing a tool tab or leaving its project first flushes these drafts. Command-definition drafts still require their existing Apply/Discard flow.
+
+Dialogue-length advice defaults on at 80 weighted characters: CJK, full-width characters and emoji graphemes count as 1; other graphemes count as 0.5. It excludes source speaker prefixes, recognized syntax and unevaluated dynamic spans. It is a static estimate, not VN line capacity or a compile error. Use the shared 800 ms/IME diagnostic display rule; never truncate or rewrite dialogue automatically.
+
+Verification: unit tests cover preferences, persistence, diagnostics and decorations. This refinement still requires the coordinated desktop UI acceptance run; it is not evidence of a newly verified Portable.
+
 These rules describe the current dark Windows desktop and Web workspace. Historical reviews are archived under [history/](history/); the [verification report](../releases/0.10.0/verification.md) distinguishes implemented behavior from device cases not tested. UI copy is available in English, Traditional Chinese and Simplified Chinese; Yarn source, user stories and custom command content are never translated.
 
 ## Launcher and workspaces

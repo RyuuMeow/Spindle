@@ -4,6 +4,14 @@
 
 # 文件、保存與同步契約
 
+## 呈現偏好與共用診斷
+
+`presentation-preferences.ts` 集中解析編輯器角色、Play 呈現及台詞長度預設值並驗證欄位 patch。偏好存於 App profile／Web storage，不寫入專案。桌面主程序合併更新；支援 Web Lock 時，Web 偏好與風格更新共用同一鎖。Monaco 使用可移除 decoration、CodeMirror 更新既有 decoration field、閱讀模式保留來源 span；不重建文件 model 或修改 Yarn。
+
+`diagnostics/dialogue-length.ts` 使用既有 reading structure 計算靜態 grapheme。`parse` 接受診斷選項，UI 結果經 `DiagnosticPresentation`，MCP 立即檢查已同步內容。MCP 分析快取含正規化診斷偏好。提醒具有穩定 code、參數與 UTF-16 來源欄位，不附自動快速修正。詳見 [UI 契約](ui-design.zh-TW.md) 與 [MCP 指南](mcp.zh-TW.md)。
+
+預覽資料採 400ms 自動保存控制器，具三方欄位合併、版本衝突重試與未保存輸入保留；離開流程只保存目前專案的控制器。單元測試涵蓋上述契約，桌面互動與最終封裝仍須分別實機驗收。
+
 ## 邊界
 
 `app/workspace/types.ts` 定義文件、專案、分頁、視窗與 IPC 操作。文件 ID 不依賴顯示檔名；同一文件的多個視圖共用內容，每張 tab 保留模式、位置、選取、閱讀折疊及圖表狀態。

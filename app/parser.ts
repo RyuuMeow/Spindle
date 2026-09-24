@@ -7,7 +7,7 @@ import {
   dialogueLengthFindings,
   DIALOGUE_LENGTH_CODE,
   type DialogueLengthPreference,
-} from "./diagnostics/dialogue-length";
+} from "./diagnostics/dialogue-length.ts";
 export type AnalysisOptions = { dialogueLength?: DialogueLengthPreference };
 export type Param = {
   displayName?: string;

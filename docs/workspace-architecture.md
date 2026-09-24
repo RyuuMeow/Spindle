@@ -4,6 +4,14 @@
 
 # Workspace architecture
 
+## Presentation preferences and shared diagnostics
+
+`presentation-preferences.ts` resolves editor-character, Play-presentation and dialogue-length defaults and validates field patches. App profile and Web storage keep these global preferences; they do not belong in project metadata. Desktop merges patches centrally; Web preference and appearance writes share the same Web Lock when supported. Monaco uses removable decorations, CodeMirror updates existing decoration fields, and the reader retains source-linked spans. These updates do not rebuild document models or mutate Yarn.
+
+`diagnostics/dialogue-length.ts` consumes the existing reading structure and counts static grapheme spans. `parse` accepts diagnostic options; UI results pass through `DiagnosticPresentation`, while MCP validates synchronized text immediately. MCP analysis cache keys include resolved diagnostic preferences. The advisory has a stable code, arguments and UTF-16 source columns; it has no automatic quick fix. See the [UI contract](ui-design.md) and [MCP guide](mcp.md).
+
+Preview metadata uses a 400 ms autosave controller with three-way field merging, revision-conflict retry and retained unsaved input. Leave guards flush controllers scoped to the current project. Unit verification covers these contracts; coordinated desktop interaction and final packaged acceptance remain separate validation steps.
+
 Spindle keeps Yarn text as the content authority. Source, reading, graph node editors, tabs, and windows share stable `DocumentId`s and versioned text transactions. Layout, preferences, command definitions and project history have separate persistence and Undo boundaries. Historical design notes live under [history/](history/); they are not current implementation contracts.
 
 ## Documents, tabs and synchronization
