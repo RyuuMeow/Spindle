@@ -22,6 +22,7 @@ namespace Yarn
     internal partial class VirtualMachine
     {
         internal Action<string, int, Instruction>? BeforeInstruction;
+        internal Action<Instruction>? AfterInstruction;
         internal partial class State
         {
             internal State Copy()
@@ -53,6 +54,7 @@ namespace Yarn
     public partial class Dialogue
     {
         public Action<string, int, Instruction>? DebugBeforeInstruction { set => vm.BeforeInstruction = value; }
+        public Action<Instruction>? DebugAfterInstruction { set => vm.AfterInstruction = value; }
         public object CaptureDebugState() => vm.Capture();
         public bool DebugConditionValue() => vm.state.PeekValue().ConvertTo<bool>();
         public void RestoreDebugState(object state) => vm.Restore((VirtualMachine.Snapshot)state);

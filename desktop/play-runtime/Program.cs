@@ -3,8 +3,12 @@ using System.Text.Json.Nodes;
 using Yarn;
 using Yarn.Compiler;
 using Yarn.Markup;
+using System.Text;
+using System.Collections.Immutable;
 
 // One private stdio helper per editor session. No disk or network commands.
+Console.InputEncoding = new UTF8Encoding(false);
+Console.OutputEncoding = new UTF8Encoding(false);
 var engine = new PlayEngine();
 while (Console.ReadLine() is { } input)
 {
@@ -37,14 +41,16 @@ sealed class PlayEngine
     Dialogue? dialogue;
     MemoryVariableStore store = new();
     SnapshotRandom random = new();
-    JsonArray documents = new(), events = new(), options = new();
+    JsonArray documents = new(), options = new();
+    ImmutableList<JsonNode> events = ImmutableList<JsonNode>.Empty;
     JsonNode? location;
     string status = "idle", start = "";
     int revision, budget;
+    object? previousAssignment;
     readonly List<Checkpoint> history = new();
     Checkpoint? optionBase;
     readonly Dictionary<string, object> overrides = new();
-    record Checkpoint(object Vm, Dictionary<string, object> Values, uint Random, JsonArray Events, JsonArray Options, string Status, JsonNode? Location, Checkpoint? OptionOrigin, Dictionary<string, object> Overrides);
+    record Checkpoint(object Vm, Dictionary<string, object> Values, uint Random, ImmutableList<JsonNode> Events, JsonArray Options, string Status, JsonNode? Location, Checkpoint? OptionOrigin, Dictionary<string, object> Overrides);
 
     public JsonNode Request(JsonNode request)
     {
@@ -52,10 +58,10 @@ sealed class PlayEngine
         if (action == "compile")
         {
             documents = (JsonArray)request["documents"]!.DeepClone();
-            var job = CompilationJob.CreateFromString("", "");
+            var job = CompilationJob.CreateFromString("", "", new Dialogue(new MemoryVariableStore()).Library);
             job.Inputs = documents.Select(d => new CompilationJob.File { FileName = d!["id"]!.GetValue<string>(), Source = d["text"]!.GetValue<string>() }).ToArray();
             program = Compiler.Compile(job);
-            dialogue = null; events.Clear(); options.Clear(); history.Clear();
+            dialogue = null; events = events.Clear(); options.Clear(); history.Clear();
             status = program.ContainsErrors ? "error" : "ready";
         }
         else if (action == "start")
@@ -66,22 +72,32 @@ sealed class PlayEngine
             store = new(); random = new(); overrides.Clear(); SpindleRandom.Source = random;
             dialogue = new Dialogue(store);
             dialogue.SetProgram(program.Program);
-            events.Clear(); options.Clear(); history.Clear(); optionBase = null;
+            events = events.Clear(); options.Clear(); history.Clear(); optionBase = null;
             dialogue.DebugBeforeInstruction = (node, index, instruction) => {
                 if (--budget < 0) throw new Exception("INSTRUCTION_BUDGET_EXCEEDED");
                 var info = program.ProjectDebugInfo?.GetNodeDebugInfo(node)?.GetLineInfo(index);
-                if (info is { } source && source.Range.IsValid) location = Source(source.FileName, source.Range.Start.Line + 1, source.Range.Start.Character + 1);
+                location = info is { } source && source.Range.IsValid ? Source(source.FileName, source.Range.Start.Line + 1, source.Range.Start.Character + 1) : null;
                 if (optionBase == null && location != null && SourceText(location).TrimStart().StartsWith("->")) optionBase = Capture();
                 if (instruction.InstructionTypeCase == Instruction.InstructionTypeOneofCase.JumpIfFalse)
                     Add("condition", dialogue.DebugConditionValue() ? "true" : "false", location);
+                if (instruction.InstructionTypeCase == Instruction.InstructionTypeOneofCase.StoreVariable)
+                    previousAssignment = VariableValue(instruction.StoreVariable.VariableName);
             };
             dialogue.LineHandler = line => { options.Clear(); Add("line", Render(line), LineSource(line)); status = "line"; };
+            dialogue.DebugAfterInstruction = instruction => {
+                if (instruction.InstructionTypeCase == Instruction.InstructionTypeOneofCase.StoreVariable) {
+                    var name = instruction.StoreVariable.VariableName;
+                    if (!name.StartsWith("$Yarn.Internal.")) Add("variable", name + ": " + JsonSerializer.Serialize(previousAssignment) + " → " + JsonSerializer.Serialize(VariableValue(name)), location);
+                }
+                if (instruction.InstructionTypeCase is Instruction.InstructionTypeOneofCase.RunNode or Instruction.InstructionTypeOneofCase.DetourToNode or Instruction.InstructionTypeOneofCase.PeekAndRunNode or Instruction.InstructionTypeOneofCase.PeekAndDetourToNode)
+                    Add("transfer", dialogue.CurrentNode ?? "", location);
+            };
             dialogue.CommandHandler = command => { Add("command", command.Text, location); status = "command"; };
             dialogue.OptionsHandler = set => {
                 options = new JsonArray(set.Options.Select(o => (JsonNode)new JsonObject { ["id"] = o.ID, ["text"] = Render(o.Line), ["available"] = o.IsAvailable, ["source"] = LineSource(o.Line) }).ToArray());
                 Add("options", "", location); status = "options";
             };
-            dialogue.NodeStartHandler = node => Add("scene", node, null);
+            dialogue.NodeStartHandler = node => { var metadata = program.NodeMetadata.FirstOrDefault(n => n.Title == node || n.UniqueTitle == node); Add("scene", node, metadata == null ? null : Source(metadata.Uri, metadata.TitleLine + 1, 1)); };
             dialogue.DialogueCompleteHandler = () => status = "completed";
             dialogue.SetNode(start); Advance(); history.Add(Capture());
         }
@@ -113,6 +129,7 @@ sealed class PlayEngine
                 : declaration.Type == Types.Boolean ? request["value"]!.GetValue<bool>()
                 : declaration.Type == Types.String ? request["value"]!.GetValue<string>()
                 : throw new Exception("VARIABLE_TYPE_UNSUPPORTED");
+            var previous = VariableValue(name);
             overrides[name] = value;
             if (status == "options" && optionBase != null) {
                 var origin = optionBase; var changes = new Dictionary<string, object>(overrides);
@@ -121,7 +138,7 @@ sealed class PlayEngine
                 Advance();
             }
             else Set(name, value);
-            Add("override", name + " = " + value, null);
+            Add("override", name + ": " + JsonSerializer.Serialize(previous) + " → " + JsonSerializer.Serialize(value), Source(declaration.SourceFileName, declaration.SourceFileLine + 1, 1));
             history.Add(Capture());
         }
         else if (action == "stop") { dialogue?.Stop(); status = "stopped"; }
@@ -130,24 +147,36 @@ sealed class PlayEngine
         return State();
     }
     void Set(string name, object value) { if (value is float number) store.SetValue(name, number); else if (value is bool boolean) store.SetValue(name, boolean); else store.SetValue(name, (string)value); }
+    object? VariableValue(string name) {
+        var declaration = program?.Declarations.FirstOrDefault(d => d.Name == name);
+        if (declaration?.Type == Types.Number && store.TryGetValue<float>(name, out var n)) return n;
+        if (declaration?.Type == Types.Boolean && store.TryGetValue<bool>(name, out var b)) return b;
+        if (declaration?.Type == Types.String && store.TryGetValue<string>(name, out var s)) return s;
+        return null;
+    }
     void Advance()
     {
         budget = 100_000;
-        try { do { var before = store.CaptureDebugValues(); dialogue!.Continue(); foreach (var pair in store.CaptureDebugValues()) if (!before.TryGetValue(pair.Key, out var previous) || !Equals(previous, pair.Value)) Add("variable", pair.Key + " = " + pair.Value, location); } while (status == "command"); }
+        try { do { dialogue!.Continue(); } while (status == "command"); }
         catch (Exception e) { status = "error"; Add("error", e.Message, location); }
     }
-    Checkpoint Capture() => new(dialogue!.CaptureDebugState(), store.CaptureDebugValues(), random.State, (JsonArray)events.DeepClone(), (JsonArray)options.DeepClone(), status, location?.DeepClone(), optionBase, new Dictionary<string, object>(overrides));
-    void Restore(Checkpoint s) { dialogue!.RestoreDebugState(s.Vm); store.RestoreDebugValues(s.Values); random.State = s.Random; events = (JsonArray)s.Events.DeepClone(); options = (JsonArray)s.Options.DeepClone(); status = s.Status; location = s.Location?.DeepClone(); optionBase = s.OptionOrigin; overrides.Clear(); foreach (var pair in s.Overrides) overrides[pair.Key] = pair.Value; }
-    void Add(string kind, string text, JsonNode? source) => events.Add(new JsonObject { ["id"] = events.Count + 1, ["kind"] = kind, ["text"] = text, ["source"] = source?.DeepClone() });
+    Checkpoint Capture() => new(dialogue!.CaptureDebugState(), store.CaptureDebugValues(), random.State, events, (JsonArray)options.DeepClone(), status, location?.DeepClone(), optionBase, new Dictionary<string, object>(overrides));
+    void Restore(Checkpoint s) { dialogue!.RestoreDebugState(s.Vm); store.RestoreDebugValues(s.Values); random.State = s.Random; events = s.Events; options = (JsonArray)s.Options.DeepClone(); status = s.Status; location = s.Location?.DeepClone(); optionBase = s.OptionOrigin; overrides.Clear(); foreach (var pair in s.Overrides) overrides[pair.Key] = pair.Value; }
+    void Add(string kind, string text, JsonNode? source) {
+        if (events.Count >= 10000 && kind != "error") throw new Exception("PLAY_EVENT_LIMIT_EXCEEDED");
+        events = events.Add(new JsonObject { ["id"] = events.Count + 1, ["kind"] = kind, ["text"] = text, ["source"] = source?.DeepClone() });
+    }
     string Render(Line line) => LineParser.ExpandSubstitutions(program!.StringTable![line.ID].text!, line.Substitutions);
     JsonNode? LineSource(Line line) { var info = program!.StringTable![line.ID]; return Source(info.fileName, info.lineNumber, 1); }
     JsonNode? Source(string? id, int line, int column)
     {
+        if (line < 1 || column < 1) return null;
         var doc = documents.FirstOrDefault(d => d!["id"]!.GetValue<string>() == id);
         if (doc == null) return null;
         var text = doc["text"]!.GetValue<string>(); var offset = 0;
         for (var i = 1; i < line; i++) { var end = text.IndexOf('\n', offset); if (end < 0) break; offset = end + 1; }
-        return new JsonObject { ["documentId"] = id, ["version"] = doc["version"]!.DeepClone(), ["line"] = line, ["column"] = column, ["from"] = Math.Min(text.Length, offset + column - 1) };
+        var utf16Column = text.AsSpan(offset).ToString().Split('\n')[0].EnumerateRunes().Take(column - 1).Sum(r => r.Utf16SequenceLength) + 1;
+        return new JsonObject { ["documentId"] = id, ["version"] = doc["version"]!.DeepClone(), ["line"] = line, ["column"] = utf16Column, ["from"] = Math.Min(text.Length, offset + utf16Column - 1) };
     }
     string SourceText(JsonNode source) => documents.First(d => d!["id"]!.GetValue<string>() == source["documentId"]!.GetValue<string>())!["text"]!.GetValue<string>().Split('\n').ElementAtOrDefault(source["line"]!.GetValue<int>() - 1) ?? "";
     JsonNode State()
@@ -163,7 +192,7 @@ sealed class PlayEngine
         return new JsonObject {
             ["protocolVersion"] = 1, ["revision"] = revision, ["status"] = status,
             ["scene"] = dialogue?.CurrentNode ?? start, ["canBack"] = history.Count > 1,
-            ["events"] = events.DeepClone(), ["options"] = options.DeepClone(), ["variables"] = variables,
+            ["events"] = new JsonArray(events.Select(e => e.DeepClone()).ToArray()), ["options"] = options.DeepClone(), ["variables"] = variables,
             ["scenes"] = JsonSerializer.SerializeToNode(program?.NodeMetadata.Select(n => n.Title).Distinct().ToArray() ?? Array.Empty<string>()),
             ["diagnostics"] = JsonSerializer.SerializeToNode(program?.Diagnostics.Select(d => new { message = d.Message, severity = d.Severity.ToString(), source = Source(d.FileName, d.Range.Start.Line + 1, d.Range.Start.Character + 1) }).ToArray()),
         };

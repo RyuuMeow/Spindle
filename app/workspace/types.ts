@@ -257,6 +257,7 @@ export type ActionResult = {
   cancelled?: boolean;
 };
 export type DesktopBridge = {
+  play: import("../play/types").PlayBridge;
   copyText: (text: string) => Promise<void>;
   agent: import("../mcp/types").AgentBridge;
   fonts: () => Promise<string[]>;

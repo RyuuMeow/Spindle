@@ -5,6 +5,20 @@ const subscribe = (channel, callback) => {
   return () => ipcRenderer.removeListener(channel, handler);
 };
 contextBridge.exposeInMainWorld("yarnDesktop", {
+  play: {
+    isWindow: process.argv.includes("--spindle-play=true"),
+    open: () => ipcRenderer.invoke("play:open"),
+    action: (action, revision) =>
+      ipcRenderer.invoke("play:action", action, revision),
+    subscribe: (callback) => subscribe("play:changed", callback),
+    reveal: (source) => ipcRenderer.invoke("play:reveal", source),
+    characters: () => ipcRenderer.invoke("play:characters"),
+    onCharacters: (callback) => subscribe("play:characters", callback),
+    onResources: (callback) => subscribe("preview:changed", callback),
+    resources: () => ipcRenderer.invoke("preview:read"),
+    save: (config) => ipcRenderer.invoke("preview:save", config),
+    importImage: () => ipcRenderer.invoke("preview:import"),
+  },
   locale: process.argv
     .find((a) => a.startsWith("--spindle-locale="))
     ?.split("=")[1],

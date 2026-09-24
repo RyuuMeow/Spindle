@@ -474,6 +474,7 @@ namespace Yarn
 
                     BeforeInstruction?.Invoke(state.currentNodeName!, state.programCounter, currentInstruction);
                     RunInstruction(currentInstruction);
+                    AfterInstruction?.Invoke(currentInstruction);
 
                     state.programCounter++;
 

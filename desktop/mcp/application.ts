@@ -25,6 +25,8 @@ import type {
 import type { WorkspaceService } from "../workspace-service";
 type Input<K extends keyof typeof schemas> = z.infer<(typeof schemas)[K]>;
 export type AgentHost = {
+  playList?(editorSessionId: string): unknown;
+  playContext?(editorSessionId: string, playSessionId: string): unknown;
   list(): EditorSessionInfo[];
   request(
     id: string,
@@ -203,6 +205,14 @@ export class AgentApplication {
     input: unknown,
   ): Promise<unknown> {
     if (name === "list_editor_sessions") return { sessions: this.host.list() };
+    if (name === "list_play_sessions" || name === "get_play_context") {
+      const args = input as Input<"get_play_context">;
+      this.session(args.editorSessionId);
+      if (name === "list_play_sessions")
+        return { sessions: this.host.playList?.(args.editorSessionId) || [] };
+      if (!this.host.playContext) throw Error("PLAY_UNAVAILABLE");
+      return this.host.playContext(args.editorSessionId, args.playSessionId);
+    }
     if (name === "list_projects") {
       const a = input as Input<"list_projects">,
         sessions = this.host.list();

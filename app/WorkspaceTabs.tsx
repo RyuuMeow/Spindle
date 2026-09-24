@@ -1,5 +1,6 @@
 "use client";
 import { t as tr } from "./i18n/index.ts";
+import { pt } from "./play/messages";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -125,6 +126,7 @@ export default function WorkspaceTabs({
         <TabsList aria-label={tr("m53127dbd0a28")}>
           {tabs.map((tab, index) => {
             const utilityNames: Record<string, string> = {
+              "@characters": pt("characters"),
               "@commands": tr("mae2f19d77e06"),
               "@settings": tr("m0d8619aae051"),
               "@recovery": tr("m525e69a5165d"),
@@ -297,6 +299,7 @@ export default function WorkspaceTabs({
                 <span>
                   <strong>
                     {{
+                      "@characters": pt("characters"),
                       "@commands": tr("mae2f19d77e06"),
                       "@settings": tr("m0d8619aae051"),
                       "@recovery": tr("m525e69a5165d"),

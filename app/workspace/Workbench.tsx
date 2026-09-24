@@ -57,6 +57,7 @@ import {
   FolderPlus,
   X,
   Check,
+  Play,
 } from "lucide-react";
 import type { editor as MonacoEditor, Position } from "monaco-editor";
 import {
@@ -117,6 +118,9 @@ import { InlineNameEditor, type InlineDraft } from "./InlineNameEditor";
 import FileTree from "./FileTree";
 import { projectFolders, uniqueCopyName } from "./file-tree";
 import "./workspace.css";
+import CharactersView from "../play/CharactersView";
+import { pt } from "../play/messages";
+import { PreviewProvider } from "../play/context";
 
 type Prompt = {
   title: string;
@@ -133,6 +137,7 @@ const modes = {
   graph: tr("m3f633044cfc6"),
 };
 const utilityNames: Record<string, string> = {
+  "@characters": pt("characters"),
   "@new-document": tr("m47fcdf3ee211"),
   "@settings": tr("m0d8619aae051"),
   "@commands": tr("mae2f19d77e06"),
@@ -300,6 +305,9 @@ function WorkbenchContent({
     }
   });
   const utility = !!utilityNames[active?.documentId || ""];
+  useEffect(() =>
+    window.yarnDesktop?.play.onCharacters(() => openDocument("@characters")),
+  );
   const commandHasDraft = commandDirty;
   const outlineOpen = !!session.outline?.[mode];
   const [narrowPanels, setNarrowPanels] = useState(false);
@@ -1871,826 +1879,935 @@ function WorkbenchContent({
   if (!project)
     return <div className="empty-editor">{tr("m54df28110c50")}</div>;
   return (
-    <main
-      className={
-        "workbench dark" +
-        (window.yarnDesktop?.titleBarOverlay ? " desktop-overlay" : "")
-      }
-      onMouseUp={(e) => {
-        if (e.button === 3 || e.button === 4) {
-          e.preventDefault();
-          history(e.button === 3);
+    <PreviewProvider project={project}>
+      <main
+        className={
+          "workbench dark" +
+          (window.yarnDesktop?.titleBarOverlay ? " desktop-overlay" : "")
         }
-      }}
-      onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("Files")) e.preventDefault();
-      }}
-      onDrop={(e) => {
-        if (!e.dataTransfer.files.length) return;
-        e.preventDefault();
-        if (window.yarnDesktop)
-          void perform({
-            type: "openFiles",
-            paths: window.yarnDesktop.paths([...e.dataTransfer.files]),
-          }).then(adopt);
-        else void importFiles(e.dataTransfer.files);
-      }}
-    >
-      <input
-        ref={input}
-        type="file"
-        multiple
-        accept=".yarn,.json"
-        hidden
-        onChange={(e) => void importFiles(e.target.files)}
-      />
-      <header className="workspace-header">
-        <div className="workspace-identity">
-          <ChromeButton
-            aria-label={tr("m2d2bb5d9817d")}
-            title={tr("m2d2bb5d9817d")}
-            disabled={utility || standalone}
-            onClick={() => {
-              setSideFocus("left");
-              setSession((s) => ({ ...s, left: !s.left }));
-            }}
-          >
-            <PanelLeft size={18} />
-          </ChromeButton>
-          <DropdownMenu
-            open={projectMenuOpen}
-            onOpenChange={(open) => {
-              if (open || menu?.parent !== "project") setProjectMenuOpen(open);
-            }}
-            modal={false}
-          >
-            <DropdownMenuTrigger
-              className="project-switch"
-              aria-label={project.name}
-            >
-              <BookText size={18} />
-              <strong>{project.name}</strong>
-              <ChevronDown size={13} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              className="desktop-menu project-menu"
-              onInteractOutside={(event) => {
-                if (menu?.parent === "project") event.preventDefault();
+        onMouseUp={(e) => {
+          if (e.button === 3 || e.button === 4) {
+            e.preventDefault();
+            history(e.button === 3);
+          }
+        }}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          if (window.yarnDesktop)
+            void perform({
+              type: "openFiles",
+              paths: window.yarnDesktop.paths([...e.dataTransfer.files]),
+            }).then(adopt);
+          else void importFiles(e.dataTransfer.files);
+        }}
+      >
+        <input
+          ref={input}
+          type="file"
+          multiple
+          accept=".yarn,.json"
+          hidden
+          onChange={(e) => void importFiles(e.target.files)}
+        />
+        <header className="workspace-header">
+          <div className="workspace-identity">
+            <ChromeButton
+              aria-label={tr("m2d2bb5d9817d")}
+              title={tr("m2d2bb5d9817d")}
+              disabled={utility || standalone}
+              onClick={() => {
+                setSideFocus("left");
+                setSession((s) => ({ ...s, left: !s.left }));
               }}
             >
-              <DropdownMenuItem
-                onSelect={() =>
-                  onNavigate
-                    ? void leaveWorkspace("create")
-                    : ask({
-                        title: tr("m4efd9b7b6756"),
-                        label: tr("mc4f17fe66069"),
-                        value: tr("md70df31e32d2"),
-                        run: async (name) => {
-                          await adopt(
-                            await perform({ type: "createProject", name }),
-                          );
-                        },
-                      })
-                }
+              <PanelLeft size={18} />
+            </ChromeButton>
+            <DropdownMenu
+              open={projectMenuOpen}
+              onOpenChange={(open) => {
+                if (open || menu?.parent !== "project")
+                  setProjectMenuOpen(open);
+              }}
+              modal={false}
+            >
+              <DropdownMenuTrigger
+                className="project-switch"
+                aria-label={project.name}
               >
-                <FolderPlus size={15} />
-                {tr("m181ad3312ed1")}
-              </DropdownMenuItem>
-              {onNavigate && (
-                <>
-                  <DropdownMenuItem
-                    onSelect={() => void leaveWorkspace({ type: "openFolder" })}
-                  >
-                    <FolderOpen size={15} />
-                    {tr("m7e116545a4ad")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => void perform({ type: "openFiles" })}
-                  >
-                    <FileText size={15} />
-                    {tr("ma1e8c391c80d")}
-                  </DropdownMenuItem>
-                </>
-              )}
-              {!standalone && (
-                <DropdownMenuItem onSelect={() => input.current?.click()}>
-                  <FilePlus2 size={15} />
-                  {tr("mfa648d30197e")}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              {(onNavigate
-                ? (snapshot.catalog || []).filter((p) => p.recent).slice(0, 5)
-                : snapshot.projects
-              ).map((p) => (
-                <DropdownMenuItem
-                  key={p.id}
-                  disabled={"unavailable" in p && !!p.unavailable}
-                  onSelect={() => void selectProject(p.id)}
-                  onContextMenu={(event) => {
-                    if (!onNavigate) return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    showMenu(event, [
-                      {
-                        label: tr("m4679d41e738f"),
-                        icon: <Trash2 size={15} />,
-                        run: () =>
-                          void perform({
-                            type: "catalog",
-                            operation: "removeRecent",
-                            id: p.id,
-                          }),
-                      },
-                    ]);
-                    const origin = event.currentTarget as HTMLElement;
-                    setMenu((current) =>
-                      current
-                        ? { ...current, origin, parent: "project" }
-                        : current,
-                    );
-                  }}
-                >
-                  <Check
-                    size={15}
-                    style={{
-                      visibility: p.id === project.id ? "visible" : "hidden",
-                    }}
-                  />
-                  {p.name}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              {!onNavigate && (
+                <BookText size={18} />
+                <strong>{project.name}</strong>
+                <ChevronDown size={13} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="desktop-menu project-menu"
+                onInteractOutside={(event) => {
+                  if (menu?.parent === "project") event.preventDefault();
+                }}
+              >
                 <DropdownMenuItem
                   onSelect={() =>
-                    void perform({ type: "save", projectId: project.id })
+                    onNavigate
+                      ? void leaveWorkspace("create")
+                      : ask({
+                          title: tr("m4efd9b7b6756"),
+                          label: tr("mc4f17fe66069"),
+                          value: tr("md70df31e32d2"),
+                          run: async (name) => {
+                            await adopt(
+                              await perform({ type: "createProject", name }),
+                            );
+                          },
+                        })
                   }
                 >
-                  {tr("m96d510bbf21a")}
-                  <span className="menu-shortcut">Ctrl+Shift+S</span>
+                  <FolderPlus size={15} />
+                  {tr("m181ad3312ed1")}
                 </DropdownMenuItem>
-              )}
-              {!standalone && (
-                <>
+                {onNavigate && (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void leaveWorkspace({ type: "openFolder" })
+                      }
+                    >
+                      <FolderOpen size={15} />
+                      {tr("m7e116545a4ad")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => void perform({ type: "openFiles" })}
+                    >
+                      <FileText size={15} />
+                      {tr("ma1e8c391c80d")}
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {!standalone && (
+                  <DropdownMenuItem onSelect={() => input.current?.click()}>
+                    <FilePlus2 size={15} />
+                    {tr("mfa648d30197e")}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                {(onNavigate
+                  ? (snapshot.catalog || []).filter((p) => p.recent).slice(0, 5)
+                  : snapshot.projects
+                ).map((p) => (
+                  <DropdownMenuItem
+                    key={p.id}
+                    disabled={"unavailable" in p && !!p.unavailable}
+                    onSelect={() => void selectProject(p.id)}
+                    onContextMenu={(event) => {
+                      if (!onNavigate) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      showMenu(event, [
+                        {
+                          label: tr("m4679d41e738f"),
+                          icon: <Trash2 size={15} />,
+                          run: () =>
+                            void perform({
+                              type: "catalog",
+                              operation: "removeRecent",
+                              id: p.id,
+                            }),
+                        },
+                      ]);
+                      const origin = event.currentTarget as HTMLElement;
+                      setMenu((current) =>
+                        current
+                          ? { ...current, origin, parent: "project" }
+                          : current,
+                      );
+                    }}
+                  >
+                    <Check
+                      size={15}
+                      style={{
+                        visibility: p.id === project.id ? "visible" : "hidden",
+                      }}
+                    />
+                    {p.name}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                {!onNavigate && (
                   <DropdownMenuItem
                     onSelect={() =>
-                      void perform({ type: "export", projectId: project.id })
+                      void perform({ type: "save", projectId: project.id })
                     }
                   >
-                    <ExternalLink size={15} />
-                    {tr("m13861276e06f")}
+                    {tr("m96d510bbf21a")}
+                    <span className="menu-shortcut">Ctrl+Shift+S</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => openDocument("@recovery")}>
-                    <ArchiveRestore size={15} />
-                    {tr("mdfe27c2e6e7e")}
-                  </DropdownMenuItem>
+                )}
+                {!standalone && (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void perform({ type: "export", projectId: project.id })
+                      }
+                    >
+                      <ExternalLink size={15} />
+                      {tr("m13861276e06f")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => openDocument("@recovery")}
+                    >
+                      <ArchiveRestore size={15} />
+                      {tr("mdfe27c2e6e7e")}
+                    </DropdownMenuItem>
+                    {window.yarnDesktop && (
+                      <DropdownMenuItem
+                        onSelect={() => openDocument("@characters")}
+                      >
+                        <BookOpen size={15} />
+                        {pt("characters")}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onSelect={() => requestAnimationFrame(openCommands)}
+                    >
+                      <Settings2 size={15} />
+                      {tr("mae2f19d77e06")}
+                      {commandHasDraft ? tr("m96f6a0f923e8") : ""}
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {project.root && (
                   <DropdownMenuItem
-                    onSelect={() => requestAnimationFrame(openCommands)}
+                    onSelect={() =>
+                      void perform({ type: "reveal", projectId: project.id })
+                    }
                   >
-                    <Settings2 size={15} />
-                    {tr("mae2f19d77e06")}
-                    {commandHasDraft ? tr("m96f6a0f923e8") : ""}
+                    <FolderOpen size={15} />
+                    {tr("mb89391aa4985")}
                   </DropdownMenuItem>
-                </>
-              )}
-              {project.root && (
-                <DropdownMenuItem
-                  onSelect={() =>
-                    void perform({ type: "reveal", projectId: project.id })
-                  }
-                >
-                  <FolderOpen size={15} />
-                  {tr("mb89391aa4985")}
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => openSettings()}>
+                  <Settings2 size={15} />
+                  {tr("mc98007f226ed")}
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => openSettings()}>
-                <Settings2 size={15} />
-                {tr("mc98007f226ed")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openSettings("about")}>
-                {tr("m09ace4e0d455")}
-              </DropdownMenuItem>
-              {onNavigate && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={() => void leaveWorkspace("home")}
-                  >
-                    <X size={15} />
-                    {standalone ? tr("m1903e4e73f4b") : tr("me642581df698")}
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>{" "}
-          </DropdownMenu>
-        </div>
-        <div className="workspace-tab-divider" aria-hidden="true" />
-        <WorkspaceTabs
-          activeId={active?.id || ""}
-          tabs={tabs.map((t) => {
-            const d = project.documents.find((d) => d.id === t.documentId);
-            return {
-              id: t.id,
-              file: d?.name || t.documentId,
-              dirty: !!d && pendingWrite(d),
-              mode: t.mode === "graph" ? "graph" : "text",
-              location: d
-                ? tr("maf91f32f7ba8", [modes[t.mode], t.line])
-                : project.name,
-              pinned: t.pinned,
-            };
-          })}
-          onActivate={activate}
-          onClose={(id) => void closeTabs([id])}
-          onAdd={() => {
-            showFiles(true);
-          }}
-          onMenu={(id, e) => {
-            showMenu(e, tabMenu(id));
-            void window.yarnDesktop?.windows
-              .list()
-              .then((windows) =>
-                setMenu((current) =>
-                  current
-                    ? { ...current, actions: tabMenu(id, windows) }
-                    : null,
-                ),
-              );
-          }}
-          onReorder={reorder}
-          onDragStart={(id) => {
-            dragCancelled.current = false;
-            const tab = tabs.find((t) => t.id === id);
-            if (tab) void window.yarnDesktop?.windows.drag(tab, project.id);
-          }}
-          onDragEnd={(e) =>
-            void window.yarnDesktop?.windows
-              .endDrag(
-                { x: e.screenX, y: e.screenY },
-                dragCancelled.current || (e.screenX === 0 && e.screenY === 0),
-              )
-              .catch((error) => notify(String(error)))
-          }
-          onExternalDrop={(index) =>
-            void window.yarnDesktop?.windows
-              .drop(index)
-              .catch((e) => notify(String(e)))
-          }
-        />
-      </header>
-      {(client.error || snapshot.notices.length > 0) && (
-        <div className="workspace-notice" role="alert">
-          <AlertTriangle size={14} />
-          <span>{client.error || snapshot.notices.join(" ")}</span>
-          <button
-            onClick={() => {
-              const raw = Object.fromEntries(
-                Object.keys(localStorage)
-                  .filter((k) => k.startsWith("yarn-workbench"))
-                  .map((k) => [k, localStorage.getItem(k)]),
-              );
-              const blob = new Blob([JSON.stringify(raw, null, 2)], {
-                  type: "application/json",
-                }),
-                url = URL.createObjectURL(blob),
-                a = document.createElement("a");
-              a.href = url;
-              a.download = "yarn-recovery.json";
-              a.click();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
+                <DropdownMenuItem onSelect={() => openSettings("about")}>
+                  {tr("m09ace4e0d455")}
+                </DropdownMenuItem>
+                {onNavigate && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => void leaveWorkspace("home")}
+                    >
+                      <X size={15} />
+                      {standalone ? tr("m1903e4e73f4b") : tr("me642581df698")}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>{" "}
+            </DropdownMenu>
+          </div>
+          <div className="workspace-tab-divider" aria-hidden="true" />
+          <WorkspaceTabs
+            activeId={active?.id || ""}
+            tabs={tabs.map((t) => {
+              const d = project.documents.find((d) => d.id === t.documentId);
+              return {
+                id: t.id,
+                file: d?.name || t.documentId,
+                dirty: !!d && pendingWrite(d),
+                mode: t.mode === "graph" ? "graph" : "text",
+                location: d
+                  ? tr("maf91f32f7ba8", [modes[t.mode], t.line])
+                  : project.name,
+                pinned: t.pinned,
+              };
+            })}
+            onActivate={activate}
+            onClose={(id) => void closeTabs([id])}
+            onAdd={() => {
+              showFiles(true);
             }}
-          >
-            {tr("md4ac3777de8f")}
-          </button>
-        </div>
-      )}
-      <div className="document-toolbar" ref={setHistoryToolbar}>
-        {!historySelection && (
-          <>
-            <div className="document-heading">
-              <ChromeButton
-                title={tr("m6366c7c54bb5")}
-                aria-label={tr("m572cf45ba436")}
-                disabled={!navigationAvailable.back}
-                onClick={() => history(true)}
-              >
-                <ArrowLeft size={15} />
-              </ChromeButton>
-              <ChromeButton
-                title={tr("m4c9b86bdf289")}
-                aria-label={tr("m9b49a6e0393e")}
-                disabled={!navigationAvailable.forward}
-                onClick={() => history(false)}
-              >
-                <ArrowRight size={15} />
-              </ChromeButton>
-              <span title={doc?.path || doc?.name}>
-                {doc?.name ||
-                  utilityNames[active?.documentId || ""] ||
-                  tr("m1c5ab76e581d")}
-              </span>
-              {doc && ["error", "conflict", "missing"].includes(doc.status) && (
-                <span
-                  className={"save-status " + doc.status}
-                  role="status"
-                  title={
-                    saveLabels[doc.status] +
-                    (doc.path ? " · " + doc.path : tr("mb09d56aec273"))
-                  }
+            onMenu={(id, e) => {
+              showMenu(e, tabMenu(id));
+              void window.yarnDesktop?.windows
+                .list()
+                .then((windows) =>
+                  setMenu((current) =>
+                    current
+                      ? { ...current, actions: tabMenu(id, windows) }
+                      : null,
+                  ),
+                );
+            }}
+            onReorder={reorder}
+            onDragStart={(id) => {
+              dragCancelled.current = false;
+              const tab = tabs.find((t) => t.id === id);
+              if (tab) void window.yarnDesktop?.windows.drag(tab, project.id);
+            }}
+            onDragEnd={(e) =>
+              void window.yarnDesktop?.windows
+                .endDrag(
+                  { x: e.screenX, y: e.screenY },
+                  dragCancelled.current || (e.screenX === 0 && e.screenY === 0),
+                )
+                .catch((error) => notify(String(error)))
+            }
+            onExternalDrop={(index) =>
+              void window.yarnDesktop?.windows
+                .drop(index)
+                .catch((e) => notify(String(e)))
+            }
+          />
+        </header>
+        {(client.error || snapshot.notices.length > 0) && (
+          <div className="workspace-notice" role="alert">
+            <AlertTriangle size={14} />
+            <span>{client.error || snapshot.notices.join(" ")}</span>
+            <button
+              onClick={() => {
+                const raw = Object.fromEntries(
+                  Object.keys(localStorage)
+                    .filter((k) => k.startsWith("yarn-workbench"))
+                    .map((k) => [k, localStorage.getItem(k)]),
+                );
+                const blob = new Blob([JSON.stringify(raw, null, 2)], {
+                    type: "application/json",
+                  }),
+                  url = URL.createObjectURL(blob),
+                  a = document.createElement("a");
+                a.href = url;
+                a.download = "yarn-recovery.json";
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+            >
+              {tr("md4ac3777de8f")}
+            </button>
+          </div>
+        )}
+        <div className="document-toolbar" ref={setHistoryToolbar}>
+          {!historySelection && (
+            <>
+              <div className="document-heading">
+                <ChromeButton
+                  title={tr("m6366c7c54bb5")}
+                  aria-label={tr("m572cf45ba436")}
+                  disabled={!navigationAvailable.back}
+                  onClick={() => history(true)}
                 >
-                  <AlertTriangle size={13} />
-                  <span>{saveLabels[doc.status]}</span>
+                  <ArrowLeft size={15} />
+                </ChromeButton>
+                <ChromeButton
+                  title={tr("m4c9b86bdf289")}
+                  aria-label={tr("m9b49a6e0393e")}
+                  disabled={!navigationAvailable.forward}
+                  onClick={() => history(false)}
+                >
+                  <ArrowRight size={15} />
+                </ChromeButton>
+                <span title={doc?.path || doc?.name}>
+                  {doc?.name ||
+                    utilityNames[active?.documentId || ""] ||
+                    tr("m1c5ab76e581d")}
                 </span>
-              )}
-            </div>
-            <div className="document-actions">
-              {doc && (
-                <>
-                  <SegmentedControl
-                    label={tr("mc25be7b46423")}
-                    value={mode}
-                    onChange={(value) => {
-                      tabPatch({ dialogueOnly: false });
-                      modeChange(value as TabView["mode"]);
-                    }}
-                    options={[
-                      {
-                        value: "source",
-                        label: modes.source,
-                        icon: <PenLine size={15} />,
-                      },
-                      {
-                        value: "rendered",
-                        label: modes.rendered,
-                        icon: <BookOpen size={15} />,
-                      },
-                      {
-                        value: "graph",
-                        label: modes.graph,
-                        icon: <Network size={15} />,
-                      },
-                    ]}
-                  />
-                  <div className="document-icon-tools">
-                    <ChromeButton
-                      title={tr("m9c633473d49a")}
-                      aria-label={tr("mf40b96ff73c0")}
-                      aria-pressed={!!active.dialogueOnly}
-                      onClick={() => {
-                        capture();
-                        tabPatch({ dialogueOnly: !active.dialogueOnly });
-                      }}
+                {doc &&
+                  ["error", "conflict", "missing"].includes(doc.status) && (
+                    <span
+                      className={"save-status " + doc.status}
+                      role="status"
+                      title={
+                        saveLabels[doc.status] +
+                        (doc.path ? " · " + doc.path : tr("mb09d56aec273"))
+                      }
                     >
-                      <BookText size={16} />
-                    </ChromeButton>
-                    <ChromeButton
-                      title={tr("m4c3cec274391")}
-                      aria-pressed={historyOpen}
-                      onClick={() => {
-                        capture();
-                        setSideFocus("right");
-                        setHistorySelection(null);
-                        setStatisticsOpen(false);
-                        setHistoryOpen(!historyOpen);
+                      <AlertTriangle size={13} />
+                      <span>{saveLabels[doc.status]}</span>
+                    </span>
+                  )}
+              </div>
+              <div className="document-actions">
+                {doc && (
+                  <>
+                    <SegmentedControl
+                      label={tr("mc25be7b46423")}
+                      value={mode}
+                      onChange={(value) => {
+                        tabPatch({ dialogueOnly: false });
+                        modeChange(value as TabView["mode"]);
                       }}
-                    >
-                      <Clock3 size={16} />
-                    </ChromeButton>
-                    <ChromeButton
-                      title={tr("m9c44f8a4637d")}
-                      aria-pressed={showOutline}
-                      onClick={() => {
-                        setHistoryOpen(false);
-                        setStatisticsOpen(false);
-                        setSideFocus("right");
-                        setHistorySelection(null);
-                        setSession((s) => ({
-                          ...s,
-                          outline: { ...s.outline, [mode]: !showOutline },
-                        }));
-                      }}
-                    >
-                      <ListTree size={16} />
-                    </ChromeButton>
+                      options={[
+                        {
+                          value: "source",
+                          label: modes.source,
+                          icon: <PenLine size={15} />,
+                        },
+                        {
+                          value: "rendered",
+                          label: modes.rendered,
+                          icon: <BookOpen size={15} />,
+                        },
+                        {
+                          value: "graph",
+                          label: modes.graph,
+                          icon: <Network size={15} />,
+                        },
+                      ]}
+                    />
+                    <div className="document-icon-tools">
+                      {window.yarnDesktop && (
+                        <ChromeButton
+                          title={
+                            pt("play") +
+                            (analysis.nodes.find(
+                              (n) =>
+                                n.file === doc?.name &&
+                                n.start <= active.line &&
+                                n.end >= active.line,
+                            )?.name
+                              ? ": " +
+                                analysis.nodes.find(
+                                  (n) =>
+                                    n.file === doc?.name &&
+                                    n.start <= active.line &&
+                                    n.end >= active.line,
+                                )?.name
+                              : "")
+                          }
+                          onClick={() =>
+                            void window
+                              .yarnDesktop!.play.open()
+                              .catch((e) =>
+                                notify(
+                                  String(e).includes("PLAY_INPUT_PENDING")
+                                    ? pt("pending")
+                                    : String(e),
+                                ),
+                              )
+                          }
+                        >
+                          <Play size={17} aria-hidden="true" />
+                        </ChromeButton>
+                      )}
+                      <ChromeButton
+                        title={tr("m9c633473d49a")}
+                        aria-label={tr("mf40b96ff73c0")}
+                        aria-pressed={!!active.dialogueOnly}
+                        onClick={() => {
+                          capture();
+                          tabPatch({ dialogueOnly: !active.dialogueOnly });
+                        }}
+                      >
+                        <BookText size={16} />
+                      </ChromeButton>
+                      <ChromeButton
+                        title={tr("m4c3cec274391")}
+                        aria-pressed={historyOpen}
+                        onClick={() => {
+                          capture();
+                          setSideFocus("right");
+                          setHistorySelection(null);
+                          setStatisticsOpen(false);
+                          setHistoryOpen(!historyOpen);
+                        }}
+                      >
+                        <Clock3 size={16} />
+                      </ChromeButton>
+                      <ChromeButton
+                        title={tr("m9c44f8a4637d")}
+                        aria-pressed={showOutline}
+                        onClick={() => {
+                          setHistoryOpen(false);
+                          setStatisticsOpen(false);
+                          setSideFocus("right");
+                          setHistorySelection(null);
+                          setSession((s) => ({
+                            ...s,
+                            outline: { ...s.outline, [mode]: !showOutline },
+                          }));
+                        }}
+                      >
+                        <ListTree size={16} />
+                      </ChromeButton>
+                      <ChromeButton
+                        title={
+                          tr("m628f065501a2") +
+                          errorCount +
+                          tr("m3399917a26f3") +
+                          warningCount +
+                          tr("ma8b7a4480407")
+                        }
+                        aria-label={tr("mcf85ad10cef3")}
+                        aria-pressed={problems}
+                        className="check-button"
+                        onClick={() => {
+                          requestDiagnostics();
+                          setProblems((v) => !v);
+                        }}
+                      >
+                        {errorCount > 0 && (
+                          <span className="diagnostic-count error">
+                            <CircleAlert size={16} />
+                            <b>{errorCount}</b>
+                          </span>
+                        )}
+                        {warningCount > 0 && (
+                          <span className="diagnostic-count warning">
+                            <AlertTriangle size={16} />
+                            <b>{warningCount}</b>
+                          </span>
+                        )}
+                        {!errorCount && !warningCount && <Check size={16} />}
+                      </ChromeButton>
+                      <ChromeButton
+                        title={tr("me3ca8ea79b91")}
+                        aria-label={tr("me3ca8ea79b91")}
+                        aria-pressed={statisticsOpen}
+                        onClick={() => {
+                          setStatisticsOpen(!statisticsOpen);
+                          setHistoryOpen(false);
+                          setHistorySelection(null);
+                          setSideFocus("right");
+                        }}
+                      >
+                        <BarChart3 size={16} />
+                      </ChromeButton>
+                      {!doc.path && (
+                        <button
+                          className="draft-save"
+                          onClick={() =>
+                            void perform({
+                              type: window.yarnDesktop ? "saveAs" : "export",
+                              projectId: project.id,
+                              documentId: doc.id,
+                            })
+                          }
+                        >
+                          <FilePlus2 size={15} />
+                          <span>{tr("mf0ce89ab17f9")}</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+                <ChromeButton
+                  title={tr("mf8ff4ec5e324")}
+                  aria-label={tr("m3b406d1c3710")}
+                  aria-pressed={searchOpen}
+                  onClick={showSearch}
+                >
+                  <Search size={16} />
+                </ChromeButton>
+              </div>
+            </>
+          )}
+        </div>
+        <div
+          className={
+            "workspace-body " +
+            (sideFocus === "left" ? "left-priority " : "") +
+            (utility ? "utility-surface" : "") +
+            ((showOutline || historyOpen || statisticsOpen) && !utility
+              ? " has-document-side"
+              : "")
+          }
+        >
+          {session.left &&
+            !standalone &&
+            (!utility || inlineDraft?.kind.endsWith("document")) && (
+              <aside
+                className="workspace-sidebar"
+                style={{ width: session.sidebarWidth }}
+              >
+                <div className="section-heading">
+                  <span>{tr("m627b75e6aced")}</span>
+                  <div>
                     <ChromeButton
                       title={
-                        tr("m628f065501a2") +
-                        errorCount +
-                        tr("m3399917a26f3") +
-                        warningCount +
-                        tr("ma8b7a4480407")
+                        fileSort === "name-asc"
+                          ? tr("m06be05a30639")
+                          : fileSort === "name-desc"
+                            ? tr("ma8c46cf0616f")
+                            : tr("m6ea8a7b7ac40")
                       }
-                      aria-label={tr("mcf85ad10cef3")}
-                      aria-pressed={problems}
-                      className="check-button"
-                      onClick={() => {
-                        requestDiagnostics();
-                        setProblems((v) => !v);
-                      }}
+                      aria-label={
+                        fileSort === "name-asc"
+                          ? tr("m5e3ccf27d155")
+                          : fileSort === "name-desc"
+                            ? tr("mabcbf8218926")
+                            : tr("m1f50bd5ddbca")
+                      }
+                      onClick={() =>
+                        setFileSort(
+                          fileSort === "name-asc" ? "name-desc" : "name-asc",
+                        )
+                      }
+                      onContextMenu={(e) =>
+                        showMenu(e, [
+                          {
+                            label: tr("m1f50bd5ddbca"),
+                            run: () => setFileSort("manual"),
+                          },
+                          {
+                            label: tr("m5e3ccf27d155"),
+                            run: () => setFileSort("name-asc"),
+                          },
+                          {
+                            label: tr("mabcbf8218926"),
+                            run: () => setFileSort("name-desc"),
+                          },
+                        ])
+                      }
+                      onKeyDown={(e) =>
+                        menuKeys(e, [
+                          {
+                            label: tr("m1f50bd5ddbca"),
+                            run: () => setFileSort("manual"),
+                          },
+                          {
+                            label: tr("m5e3ccf27d155"),
+                            run: () => setFileSort("name-asc"),
+                          },
+                          {
+                            label: tr("mabcbf8218926"),
+                            run: () => setFileSort("name-desc"),
+                          },
+                        ])
+                      }
                     >
-                      {errorCount > 0 && (
-                        <span className="diagnostic-count error">
-                          <CircleAlert size={16} />
-                          <b>{errorCount}</b>
-                        </span>
+                      {fileSort === "name-desc" ? (
+                        <ArrowUpZA size={15} />
+                      ) : fileSort === "name-asc" ? (
+                        <ArrowDownAZ size={15} />
+                      ) : (
+                        <ListOrdered size={15} />
                       )}
-                      {warningCount > 0 && (
-                        <span className="diagnostic-count warning">
-                          <AlertTriangle size={16} />
-                          <b>{warningCount}</b>
-                        </span>
-                      )}
-                      {!errorCount && !warningCount && <Check size={16} />}
                     </ChromeButton>
                     <ChromeButton
-                      title={tr("me3ca8ea79b91")}
-                      aria-label={tr("me3ca8ea79b91")}
-                      aria-pressed={statisticsOpen}
-                      onClick={() => {
-                        setStatisticsOpen(!statisticsOpen);
-                        setHistoryOpen(false);
-                        setHistorySelection(null);
-                        setSideFocus("right");
-                      }}
+                      title={tr("m67b8c733279b")}
+                      onClick={() => newFolder()}
                     >
-                      <BarChart3 size={16} />
+                      <FolderPlus size={15} />
                     </ChromeButton>
-                    {!doc.path && (
-                      <button
-                        className="draft-save"
-                        onClick={() =>
-                          void perform({
-                            type: window.yarnDesktop ? "saveAs" : "export",
-                            projectId: project.id,
-                            documentId: doc.id,
-                          })
-                        }
-                      >
-                        <FilePlus2 size={15} />
-                        <span>{tr("mf0ce89ab17f9")}</span>
-                      </button>
-                    )}
+                    <ChromeButton
+                      title={tr("m47fcdf3ee211")}
+                      aria-label={tr("m47fcdf3ee211")}
+                      onClick={() => newDocument()}
+                    >
+                      <Plus size={15} />
+                    </ChromeButton>
                   </div>
-                </>
-              )}
-              <ChromeButton
-                title={tr("mf8ff4ec5e324")}
-                aria-label={tr("m3b406d1c3710")}
-                aria-pressed={searchOpen}
-                onClick={showSearch}
-              >
-                <Search size={16} />
-              </ChromeButton>
-            </div>
-          </>
-        )}
-      </div>
-      <div
-        className={
-          "workspace-body " +
-          (sideFocus === "left" ? "left-priority " : "") +
-          (utility ? "utility-surface" : "") +
-          ((showOutline || historyOpen || statisticsOpen) && !utility
-            ? " has-document-side"
-            : "")
-        }
-      >
-        {session.left &&
-          !standalone &&
-          (!utility || inlineDraft?.kind.endsWith("document")) && (
-            <aside
-              className="workspace-sidebar"
-              style={{ width: session.sidebarWidth }}
-            >
-              <div className="section-heading">
-                <span>{tr("m627b75e6aced")}</span>
-                <div>
-                  <ChromeButton
-                    title={
-                      fileSort === "name-asc"
-                        ? tr("m06be05a30639")
-                        : fileSort === "name-desc"
-                          ? tr("ma8c46cf0616f")
-                          : tr("m6ea8a7b7ac40")
-                    }
-                    aria-label={
-                      fileSort === "name-asc"
-                        ? tr("m5e3ccf27d155")
-                        : fileSort === "name-desc"
-                          ? tr("mabcbf8218926")
-                          : tr("m1f50bd5ddbca")
-                    }
-                    onClick={() =>
-                      setFileSort(
-                        fileSort === "name-asc" ? "name-desc" : "name-asc",
-                      )
-                    }
-                    onContextMenu={(e) =>
-                      showMenu(e, [
-                        {
-                          label: tr("m1f50bd5ddbca"),
-                          run: () => setFileSort("manual"),
-                        },
-                        {
-                          label: tr("m5e3ccf27d155"),
-                          run: () => setFileSort("name-asc"),
-                        },
-                        {
-                          label: tr("mabcbf8218926"),
-                          run: () => setFileSort("name-desc"),
-                        },
-                      ])
-                    }
-                    onKeyDown={(e) =>
-                      menuKeys(e, [
-                        {
-                          label: tr("m1f50bd5ddbca"),
-                          run: () => setFileSort("manual"),
-                        },
-                        {
-                          label: tr("m5e3ccf27d155"),
-                          run: () => setFileSort("name-asc"),
-                        },
-                        {
-                          label: tr("mabcbf8218926"),
-                          run: () => setFileSort("name-desc"),
-                        },
-                      ])
-                    }
-                  >
-                    {fileSort === "name-desc" ? (
-                      <ArrowUpZA size={15} />
-                    ) : fileSort === "name-asc" ? (
-                      <ArrowDownAZ size={15} />
-                    ) : (
-                      <ListOrdered size={15} />
-                    )}
-                  </ChromeButton>
-                  <ChromeButton
-                    title={tr("m67b8c733279b")}
-                    onClick={() => newFolder()}
-                  >
-                    <FolderPlus size={15} />
-                  </ChromeButton>
-                  <ChromeButton
-                    title={tr("m47fcdf3ee211")}
-                    aria-label={tr("m47fcdf3ee211")}
-                    onClick={() => newDocument()}
-                  >
-                    <Plus size={15} />
-                  </ChromeButton>
                 </div>
-              </div>
-              <div className="workspace-files">
-                <FileTree
-                  key={project.id}
-                  project={project}
-                  sort={fileSort}
-                  documentId={doc?.id}
-                  folder={activeFolder}
-                  onFolder={setActiveFolder}
-                  draft={inlineDraft}
-                  inline={inlineName}
-                  onOpen={(d, newTab) => {
-                    setActiveFolder(folderOf(d.name));
-                    openDocument(d.id, newTab);
-                  }}
-                  onRenameFile={renameDocumentInline}
-                  onRenameFolder={renameFolderInline}
-                  onFileMenu={(e, d) => showMenu(e, fileMenu(d))}
-                  onFolderMenu={(e, path) => showMenu(e, folderMenu(path))}
-                  onMove={async (entry, parent, before) => {
-                    const r = await perform({
-                      type: "moveEntry",
-                      projectId: project.id,
-                      entry,
-                      parent,
-                      before,
-                    });
-                    if (r) {
-                      setFileSort("manual");
-                      setActiveFolder(parent);
-                    }
-                  }}
-                />
-                {!project.documents.length && (
-                  <p className="empty-small">
-                    {tr("m38e52dafbea7")}
-                    <button onClick={() => newDocument()}>
-                      {tr("m28238f630328")}
-                    </button>
-                  </p>
-                )}
-              </div>
-              <PanelResizeHandle
-                side="left"
-                value={session.sidebarWidth}
-                min={180}
-                max={420}
-                label={tr("ma1f0112c8a95")}
-                onResize={(sidebarWidth) =>
-                  setSession((s) => ({ ...s, sidebarWidth }))
-                }
-              />
-            </aside>
-          )}
-        <section className="workspace-center">
-          {doc && ["conflict", "missing", "error"].includes(doc.status) && (
-            <div className="workspace-notice" role="alert">
-              <AlertTriangle size={15} />
-              <span>{doc.error || saveLabels[doc.status]}</span>
-              <button onClick={() => setConflict(doc)}>
-                {tr("mcece58780d3c")}
-              </button>
-            </div>
-          )}
-          {tabs.some((tab) => tab.documentId === "@commands") && (
-            <div
-              className="retained-utility"
-              hidden={active?.documentId !== "@commands"}
-            >
-              <CommandManager
-                key={project.id}
-                revealName={commandTarget?.name}
-                revealNonce={commandTarget?.nonce}
-                commands={project.commands}
-                notify={notify}
-                onDirtyChange={setCommandDirty}
-                actionsRef={commandActions}
-                referenceCount={(name) =>
-                  analysis.nodes.reduce(
-                    (sum, n) =>
-                      sum + n.calls.filter((c) => c.name === name).length,
-                    0,
-                  )
-                }
-                onChange={async (commands, expectedCommands) =>
-                  !!(await perform({
-                    type: "commands",
-                    projectId: project.id,
-                    commands,
-                    expectedCommands,
-                  }))
-                }
-              />
-            </div>
-          )}
-          {tabs.some((tab) => tab.documentId === "@settings") && (
-            <div
-              className="retained-utility"
-              hidden={active?.documentId !== "@settings"}
-            >
-              <SettingsView
-                navigation={settingsNavigation}
-                rescue={<RescueSettings client={client} />}
-                initialSection={settingsSection}
-                focusOnMount={false}
-                appPreferences={snapshot.preferences}
-                onAppearance={(patch) =>
-                  void perform({ type: "appearance", patch })
-                }
-                onAppPreferences={
-                  true
-                    ? (value) =>
-                        void perform({
-                          type: "preferences",
-                          ...value,
-                        })
-                    : undefined
-                }
-                preferences={session}
-                onChange={(next) => setSession((s) => ({ ...s, ...next }))}
-                onResetLayout={() =>
-                  setSession((s) => ({
-                    ...s,
-                    left: true,
-                    sidebarWidth: 220,
-                    rightPanelWidth: 260,
-                    problemsHeight: 140,
-                    outline: {},
-                  }))
-                }
-                onOpenData={
-                  window.yarnDesktop
-                    ? () =>
-                        void window.yarnDesktop
-                          ?.openLogs()
-                          .catch((e) => notify(String(e)))
-                    : undefined
-                }
-                version={window.yarnDesktop?.version || "Web"}
-              />
-            </div>
-          )}
-          {active?.documentId === "@new-document" ? (
-            <div className="settings-content">
-              <h2>{tr("m47fcdf3ee211")}</h2>
-              <p>{inlineDraft?.folder || tr("mad3639a602e1")}</p>
-              <p>{tr("mddde16c6ddf6")}</p>
-            </div>
-          ) : active?.documentId === "@commands" ||
-            active?.documentId === "@settings" ? null : active?.documentId ===
-            "@recovery" ? (
-            <RecoveryView
-              key={project.id}
-              project={project}
-              state={session.recovery}
-              onChange={(recovery) => setSession((s) => ({ ...s, recovery }))}
-              onPurge={async (recoveryId) =>
-                !!(await perform({
-                  type: "purgeTrash",
-                  projectId: project.id,
-                  recoveryId,
-                }))
-              }
-              onRestore={async (entry, expectedVersion, expectedText) =>
-                !!(await perform({
-                  type: "recover",
-                  projectId: project.id,
-                  recoveryId: entry.id,
-                  expectedVersion,
-                  expectedText,
-                }))
-              }
-            />
-          ) : doc ? (
-            <div
-              className="editor-pane"
-              style={historySelection ? { display: "none" } : undefined}
-              inert={!!historySelection}
-            >
-              {active.dialogueOnly && (
-                <DialogueReader
-                  text={doc.text}
-                  name={doc.name}
-                  line={active.line}
-                  goTo={goto}
-                />
-              )}
-              {!active.dialogueOnly && mode === "source" && (
-                <div
-                  className="editor-surface"
-                  onCompositionStart={() =>
-                    void perform({
-                      type: "composition",
-                      projectId: project.id,
-                      documentId: doc.id,
-                      active: true,
-                    })
-                  }
-                  onCompositionEnd={() =>
-                    void perform({
-                      type: "composition",
-                      projectId: project.id,
-                      documentId: doc.id,
-                      active: false,
-                    })
-                  }
-                >
-                  <CodeEditor
-                    onRegisterCommand={registerCommand}
-                    persistedView={active.sourceView}
-                    onView={(sourceView) => tabPatch({ sourceView })}
-                    onNavigate={go}
+                <div className="workspace-files">
+                  <FileTree
                     key={project.id}
+                    project={project}
+                    sort={fileSort}
+                    documentId={doc?.id}
+                    folder={activeFolder}
+                    onFolder={setActiveFolder}
+                    draft={inlineDraft}
+                    inline={inlineName}
+                    onOpen={(d, newTab) => {
+                      setActiveFolder(folderOf(d.name));
+                      openDocument(d.id, newTab);
+                    }}
+                    onRenameFile={renameDocumentInline}
+                    onRenameFolder={renameFolderInline}
+                    onFileMenu={(e, d) => showMenu(e, fileMenu(d))}
+                    onFolderMenu={(e, path) => showMenu(e, folderMenu(path))}
+                    onMove={async (entry, parent, before) => {
+                      const r = await perform({
+                        type: "moveEntry",
+                        projectId: project.id,
+                        entry,
+                        parent,
+                        before,
+                      });
+                      if (r) {
+                        setFileSort("manual");
+                        setActiveFolder(parent);
+                      }
+                    }}
+                  />
+                  {!project.documents.length && (
+                    <p className="empty-small">
+                      {tr("m38e52dafbea7")}
+                      <button onClick={() => newDocument()}>
+                        {tr("m28238f630328")}
+                      </button>
+                    </p>
+                  )}
+                </div>
+                <PanelResizeHandle
+                  side="left"
+                  value={session.sidebarWidth}
+                  min={180}
+                  max={420}
+                  label={tr("ma1f0112c8a95")}
+                  onResize={(sidebarWidth) =>
+                    setSession((s) => ({ ...s, sidebarWidth }))
+                  }
+                />
+              </aside>
+            )}
+          <section className="workspace-center">
+            {tabs.some((tab) => tab.documentId === "@characters") && (
+              <div
+                className="retained-utility"
+                hidden={active?.documentId !== "@characters"}
+              >
+                <CharactersView key={project.id} projectId={project.id} />
+              </div>
+            )}
+            {doc && ["conflict", "missing", "error"].includes(doc.status) && (
+              <div className="workspace-notice" role="alert">
+                <AlertTriangle size={15} />
+                <span>{doc.error || saveLabels[doc.status]}</span>
+                <button onClick={() => setConflict(doc)}>
+                  {tr("mcece58780d3c")}
+                </button>
+              </div>
+            )}
+            {tabs.some((tab) => tab.documentId === "@commands") && (
+              <div
+                className="retained-utility"
+                hidden={active?.documentId !== "@commands"}
+              >
+                <CommandManager
+                  key={project.id}
+                  revealName={commandTarget?.name}
+                  revealNonce={commandTarget?.nonce}
+                  commands={project.commands}
+                  notify={notify}
+                  onDirtyChange={setCommandDirty}
+                  actionsRef={commandActions}
+                  referenceCount={(name) =>
+                    analysis.nodes.reduce(
+                      (sum, n) =>
+                        sum + n.calls.filter((c) => c.name === name).length,
+                      0,
+                    )
+                  }
+                  onChange={async (commands, expectedCommands) =>
+                    !!(await perform({
+                      type: "commands",
+                      projectId: project.id,
+                      commands,
+                      expectedCommands,
+                    }))
+                  }
+                />
+              </div>
+            )}
+            {tabs.some((tab) => tab.documentId === "@settings") && (
+              <div
+                className="retained-utility"
+                hidden={active?.documentId !== "@settings"}
+              >
+                <SettingsView
+                  navigation={settingsNavigation}
+                  rescue={<RescueSettings client={client} />}
+                  initialSection={settingsSection}
+                  focusOnMount={false}
+                  appPreferences={snapshot.preferences}
+                  onAppearance={(patch) =>
+                    void perform({ type: "appearance", patch })
+                  }
+                  onAppPreferences={
+                    true
+                      ? (value) =>
+                          void perform({
+                            type: "preferences",
+                            ...value,
+                          })
+                      : undefined
+                  }
+                  preferences={session}
+                  onChange={(next) => setSession((s) => ({ ...s, ...next }))}
+                  onResetLayout={() =>
+                    setSession((s) => ({
+                      ...s,
+                      left: true,
+                      sidebarWidth: 220,
+                      rightPanelWidth: 260,
+                      problemsHeight: 140,
+                      outline: {},
+                    }))
+                  }
+                  onOpenData={
+                    window.yarnDesktop
+                      ? () =>
+                          void window.yarnDesktop
+                            ?.openLogs()
+                            .catch((e) => notify(String(e)))
+                      : undefined
+                  }
+                  version={window.yarnDesktop?.version || "Web"}
+                />
+              </div>
+            )}
+            {active?.documentId === "@new-document" ? (
+              <div className="settings-content">
+                <h2>{tr("m47fcdf3ee211")}</h2>
+                <p>{inlineDraft?.folder || tr("mad3639a602e1")}</p>
+                <p>{tr("mddde16c6ddf6")}</p>
+              </div>
+            ) : active?.documentId === "@characters" ||
+              active?.documentId === "@commands" ||
+              active?.documentId === "@settings" ? null : active?.documentId ===
+              "@recovery" ? (
+              <RecoveryView
+                key={project.id}
+                project={project}
+                state={session.recovery}
+                onChange={(recovery) => setSession((s) => ({ ...s, recovery }))}
+                onPurge={async (recoveryId) =>
+                  !!(await perform({
+                    type: "purgeTrash",
+                    projectId: project.id,
+                    recoveryId,
+                  }))
+                }
+                onRestore={async (entry, expectedVersion, expectedText) =>
+                  !!(await perform({
+                    type: "recover",
+                    projectId: project.id,
+                    recoveryId: entry.id,
+                    expectedVersion,
+                    expectedText,
+                  }))
+                }
+              />
+            ) : doc ? (
+              <div
+                className="editor-pane"
+                style={historySelection ? { display: "none" } : undefined}
+                inert={!!historySelection}
+              >
+                {active.dialogueOnly && (
+                  <DialogueReader
+                    text={doc.text}
+                    name={doc.name}
+                    line={active.line}
+                    goTo={goto}
+                  />
+                )}
+                {!active.dialogueOnly && mode === "source" && (
+                  <div
+                    className="editor-surface"
+                    onCompositionStart={() =>
+                      void perform({
+                        type: "composition",
+                        projectId: project.id,
+                        documentId: doc.id,
+                        active: true,
+                      })
+                    }
+                    onCompositionEnd={() =>
+                      void perform({
+                        type: "composition",
+                        projectId: project.id,
+                        documentId: doc.id,
+                        active: false,
+                      })
+                    }
+                  >
+                    <CodeEditor
+                      onRegisterCommand={registerCommand}
+                      persistedView={active.sourceView}
+                      onView={(sourceView) => tabPatch({ sourceView })}
+                      onNavigate={go}
+                      key={project.id}
+                      doc={doc}
+                      commands={project.commands}
+                      variables={variables}
+                      nodes={analysis.nodes}
+                      issues={diagnostics.visible}
+                      onChange={(value, event) => {
+                        const source = client
+                          .getSnapshot()
+                          .projects.find((p) => p.id === project.id)!
+                          .documents.find((d) => d.id === doc.id)!.text;
+                        client.edit(
+                          project.id,
+                          doc.id,
+                          event.isEolChange
+                            ? difference(source, value)
+                            : monacoSourceEdits(source, event.changes),
+                          false,
+                        );
+                      }}
+                      onCursor={(p: Position) =>
+                        tabPatch({
+                          line: p.lineNumber,
+                          column: p.column,
+                          selection: undefined,
+                        })
+                      }
+                      editorRef={editorRef}
+                      monacoRef={monacoRef}
+                      modelEpoch={
+                        snapshot.projects.findIndex(
+                          (p) => p.id === project.id,
+                        ) + 1
+                      }
+                      viewKey={active.id + ":" + doc.id}
+                      viewStates={editorViews}
+                      goTo={goto}
+                      onUndo={(redo) =>
+                        void perform({
+                          type: redo ? "redo" : "undo",
+                          projectId: project.id,
+                          documentId: doc.id,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                {!active.dialogueOnly && mode === "rendered" && (
+                  <ReadingEditor
+                    onVariableNavigate={go}
+                    issues={diagnostics.visible}
+                    onRegisterCommand={registerCommand}
+                    goTo={goto}
+                    scenes={analysis.nodes}
+                    canNavigate={(name) =>
+                      analysis.nodes.filter((node) => node.name === name)
+                        .length === 1
+                    }
+                    onNavigate={(name) => {
+                      const node = analysis.nodes.find((n) => n.name === name);
+                      if (node) {
+                        const target = project.documents.find(
+                          (d) => d.name === node.file,
+                        );
+                        if (target)
+                          openDocument(
+                            target.id,
+                            false,
+                            node.body,
+                            1,
+                            true,
+                            "rendered",
+                          );
+                      } else notify(tr("me4b39c373b97") + name);
+                    }}
+                    key={active.id + doc.id}
                     doc={doc}
                     commands={project.commands}
                     variables={variables}
-                    nodes={analysis.nodes}
-                    issues={diagnostics.visible}
-                    onChange={(value, event) => {
-                      const source = client
-                        .getSnapshot()
-                        .projects.find((p) => p.id === project.id)!
-                        .documents.find((d) => d.id === doc.id)!.text;
-                      client.edit(
-                        project.id,
-                        doc.id,
-                        event.isEolChange
-                          ? difference(source, value)
-                          : monacoSourceEdits(source, event.changes),
-                        false,
-                      );
-                    }}
-                    onCursor={(p: Position) =>
-                      tabPatch({
-                        line: p.lineNumber,
-                        column: p.column,
-                        selection: undefined,
-                      })
-                    }
-                    editorRef={editorRef}
-                    monacoRef={monacoRef}
-                    modelEpoch={
-                      snapshot.projects.findIndex((p) => p.id === project.id) +
-                      1
-                    }
-                    viewKey={active.id + ":" + doc.id}
-                    viewStates={editorViews}
-                    goTo={goto}
+                    line={active.line}
+                    column={active.column}
+                    scrollTop={active.scrollTop}
+                    selection={active.selection}
+                    folded={active.folded}
+                    onFoldedChange={(folded) => tabPatch({ folded })}
+                    onSelection={(selection) => tabPatch({ selection })}
+                    onEdit={(edits) => client.edit(project.id, doc.id, edits)}
                     onUndo={(redo) =>
                       void perform({
                         type: redo ? "redo" : "undo",
@@ -2698,629 +2815,596 @@ function WorkbenchContent({
                         documentId: doc.id,
                       })
                     }
+                    onComposition={(value) =>
+                      void perform({
+                        type: "composition",
+                        projectId: project.id,
+                        documentId: doc.id,
+                        active: value,
+                      })
+                    }
+                    onCursor={(line, column, scrollTop) =>
+                      tabPatch({ line, column, scrollTop })
+                    }
+                    actionsRef={readingActions}
                   />
+                )}
+                {!active.dialogueOnly && mode === "graph" && (
+                  <Graph
+                    onRegisterCommand={registerCommand}
+                    key={active.id + ":" + doc.id}
+                    file={doc.name}
+                    documents={project.documents}
+                    commands={project.commands}
+                    onDocumentEdit={(documentId, edits, expectedText) => {
+                      const current = client
+                        .getSnapshot()
+                        .projects.find((p) => p.id === project.id)
+                        ?.documents.find((d) => d.id === documentId);
+                      if (!current || current.text !== expectedText)
+                        return false;
+                      client.edit(project.id, documentId, edits, false);
+                      return true;
+                    }}
+                    onDocumentUndo={(documentId, redo) =>
+                      void perform({
+                        type: redo ? "redo" : "undo",
+                        projectId: project.id,
+                        documentId,
+                      })
+                    }
+                    onDocumentSave={(documentId) =>
+                      void perform({
+                        type: "save",
+                        projectId: project.id,
+                        documentId,
+                      })
+                    }
+                    onDocumentComposition={(documentId, active) =>
+                      void perform({
+                        type: "composition",
+                        projectId: project.id,
+                        documentId,
+                        active,
+                      })
+                    }
+                    onRenameScene={async (node, name, expectedText) => {
+                      const current = client
+                        .getSnapshot()
+                        .projects.find((p) => p.id === project.id)
+                        ?.documents.find((d) => d.name === node.file);
+                      if (!current || current.text !== expectedText) {
+                        notify(tr("me8153c416722"));
+                        return false;
+                      }
+                      return !!(await perform({
+                        type: "renameScene",
+                        projectId: project.id,
+                        documentId: current.id,
+                        version: current.version,
+                        fromName: node.name,
+                        name,
+                      }));
+                    }}
+                    allNodes={analysis.nodes}
+                    links={analysis.links}
+                    issues={diagnostics.published}
+                    editorIssues={diagnostics.visible}
+                    selected={selected}
+                    onSelect={(n) => setSelected(n?.id || "")}
+                    onOpen={(n) => go(n.file, n.body)}
+                    onGoTo={go}
+                    onCreate={newScene}
+                    focus={focus}
+                    graphState={active.graph}
+                    onGraphState={(graph) => tabPatch({ graph })}
+                    onNodeMenu={(node, event) =>
+                      showMenu(event, sceneMenu(node))
+                    }
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="empty-editor">
+                <BookText size={36} />
+                <h2>
+                  {project.documents.length
+                    ? tr("m20c81a3a79e0")
+                    : tr("m9acaf2907b3c")}
+                </h2>
+                <p>
+                  {project.documents.length
+                    ? tr("m2d6200bec9c3")
+                    : tr("me93802c2c235")}
+                </p>
+                <div className="empty-actions">
+                  <button className="primary" onClick={() => newDocument()}>
+                    {tr("m47fcdf3ee211")}
+                  </button>
+                  <button
+                    onClick={() => {
+                      showFiles();
+                    }}
+                  >
+                    {tr("m2048d78f9db8")}
+                  </button>
+                  {window.yarnDesktop && (
+                    <button
+                      onClick={() =>
+                        void perform({ type: "openFolder" }).then(adopt)
+                      }
+                    >
+                      {tr("m9ea1db41d4bb")}
+                    </button>
+                  )}
                 </div>
-              )}
-              {!active.dialogueOnly && mode === "rendered" && (
-                <ReadingEditor
-                  onVariableNavigate={go}
-                  issues={diagnostics.visible}
-                  onRegisterCommand={registerCommand}
-                  goTo={goto}
-                  scenes={analysis.nodes}
-                  canNavigate={(name) =>
-                    analysis.nodes.filter((node) => node.name === name)
-                      .length === 1
-                  }
-                  onNavigate={(name) => {
-                    const node = analysis.nodes.find((n) => n.name === name);
-                    if (node) {
-                      const target = project.documents.find(
-                        (d) => d.name === node.file,
-                      );
-                      if (target)
-                        openDocument(
-                          target.id,
-                          false,
-                          node.body,
-                          1,
-                          true,
-                          "rendered",
-                        );
-                    } else notify(tr("me4b39c373b97") + name);
-                  }}
-                  key={active.id + doc.id}
-                  doc={doc}
-                  commands={project.commands}
-                  variables={variables}
-                  line={active.line}
-                  column={active.column}
-                  scrollTop={active.scrollTop}
-                  selection={active.selection}
-                  folded={active.folded}
-                  onFoldedChange={(folded) => tabPatch({ folded })}
-                  onSelection={(selection) => tabPatch({ selection })}
-                  onEdit={(edits) => client.edit(project.id, doc.id, edits)}
-                  onUndo={(redo) =>
-                    void perform({
-                      type: redo ? "redo" : "undo",
-                      projectId: project.id,
-                      documentId: doc.id,
-                    })
-                  }
-                  onComposition={(value) =>
-                    void perform({
-                      type: "composition",
-                      projectId: project.id,
-                      documentId: doc.id,
-                      active: value,
-                    })
-                  }
-                  onCursor={(line, column, scrollTop) =>
-                    tabPatch({ line, column, scrollTop })
-                  }
-                  actionsRef={readingActions}
+              </div>
+            )}
+            {doc && historySelection && (
+              <HistoryPreview
+                key={historySelection.entry.id}
+                compareMode={historyCompare}
+                onCompare={setHistoryCompare}
+                toolbarTarget={historyToolbar}
+                line={active.line}
+                entry={historySelection.entry}
+                currentText={historySelection.text}
+                stale={
+                  doc.version !== historySelection.version ||
+                  doc.text !== historySelection.text
+                }
+                onReturn={() => {
+                  setHistorySelection(null);
+                  requestAnimationFrame(() => {
+                    if (mode === "source") editorRef.current?.focus();
+                    else
+                      document
+                        .querySelector<HTMLElement>(
+                          mode === "rendered" ? ".cm-content" : ".story-canvas",
+                        )
+                        ?.focus();
+                  });
+                }}
+                onRestore={() =>
+                  void restoreEntry(
+                    historySelection.entry,
+                    historySelection.version,
+                    historySelection.text,
+                  )
+                }
+              />
+            )}
+            {problems && !utility && !historySelection && (
+              <ProblemsPanel
+                issues={currentIssues}
+                scope={issueScope}
+                onScope={setIssueScope}
+                severity={issueSeverity}
+                onSeverity={setIssueSeverity}
+                height={session.problemsHeight ?? 140}
+                onHeight={(problemsHeight) =>
+                  setSession((s) => ({ ...s, problemsHeight }))
+                }
+                onClose={() => setProblems(false)}
+                onNavigate={(issue) => go(issue.file, issue.line, issue.column)}
+              />
+            )}
+          </section>
+          {showOutline && !utility && (
+            <aside
+              className="document-side workspace-scenes"
+              aria-label={tr("m9c44f8a4637d")}
+              style={{
+                width: session.rightPanelWidth ?? 260,
+                flexBasis: session.rightPanelWidth ?? 260,
+              }}
+            >
+              <PanelResizeHandle
+                side="right"
+                value={session.rightPanelWidth ?? 260}
+                min={220}
+                max={420}
+                label={tr("mc0a9957d0f32")}
+                onResize={(rightPanelWidth) =>
+                  setSession((s) => ({ ...s, rightPanelWidth }))
+                }
+              />
+              <div className="section-heading">
+                <strong>
+                  {tr("mcb88dc73b257")}
+                  <small>{nodes.length}</small>
+                </strong>
+                <div>
+                  <ChromeButton
+                    title={tr("m0478321878a2")}
+                    aria-label={tr("m0478321878a2")}
+                    disabled={!doc}
+                    onClick={newScene}
+                  >
+                    <Plus size={15} />
+                  </ChromeButton>
+                </div>
+              </div>
+              <div className="node-search">
+                <Search size={13} />
+                <input
+                  aria-label={tr("m3cf6f8a53f47")}
+                  placeholder={tr("m1caeda23f27a")}
+                  value={sceneQuery}
+                  onChange={(e) => setSceneQuery(e.target.value)}
                 />
+              </div>
+              <div className="node-scroll">
+                {nodes
+                  .filter((n) =>
+                    (
+                      n.name +
+                      " " +
+                      n.headers.tags +
+                      " " +
+                      (doc
+                        ? doc.text.slice(
+                            sceneRange(doc.text, n).from,
+                            sceneRange(doc.text, n).to,
+                          )
+                        : n.summary)
+                    )
+                      .toLowerCase()
+                      .includes(sceneQuery.toLowerCase()),
+                  )
+                  .map((n) =>
+                    inlineDraft?.kind === "rename-scene" &&
+                    inlineDraft.documentId === doc?.id &&
+                    inlineDraft.sceneName === n.name ? (
+                      <div key={n.id}>{inlineName()}</div>
+                    ) : (
+                      <button
+                        key={n.id}
+                        className={
+                          "node-row " + (selected === n.id ? "active" : "")
+                        }
+                        draggable
+                        onDragStart={(e) =>
+                          e.dataTransfer.setData(
+                            "application/x-yarn-scene",
+                            n.id,
+                          )
+                        }
+                        onDragOver={(e) => {
+                          if (
+                            e.dataTransfer.types.includes(
+                              "application/x-yarn-scene",
+                            )
+                          )
+                            e.preventDefault();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          void moveScene(
+                            e.dataTransfer.getData("application/x-yarn-scene"),
+                            n,
+                          );
+                        }}
+                        onClick={() => {
+                          setSelected(n.id);
+                          if (mode === "graph" && !active.dialogueOnly)
+                            setFocus((f) => f + 1);
+                          else if (doc)
+                            openDocument(doc.id, false, n.body, 1, true, mode);
+                        }}
+                        onContextMenu={(e) => showMenu(e, sceneMenu(n))}
+                        onKeyDown={(e) => {
+                          if (e.key === "F2") {
+                            e.preventDefault();
+                            renameSceneInline(n);
+                          } else menuKeys(e, sceneMenu(n));
+                        }}
+                      >
+                        <FileText size={13} />
+                        <span>{n.name}</span>
+                      </button>
+                    ),
+                  )}
+                {inlineDraft?.kind === "new-scene" &&
+                  inlineDraft.documentId === doc?.id &&
+                  inlineName()}
+              </div>
+            </aside>
+          )}
+          {doc && statisticsOpen && !utility && (
+            <StatisticsPanel
+              doc={doc}
+              width={session.rightPanelWidth ?? 260}
+              onWidth={(rightPanelWidth) =>
+                setSession((s) => ({ ...s, rightPanelWidth }))
+              }
+              onNavigate={(line) => {
+                openDocument(doc.id, false, line, 1, true, mode);
+                if (mode === "graph" && !active.dialogueOnly) {
+                  const node = nodes.find((n) => n.start === line);
+                  setSelected(node?.id || "");
+                  setFocus((f) => f + 1);
+                }
+                setStatisticsOpen(true);
+                setSideFocus("right");
+              }}
+            />
+          )}
+          {doc && historyOpen && !utility && (
+            <HistoryList
+              width={session.rightPanelWidth ?? 260}
+              onWidth={(rightPanelWidth) =>
+                setSession((s) => ({ ...s, rightPanelWidth }))
+              }
+              entries={project.recovery.filter(
+                (entry) => entry.documentId === doc.id && !entry.deleted,
               )}
-              {!active.dialogueOnly && mode === "graph" && (
-                <Graph
-                  onRegisterCommand={registerCommand}
-                  key={active.id + ":" + doc.id}
-                  file={doc.name}
-                  documents={project.documents}
-                  commands={project.commands}
-                  onDocumentEdit={(documentId, edits, expectedText) => {
-                    const current = client
-                      .getSnapshot()
-                      .projects.find((p) => p.id === project.id)
-                      ?.documents.find((d) => d.id === documentId);
-                    if (!current || current.text !== expectedText) return false;
-                    client.edit(project.id, documentId, edits, false);
-                    return true;
-                  }}
-                  onDocumentUndo={(documentId, redo) =>
+              selected={historySelection?.entry.id}
+              onSelect={(entry) => {
+                capture();
+                setHistorySelection({
+                  entry,
+                  text: doc.text,
+                  version: doc.version,
+                });
+              }}
+              onClose={() => {
+                setHistoryOpen(false);
+                setHistorySelection(null);
+              }}
+            />
+          )}
+        </div>
+        <ActionMenu menu={menu} onClose={() => setMenu(null)} />
+        <Dialog
+          open={!!prompt}
+          onOpenChange={(open) => {
+            if (!open && !busy) setPrompt(null);
+          }}
+        >
+          <DialogContent>
+            <DialogTitle>{prompt?.title || tr("med31fbb483ee")}</DialogTitle>
+            <DialogDescription style={{ whiteSpace: "pre-line" }}>
+              {prompt?.description || tr("meb65ff62ffbe")}
+            </DialogDescription>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                setPromptError("");
+                try {
+                  await prompt?.run(promptValue);
+                  setPrompt(null);
+                } catch (error) {
+                  setPromptError(String(error));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {prompt?.label && (
+                <label>
+                  {prompt.label}
+                  <input
+                    autoFocus
+                    aria-label={prompt.label}
+                    value={promptValue}
+                    onChange={(e) => setPromptValue(e.target.value)}
+                    required
+                  />
+                </label>
+              )}
+              {promptError && (
+                <p className="error" role="alert">
+                  {promptError}
+                </p>
+              )}
+              <div className="dialog-actions">
+                <button
+                  type="button"
+                  onClick={() => setPrompt(null)}
+                  disabled={busy}
+                >
+                  {tr("m2cd0f3be8738")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className={prompt?.danger ? "destructive" : "primary"}
+                >
+                  {busy
+                    ? tr("md166e71ff3ae")
+                    : prompt?.submitLabel || tr("m20db9f87b860")}
+                </button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+        {searchOpen && (
+          <SearchOverlay
+            documents={project.documents}
+            query={searchQuery}
+            onQuery={setSearchQuery}
+            scope={searchScope}
+            onScope={setSearchScope}
+            newTab={quickNewTab}
+            onNavigate={navigateHit}
+            onClose={() => setSearchOpen(false)}
+            commands={project.commands}
+            settings={settingEntries}
+            recent={session.recentDocuments}
+            onChoose={(hit) => {
+              if (hit.kind === "setting") {
+                openSettings(hit.section as SettingsSection);
+                setSettingsNavigation({
+                  section: hit.section as SettingsSection,
+                  field: hit.field,
+                  nonce: Date.now(),
+                });
+              }
+              if (hit.kind === "utility") {
+                if (hit.page === "characters") openDocument("@characters");
+                else openCommands();
+              }
+              if (hit.kind === "command") {
+                openCommands();
+                setCommandTarget({ name: hit.name, nonce: Date.now() });
+              }
+            }}
+            onCreate={standalone ? undefined : createFromSearch}
+          />
+        )}
+        <Dialog
+          open={!!conflict}
+          onOpenChange={(open) => {
+            if (!open) setConflict(null);
+          }}
+        >
+          <DialogContent className="conflict-dialog">
+            <DialogTitle>
+              {tr("mcece58780d3c")} {conflict?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {conflict?.error}
+              {tr("mc97238f67983")}
+            </DialogDescription>
+            <div className="conflict-columns">
+              <label>
+                {tr("mc2f0001e7e2e")}
+                <textarea readOnly value={conflict?.text || ""} />
+              </label>
+              <label>
+                {tr("ma58034b77334")}
+                <textarea
+                  readOnly
+                  value={conflict?.externalText ?? tr("mf225be1f7f06")}
+                />
+              </label>
+            </div>
+            <div className="dialog-actions">
+              <button
+                onClick={() => {
+                  if (conflict)
                     void perform({
-                      type: redo ? "redo" : "undo",
+                      type: "saveAs",
                       projectId: project.id,
-                      documentId,
-                    })
-                  }
-                  onDocumentSave={(documentId) =>
+                      documentId: conflict.id,
+                    }).then((r) => {
+                      if (r && !r.cancelled) setConflict(null);
+                    });
+                }}
+              >
+                {tr("m2754144d1c1d")}
+              </button>
+              {conflict?.externalText !== undefined && (
+                <>
+                  <button
+                    onClick={() =>
+                      void perform({
+                        type: "resolve",
+                        projectId: project.id,
+                        documentId: conflict.id,
+                        choice: "disk",
+                      }).then((r) => {
+                        if (r) setConflict(null);
+                      })
+                    }
+                  >
+                    {tr("mfcfd41034f23")}
+                  </button>
+                  <button
+                    className="primary"
+                    onClick={() =>
+                      void perform({
+                        type: "resolve",
+                        projectId: project.id,
+                        documentId: conflict.id,
+                        choice: "local",
+                      }).then((r) => {
+                        if (r) setConflict(null);
+                      })
+                    }
+                  >
+                    {tr("m8f0008e2e546")}
+                  </button>
+                </>
+              )}
+              {conflict?.status === "error" && (
+                <button
+                  onClick={() =>
                     void perform({
                       type: "save",
                       projectId: project.id,
-                      documentId,
+                      documentId: conflict.id,
                     })
                   }
-                  onDocumentComposition={(documentId, active) =>
-                    void perform({
-                      type: "composition",
-                      projectId: project.id,
-                      documentId,
-                      active,
-                    })
-                  }
-                  onRenameScene={async (node, name, expectedText) => {
-                    const current = client
-                      .getSnapshot()
-                      .projects.find((p) => p.id === project.id)
-                      ?.documents.find((d) => d.name === node.file);
-                    if (!current || current.text !== expectedText) {
-                      notify(tr("me8153c416722"));
-                      return false;
-                    }
-                    return !!(await perform({
-                      type: "renameScene",
-                      projectId: project.id,
-                      documentId: current.id,
-                      version: current.version,
-                      fromName: node.name,
-                      name,
-                    }));
-                  }}
-                  allNodes={analysis.nodes}
-                  links={analysis.links}
-                  issues={diagnostics.published}
-                  editorIssues={diagnostics.visible}
-                  selected={selected}
-                  onSelect={(n) => setSelected(n?.id || "")}
-                  onOpen={(n) => go(n.file, n.body)}
-                  onGoTo={go}
-                  onCreate={newScene}
-                  focus={focus}
-                  graphState={active.graph}
-                  onGraphState={(graph) => tabPatch({ graph })}
-                  onNodeMenu={(node, event) => showMenu(event, sceneMenu(node))}
-                />
+                >
+                  {tr("m7a824d822e96")}
+                </button>
               )}
             </div>
-          ) : (
-            <div className="empty-editor">
-              <BookText size={36} />
-              <h2>
-                {project.documents.length
-                  ? tr("m20c81a3a79e0")
-                  : tr("m9acaf2907b3c")}
-              </h2>
-              <p>
-                {project.documents.length
-                  ? tr("m2d6200bec9c3")
-                  : tr("me93802c2c235")}
-              </p>
-              <div className="empty-actions">
-                <button className="primary" onClick={() => newDocument()}>
-                  {tr("m47fcdf3ee211")}
-                </button>
-                <button
-                  onClick={() => {
-                    showFiles();
-                  }}
-                >
-                  {tr("m2048d78f9db8")}
-                </button>
-                {window.yarnDesktop && (
-                  <button
-                    onClick={() =>
-                      void perform({ type: "openFolder" }).then(adopt)
-                    }
-                  >
-                    {tr("m9ea1db41d4bb")}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          {doc && historySelection && (
-            <HistoryPreview
-              key={historySelection.entry.id}
-              compareMode={historyCompare}
-              onCompare={setHistoryCompare}
-              toolbarTarget={historyToolbar}
-              line={active.line}
-              entry={historySelection.entry}
-              currentText={historySelection.text}
-              stale={
-                doc.version !== historySelection.version ||
-                doc.text !== historySelection.text
-              }
-              onReturn={() => {
-                setHistorySelection(null);
-                requestAnimationFrame(() => {
-                  if (mode === "source") editorRef.current?.focus();
-                  else
-                    document
-                      .querySelector<HTMLElement>(
-                        mode === "rendered" ? ".cm-content" : ".story-canvas",
-                      )
-                      ?.focus();
-                });
-              }}
-              onRestore={() =>
-                void restoreEntry(
-                  historySelection.entry,
-                  historySelection.version,
-                  historySelection.text,
-                )
-              }
-            />
-          )}
-          {problems && !utility && !historySelection && (
-            <ProblemsPanel
-              issues={currentIssues}
-              scope={issueScope}
-              onScope={setIssueScope}
-              severity={issueSeverity}
-              onSeverity={setIssueSeverity}
-              height={session.problemsHeight ?? 140}
-              onHeight={(problemsHeight) =>
-                setSession((s) => ({ ...s, problemsHeight }))
-              }
-              onClose={() => setProblems(false)}
-              onNavigate={(issue) => go(issue.file, issue.line, issue.column)}
-            />
-          )}
-        </section>
-        {showOutline && !utility && (
-          <aside
-            className="document-side workspace-scenes"
-            aria-label={tr("m9c44f8a4637d")}
-            style={{
-              width: session.rightPanelWidth ?? 260,
-              flexBasis: session.rightPanelWidth ?? 260,
-            }}
-          >
-            <PanelResizeHandle
-              side="right"
-              value={session.rightPanelWidth ?? 260}
-              min={220}
-              max={420}
-              label={tr("mc0a9957d0f32")}
-              onResize={(rightPanelWidth) =>
-                setSession((s) => ({ ...s, rightPanelWidth }))
-              }
-            />
-            <div className="section-heading">
-              <strong>
-                {tr("mcb88dc73b257")}
-                <small>{nodes.length}</small>
-              </strong>
-              <div>
-                <ChromeButton
-                  title={tr("m0478321878a2")}
-                  aria-label={tr("m0478321878a2")}
-                  disabled={!doc}
-                  onClick={newScene}
-                >
-                  <Plus size={15} />
-                </ChromeButton>
-              </div>
-            </div>
-            <div className="node-search">
-              <Search size={13} />
-              <input
-                aria-label={tr("m3cf6f8a53f47")}
-                placeholder={tr("m1caeda23f27a")}
-                value={sceneQuery}
-                onChange={(e) => setSceneQuery(e.target.value)}
-              />
-            </div>
-            <div className="node-scroll">
-              {nodes
-                .filter((n) =>
-                  (
-                    n.name +
-                    " " +
-                    n.headers.tags +
-                    " " +
-                    (doc
-                      ? doc.text.slice(
-                          sceneRange(doc.text, n).from,
-                          sceneRange(doc.text, n).to,
-                        )
-                      : n.summary)
-                  )
-                    .toLowerCase()
-                    .includes(sceneQuery.toLowerCase()),
-                )
-                .map((n) =>
-                  inlineDraft?.kind === "rename-scene" &&
-                  inlineDraft.documentId === doc?.id &&
-                  inlineDraft.sceneName === n.name ? (
-                    <div key={n.id}>{inlineName()}</div>
-                  ) : (
-                    <button
-                      key={n.id}
-                      className={
-                        "node-row " + (selected === n.id ? "active" : "")
-                      }
-                      draggable
-                      onDragStart={(e) =>
-                        e.dataTransfer.setData("application/x-yarn-scene", n.id)
-                      }
-                      onDragOver={(e) => {
-                        if (
-                          e.dataTransfer.types.includes(
-                            "application/x-yarn-scene",
-                          )
-                        )
-                          e.preventDefault();
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        void moveScene(
-                          e.dataTransfer.getData("application/x-yarn-scene"),
-                          n,
-                        );
-                      }}
-                      onClick={() => {
-                        setSelected(n.id);
-                        if (mode === "graph" && !active.dialogueOnly)
-                          setFocus((f) => f + 1);
-                        else if (doc)
-                          openDocument(doc.id, false, n.body, 1, true, mode);
-                      }}
-                      onContextMenu={(e) => showMenu(e, sceneMenu(n))}
-                      onKeyDown={(e) => {
-                        if (e.key === "F2") {
-                          e.preventDefault();
-                          renameSceneInline(n);
-                        } else menuKeys(e, sceneMenu(n));
-                      }}
-                    >
-                      <FileText size={13} />
-                      <span>{n.name}</span>
-                    </button>
-                  ),
-                )}
-              {inlineDraft?.kind === "new-scene" &&
-                inlineDraft.documentId === doc?.id &&
-                inlineName()}
-            </div>
-          </aside>
-        )}
-        {doc && statisticsOpen && !utility && (
-          <StatisticsPanel
-            doc={doc}
-            width={session.rightPanelWidth ?? 260}
-            onWidth={(rightPanelWidth) =>
-              setSession((s) => ({ ...s, rightPanelWidth }))
-            }
-            onNavigate={(line) => {
-              openDocument(doc.id, false, line, 1, true, mode);
-              if (mode === "graph" && !active.dialogueOnly) {
-                const node = nodes.find((n) => n.start === line);
-                setSelected(node?.id || "");
-                setFocus((f) => f + 1);
-              }
-              setStatisticsOpen(true);
-              setSideFocus("right");
-            }}
-          />
-        )}
-        {doc && historyOpen && !utility && (
-          <HistoryList
-            width={session.rightPanelWidth ?? 260}
-            onWidth={(rightPanelWidth) =>
-              setSession((s) => ({ ...s, rightPanelWidth }))
-            }
-            entries={project.recovery.filter(
-              (entry) => entry.documentId === doc.id && !entry.deleted,
-            )}
-            selected={historySelection?.entry.id}
-            onSelect={(entry) => {
-              capture();
-              setHistorySelection({
-                entry,
-                text: doc.text,
-                version: doc.version,
-              });
-            }}
-            onClose={() => {
-              setHistoryOpen(false);
-              setHistorySelection(null);
-            }}
-          />
-        )}
-      </div>
-      <ActionMenu menu={menu} onClose={() => setMenu(null)} />
-      <Dialog
-        open={!!prompt}
-        onOpenChange={(open) => {
-          if (!open && !busy) setPrompt(null);
-        }}
-      >
-        <DialogContent>
-          <DialogTitle>{prompt?.title || tr("med31fbb483ee")}</DialogTitle>
-          <DialogDescription style={{ whiteSpace: "pre-line" }}>
-            {prompt?.description || tr("meb65ff62ffbe")}
-          </DialogDescription>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setBusy(true);
-              setPromptError("");
-              try {
-                await prompt?.run(promptValue);
-                setPrompt(null);
-              } catch (error) {
-                setPromptError(String(error));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {prompt?.label && (
-              <label>
-                {prompt.label}
-                <input
-                  autoFocus
-                  aria-label={prompt.label}
-                  value={promptValue}
-                  onChange={(e) => setPromptValue(e.target.value)}
-                  required
-                />
-              </label>
-            )}
-            {promptError && (
-              <p className="error" role="alert">
-                {promptError}
-              </p>
-            )}
-            <div className="dialog-actions">
-              <button
-                type="button"
-                onClick={() => setPrompt(null)}
-                disabled={busy}
-              >
-                {tr("m2cd0f3be8738")}
-              </button>
-              <button
-                type="submit"
-                disabled={busy}
-                className={prompt?.danger ? "destructive" : "primary"}
-              >
-                {busy
-                  ? tr("md166e71ff3ae")
-                  : prompt?.submitLabel || tr("m20db9f87b860")}
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-      {searchOpen && (
-        <SearchOverlay
-          documents={project.documents}
-          query={searchQuery}
-          onQuery={setSearchQuery}
-          scope={searchScope}
-          onScope={setSearchScope}
-          newTab={quickNewTab}
-          onNavigate={navigateHit}
-          onClose={() => setSearchOpen(false)}
-          commands={project.commands}
-          settings={settingEntries}
-          recent={session.recentDocuments}
-          onChoose={(hit) => {
-            if (hit.kind === "setting") {
-              openSettings(hit.section as SettingsSection);
-              setSettingsNavigation({
-                section: hit.section as SettingsSection,
-                field: hit.field,
-                nonce: Date.now(),
-              });
-            }
-            if (hit.kind === "utility") openCommands();
-            if (hit.kind === "command") {
-              openCommands();
-              setCommandTarget({ name: hit.name, nonce: Date.now() });
-            }
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={!!leaveFailure}
+          onOpenChange={(open) => {
+            if (!open) setLeaveFailure(null);
           }}
-          onCreate={standalone ? undefined : createFromSearch}
-        />
-      )}
-      <Dialog
-        open={!!conflict}
-        onOpenChange={(open) => {
-          if (!open) setConflict(null);
-        }}
-      >
-        <DialogContent className="conflict-dialog">
-          <DialogTitle>
-            {tr("mcece58780d3c")} {conflict?.name}
-          </DialogTitle>
-          <DialogDescription>
-            {conflict?.error}
-            {tr("mc97238f67983")}
-          </DialogDescription>
-          <div className="conflict-columns">
-            <label>
-              {tr("mc2f0001e7e2e")}
-              <textarea readOnly value={conflict?.text || ""} />
-            </label>
-            <label>
-              {tr("ma58034b77334")}
-              <textarea
-                readOnly
-                value={conflict?.externalText ?? tr("mf225be1f7f06")}
-              />
-            </label>
-          </div>
-          <div className="dialog-actions">
-            <button
-              onClick={() => {
-                if (conflict)
-                  void perform({
-                    type: "saveAs",
-                    projectId: project.id,
-                    documentId: conflict.id,
-                  }).then((r) => {
-                    if (r && !r.cancelled) setConflict(null);
-                  });
-              }}
-            >
-              {tr("m2754144d1c1d")}
-            </button>
-            {conflict?.externalText !== undefined && (
-              <>
-                <button
-                  onClick={() =>
-                    void perform({
-                      type: "resolve",
-                      projectId: project.id,
-                      documentId: conflict.id,
-                      choice: "disk",
-                    }).then((r) => {
-                      if (r) setConflict(null);
-                    })
-                  }
-                >
-                  {tr("mfcfd41034f23")}
-                </button>
-                <button
-                  className="primary"
-                  onClick={() =>
-                    void perform({
-                      type: "resolve",
-                      projectId: project.id,
-                      documentId: conflict.id,
-                      choice: "local",
-                    }).then((r) => {
-                      if (r) setConflict(null);
-                    })
-                  }
-                >
-                  {tr("m8f0008e2e546")}
-                </button>
-              </>
-            )}
-            {conflict?.status === "error" && (
+        >
+          <DialogContent className="workbench-dialog">
+            <DialogTitle>{tr("mc1f4025e9e8c")}</DialogTitle>
+            <DialogDescription>{leaveFailure?.message}</DialogDescription>
+            <div className="dialog-actions">
+              <button onClick={() => setLeaveFailure(null)}>
+                {tr("m9f2b484bc113")}
+              </button>
               <button
-                onClick={() =>
-                  void perform({
-                    type: "save",
-                    projectId: project.id,
-                    documentId: conflict.id,
-                  })
-                }
+                onClick={() => {
+                  const action = leaveFailure!.action;
+                  setLeaveFailure(null);
+                  void leaveWorkspace(action);
+                }}
               >
                 {tr("m7a824d822e96")}
               </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        {closing && (
+          <div
+            className="close-save-overlay"
+            tabIndex={-1}
+            ref={(element) => element?.focus()}
+            onKeyDownCapture={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            {closeSaving && (
+              <div
+                className="close-save-panel"
+                role="status"
+                aria-live="polite"
+              >
+                <LoaderCircle size={20} className="save-spinner" />
+                <span>{tr("m6bdb4435095e")}</span>
+              </div>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!leaveFailure}
-        onOpenChange={(open) => {
-          if (!open) setLeaveFailure(null);
-        }}
-      >
-        <DialogContent className="workbench-dialog">
-          <DialogTitle>{tr("mc1f4025e9e8c")}</DialogTitle>
-          <DialogDescription>{leaveFailure?.message}</DialogDescription>
-          <div className="dialog-actions">
-            <button onClick={() => setLeaveFailure(null)}>
-              {tr("m9f2b484bc113")}
-            </button>
+        )}
+        {toast && !prompt && (
+          <div className="toast" role="status">
+            <span>{toast}</span>
             <button
-              onClick={() => {
-                const action = leaveFailure!.action;
-                setLeaveFailure(null);
-                void leaveWorkspace(action);
-              }}
+              aria-label={tr("m641c2d091bbc")}
+              onClick={() => setToast("")}
             >
-              {tr("m7a824d822e96")}
+              <X size={14} />
             </button>
           </div>
-        </DialogContent>
-      </Dialog>
-      {closing && (
-        <div
-          className="close-save-overlay"
-          tabIndex={-1}
-          ref={(element) => element?.focus()}
-          onKeyDownCapture={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          {closeSaving && (
-            <div className="close-save-panel" role="status" aria-live="polite">
-              <LoaderCircle size={20} className="save-spinner" />
-              <span>{tr("m6bdb4435095e")}</span>
-            </div>
-          )}
-        </div>
-      )}
-      {toast && !prompt && (
-        <div className="toast" role="status">
-          <span>{toast}</span>
-          <button aria-label={tr("m641c2d091bbc")} onClick={() => setToast("")}>
-            <X size={14} />
-          </button>
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </PreviewProvider>
   );
 }
 

@@ -10,6 +10,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { CornerDownRight } from "lucide-react";
 import { readingStructure } from "./structure";
 import "./dialogue-reader.css";
+import { ReadingPortrait } from "../play/context";
+import { dialogueText } from "../play/presentation";
 
 /** A source-linked reading surface. It never evaluates branches or edits the script. */
 export default function DialogueReader({
@@ -121,6 +123,11 @@ export default function DialogueReader({
               className={l.kind === "option" ? "reader-option" : undefined}
             >
               {l.kind === "option" && <CornerDownRight size={16} />}
+              {l.kind === "dialogue" && (
+                <ReadingPortrait
+                  speaker={dialogueText(l.text.trim()).speaker}
+                />
+              )}
               <span>{spans}</span>
             </p>
           );

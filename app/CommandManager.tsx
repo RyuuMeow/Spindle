@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { type Command, type Param, validateCommand } from "./parser";
 import "./controls.css";
+import CommandPreviewBinding from "./play/CommandPreviewBinding";
 
 export type CommandActions = {
   save: () => Promise<boolean>;
@@ -826,6 +827,13 @@ export default function CommandManager({
             />
           </label>
         </div>
+        {window.yarnDesktop && index >= 0 && commands[index] && (
+          <CommandPreviewBinding
+            key={commands[index].name}
+            command={commands[index].name}
+            disabled={dirty}
+          />
+        )}
       </form>
 
       <AlertDialog open={remove} onOpenChange={setRemove}>

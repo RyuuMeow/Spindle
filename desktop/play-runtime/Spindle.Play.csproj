@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Spindle.Play</AssemblyName>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../vendor/yarn-spinner/YarnSpinner.Compiler/YarnSpinner.Compiler.csproj" />

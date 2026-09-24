@@ -53,7 +53,7 @@ const {
 } = require("./window-lifecycle.cjs");
 const origin = "workbench://app";
 const windows = new Map();
-let agentHost, mcpRuntime;
+let agentHost, mcpRuntime, playService;
 let service,
   sessionFile,
   sessions = {},
@@ -64,6 +64,7 @@ let service,
 const focused = () =>
   BrowserWindow.getFocusedWindow() || windows.values().next().value?.window;
 function broadcast() {
+  playService?.changed();
   for (const { window } of windows.values())
     if (!window.isDestroyed()) window.webContents.send("workspace:changed");
 }
@@ -284,7 +285,7 @@ async function moveTab(source, tab, projectId, targetId, point) {
     (!service.engine
       .project(projectId)
       .documents.some((d) => d.id === tab.documentId) &&
-      !["@commands", "@settings", "@recovery"].includes(tab.documentId))
+      !["@commands", "@settings", "@recovery", "@characters"].includes(tab.documentId))
   )
     throw Error(tr("m0eaf2d6c6027"));
   if (targetId === source.id) return;
@@ -484,6 +485,7 @@ function wire() {
     windows.get(id).projectId = value.screen === "home" ? "" : value.projectId;
     saveSessions();
     agentHost?.rebound(windows.get(id));
+    playService?.changed();
     synchronizeBindings(service, windows);
   });
   ipcMain.handle("workspace:windows", (event) => {
@@ -688,6 +690,21 @@ else {
         service,
         agentHost,
       );
+      playService = require("./play-service.cjs").createPlayService({
+        service,
+        host: agentHost,
+        owner,
+        directory: __dirname,
+        profile,
+        notifyResources: (projectId) => {
+          for (const item of windows.values())
+            if (item.projectId === projectId && !item.window.isDestroyed())
+              item.window.webContents.send("preview:changed");
+        },
+      });
+      agentHost.playList = playService.list;
+      agentHost.playContext = playService.context;
+      app.on("before-quit", () => playService.close());
       ipcMain.handle("agent:settings", (event) => {
         owner(event);
         return mcpRuntime.settings();

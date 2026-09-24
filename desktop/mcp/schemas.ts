@@ -47,6 +47,8 @@ export const fileWriteTools = [
   "restore_trash",
 ];
 export const schemas = {
+  list_play_sessions: z.object(target).strict(),
+  get_play_context: z.object({ ...target, playSessionId: id }).strict(),
   list_project_entries: z
     .object({ ...target, parent: z.string().max(1000).default(""), ...paging })
     .strict(),
@@ -205,6 +207,10 @@ export const schemas = {
     .strict(),
 };
 export const descriptions: Record<keyof typeof schemas, string> = {
+  list_play_sessions:
+    "List Play preview sessions belonging to an explicit editor session. Read only; does not start or focus windows.",
+  get_play_context:
+    "Read a Play session's fixed source versions, current dialogue/options, variables and recent events. Separate from editor selection. Events may be truncated; does not advance execution.",
   list_project_entries:
     "List immediate project children, including empty folders, stable file IDs and manual tree order. Parent is a project-relative path; root is empty string.",
   list_trash:

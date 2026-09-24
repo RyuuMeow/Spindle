@@ -2,6 +2,8 @@
 import { t as tr } from "./i18n/index.ts";
 
 import { useEditorContext } from "./mcp/editor-context";
+import { usePreview } from "./play/context";
+import { pt } from "./play/messages";
 import { useAppearance, appearanceVariables } from "./appearance/context";
 
 import {
@@ -138,6 +140,16 @@ const sidePosition = {
 };
 
 function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
+  const { visited } = usePreview();
+  const played =
+    data.node &&
+    visited.some(
+      (v) =>
+        v.file === data.node!.file &&
+        v.line >= data.node!.body &&
+        v.line <= data.node!.end &&
+        ["line", "choice", "command"].includes(v.kind),
+    );
   const Icon =
     data.kind === "missing"
       ? AlertTriangle
@@ -182,6 +194,11 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
         if (!data.editor) data.open();
       }}
     >
+      {played && (
+        <span className="play-coverage" title={pt("runPath")}>
+          ▶
+        </span>
+      )}
       {Object.entries(sidePosition).map(([side, position]) => (
         <Fragment key={side}>
           <Handle

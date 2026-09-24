@@ -56,6 +56,7 @@ import {
 } from "./structure";
 import { readingLayout } from "./layout";
 import { readingDecorations } from "./decorations";
+import { usePreview } from "../play/context";
 import { readingIcon } from "./icons";
 import "./reading.css";
 
@@ -111,6 +112,14 @@ export default function ReadingEditor(props: Props) {
     "rendered",
     props.variables,
   );
+  const { resources } = usePreview();
+  const previewRef = useRef(resources);
+  useEffect(() => {
+    previewRef.current = resources;
+    const view = viewRef.current;
+    if (view && !view.composing)
+      view.dispatch({ effects: refreshDecorations.of(null) });
+  }, [resources]);
   useEffect(() => {
     latest.current = props;
   });
@@ -158,6 +167,7 @@ export default function ReadingEditor(props: Props) {
           config.commands,
           state.field(structure),
           state.readOnly,
+          previewRef.current,
         ),
       update: (value, tr) =>
         composing
@@ -171,6 +181,7 @@ export default function ReadingEditor(props: Props) {
                 latest.current.commands,
                 tr.state.field(structure),
                 tr.state.readOnly,
+                previewRef.current,
               )
             : value,
       provide: (field) => EditorView.decorations.from(field),

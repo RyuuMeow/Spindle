@@ -15,6 +15,41 @@ import { readingStructure, type ReadingLine } from "./structure";
 import { commandEnd, readingVariables } from "./tokens";
 import { readingLayout } from "./layout";
 import { readingIcon, type ReadingIcon } from "./icons";
+import type { PreviewResources } from "../play/types";
+import { dialogueText } from "../play/presentation";
+
+class PortraitWidget extends WidgetType {
+  constructor(
+    readonly name: string,
+    readonly image?: string,
+    readonly color?: string,
+  ) {
+    super();
+  }
+  eq(other: PortraitWidget) {
+    return (
+      other.name === this.name &&
+      other.image === this.image &&
+      other.color === this.color
+    );
+  }
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "reading-portrait";
+    span.setAttribute("aria-hidden", "true");
+    if (this.color) span.style.borderColor = this.color;
+    if (this.image) {
+      const image = document.createElement("img");
+      image.src = this.image;
+      image.alt = "";
+      span.appendChild(image);
+    } else span.textContent = [...this.name].slice(0, 2).join("");
+    return span;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
 
 class Token extends WidgetType {
   constructor(
@@ -67,6 +102,7 @@ export function readingDecorations(
   commands: (string | Command)[],
   lines: ReadingLine[] = readingStructure(state.doc.toString()),
   readOnly = false,
+  preview?: PreviewResources | null,
 ) {
   const definitions = commands.filter(
     (c): c is Command => typeof c !== "string",
@@ -194,6 +230,21 @@ export function readingDecorations(
       }).range(line.from),
     );
     let rawInline: { from: number; to: number } | undefined;
+    if (line.kind === "dialogue") {
+      const speaker = dialogueText(trim).speaker,
+        actor = preview?.config.characters.find((c) => c.name === speaker);
+      if (speaker)
+        ranges.push(
+          Decoration.widget({
+            widget: new PortraitWidget(
+              actor?.displayName || speaker,
+              actor?.portrait ? preview?.images[actor.portrait] : undefined,
+              actor?.color,
+            ),
+            side: -1,
+          }).range(from),
+        );
+    }
     if (line.kind === "blank") continue;
     if (active && structural) continue;
     if (

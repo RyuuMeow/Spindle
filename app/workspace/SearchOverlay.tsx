@@ -97,6 +97,7 @@ export function SearchOverlay({
         query,
         scope,
         canCreate: !!onCreate,
+        canPreview: !!window.yarnDesktop,
       }),
     [documents, commands, settings, recent, query, scope, onCreate],
   );

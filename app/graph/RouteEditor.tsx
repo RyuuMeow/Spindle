@@ -1,5 +1,6 @@
 import { t as tr } from "../i18n/index.ts";
 import { useRef } from "react";
+import { usePreview } from "../play/context";
 import {
   BaseEdge,
   ViewportPortal,
@@ -45,6 +46,7 @@ export type RouteData = {
 };
 export type RouteEdge = Edge<RouteData, "route">;
 export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
+  const { visited } = usePreview();
   const flow = useReactFlow(),
     drag = useRef<{
       action: RouteAction;
@@ -56,6 +58,14 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
   const { route, geometry, group, active, controls, muted, zoom } = data,
     item = group.items[0];
   const label = linkSummary(item);
+  const played = group.items.some((link) =>
+    visited.some(
+      (v) =>
+        v.kind === "transfer" &&
+        v.file === link.source.split("::")[0] &&
+        v.line === link.line,
+    ),
+  );
   function down(
     event: React.PointerEvent<SVGElement | HTMLButtonElement>,
     action: RouteAction,
@@ -124,7 +134,13 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
           markerEnd={markerEnd}
           interactionWidth={20}
           style={{
-            stroke: active ? "#d4dfeb" : muted ? "#555" : "#999",
+            stroke: active
+              ? "#d4dfeb"
+              : played
+                ? "#97c9ae"
+                : muted
+                  ? "#555"
+                  : "#999",
             strokeWidth: active ? 2.4 : 1.6,
             strokeDasharray: item.dynamic
               ? "6 5"

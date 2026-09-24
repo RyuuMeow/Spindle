@@ -1,4 +1,5 @@
 import { t as tr } from "../i18n/index.ts";
+import { pt } from "../play/messages";
 import type { DocumentRecord } from "./types";
 export type SearchScope = "all" | "files" | "content" | "settings" | "commands";
 export type SearchHit = {
@@ -67,7 +68,7 @@ export type PaletteHit =
       id: string;
       text: string;
       detail: string;
-      page: "commands";
+      page: "commands" | "characters";
     }
   | {
       kind: "document";
@@ -110,10 +111,22 @@ export function paletteSearch(input: {
   query: string;
   scope: SearchScope;
   canCreate: boolean;
+  canPreview?: boolean;
 }) {
   const q = input.query.trim(),
     needle = q.toLocaleLowerCase();
   const hits: PaletteHit[] = [];
+  if (
+    input.canPreview &&
+    (!needle || /character|preview|角色|預覽|预览/i.test(q))
+  )
+    hits.push({
+      kind: "utility",
+      id: "characters-page",
+      text: pt("characters"),
+      detail: pt("characterHelp"),
+      page: "characters",
+    });
   const matches = (value: string) =>
     !needle || value.toLocaleLowerCase().includes(needle);
   const createAlias =
