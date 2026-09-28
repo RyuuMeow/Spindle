@@ -100,6 +100,7 @@ export default function PlayLaunchButton({
     <>
       <ChromeButton
         title={title}
+        className="play-launch-button"
         data-play-launch
         aria-pressed={active || pending === "open"}
         aria-busy={!!pending}
@@ -125,6 +126,7 @@ export default function PlayLaunchButton({
         ) : (
           <Play size={17} aria-hidden="true" />
         )}
+        <span>{labels[launch.mode]}</span>
       </ChromeButton>
       <DropdownMenu
         open={!!menu}

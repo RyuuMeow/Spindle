@@ -967,3 +967,4 @@ button.statistics-bar:hover { color:#fff; background:#ffffff05; }
 }
 .play-launch-menu-item { display:flex; align-items:center; gap:8px; padding:6px 9px; border-radius:var(--radius-sm); outline:none; cursor:default; font-size:13px; }
 .play-launch-menu-item[data-highlighted] { background:var(--accent); color:var(--accent-foreground); }
+.document-icon-tools > .play-launch-button { width:auto; flex:0 0 auto; padding:0 8px; gap:6px; font-size:12px; }

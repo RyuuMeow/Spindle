@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { pt } from "./messages";
 import { t as tr } from "../i18n";
+import { SearchableSelect } from "@/components/SearchableSelect";
 import { CompactSelect } from "@/components/CompactSelect";
 import { CompilePanel } from "./CompilePanel";
 import { resolvePresentation } from "../workspace/presentation-preferences";
@@ -497,7 +498,9 @@ export default function PlayApp() {
       <header className="play-toolbar" aria-label={pt("play")}>
         <label>
           <span>{pt("start")}</span>
-          <CompactSelect
+          <SearchableSelect
+            searchLabel={pt("searchScenes")}
+            emptyLabel={pt("noMatchingScenes")}
             label={pt("start")}
             placeholder={pt("chooseStart")}
             value={session?.startScene || ""}
@@ -635,11 +638,6 @@ export default function PlayApp() {
           <Minimize2 size={17} />
           <span>{pt("exitImmersive")}</span>
         </button>
-      )}
-      {session?.startLocation && !immersive && (
-        <div className="play-notice" role="status">
-          {pt("launchLineHint")}
-        </div>
       )}
       {session?.stale && (
         <div className="play-notice">

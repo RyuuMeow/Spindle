@@ -2674,6 +2674,7 @@ function WorkbenchContent({
                 hidden={active?.documentId !== "@settings"}
               >
                 <SettingsView
+                  scenes={analysis.nodes}
                   navigation={settingsNavigation}
                   rescue={<RescueSettings client={client} />}
                   initialSection={settingsSection}

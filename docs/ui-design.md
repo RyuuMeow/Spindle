@@ -4,6 +4,8 @@
 
 # Spindle interface conventions
 
+The editor Play button shows its mode beside the icon. Settings → Play offers a searchable scene dropdown populated from all documents in the current workspace. Typing filters the open list; arrows and Enter select, Escape cancels. A saved scene missing from this workspace remains unchanged until another scene is selected. The story area has no persistent launch-mode banner.
+
 Play's editor button shows a pause glyph while opening or active; its action is explicitly “Stop and close Play,” not runtime pause. Right-click or Shift+F10 opens the persistent radio-choice launch menu. Novel's continuation cue is horizontally centered at the top of the transparent advance area, 12 CSS px below its start; the whole area remains clickable. See [launch rules and source-entry limits](play.md).
 
 ## Character presentation and writing advice

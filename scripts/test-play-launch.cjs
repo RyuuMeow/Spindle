@@ -56,7 +56,7 @@ async function launch() {
     });
   }, root);
 }
-const toggle = () => editor.locator("[data-play-launch]");
+const toggle = () => editor.locator("[data-play-launch]:visible");
 async function document(name, line = 1) {
   if (
     !(await editor
@@ -86,6 +86,11 @@ async function document(name, line = 1) {
 async function chooseMode(name) {
   await toggle().click({ button: "right" });
   await editor.getByRole("menuitemradio", { name, exact: true }).click();
+  assert.equal(
+    (await toggle().innerText()).trim(),
+    name,
+    "Mode stays visible on editor Play button",
+  );
 }
 async function open() {
   const pending = app.waitForEvent("window");
@@ -152,6 +157,22 @@ async function record(name, fn) {
       async () => {
         await open();
         assert.equal((await state()).state.scene, "Start");
+        await play
+          .getByRole("button", { name: "Start scene", exact: true })
+          .click();
+        const picker = play.getByRole("combobox");
+        await picker.fill("故事");
+        assert.equal(
+          await play.getByRole("option").count(),
+          1,
+          "Play scene picker shares keyboard filtering",
+        );
+        await picker.press("Escape");
+        assert.equal(
+          (await state()).state.scene,
+          "Start",
+          "Cancelling Play filter does not restart playback",
+        );
         await editor.screenshot({
           path: path.join(out, "play-open-feedback.png"),
         });
@@ -221,6 +242,15 @@ async function record(name, fn) {
         await chooseMode("Current line");
         await open();
         const current = await state();
+        assert.equal(
+          await play
+            .getByText("Play from current line; preceding content is skipped", {
+              exact: true,
+            })
+            .count(),
+          0,
+          "Direct-entry banner must not occupy the story viewport",
+        );
         assert(
           current.state.events.some(
             (e) => e.kind === "line" && e.text.includes("Exact target"),
@@ -242,6 +272,41 @@ async function record(name, fn) {
       },
     );
     await record(
+      "Narrow toolbar keeps the mode label readable in overflow",
+      async () => {
+        const win = await app.browserWindow(editor);
+        await win.evaluate((w) => w.setContentSize(800, 800));
+        await editor.locator(".document-tools-overflow").click();
+        const geometry = await toggle().evaluate((button) => {
+          const label = button.querySelector("span");
+          const rect = button.getBoundingClientRect();
+          const text = label.getBoundingClientRect();
+          return {
+            left: rect.left,
+            right: rect.right,
+            textRight: text.right,
+            textLeft: text.left,
+            width: window.innerWidth,
+          };
+        });
+        assert(geometry.left >= 0 && geometry.right <= geometry.width);
+        assert(
+          geometry.textLeft >= geometry.left &&
+            geometry.textRight <= geometry.right,
+          "Mode label must fit its button",
+        );
+        assert.equal((await toggle().innerText()).trim(), "Current line");
+        await editor.screenshot({
+          path: path.join(out, "play-mode-narrow.png"),
+        });
+        await editor.locator(".document-tools-overflow").click();
+        await editor
+          .locator(".document-tools-popover")
+          .waitFor({ state: "hidden" });
+        await win.evaluate((w) => w.setContentSize(1280, 800));
+      },
+    );
+    await record(
       "Default scene setting persists and controls default launch",
       async () => {
         await editor.locator(".project-switch").click();
@@ -253,28 +318,66 @@ async function record(name, fn) {
           .getByRole("button", { name: "Play", exact: true })
           .click();
         const field = editor.locator("#play-default-scene");
-        await field.fill("故事開始");
-        await field.fill("");
-        await editor.waitForTimeout(250);
+        const pickerWidth = await field.evaluate(
+          (button) => button.getBoundingClientRect().width,
+        );
+        assert(
+          pickerWidth >= 200 && pickerWidth <= 260,
+          `Settings scene control should retain its field width, got ${pickerWidth}px`,
+        );
+        await field.click();
+        const search = editor.getByRole("combobox");
+        await search.waitFor();
         assert.equal(
-          await field.inputValue(),
-          "",
-          "Older saved preference must not overwrite an invalid draft",
+          await editor.getByRole("option").count(),
+          4,
+          "All scenes from both documents are listed",
         );
-        assert.equal(await field.getAttribute("aria-invalid"), "true");
-        const persisted = JSON.parse(
-          fs.readFileSync(
-            path.join(profile, "project-catalog-v1.json"),
-            "utf8",
-          ),
-        );
+        await search.fill("latER");
+        assert.equal(await editor.getByRole("option").count(), 1);
+        assert.match(await editor.getByRole("option").innerText(), /Later/);
+        await search.press("Escape");
         assert.equal(
-          persisted.preferences.playLaunch.defaultScene,
-          "故事開始",
-          "Invalid draft must preserve last valid setting",
+          (await field.innerText()).trim(),
+          "Start",
+          "Dismissed filter must not change the setting",
         );
-        await field.fill("故事開始");
-        await field.press("Tab");
+        await field.click();
+        await search.fill("does-not-exist");
+        assert.equal(
+          await editor.getByRole("option").count(),
+          0,
+          "No match must not synthesize a scene",
+        );
+        await search.fill("故事");
+        assert.equal(
+          await editor.getByRole("option").count(),
+          1,
+          "Chinese scene names filter correctly",
+        );
+        await search.dispatchEvent("compositionstart");
+        await search.press("Enter");
+        assert(
+          await search.isVisible(),
+          "IME confirmation must not commit a scene",
+        );
+        assert.equal((await field.innerText()).trim(), "Start");
+        await search.dispatchEvent("compositionend");
+        await editor.screenshot({
+          path: path.join(out, "play-scene-filter.png"),
+        });
+        await search.press("ArrowDown");
+        await search.press("Enter");
+        assert.equal((await field.innerText()).trim(), "故事開始");
+        await until(async () => {
+          const saved = JSON.parse(
+            fs.readFileSync(
+              path.join(profile, "project-catalog-v1.json"),
+              "utf8",
+            ),
+          );
+          return saved.preferences.playLaunch.defaultScene === "故事開始";
+        }, "Selected scene was not persisted");
         await editor.screenshot({ path: path.join(out, "play-settings.png") });
         await document("Main");
         await chooseMode("Default");
@@ -343,8 +446,24 @@ async function record(name, fn) {
           .locator(".settings-navigation")
           .getByRole("button", { name: "Play", exact: true })
           .click();
-        await editor.locator("#play-default-scene").fill("MissingScene");
-        await editor.locator("#play-default-scene").press("Tab");
+        await editor.evaluate(() =>
+          window.yarnDesktop.request({
+            type: "preferences",
+            playLaunch: { defaultScene: "MissingScene" },
+          }),
+        );
+        const missing = editor.locator("#play-default-scene");
+        await until(
+          async () => (await missing.innerText()).includes("MissingScene"),
+          "Unavailable saved scene must remain visible",
+        );
+        await missing.click();
+        assert.equal(
+          await editor.getByRole("option").count(),
+          4,
+          "Missing saved scene is not a selectable workspace scene",
+        );
+        await editor.keyboard.press("Escape");
         await document("Other");
         await chooseMode("Default");
         await toggle().click();
@@ -372,6 +491,15 @@ async function record(name, fn) {
     );
   } catch (e) {
     result.errors.push(String(e.stack || e));
+    if (play && !play.isClosed()) {
+      fs.writeFileSync(
+        path.join(out, "play-failure.html"),
+        await play.content(),
+      );
+      await play
+        .screenshot({ path: path.join(out, "play-failure.png") })
+        .catch(() => {});
+    }
     await editor
       ?.screenshot({ path: path.join(out, "failure.png") })
       .catch(() => {});

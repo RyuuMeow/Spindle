@@ -156,3 +156,14 @@ The editor Play button now reflects opening/active state and cancels or closes i
 - A test navigation assumption depended on the replaceable Other preview tab after Settings/restart; the helper now identifies any document tab. This was a harness failure, not a product pass. Final launch suite was rerun after final backend cancellation cleanup.
 
 Desktop UI/UX, game-art UI/UX, PM and adversarial QA subagent reviews inspected actual desktop screenshots and behavior. No blocking findings remained. Current-line entry is deliberately limited to standalone noninterpolated dialogue in straight-line compiled scenes; arbitrary branching/command/expression entry remains unsupported and is not silently redirected. Reading/Graph launch context providers, physical IME, mixed-DPI/multi-monitor and packaged Portable were not separately exercised this round. No CI, release or installer packaging was run.
+
+## Searchable Play scenes and visible launch mode — 2026-09-28
+
+Settings → Play and the Play toolbar share a searchable scene selector. Settings lists all workspace scene titles with source filenames, preserves an unavailable saved choice, and commits only an explicit option selection. The editor Play control displays its icon and launch mode; the persistent direct-line banner has been removed. Three-language Play and UI guides are updated.
+
+- Unit tests: 279 passed (`outputs/play-picker-unit.log`). TypeScript passed; lint has zero errors and seven existing local-image warnings. Three-language catalog check: 1039 keys.
+- Web and desktop builds passed (`outputs/play-picker-web.log`, `outputs/play-picker-desktop.log`). No CI, release or package was produced.
+- Desktop tests cover scene discovery across documents, English/Chinese filtering, empty results, keyboard selection/cancellation, synthetic composition protection, retained missing choices, restart persistence, launch feedback and narrow-window label geometry.
+- Desktop UI/UX, game UI/UX, PM and adversarial QA role reviews used actual Electron screenshots. Physical IME, screen reader and mixed-DPI/multi-monitor behavior remain unverified.
+- Existing toolbar overflow does not reliably dismiss with Escape before a resize; the focused tests close it with its trigger. This issue is separate from the scene picker, whose Escape cancellation is verified.
+- Final Electron run: 10/10 checks passed, no renderer errors (`outputs/play-launch/1790587146973/result.json`), including the 240 CSS px settings field after rebuilding the final stylesheet.

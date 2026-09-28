@@ -1,0 +1,96 @@
+.searchable-select[data-slot="select-trigger"] {
+  min-width: 0;
+}
+.searchable-select > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.searchable-select > svg {
+  flex-shrink: 0;
+}
+.setting-row > .searchable-select[data-slot="select-trigger"] {
+  width: 240px;
+  max-width: 100%;
+}
+.searchable-select:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.searchable-select-menu[data-slot="select-content"] {
+  width: var(--radix-popover-trigger-width);
+  min-width: min(260px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: var(--radix-popover-content-available-height);
+  overflow: hidden;
+  outline: none;
+}
+.searchable-select-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--border);
+}
+.searchable-select-filter svg {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.searchable-select-filter input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  padding: 0;
+  outline: none;
+  box-shadow: none;
+}
+.searchable-select-menu [cmdk-list] {
+  max-height: min(
+    280px,
+    calc(var(--radix-popover-content-available-height) - 52px)
+  );
+  overflow: auto;
+  padding: 4px;
+  scroll-padding: 4px;
+}
+.searchable-select-menu [cmdk-item] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: default;
+}
+.searchable-select-menu [cmdk-item][data-selected="true"] {
+  background: var(--surface-selected);
+  color: var(--foreground);
+}
+.searchable-select-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  gap: 2px;
+}
+.searchable-select-copy small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.searchable-select-menu [cmdk-item] > svg {
+  flex-shrink: 0;
+}
+.searchable-select-menu [cmdk-empty] {
+  color: var(--muted-foreground);
+  padding: 12px 8px;
+  font-size: 12px;
+}

@@ -157,7 +157,9 @@ export default function SettingsView({
   onAppearance,
   navigation,
   rescue,
+  scenes,
 }: {
+  scenes?: readonly { name: string; file: string }[];
   navigation?: { section: SettingsSection; field?: string; nonce: number };
   rescue?: React.ReactNode;
   onAppearance?: (patch: AppearancePatch) => void;
@@ -372,6 +374,7 @@ export default function SettingsView({
               {category === "play" && (
                 <section className="settings-group">
                   <PlayLaunchSettings
+                    scenes={scenes}
                     value={presentation.playLaunch.defaultScene}
                     change={
                       onAppPreferences

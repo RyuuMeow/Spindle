@@ -4,6 +4,23 @@ const messages = {
   launchDocument: ["Current document", "當前文件", "当前文件"],
   launchLine: ["Current line", "當前行", "当前行"],
   defaultScene: ["Default start scene", "預設開始場景", "默认开始场景"],
+  searchScenes: ["Search scenes…", "搜尋場景…", "搜索场景…"],
+  noMatchingScenes: ["No matching scenes", "沒有符合的場景", "没有符合的场景"],
+  scenePickerNoWorkspace: [
+    "Open a workspace to choose a scene. The saved choice is kept.",
+    "開啟工作區後即可選擇場景；目前設定會保留。",
+    "打开工作区后即可选择场景；当前设置会保留。",
+  ],
+  scenePickerEmpty: [
+    "This workspace has no scenes. The saved choice is kept.",
+    "目前工作區沒有場景；目前設定會保留。",
+    "当前工作区没有场景；当前设置会保留。",
+  ],
+  scenePickerUnavailable: [
+    "The saved scene is not in this workspace. Choose a scene to replace it.",
+    "已保存的場景不在目前工作區；選擇其他場景才會變更設定。",
+    "已保存的场景不在当前工作区；选择其他场景才会更改设置。",
+  ],
   defaultSceneHelp: [
     "Used by Default play mode. Current document starts at its first scene.",
     "預設模式由此場景開始；當前文件模式由文件內第一個場景開始。",
