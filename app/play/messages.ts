@@ -50,9 +50,9 @@ const messages = {
     "当前文件没有可开始的场景，请新增场景或选择其他文件。",
   ],
   lineNotExecutable: [
-    "This line is not a supported direct entry. Choose plain dialogue in a sequential scene without branches or dynamic expressions.",
-    "此行不支援直接試跑。請選擇沒有分支的順序場景內、不含動態運算式的台詞行。",
-    "此行不支持直接试跑。请选择没有分支的顺序场景内、不含动态表达式的台词行。",
+    "This line is not a supported direct entry. Choose top-level dialogue or narration without inline conditions or dynamic expressions.",
+    "此行不支援直接試跑。請選擇最外層、不含行內條件或動態運算式的台詞或旁白。",
+    "此行不支持直接试跑。请选择最外层、不含行内条件或动态表达式的台词或旁白。",
   ],
   startSourceChanged: [
     "The captured entry document has changed. Close Play and start again from the desired editor position.",
