@@ -1,5 +1,5 @@
 import { t as tr } from "../i18n/index.ts";
-import { useRef } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { usePreview } from "../play/context";
 import {
   BaseEdge,
@@ -9,6 +9,7 @@ import {
   type Node,
   type NodeProps,
   useReactFlow,
+  useStore,
 } from "@xyflow/react";
 import {
   AlertTriangle,
@@ -34,7 +35,6 @@ export type RouteData = {
   active: boolean;
   controls: boolean;
   muted: boolean;
-  zoom: number;
   open: () => void;
   selectPin: (id: string) => void;
   begin: () => void;
@@ -47,6 +47,9 @@ export type RouteData = {
 export type RouteEdge = Edge<RouteData, "route">;
 export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
   const { visited } = usePreview();
+  const zoom = useStore((state) =>
+    data?.controls ? Math.max(0.5, state.transform[2]) : 1,
+  );
   const flow = useReactFlow(),
     drag = useRef<{
       action: RouteAction;
@@ -55,7 +58,7 @@ export function StoryConnection({ id, data, markerEnd }: EdgeProps<RouteEdge>) {
       moved: boolean;
     } | null>(null);
   if (!data) return null;
-  const { route, geometry, group, active, controls, muted, zoom } = data,
+  const { route, geometry, group, active, controls, muted } = data,
     item = group.items[0];
   const label = linkSummary(item);
   const played = group.items.some((link) =>
@@ -241,6 +244,25 @@ export type RouteCardNode = Node<
   "routeCard"
 >;
 export function RouteCard({ data, selected }: NodeProps<RouteCardNode>) {
+  const measure = data.onMeasure;
+  const onMeasure = useRef(measure);
+  const measuredHeight = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    onMeasure.current = measure;
+    // A font change can retain the same dimensions, so ResizeObserver may not
+    // fire. Associate the last measurement with the new font cache key too.
+    if (measuredHeight.current !== null) measure(measuredHeight.current);
+  }, [measure]);
+  const observeCard = useCallback((element: HTMLDivElement | null) => {
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const height = entry.borderBoxSize[0]?.blockSize ?? element.offsetHeight;
+      measuredHeight.current = Math.ceil(height);
+      onMeasure.current(measuredHeight.current);
+    });
+    observer.observe(element, { box: "border-box" });
+    return () => observer.disconnect();
+  }, []);
   const { group, geometry, muted } = data,
     item = group.items[0];
   const label = linkSummary(item);
@@ -256,14 +278,7 @@ export function RouteCard({ data, selected }: NodeProps<RouteCardNode>) {
 
   return (
     <div
-      ref={(element) => {
-        if (!element) return;
-        const observer = new ResizeObserver(() =>
-          data.onMeasure(Math.ceil(element.offsetHeight)),
-        );
-        observer.observe(element);
-        return () => observer.disconnect();
-      }}
+      ref={observeCard}
       data-route-id={group.id}
       role="button"
       tabIndex={0}

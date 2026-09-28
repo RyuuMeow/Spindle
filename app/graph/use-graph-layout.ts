@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -235,11 +236,10 @@ export function useGraphLayout(settings: Settings) {
     },
     [snapshot, createWorker, clearRequestTimer],
   );
-  const geometryKey = JSON.stringify([
-    layout.positions,
-    settings.sizes,
-    settings.labels,
-  ]);
+  const geometryKey = useMemo(
+    () => JSON.stringify([layout.positions, settings.sizes, settings.labels]),
+    [layout.positions, settings.sizes, settings.labels],
+  );
   useEffect(() => {
     if (!settings.ready || settings.suspended) return;
     const timer = setTimeout(
@@ -344,22 +344,40 @@ export function useGraphLayout(settings: Settings) {
     },
     [apply, persist, snapshot, clearRequestTimer, request],
   );
-  return {
-    layout,
-    current,
-    historyRevision,
-    busy,
-    error,
-    begin,
-    preview,
-    cancel,
-    commit,
-    translate,
-    transaction,
-    request,
-    history,
-    persist,
-    canUndo: historyCounts.undo > 0,
-    canRedo: historyCounts.redo > 0,
-  };
+  return useMemo(
+    () => ({
+      layout,
+      current,
+      historyRevision,
+      busy,
+      error,
+      begin,
+      preview,
+      cancel,
+      commit,
+      translate,
+      transaction,
+      request,
+      history,
+      persist,
+      canUndo: historyCounts.undo > 0,
+      canRedo: historyCounts.redo > 0,
+    }),
+    [
+      layout,
+      historyRevision,
+      busy,
+      error,
+      begin,
+      preview,
+      cancel,
+      commit,
+      translate,
+      transaction,
+      request,
+      history,
+      persist,
+      historyCounts,
+    ],
+  );
 }

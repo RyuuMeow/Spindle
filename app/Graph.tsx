@@ -31,6 +31,7 @@ import {
   Handle,
   Position,
   useReactFlow,
+  useStore,
   MarkerType,
   SelectionMode,
   getViewportForBounds,
@@ -99,7 +100,7 @@ type CardData = SceneRecord & {
   editor?: ReactNode;
   warning: boolean;
   compact: boolean;
-  zoom: number;
+  distant: boolean;
   open: () => void;
   menu?: (event: React.KeyboardEvent) => void;
 };
@@ -177,7 +178,7 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
         : tr("mebaad66708ec");
   return (
     <div
-      className={`flow-card flow-card--${data.kind}${selected ? " is-selected" : ""}${data.editor ? " is-editing" : data.compact ? " is-overview" : ""}${!data.editor && data.zoom < 0.35 ? " is-distant" : ""}`}
+      className={`flow-card flow-card--${data.kind}${selected ? " is-selected" : ""}${data.editor ? " is-editing" : data.compact ? " is-overview" : ""}${!data.editor && data.distant ? " is-distant" : ""}`}
       tabIndex={data.editor ? -1 : 0}
       role={data.editor ? undefined : "button"}
       aria-label={tr("m64f54405685e", [
@@ -306,6 +307,43 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
 const nodeTypes = { scene: SceneCard, routeCard: RouteCard };
 const edgeTypes = { route: StoryConnection };
 
+// Only these controls need the exact zoom on every frame. Keep viewport changes
+// out of the canvas's node data, route geometry and measurement subscriptions.
+function ZoomControls() {
+  const zoom = useStore((state) => state.transform[2]);
+  const flow = useReactFlow();
+  return (
+    <>
+      <ChromeButton
+        type="button"
+        aria-label={tr("m092a4a0ba550")}
+        disabled={zoom <= 0.2}
+        onClick={() => void flow.zoomOut({ duration: 150 })}
+        title={tr("m092a4a0ba550")}
+      >
+        <Minus size={15} />
+      </ChromeButton>
+      <button
+        type="button"
+        className="flow-zoom-value"
+        title={tr("m52918cc9eae8")}
+        onClick={() => void flow.zoomTo(1, { duration: 150 })}
+      >
+        {Math.round(zoom * 100)}%
+      </button>
+      <ChromeButton
+        type="button"
+        aria-label={tr("m80f8fbcfa011")}
+        disabled={zoom >= 2}
+        onClick={() => void flow.zoomIn({ duration: 150 })}
+        title={tr("m80f8fbcfa011")}
+      >
+        <Plus size={15} />
+      </ChromeButton>
+    </>
+  );
+}
+
 export default function Graph(props: GraphProps) {
   return (
     <ReactFlowProvider>
@@ -353,7 +391,9 @@ function Canvas({
   const [dragging, setDragging] = useState(false);
   const leftDragStart = useRef<Point | null>(null);
   const [closeRequest, setCloseRequest] = useState(0);
-  const [zoom, setZoom] = useState(graphState?.viewport?.zoom || 1);
+  const detail = useStore((state) =>
+    state.transform[2] < 0.35 ? 0 : state.transform[2] < 0.6 ? 1 : 2,
+  );
   const [heights, setHeights] = useState<Record<string, number>>({});
   const measurementFrame = useRef<number | null>(null);
   const pendingHeights = useRef<Record<string, number>>({});
@@ -693,8 +733,8 @@ function Canvas({
         data: {
           ...record,
           editor: editing?.record.id === record.id ? nodeEditor : undefined,
-          compact: zoom < 0.6,
-          zoom,
+          compact: detail < 2,
+          distant: detail === 0,
           open: () => openRecord(record),
           menu: record.node
             ? (event) => onNodeMenu?.(record.node!, event)
@@ -714,7 +754,7 @@ function Canvas({
       positions,
       automatic,
       nodeSelection,
-      zoom,
+      detail,
       openRecord,
       issues,
       onNodeMenu,
@@ -853,7 +893,6 @@ function Canvas({
             muted:
               (!!edgeSelection || !!groupSelection || nodeSelection.size > 0) &&
               !active,
-            zoom,
             open: () => selectEdge(group.id),
             selectPin: (pin) => setSelectedPin({ edge: group.id, pin }),
             selectGroup: () => {
@@ -916,7 +955,6 @@ function Canvas({
       edgeSelection,
       groupSelection,
       nodeSelection,
-      zoom,
       layout,
       selectEdge,
       beginRoute,
@@ -924,46 +962,61 @@ function Canvas({
       endRoute,
     ],
   );
-  const cardNodes: RouteCardNode[] = routes
-    .filter((r) => r.labelVisible && zoom >= 0.35)
-    .map((r) => ({
-      id: r.id,
-      type: "routeCard",
-      position: { x: r.labelRect.x, y: r.labelRect.y },
-      width: r.labelRect.width,
-      height: r.labelRect.height,
-      measured: { width: r.labelRect.width, height: r.labelRect.height },
-      selected: nodeSelection.has(r.id),
-      zIndex: 50,
-      draggable: !editing,
-      data: {
-        group: groups.find((g) => g.id === r.id)!,
-        geometry: layout.layout.routes[r.id],
-        onMeasure: (height: number) =>
-          setRouteHeights((previous) =>
-            previous[r.id]?.key === fontKey && previous[r.id]?.height === height
-              ? previous
-              : { ...previous, [r.id]: { key: fontKey, height } },
-          ),
-        muted: false,
-        select: (additive) => {
-          setNodeSelection((prior) => {
-            const next = additive ? new Set(prior) : new Set<string>();
-            if (additive && next.has(r.id)) next.delete(r.id);
-            else next.add(r.id);
-            return next;
-          });
-          setEdgeSelection(r.id);
-          setSelectedPin(null);
-          setGroupSelection("");
-        },
-        context: (event) => {
-          const b = event.currentTarget.getBoundingClientRect();
-          if (!nodeSelection.has(r.id)) setNodeSelection(new Set([r.id]));
-          setCanvasMenu({ x: b.left, y: b.bottom, edge: r.id });
-        },
-      },
-    }));
+  const showRouteCards = detail > 0;
+  const cardNodes: RouteCardNode[] = useMemo(
+    () =>
+      routes
+        .filter((r) => r.labelVisible && showRouteCards)
+        .map((r) => ({
+          id: r.id,
+          type: "routeCard",
+          position: { x: r.labelRect.x, y: r.labelRect.y },
+          width: r.labelRect.width,
+          height: r.labelRect.height,
+          measured: { width: r.labelRect.width, height: r.labelRect.height },
+          selected: nodeSelection.has(r.id),
+          zIndex: 50,
+          draggable: !editing,
+          data: {
+            group: groups.find((g) => g.id === r.id)!,
+            geometry: layout.layout.routes[r.id],
+            onMeasure: (height: number) =>
+              setRouteHeights((previous) =>
+                previous[r.id]?.key === fontKey &&
+                previous[r.id]?.height === height
+                  ? previous
+                  : { ...previous, [r.id]: { key: fontKey, height } },
+              ),
+            muted: false,
+            select: (additive) => {
+              setNodeSelection((prior) => {
+                const next = additive ? new Set(prior) : new Set<string>();
+                if (additive && next.has(r.id)) next.delete(r.id);
+                else next.add(r.id);
+                return next;
+              });
+              setEdgeSelection(r.id);
+              setSelectedPin(null);
+              setGroupSelection("");
+            },
+            context: (event) => {
+              const b = event.currentTarget.getBoundingClientRect();
+              if (!nodeSelection.has(r.id)) setNodeSelection(new Set([r.id]));
+              setCanvasMenu({ x: b.left, y: b.bottom, edge: r.id });
+            },
+          },
+        })),
+    [
+      routes,
+      showRouteCards,
+      groups,
+      layout.layout.routes,
+      fontKey,
+      nodeSelection,
+      editing,
+    ],
+  );
+  const flowNodes = useMemo(() => [...nodes, ...cardNodes], [nodes, cardNodes]);
   const selectionLabel = nodeSelection.size
     ? tr("m9188db9d7642") + nodeSelection.size + tr("m30ab8bd88957")
     : tr("mfd774be38b47");
@@ -1116,6 +1169,7 @@ function Canvas({
     layout.history(true);
   }
   const rightDrag = useRef<{
+    pointerId: number;
     x: number;
     y: number;
     viewport: Viewport;
@@ -1202,6 +1256,7 @@ function Canvas({
         if (id && layout.layout.routes[id]?.card && !nodeSelection.has(id))
           setNodeSelection(new Set([id]));
         rightDrag.current = {
+          pointerId: event.pointerId,
           x: event.clientX,
           y: event.clientY,
           viewport: flow.getViewport(),
@@ -1212,6 +1267,7 @@ function Canvas({
             target.closest("[data-pin-id]")?.getAttribute("data-pin-id") ||
             undefined,
         };
+        event.currentTarget.focus({ preventScroll: true });
         event.currentTarget.setPointerCapture(event.pointerId);
         event.preventDefault();
         event.stopPropagation();
@@ -1260,11 +1316,20 @@ function Canvas({
           });
       }}
       onPointerCancel={() => {
+        const panned = rightDrag.current?.moved;
         setDragging(false);
         leftDragStart.current = null;
         rightDrag.current = null;
         routeDragRef.current = null;
         layout.cancel();
+        if (panned) layout.persist();
+      }}
+      onLostPointerCapture={(event) => {
+        if (event.target !== event.currentTarget || !rightDrag.current) return;
+        const panned = rightDrag.current.moved;
+        rightDrag.current = null;
+        setDragging(false);
+        if (panned) layout.persist();
       }}
       onContextMenuCapture={(event) => {
         if (
@@ -1284,6 +1349,11 @@ function Canvas({
         )
           return;
         if (e.key === "Escape") {
+          const right = rightDrag.current;
+          rightDrag.current = null;
+          if (right?.moved) layout.persist();
+          if (right && canvasElement.current?.hasPointerCapture(right.pointerId))
+            canvasElement.current.releasePointerCapture(right.pointerId);
           setDragging(false);
           leftDragStart.current = null;
           routeDragRef.current = null;
@@ -1429,7 +1499,7 @@ function Canvas({
       )}
       {nodes.length ? (
         <ReactFlow<GraphFlowNode, RouteEdge>
-          nodes={[...nodes, ...cardNodes]}
+          nodes={flowNodes}
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -1549,8 +1619,11 @@ function Canvas({
           }}
           onEdgeClick={(_, edge) => selectEdge(edge.id)}
           onNodeDragStop={() => layout.commit()}
-          onMove={(_, viewport) => setZoom(viewport.zoom)}
-          onMoveEnd={() => save()}
+          onMoveEnd={() => {
+            // setViewport ends a programmatic move at every right-drag step.
+            // The gesture already persists once on pointer-up.
+            if (!rightDrag.current?.moved) save();
+          }}
           defaultViewport={graphState?.viewport}
         >
           {Object.values(layout.layout.trunks).map((trunk) => (
@@ -1757,32 +1830,7 @@ function Canvas({
             <Search size={16} />
           </ChromeButton>
           <span />
-          <ChromeButton
-            type="button"
-            aria-label={tr("m092a4a0ba550")}
-            disabled={zoom <= 0.2}
-            onClick={() => void flow.zoomOut({ duration: 150 })}
-            title={tr("m092a4a0ba550")}
-          >
-            <Minus size={15} />
-          </ChromeButton>
-          <button
-            type="button"
-            className="flow-zoom-value"
-            title={tr("m52918cc9eae8")}
-            onClick={() => void flow.zoomTo(1, { duration: 150 })}
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          <ChromeButton
-            type="button"
-            aria-label={tr("m80f8fbcfa011")}
-            disabled={zoom >= 2}
-            onClick={() => void flow.zoomIn({ duration: 150 })}
-            title={tr("m80f8fbcfa011")}
-          >
-            <Plus size={15} />
-          </ChromeButton>
+          <ZoomControls />
           <span />
           <ChromeButton
             type="button"
@@ -1803,7 +1851,7 @@ function Canvas({
                 void flow.setCenter(
                   node.position.x + CARD_WIDTH / 2,
                   node.position.y + cardHeights[node.id] / 2,
-                  { zoom: Math.max(zoom, 1), duration: 200 },
+                  { zoom: Math.max(flow.getZoom(), 1), duration: 200 },
                 );
             }}
           >
