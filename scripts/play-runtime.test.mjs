@@ -273,10 +273,57 @@ test("current-line rejects structural, nested, interpolated and nonexistent entr
       "title: Start\n---\n<<declare $n = 0>>\n// Comment\nMira: {$n}\n<<if true>>\nMira: Nested\n<<endif>>\n-> Choice\n    Mira: Branch\nMira: End\n===",
     ),
   });
-  for (const line of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99]) {
+  for (const line of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 99]) {
     await assert.rejects(
       call("start", { scene: "Start", location: { documentId: "doc", line } }),
       /PLAY_LINE_NOT_EXECUTABLE/,
     );
   }
+});
+
+test("plain narration current-line entry preserves Unicode and CRLF source", async (t) => {
+  const call = helper(t);
+  await call("compile", {
+    documents: docs(
+      "title: Start\r\n---\r\n第一句旁白。\r\n雨落下了。🌧️\r\n最後一句。\r\n===",
+    ),
+  });
+  const state = await call("start", {
+    scene: "Start",
+    location: { documentId: "doc", line: 4 },
+  });
+  assert.equal(
+    state.events.filter((e) => e.kind === "line").at(-1).text,
+    "雨落下了。🌧️",
+  );
+  assert.equal(
+    state.events.filter((e) => e.kind === "line").at(-1).source.line,
+    4,
+  );
+});
+
+test("top-level narration can start before and after unrelated branches", async (t) => {
+  const call = helper(t);
+  await call("compile", {
+    documents: docs(
+      "title: Start\n---\n雨落下了。\n<<if true>>\n條件內旁白。\n<<endif>>\n-> Go\n    選項內旁白。\n結束旁白。\n===",
+    ),
+  });
+  for (const line of [3, 9]) {
+    const state = await call("start", {
+      scene: "Start",
+      location: { documentId: "doc", line },
+    });
+    assert.equal(
+      state.events.filter((e) => e.kind === "line").at(-1).source.line,
+      line,
+    );
+    const after = await call("next");
+    assert.notEqual(after.status, "error");
+  }
+  for (const line of [5, 8])
+    await assert.rejects(
+      call("start", { scene: "Start", location: { documentId: "doc", line } }),
+      /PLAY_LINE_NOT_EXECUTABLE/,
+    );
 });

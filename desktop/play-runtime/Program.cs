@@ -157,20 +157,18 @@ sealed class PlayEngine
         var lines = doc["text"]!.GetValue<string>().Split('\n');
         if (line < 1 || line > lines.Length) throw new Exception("PLAY_LINE_NOT_EXECUTABLE");
         var text = lines[line - 1].Trim();
-        // Restrict v1 entries to standalone, stack-neutral dialogue. Entering
-        // options, conditional branches or expression bytecode is unsafe.
-        if (text.Length == 0 || text.StartsWith("//") || text.StartsWith("<<") || text.StartsWith("->") || text.StartsWith("=>") || text.Contains("<<") || char.IsWhiteSpace(lines[line - 1][0])) throw new Exception("PLAY_LINE_NOT_EXECUTABLE");
-        var node = program!.Program!.Nodes[scene];
-        // Branch entry requires a control-flow/stack verifier. Until then only
-        // straight-line nodes are accepted, based on official bytecode rather
-        // than a second parser or whitespace-sensitive source heuristics.
-        if (node.Instructions.Any(i => i.InstructionTypeCase is
-            Instruction.InstructionTypeOneofCase.JumpIfFalse or
-            Instruction.InstructionTypeOneofCase.JumpTo or
-            Instruction.InstructionTypeOneofCase.AddOption or
-            Instruction.InstructionTypeOneofCase.AddSaliencyCandidate or
-            Instruction.InstructionTypeOneofCase.AddSaliencyCandidateFromNode))
+        // Use the official syntax tree to identify a top-level dialogue statement.
+        // A branch elsewhere in the node does not make this entry unsafe. Nested
+        // statements and inline conditions may depend on prior stack/control state.
+        var syntax = Utility.ParseSourceText(doc["text"]!.GetValue<string>(), id);
+        var sourceLine = Compiler.FlattenParseTree(syntax.Tree)
+            .OfType<YarnSpinnerParser.Line_statementContext>()
+            .SingleOrDefault(statement => statement.Start.Line == line);
+        if (text.Length == 0 || sourceLine == null || sourceLine.line_condition() != null ||
+            sourceLine.Parent is not YarnSpinnerParser.StatementContext ||
+            sourceLine.Parent.Parent is not YarnSpinnerParser.BodyContext)
             throw new Exception("PLAY_LINE_NOT_EXECUTABLE");
+        var node = program!.Program!.Nodes[scene];
         var matches = node.Instructions.Select((instruction, index) => (instruction, index)).Where(pair => {
             if (pair.instruction.InstructionTypeCase != Instruction.InstructionTypeOneofCase.RunLine || pair.instruction.RunLine.SubstitutionCount != 0) return false;
             var info = program.StringTable![pair.instruction.RunLine.LineID];

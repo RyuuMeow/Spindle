@@ -167,3 +167,14 @@ Settings → Play and the Play toolbar share a searchable scene selector. Settin
 - Desktop UI/UX, game UI/UX, PM and adversarial QA role reviews used actual Electron screenshots. Physical IME, screen reader and mixed-DPI/multi-monitor behavior remain unverified.
 - Existing toolbar overflow does not reliably dismiss with Escape before a resize; the focused tests close it with its trigger. This issue is separate from the scene picker, whose Escape cancellation is verified.
 - Final Electron run: 10/10 checks passed, no renderer errors (`outputs/play-launch/1790587146973/result.json`), including the 240 CSS px settings field after rebuilding the final stylesheet.
+
+## Source scrolling, closing menus and narration entry — 2026-09-28
+
+Source scroll persisted its view, which rerendered Workbench and unnecessarily rescanned the entire document for selection/symbol highlighting. External refresh now depends on variable definitions, and the highlight controller caches semantic inputs. Selection, text edits, Find and preferences still invalidate correctly. Right-click menus retain their anchor and contents during Radix exit animation instead of moving to (0,0).
+
+Current-line validation previously rejected an entire compiled scene whenever it contained any branch. It now uses the official Yarn syntax tree to accept top-level standalone dialogue/narration while retaining exact string-table source matching and zero-substitution bytecode checks. Branch bodies, inline conditions, commands and interpolation remain unsupported; unrelated branches elsewhere no longer reject narration. This reproduces one cause of narration rejection; the user's exact failing source was not supplied.
+
+- Actual Electron 2,000-line/60-scroll-step comparison: full-text reads 59 → 0, highlight stylesheet writes 59 → 0; elapsed 1,132ms → 660ms. Maximum frame remained 68.4ms, so this is not a claim of zero dropped frames. Evidence: `outputs/source-scroll/1790588074447/result.json` and `outputs/source-scroll/1790588213764/result.json`.
+- Unit suite 282/282 passed, including 11 official-runtime tests and a highlight invalidation regression. Plain Chinese/emoji narration with CRLF and narration before/after unrelated branches are covered; the branch test failed before the fix.
+- Actual Play desktop workflow 10/10 passed, no renderer errors: `outputs/play-launch/1790588251905/result.json`. Mode selection now asserts the closing anchor retains its original coordinates.
+- TypeScript, lint (zero errors; seven existing image warnings), Web/desktop build and runtime staging passed. No CI, release or packaging. Physical IME, mixed-DPI and the exact user project remain unverified.
