@@ -2,6 +2,12 @@
 
 [English](CHANGELOG.md) · [繁體中文詳細記錄](CHANGELOG.zh-TW.md)
 
+## 0.11.0
+
+Adds Windows Play with Novel/VN presentation, reversible runtime checkpoints, source links, character/asset configuration and preview effects. Adds default/document/current-line launch modes, weighted dialogue-length advice and two read-only MCP Play tools. Improves character autosave, list editors, responsive panels, Source/Reading/Graph scrolling and menu tooltip behavior. Live MCP editor context includes the document, cursor and exact selected text; the README now foregrounds this workflow.
+
+[Release notes: English](releases/0.11.0/en.md) · [繁體中文](releases/0.11.0/zh-TW.md) · [简体中文](releases/0.11.0/zh-CN.md) · [Verification](releases/0.11.0/verification.md)
+
 ## 0.10.0
 
 Unified search across scripts, content, settings and commands; provisional script creation in a new tab; English, Traditional Chinese and Simplified Chinese UI; legacy draft recovery in Settings; versioned Windows Portable and NSIS update flows. The public demo project and locale-matched guides are separate from the empty default workspace.

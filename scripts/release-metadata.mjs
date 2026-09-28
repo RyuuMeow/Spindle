@@ -50,7 +50,7 @@ const names = fs
   .filter(
     (name) =>
       (name.includes(version) && /\.(exe|json|md|zip)$/.test(name)) ||
-      name.endsWith("-source.zip") ||
+      (name.endsWith("-source.zip") && !name.startsWith("Spindle-")) ||
       ["latest.yml", "LICENSE.txt", "THIRD_PARTY_NOTICES.md"].includes(name),
   );
 const sums = names.sort().map(

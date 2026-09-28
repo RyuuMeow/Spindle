@@ -10,7 +10,11 @@ const pw = require("playwright"),
   target = path.join(base, "My Spindle.exe");
 fs.mkdirSync(path.join(root, ".spindle"), { recursive: true });
 fs.mkdirSync(path.join(profile, "updates"), { recursive: true });
-fs.copyFileSync("release/Spindle-0.9.2-Portable-x64.exe", target);
+fs.copyFileSync(
+  process.env.SPINDLE_PREVIOUS_PORTABLE ||
+    "release/Spindle-0.10.0-Portable-x64.exe",
+  target,
+);
 fs.writeFileSync(
   path.join(root, "Story.yarn"),
   "title: Start\n---\nNarrator: Before update\n===\n",
@@ -91,7 +95,7 @@ const hash = (file) =>
         pid,
         profile,
         token,
-        version: "0.10.0",
+        version: require("../version.json").version,
       }),
     );
     console.log("Starting actual Portable replacement");

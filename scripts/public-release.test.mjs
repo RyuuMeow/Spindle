@@ -39,14 +39,33 @@ test("release metadata accepts Windows checkout line endings", () => {
         path.join(root, "release", `Spindle-0.10.0-${kind}-x64.exe`),
         "test artifact",
       );
-    execFileSync(process.execPath, [path.resolve("scripts/release-metadata.mjs")], {
-      cwd: root,
-    });
+    for (const name of [
+      "Spindle-0.9.2-source.zip",
+      "Spindle-0.10.0-source.zip",
+      "vendor-source.zip",
+    ])
+      fs.writeFileSync(path.join(root, "release", name), "source fixture");
+    execFileSync(
+      process.execPath,
+      [path.resolve("scripts/release-metadata.mjs")],
+      {
+        cwd: root,
+      },
+    );
     const metadata = JSON.parse(
-      fs.readFileSync(path.join(root, "release", "Spindle-0.10.0-release.json")),
+      fs.readFileSync(
+        path.join(root, "release", "Spindle-0.10.0-release.json"),
+      ),
     );
     assert.equal(metadata.notes.en.features, "- Verified");
     assert.equal(metadata.notes["zh-TW"].markdown.includes("\r"), false);
+    const manifest = fs.readFileSync(
+      path.join(root, "release", "SHA256SUMS-0.10.0.txt"),
+      "utf8",
+    );
+    assert.ok(!manifest.includes("Spindle-0.9.2-source.zip"));
+    assert.ok(manifest.includes("Spindle-0.10.0-source.zip"));
+    assert.ok(manifest.includes("vendor-source.zip"));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -148,7 +167,10 @@ test("release checks never download executables and respect skipped versions", a
   const original = globalThis.fetch,
     requests = [],
     prompts = [];
-  const version = "0.11.0",
+  const version = require("semver").inc(
+      require("../version.json").version,
+      "minor",
+    ),
     name = `Spindle-${version}-Portable-x64.exe`,
     url = (n) =>
       `https://github.com/RyuuMeow/Spindle/releases/download/v${version}/${n}`;
