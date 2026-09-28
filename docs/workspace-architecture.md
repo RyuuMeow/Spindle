@@ -4,6 +4,8 @@
 
 # Workspace architecture
 
+Play launch preferences store mode and default scene in the App profile. The owner-bound service broadcasts window/launch status, cancels pending helpers with generation checks, and disposes failed windows. A captured source entry is retained on restart; latest-content restart rejects a changed entry document. The helper validates bytecode before assigning a direct entry instruction; no source text is rewritten. See [Play](play.md) for supported entry limits.
+
 ## Presentation preferences and shared diagnostics
 
 `presentation-preferences.ts` resolves editor-character, Play-presentation and dialogue-length defaults and validates field patches. App profile and Web storage keep these global preferences; they do not belong in project metadata. Desktop merges patches centrally; Web preference and appearance writes share the same Web Lock when supported. Monaco uses removable decorations, CodeMirror updates existing decoration fields, and the reader retains source-linked spans. These updates do not rebuild document models or mutate Yarn.

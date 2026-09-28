@@ -4,6 +4,8 @@
 
 # Spindle interface conventions
 
+Play's editor button shows a pause glyph while opening or active; its action is explicitly “Stop and close Play,” not runtime pause. Right-click or Shift+F10 opens the persistent radio-choice launch menu. Novel's continuation cue is horizontally centered at the top of the transparent advance area, 12 CSS px below its start; the whole area remains clickable. See [launch rules and source-entry limits](play.md).
+
 ## Character presentation and writing advice
 
 Characters & preview follows the command workspace layout: a full-height character list separated from a flat, independently scrolling editor, with a drawer at narrow widths. Preview effects share the command form’s content inset and width. Character presentation toggles occupy separate rows rather than adjoining inline labels.

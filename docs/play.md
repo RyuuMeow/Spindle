@@ -2,11 +2,15 @@
 
 # Play preview — acceptance build
 
-This Windows desktop preview implements the first development round (A–D). It does not change the published 0.10.0 release. Web Play, audio, precise line entry, saved test cases and agent-controlled playback are deferred.
+This Windows desktop preview implements A–D plus editor launch modes. It does not change the published 0.10.0 release. Web Play, audio, unrestricted source entry, saved test cases and agent-controlled playback are deferred.
 
 ## Try a story
 
-Open a project and press Play beside the editor mode buttons. Playback starts at the current scene's beginning; if no scene can be identified, choose a start scene. Each editor window owns one Play window and a separate runtime. Standalone files compile only that document.
+Open a project and press Play beside the editor mode buttons. The button shows active feedback during startup and while its Play window exists; pressing it again interrupts the run and closes that window. Closing Play directly resets the editor button. Each editor window owns one Play window and a separate runtime. Standalone files compile only that document.
+
+Right-click Play to select its launch mode: Default uses the scene name in Settings → Play (initially `Start`); Current document starts at that document's first scene in source order; Current line requests a validated direct source entry. The checked mode and default scene are saved in the local App profile. Changing modes affects the next launch, not an existing run. A missing scene or invalid source entry reports an error rather than silently selecting another location.
+
+Current-line entry currently accepts standalone, top-level dialogue without interpolation in a straight-line scene. It initializes declared variables and skips preceding execution; the Play window states this explicitly. Scenes containing conditional branches or options, as well as headers, comments, commands and interpolation, are rejected. Restart retains the captured entry. Recompiling a changed entry document requires launching again from the editor, so an old line number cannot target unrelated new content.
 
 Novel mode accumulates dialogue; VN mode shows a background, three actor positions and a dialogue box. Switching modes preserves the run. Next first completes the typewriter, then advances. Auto remains enabled while waiting for a choice and resumes after a manual selection; errors stop Auto. The debug panel provides variable search, pins, typed test overrides, conditions, commands and source links. Unavailable options remain visible; an unavailable reason is not invented.
 
@@ -32,7 +36,7 @@ The offline, self-contained Windows x64 helper uses official Yarn Spinner 3.2.1 
 
 `vendor/yarn-spinner/UPSTREAM.md` identifies the pinned upstream and concentrated debug extensions. Compilation and expression evaluation remain official Yarn code. Checkpoints are process-local and not persisted. The UI labels official compiler diagnostics separately from editor diagnostics.
 
-MCP adds `list_play_sessions(editorSessionId)` and `get_play_context(editorSessionId, playSessionId)`. Both work in read-only mode and return no edit authority. Context is separate from the editor selection; events, choices and variable strings carry truncation indicators. Playback mutations and precise source entry belong to phase E.
+MCP adds `list_play_sessions(editorSessionId)` and `get_play_context(editorSessionId, playSessionId)`. Both work in read-only mode and return no edit authority. Context is separate from the editor selection; events, choices and variable strings carry truncation indicators. MCP playback mutations and source-entry operations remain deferred.
 
 ## Build and verify
 

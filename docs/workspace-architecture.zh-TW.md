@@ -4,6 +4,8 @@
 
 # 文件、保存與同步契約
 
+Play 啟動模式與預設場景保存在 App profile。服務依來源視窗隔離、廣播啟動／視窗狀態，以世代檢查取消待完成 helper，並清理載入失敗的視窗。重跑保留固定來源入口；入口文件已改變時拒絕使用最新內容重跑。helper 驗證 bytecode 後才設定直接入口，不改寫原文。支援範圍詳見 [Play](play.zh-TW.md)。
+
 ## 呈現偏好與共用診斷
 
 `presentation-preferences.ts` 集中解析編輯器角色、Play 呈現及台詞長度預設值並驗證欄位 patch。偏好存於 App profile／Web storage，不寫入專案。桌面主程序合併更新；支援 Web Lock 時，Web 偏好與風格更新共用同一鎖。Monaco 使用可移除 decoration、CodeMirror 更新既有 decoration field、閱讀模式保留來源 span；不重建文件 model 或修改 Yarn。

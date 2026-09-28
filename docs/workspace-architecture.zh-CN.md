@@ -4,6 +4,8 @@
 
 # 工作区架构
 
+Play 启动模式与默认场景保存在 App profile。服务按来源窗口隔离、广播启动／窗口状态，通过世代检查取消待完成 helper，并清理加载失败的窗口。重跑保留固定来源入口；入口文件已改变时拒绝使用最新内容重跑。helper 验证 bytecode 后才设置直接入口，不改写原文。支持范围详见 [Play](play.zh-CN.md)。
+
 ## 呈现偏好与共享诊断
 
 `presentation-preferences.ts` 集中解析编辑器角色、Play 呈现及台词长度默认值并验证字段 patch。偏好保存在 App profile／Web storage，不写入项目。桌面主进程合并更新；支持 Web Lock 时，Web 偏好与风格更新使用同一锁。Monaco 使用可移除 decoration、CodeMirror 更新既有 decoration field、阅读模式保留来源 span；不重建文档 model 或修改 Yarn。
