@@ -8,11 +8,11 @@ const out = path.resolve("outputs/play-ui/" + Date.now()),
 fs.mkdirSync(root, { recursive: true });
 fs.writeFileSync(
   path.join(root, "Story.yarn"),
-  "title: Start\n---\n<<declare $key = false>>\nMira: Hello 世界 👨‍👩‍👧‍👦\n<<give_item key 1>>\n-> Open <<if $key>>\n    <<jump Room>>\n-> Stay\n    Mira: Wait\n===",
+  "\uFEFFtitle: Start\n---\n<<declare $key = false>>\nMira: Hello 世界 👨‍👩‍👧‍👦\n<<give_item key 1>>\n-> Open <<if $key>>\n    <<jump Room>>\n-> Stay\n    Mira: Wait\n===",
 );
 fs.writeFileSync(
   path.join(root, "Room.yarn"),
-  "title: Room\n---\nMira: Inside\n===",
+  "\uFEFFtitle: Room\n---\nMira: Inside\n===",
 );
 let app, client;
 async function launch() {

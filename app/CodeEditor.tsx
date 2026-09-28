@@ -338,7 +338,10 @@ export default function CodeEditor({
       }
       language="yarn"
       theme="yarn-dark"
-      value={doc.text}
+      // Monaco stores the BOM separately. Its React adapter compares getValue()
+      // without that marker, so passing it here inserts a second, visible BOM
+      // on remote updates. syncModel restores the original marker on mount.
+      value={doc.text.startsWith("\ufeff") ? doc.text.slice(1) : doc.text}
       saveViewState
       keepCurrentModel
       onChange={(s, event) =>
