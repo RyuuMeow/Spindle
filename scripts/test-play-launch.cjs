@@ -85,7 +85,16 @@ async function document(name, line = 1) {
 }
 async function chooseMode(name) {
   await toggle().click({ button: "right" });
+  const anchor = editor.locator(
+    ".document-tools-expanded .context-menu-anchor",
+  );
+  const position = await anchor.getAttribute("style");
   await editor.getByRole("menuitemradio", { name, exact: true }).click();
+  assert.equal(
+    await anchor.getAttribute("style"),
+    position,
+    "Closing animation retains its original menu anchor",
+  );
   assert.equal(
     (await toggle().innerText()).trim(),
     name,

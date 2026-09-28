@@ -1,7 +1,7 @@
 "use client";
 import { t as tr } from "../i18n/index.ts";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -30,10 +30,15 @@ export default function ActionMenu({
   menu: MenuState | null;
   onClose: () => void;
 }) {
+  // Radix retains the closing content for its exit animation. Preserve its
+  // anchor, items and focus origin until a new menu replaces them.
+  const [retained, setRetained] = useState(menu);
+  if (menu && menu !== retained) setRetained(menu);
+  const displayed = menu ?? retained;
   return (
     <DropdownMenu
       open={!!menu}
-      modal={menu?.parent !== "project"}
+      modal={displayed?.parent !== "project"}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
@@ -42,21 +47,21 @@ export default function ActionMenu({
         tabIndex={-1}
         aria-label={tr("maceafaa89e66")}
         className="context-menu-anchor"
-        style={{ left: menu?.x || 0, top: menu?.y || 0 }}
+        style={{ left: displayed?.x || 0, top: displayed?.y || 0 }}
       />
       <DropdownMenuContent
         className="desktop-menu"
         side="bottom"
         align="start"
         onFocusOutside={(event) => {
-          if (menu?.parent === "project") event.preventDefault();
+          if (displayed?.parent === "project") event.preventDefault();
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          menu?.origin?.focus();
+          displayed?.origin?.focus();
         }}
       >
-        {menu?.actions.map((action, index) =>
+        {displayed?.actions.map((action, index) =>
           action ? (
             <DropdownMenuItem
               key={index}

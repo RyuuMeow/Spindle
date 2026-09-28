@@ -24,7 +24,8 @@ export default function PlayLaunchButton({
   const launch = resolvePresentation(preferences).playLaunch;
   const [active, setActive] = useState(false);
   const [pending, setPending] = useState<"open" | "close" | null>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState({ x: 0, y: 0 });
+  const [menuOpen, setMenuOpen] = useState(false);
   const inFlight = useRef<"open" | "close" | null>(null);
   const operation = useRef(0);
   const reportStatusError = useEffectEvent((error: unknown) =>
@@ -109,6 +110,7 @@ export default function PlayLaunchButton({
         onContextMenu={(event) => {
           event.preventDefault();
           setMenu({ x: event.clientX, y: event.clientY });
+          setMenuOpen(true);
         }}
         onKeyDown={(event) => {
           if (
@@ -118,6 +120,7 @@ export default function PlayLaunchButton({
             event.preventDefault();
             const rect = event.currentTarget.getBoundingClientRect();
             setMenu({ x: rect.left, y: rect.bottom });
+            setMenuOpen(true);
           }
         }}
       >
@@ -129,16 +132,14 @@ export default function PlayLaunchButton({
         <span>{labels[launch.mode]}</span>
       </ChromeButton>
       <DropdownMenu
-        open={!!menu}
-        onOpenChange={(open) => {
-          if (!open) setMenu(null);
-        }}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
       >
         <DropdownMenuTrigger
           className="context-menu-anchor"
           tabIndex={-1}
           aria-label={pt("start")}
-          style={{ left: menu?.x || 0, top: menu?.y || 0 }}
+          style={{ left: menu.x, top: menu.y }}
         />
         <DropdownMenuContent
           className="desktop-menu"
