@@ -201,8 +201,10 @@ export default function CodeEditor({
     undoCallback.current = onUndo;
     compositionCallback.current = onComposition;
     latest.current = { commands, nodes, variables, onRegisterCommand, issues };
-    highlights.current?.refresh();
   });
+  useLayoutEffect(() => {
+    highlights.current?.refresh();
+  }, [variables]);
   const hintChanges = useRef<import("monaco-editor").Emitter<void> | null>(
     null,
   );

@@ -13,12 +13,21 @@ export function sourceHighlights(
   root.appendChild(sheet);
   const scope = `[data-highlight-editor="${editor.getId()}"]`;
   root.setAttribute("data-highlight-editor", editor.getId());
+  let previousModel: editor.ITextModel | null = null;
+  let previousInputs = "";
+  let previousCss = "";
   const refresh = () => {
     const model = editor.getModel(),
       selection = editor.getSelection();
     const s = style();
-    sheet.textContent = `${scope} .spindle-selection-match { background-color: ${s.matches}; } ${scope} .spindle-symbol-match { ${s.symbolStyle === "background" ? `background-color: ${s.symbols}` : `box-shadow: inset 0 -1px ${s.symbols}`}; }`;
+    const css = `${scope} .spindle-selection-match { background-color: ${s.matches}; } ${scope} .spindle-symbol-match { ${s.symbolStyle === "background" ? `background-color: ${s.symbols}` : `box-shadow: inset 0 -1px ${s.symbols}`}; }`;
+    if (css !== previousCss) {
+      sheet.textContent = css;
+      previousCss = css;
+    }
     if (!model || !selection) {
+      previousModel = null;
+      previousInputs = "";
       decorations.clear();
       return;
     }
@@ -28,16 +37,28 @@ export function sourceHighlights(
       !!find.querySelector<HTMLInputElement>(
         ".find-part input, .find-part textarea",
       )?.value;
+    const names = declarations();
+    const count = editor.getSelections()?.length;
+    const from = model.getOffsetAt(selection.getStartPosition());
+    const to = model.getOffsetAt(selection.getEndPosition());
+    // View persistence and Find DOM updates can request refresh without changing
+    // semantic inputs. Do not rescan the document or replace decorations on scroll.
+    const inputs = JSON.stringify([
+      model.getVersionId(),
+      from,
+      to,
+      count,
+      searching,
+      s.highlightMatches,
+      s.highlightSymbols,
+      names,
+    ]);
+    if (model === previousModel && inputs === previousInputs) return;
+    previousModel = model;
+    previousInputs = inputs;
     const ranges =
-      editor.getSelections()?.length === 1
-        ? highlightRanges(
-            model.getValue(),
-            model.getOffsetAt(selection.getStartPosition()),
-            model.getOffsetAt(selection.getEndPosition()),
-            searching,
-            s,
-            declarations(),
-          )
+      count === 1
+        ? highlightRanges(model.getValue(), from, to, searching, s, names)
         : [];
     decorations.set(
       ranges.map((r) => {
