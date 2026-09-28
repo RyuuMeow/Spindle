@@ -7,4 +7,7 @@ Source: https://github.com/YarnSpinnerTool/YarnSpinner/tree/v3.2.1
 Spindle additions are isolated in `SpindleDebug.cs`. The runtime class is made
 partial, its instruction loop invokes a debug observer, and random selection
 uses an optional process-local test source. No language evaluation rules change.
-One helper process owns one Play session. Retain LICENSE.md when distributing.
+One helper process owns one Play session. `SetDebugEntry` is used only after
+the helper verifies an exact, stack-neutral dialogue instruction in a
+straight-line node; it does not seek by executing or rewrite source text.
+Retain LICENSE.md when distributing.

@@ -1,4 +1,5 @@
 import { t as tr } from "../i18n/index.ts";
+import { pt } from "../play/messages";
 import type { SettingEntry } from "./search";
 export const settingSections = [
   {
@@ -98,6 +99,13 @@ export const extraSettingLabels = {
   "mcp.port": tr("ma73bbb476e36"),
 };
 export const settingEntries: SettingEntry[] = [
+  {
+    id: "playLaunch.defaultScene",
+    field: "playLaunch.defaultScene",
+    section: "play",
+    label: pt("defaultScene"),
+    keywords: "start scene play 起始 開始 场景 場景",
+  },
   ...(
     [
       ["editorCharacters.showPortraits", "characters.showPortraits", "reading"],

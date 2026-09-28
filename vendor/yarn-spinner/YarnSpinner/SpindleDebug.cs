@@ -55,6 +55,12 @@ namespace Yarn
     {
         public Action<string, int, Instruction>? DebugBeforeInstruction { set => vm.BeforeInstruction = value; }
         public Action<Instruction>? DebugAfterInstruction { set => vm.AfterInstruction = value; }
+        // Only called after the host validates a stack-neutral source entry.
+        public void SetDebugEntry(int instruction) {
+            if (vm.currentNode == null || instruction < 0 || instruction >= vm.currentNode.Instructions.Count)
+                throw new ArgumentOutOfRangeException(nameof(instruction));
+            vm.state.programCounter = instruction;
+        }
         public object CaptureDebugState() => vm.Capture();
         public bool DebugConditionValue() => vm.state.PeekValue().ConvertTo<bool>();
         public void RestoreDebugState(object state) => vm.Restore((VirtualMachine.Snapshot)state);

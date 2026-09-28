@@ -57,7 +57,6 @@ import {
   FolderPlus,
   X,
   Check,
-  Play,
   MoreHorizontal,
 } from "lucide-react";
 import type { editor as MonacoEditor, Position } from "monaco-editor";
@@ -128,6 +127,7 @@ import { resolvePresentation } from "./presentation-preferences";
 import "./workspace.css";
 import CharactersView from "../play/CharactersView";
 import { pt } from "../play/messages";
+import PlayLaunchButton from "../play/PlayLaunchButton";
 import { PreviewProvider } from "../play/context";
 import { flushPreviewDrafts } from "../play/preview-autosave";
 
@@ -1935,38 +1935,11 @@ function WorkbenchContent({
   const documentTools = doc ? (
     <>
       {window.yarnDesktop && (
-        <ChromeButton
-          title={
-            pt("play") +
-            (analysis.nodes.find(
-              (n) =>
-                n.file === doc?.name &&
-                n.start <= active.line &&
-                n.end >= active.line,
-            )?.name
-              ? ": " +
-                analysis.nodes.find(
-                  (n) =>
-                    n.file === doc?.name &&
-                    n.start <= active.line &&
-                    n.end >= active.line,
-                )?.name
-              : "")
-          }
-          onClick={() =>
-            void window
-              .yarnDesktop!.play.open()
-              .catch((e) =>
-                notify(
-                  String(e).includes("PLAY_INPUT_PENDING")
-                    ? pt("pending")
-                    : String(e),
-                ),
-              )
-          }
-        >
-          <Play size={17} aria-hidden="true" />
-        </ChromeButton>
+        <PlayLaunchButton
+          preferences={snapshot.preferences}
+          change={(patch) => void perform({ type: "preferences", ...patch })}
+          notify={notify}
+        />
       )}
       <ChromeButton
         title={tr("m9c633473d49a")}

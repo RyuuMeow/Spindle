@@ -108,12 +108,13 @@ export type PlaySession = {
   capturedAt: number;
   stale: boolean;
   startScene?: string;
+  startLocation?: { documentId: string; line: number };
   state: PlayState;
   documents: { id: string; name: string; version: number; text: string }[];
   resources: PreviewResources;
 };
 export type PlayAction =
-  | { action: "state" | "next" | "back" | "stop" | "latest" }
+  | { action: "state" | "next" | "back" | "stop" | "latest" | "restart" }
   | { action: "start"; scene: string }
   | { action: "choose"; optionId: number }
   | { action: "setVariable"; name: string; value: string | number | boolean };
@@ -126,7 +127,13 @@ export type PlayBridge = {
     }) => void,
   ): () => void;
   isWindow: boolean;
-  open(): Promise<void>;
+  open(options?: {
+    mode: "default" | "document" | "line";
+    defaultScene: string;
+  }): Promise<void>;
+  close(): Promise<void>;
+  status(): Promise<boolean>;
+  onStatus(callback: (active: boolean) => void): () => void;
   action(action: PlayAction, revision?: number): Promise<PlaySession>;
   subscribe(callback: (session: PlaySession | null) => void): () => void;
   reveal(

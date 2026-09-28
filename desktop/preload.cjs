@@ -10,7 +10,10 @@ contextBridge.exposeInMainWorld("yarnDesktop", {
     onPreferences: (callback) =>
       subscribe("play:preferences-changed", callback),
     isWindow: process.argv.includes("--spindle-play=true"),
-    open: () => ipcRenderer.invoke("play:open"),
+    open: (options) => ipcRenderer.invoke("play:open", options),
+    close: () => ipcRenderer.invoke("play:close"),
+    status: () => ipcRenderer.invoke("play:status"),
+    onStatus: (callback) => subscribe("play:status-changed", callback),
     action: (action, revision) =>
       ipcRenderer.invoke("play:action", action, revision),
     subscribe: (callback) => subscribe("play:changed", callback),

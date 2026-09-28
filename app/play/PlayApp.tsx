@@ -291,7 +291,11 @@ export default function PlayApp() {
     try {
       accept(await bridge.action(action, s.state.revision));
     } catch (e) {
-      setError(String(e));
+      setError(
+        String(e).includes("PLAY_START_SOURCE_CHANGED")
+          ? pt("startSourceChanged")
+          : String(e),
+      );
       setAuto(false);
     } finally {
       actionPending.current = false;
@@ -514,7 +518,7 @@ export default function PlayApp() {
           disabled={busy || !session?.startScene}
           onClick={() => {
             setAuto(false);
-            void act({ action: "start", scene: session!.startScene! });
+            void act({ action: "restart" });
           }}
         >
           <RotateCcw size={18} />
@@ -631,6 +635,11 @@ export default function PlayApp() {
           <Minimize2 size={17} />
           <span>{pt("exitImmersive")}</span>
         </button>
+      )}
+      {session?.startLocation && !immersive && (
+        <div className="play-notice" role="status">
+          {pt("launchLineHint")}
+        </div>
       )}
       {session?.stale && (
         <div className="play-notice">
@@ -757,7 +766,7 @@ export default function PlayApp() {
                     disabled={busy}
                     onClick={() => {
                       setAuto(false);
-                      void act({ action: "start", scene: session.startScene! });
+                      void act({ action: "restart" });
                     }}
                   >
                     {pt("rerun")}

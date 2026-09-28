@@ -1,5 +1,47 @@
 import { locale } from "../i18n";
 const messages = {
+  launchDefault: ["Default", "預設", "默认"],
+  launchDocument: ["Current document", "當前文件", "当前文件"],
+  launchLine: ["Current line", "當前行", "当前行"],
+  defaultScene: ["Default start scene", "預設開始場景", "默认开始场景"],
+  defaultSceneHelp: [
+    "Used by Default play mode. Current document starts at its first scene.",
+    "預設模式由此場景開始；當前文件模式由文件內第一個場景開始。",
+    "默认模式从此场景开始；当前文件模式从文件内第一个场景开始。",
+  ],
+  invalidStartScene: [
+    "Enter a scene name of up to 160 characters without leading/trailing spaces or control characters.",
+    "請輸入最多 160 字元的場景名稱，不包含首尾空白或控制字元。",
+    "请输入最多 160 字符的场景名称，不包含首尾空白或控制字符。",
+  ],
+  launchLineHint: [
+    "Play from current line; preceding content is skipped",
+    "從當前行試跑；略過前文",
+    "从当前行试跑；跳过前文",
+  ],
+  closePlay: ["Stop and close Play", "中斷並關閉 Play", "中断并关闭 Play"],
+  startingPlay: ["Starting Play…", "正在啟動 Play…", "正在启动 Play…"],
+  closingPlay: ["Closing Play…", "正在關閉 Play…", "正在关闭 Play…"],
+  startNotFound: [
+    "The configured start scene is not in this workspace. Change the default start scene in Play settings.",
+    "工作區找不到設定的開始場景，請在 Play 設定修改預設開始場景。",
+    "工作区找不到设置的开始场景，请在 Play 设置修改默认开始场景。",
+  ],
+  documentStartNotFound: [
+    "This document has no scene to start. Add a scene or choose another document.",
+    "目前文件沒有可開始的場景，請新增場景或選擇其他文件。",
+    "当前文件没有可开始的场景，请新增场景或选择其他文件。",
+  ],
+  lineNotExecutable: [
+    "This line is not a supported direct entry. Choose plain dialogue in a sequential scene without branches or dynamic expressions.",
+    "此行不支援直接試跑。請選擇沒有分支的順序場景內、不含動態運算式的台詞行。",
+    "此行不支持直接试跑。请选择没有分支的顺序场景内、不含动态表达式的台词行。",
+  ],
+  startSourceChanged: [
+    "The captured entry document has changed. Close Play and start again from the desired editor position.",
+    "記錄的起點文件已變更。請關閉 Play，再從編輯器中想要的位置重新啟動。",
+    "记录的起点文件已更改。请关闭 Play，再从编辑器中想要的位置重新启动。",
+  ],
   resubmitChanges: [
     "Submit my changes again",
     "重新提交我的變更",

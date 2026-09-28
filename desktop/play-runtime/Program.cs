@@ -67,8 +67,11 @@ sealed class PlayEngine
         else if (action == "start")
         {
             if (program?.Program == null || program.ContainsErrors) throw new Exception("PROGRAM_NOT_COMPILED");
-            start = request["scene"]?.GetValue<string>() ?? start;
-            if (!program.Program.Nodes.ContainsKey(start)) throw new Exception("SCENE_NOT_FOUND");
+            var requestedStart = request["scene"]?.GetValue<string>() ?? start;
+            if (!program.Program.Nodes.ContainsKey(requestedStart)) throw new Exception("SCENE_NOT_FOUND");
+            int? entry = null;
+            if (request["location"] is { } target) entry = SafeEntry(target, requestedStart);
+            start = requestedStart;
             store = new(); random = new(); overrides.Clear(); SpindleRandom.Source = random;
             dialogue = new Dialogue(store);
             dialogue.SetProgram(program.Program);
@@ -99,7 +102,7 @@ sealed class PlayEngine
             };
             dialogue.NodeStartHandler = node => { var metadata = program.NodeMetadata.FirstOrDefault(n => n.Title == node || n.UniqueTitle == node); Add("scene", node, metadata == null ? null : Source(metadata.Uri, metadata.TitleLine + 1, 1)); };
             dialogue.DialogueCompleteHandler = () => status = "completed";
-            dialogue.SetNode(start); Advance(); history.Add(Capture());
+            dialogue.SetNode(start); if (entry is { } index) dialogue.SetDebugEntry(index); Advance(); history.Add(Capture());
         }
         else if (action is "next" or "choose")
         {
@@ -145,6 +148,36 @@ sealed class PlayEngine
         else if (action != "state") throw new Exception("UNKNOWN_ACTION");
         if (action != "state") revision++;
         return State();
+    }
+    int SafeEntry(JsonNode target, string scene)
+    {
+        var id = target["documentId"]!.GetValue<string>();
+        var line = target["line"]!.GetValue<int>();
+        var doc = documents.FirstOrDefault(d => d!["id"]!.GetValue<string>() == id) ?? throw new Exception("PLAY_LINE_NOT_EXECUTABLE");
+        var lines = doc["text"]!.GetValue<string>().Split('\n');
+        if (line < 1 || line > lines.Length) throw new Exception("PLAY_LINE_NOT_EXECUTABLE");
+        var text = lines[line - 1].Trim();
+        // Restrict v1 entries to standalone, stack-neutral dialogue. Entering
+        // options, conditional branches or expression bytecode is unsafe.
+        if (text.Length == 0 || text.StartsWith("//") || text.StartsWith("<<") || text.StartsWith("->") || text.StartsWith("=>") || text.Contains("<<") || char.IsWhiteSpace(lines[line - 1][0])) throw new Exception("PLAY_LINE_NOT_EXECUTABLE");
+        var node = program!.Program!.Nodes[scene];
+        // Branch entry requires a control-flow/stack verifier. Until then only
+        // straight-line nodes are accepted, based on official bytecode rather
+        // than a second parser or whitespace-sensitive source heuristics.
+        if (node.Instructions.Any(i => i.InstructionTypeCase is
+            Instruction.InstructionTypeOneofCase.JumpIfFalse or
+            Instruction.InstructionTypeOneofCase.JumpTo or
+            Instruction.InstructionTypeOneofCase.AddOption or
+            Instruction.InstructionTypeOneofCase.AddSaliencyCandidate or
+            Instruction.InstructionTypeOneofCase.AddSaliencyCandidateFromNode))
+            throw new Exception("PLAY_LINE_NOT_EXECUTABLE");
+        var matches = node.Instructions.Select((instruction, index) => (instruction, index)).Where(pair => {
+            if (pair.instruction.InstructionTypeCase != Instruction.InstructionTypeOneofCase.RunLine || pair.instruction.RunLine.SubstitutionCount != 0) return false;
+            var info = program.StringTable![pair.instruction.RunLine.LineID];
+            return info.fileName == id && info.lineNumber == line;
+        }).ToArray();
+        if (matches.Length != 1) throw new Exception("PLAY_LINE_NOT_EXECUTABLE");
+        return matches[0].index;
     }
     void Set(string name, object value) { if (value is float number) store.SetValue(name, number); else if (value is bool boolean) store.SetValue(name, boolean); else store.SetValue(name, (string)value); }
     object? VariableValue(string name) {

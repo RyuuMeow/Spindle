@@ -212,6 +212,7 @@ export type WorkspaceAction =
       skippedVersion?: string;
       editorCharacters?: import("./presentation-preferences").PresentationPreferences["editorCharacters"];
       playPresentation?: import("./presentation-preferences").PresentationPreferences["playPresentation"];
+      playLaunch?: import("./presentation-preferences").PresentationPreferences["playLaunch"];
       dialogueLength?: import("./presentation-preferences").PresentationPreferences["dialogueLength"];
     }
   | { type: "closeProject"; projectId: string }

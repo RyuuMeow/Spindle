@@ -965,3 +965,5 @@ button.statistics-bar:hover { color:#fff; background:#ffffff05; }
   .workbench .project-switch strong,
   .workbench .project-switch > svg:last-child { display:none; }
 }
+.play-launch-menu-item { display:flex; align-items:center; gap:8px; padding:6px 9px; border-radius:var(--radius-sm); outline:none; cursor:default; font-size:13px; }
+.play-launch-menu-item[data-highlighted] { background:var(--accent); color:var(--accent-foreground); }

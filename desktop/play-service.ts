@@ -28,9 +28,18 @@ type Record = {
   runtime: PlayProcess;
   busy: boolean;
 };
+const launchSchema = z
+  .object({
+    mode: z.enum(["default", "document", "line"]),
+    defaultScene: z.string().trim().min(1).max(300),
+  })
+  .strict();
+type Launch = z.infer<typeof launchSchema>;
 const actionSchema = z.discriminatedUnion("action", [
   z
-    .object({ action: z.enum(["state", "next", "back", "stop", "latest"]) })
+    .object({
+      action: z.enum(["state", "next", "back", "stop", "latest", "restart"]),
+    })
     .strict(),
   z
     .object({ action: z.literal("start"), scene: z.string().min(1).max(300) })
@@ -63,6 +72,8 @@ export function createPlayService(options: {
     "play-runtime",
     "Spindle.Play.exe",
   );
+  const generations = new Map<string, number>();
+  const pendingRuntimes = new Map<string, PlayProcess>();
   const preferencesPath = path.join(profile, "play-window-v1.json");
   function alive(record: Record) {
     return (
@@ -96,13 +107,16 @@ export function createPlayService(options: {
     return record;
   }
   function dispose(record: Record) {
+    if (records.get(record.editor.id) !== record) return;
     records.delete(record.editor.id);
+    if (!record.editor.window.isDestroyed())
+      record.editor.window.webContents.send("play:status-changed", false);
     record.runtime.close();
     if (!record.editor.window.isDestroyed())
       record.editor.window.webContents.send("play:changed", null);
     if (!record.window.isDestroyed()) record.window.destroy();
   }
-  async function snapshot(editor: EditorWindow) {
+  async function snapshot(editor: EditorWindow, launch?: Launch) {
     const target = host.list().find((s) => s.windowId === editor.id);
     if (!target) throw Error("EDITOR_SESSION_EXPIRED");
     const contexts = await Promise.all(
@@ -155,18 +169,27 @@ export function createPlayService(options: {
     const nodes = doc
       ? parse([{ ...doc, saved: doc.text }], project.commands).nodes
       : [];
-    const scene = line
+    const cursorScene = line
       ? nodes.find((n) => n.start <= line && n.end >= line)?.name
       : undefined;
     return {
       target,
       documents,
-      scene,
+      scene:
+        launch?.mode === "default"
+          ? launch.defaultScene
+          : launch?.mode === "document"
+            ? nodes[0]?.name
+            : cursorScene,
+      location:
+        launch?.mode === "line" && doc && line
+          ? { documentId: doc.id, line }
+          : undefined,
       resources: resources.read(project),
       projectName: project.name,
     };
   }
-  async function open(editor: EditorWindow) {
+  async function open(editor: EditorWindow, launch?: Launch, generation = 0) {
     const existing = records.get(editor.id);
     if (existing && alive(existing)) {
       existing.window.show();
@@ -174,10 +197,19 @@ export function createPlayService(options: {
       return;
     }
     if (existing) dispose(existing);
-    const data = await snapshot(editor);
+    const data = await snapshot(editor, launch);
+    if (launch?.mode !== "default" && launch && !data.scene)
+      throw Error("PLAY_START_NOT_FOUND");
+    if (launch?.mode === "line" && !data.location)
+      throw Error("PLAY_LINE_NOT_EXECUTABLE");
+    if (
+      generations.get(editor.id) !== generation ||
+      editor.window.isDestroyed()
+    )
+      throw Error("PLAY_LAUNCH_CANCELLED");
     const runtime = new PlayProcess(executable, (message) => {
       const record = records.get(editor.id);
-      if (record) {
+      if (record?.runtime === runtime) {
         record.session.state.status = "error";
         record.session.state.events.push({
           id: -1,
@@ -187,6 +219,7 @@ export function createPlayService(options: {
         send(record);
       }
     });
+    pendingRuntimes.set(editor.id, runtime);
     let state;
     try {
       state = await runtime.request({
@@ -194,17 +227,31 @@ export function createPlayService(options: {
         documents: data.documents,
       });
       if (state.status === "ready" && data.scene)
-        state = await runtime.request({ action: "start", scene: data.scene });
+        state = await runtime.request({
+          action: "start",
+          scene: data.scene,
+          location: data.location,
+        });
     } catch (error) {
       runtime.close();
+      if (generations.get(editor.id) !== generation)
+        throw Error("PLAY_LAUNCH_CANCELLED");
       throw error;
+    } finally {
+      if (pendingRuntimes.get(editor.id) === runtime)
+        pendingRuntimes.delete(editor.id);
     }
     if (
       editor.window.isDestroyed() ||
-      editor.projectId !== data.target.projectId
+      editor.projectId !== data.target.projectId ||
+      generations.get(editor.id) !== generation
     ) {
       runtime.close();
-      throw Error("EDITOR_SESSION_EXPIRED");
+      throw Error(
+        generations.get(editor.id) !== generation
+          ? "PLAY_LAUNCH_CANCELLED"
+          : "EDITOR_SESSION_EXPIRED",
+      );
     }
     let saved: { width?: number; height?: number; x?: number; y?: number } = {};
     try {
@@ -267,6 +314,7 @@ export function createPlayService(options: {
         capturedAt: Date.now(),
         stale: false,
         startScene: data.scene,
+        startLocation: data.location,
         documents: data.documents,
         resources: data.resources,
         state,
@@ -278,7 +326,10 @@ export function createPlayService(options: {
     editor.window.once("closed", editorClosed);
     window.on("closed", () => {
       editor.window.removeListener("closed", editorClosed);
+      if (records.get(editor.id) !== record) return;
       records.delete(editor.id);
+      if (!editor.window.isDestroyed())
+        editor.window.webContents.send("play:status-changed", false);
       runtime.close();
       if (!editor.window.isDestroyed())
         editor.window.webContents.send("play:changed", null);
@@ -297,16 +348,52 @@ export function createPlayService(options: {
       window.show();
       send(value);
     });
-    await window.loadURL("workbench://app/");
+    try {
+      await window.loadURL("workbench://app/");
+    } catch (error) {
+      dispose(record);
+      if (generations.get(editor.id) !== generation)
+        throw Error("PLAY_LAUNCH_CANCELLED");
+      throw error;
+    }
   }
-  ipcMain.handle("play:open", (event) => {
-    const editor = owner(event);
+  ipcMain.handle("play:open", (event, input) => {
+    const editor = owner(event),
+      launch = input === undefined ? undefined : launchSchema.parse(input);
     let request = opening.get(editor.id);
     if (!request) {
-      request = open(editor).finally(() => opening.delete(editor.id));
+      const generation = (generations.get(editor.id) || 0) + 1;
+      generations.set(editor.id, generation);
+      editor.window.webContents.send("play:status-changed", true);
+      request = open(editor, launch, generation).finally(() => {
+        opening.delete(editor.id);
+        if (!editor.window.isDestroyed())
+          editor.window.webContents.send(
+            "play:status-changed",
+            records.has(editor.id),
+          );
+      });
       opening.set(editor.id, request);
     }
     return request;
+  });
+  ipcMain.handle("play:status", (event) => {
+    const editor = owner(event);
+    return records.has(editor.id) || opening.has(editor.id);
+  });
+  ipcMain.handle("play:close", async (event) => {
+    const editor = owner(event);
+    generations.set(editor.id, (generations.get(editor.id) || 0) + 1);
+    pendingRuntimes.get(editor.id)?.close();
+    const record = records.get(editor.id);
+    if (record) dispose(record);
+    try {
+      await opening.get(editor.id);
+    } catch {
+      /* A cancelled launch is closed. */
+    }
+    if (!editor.window.isDestroyed())
+      editor.window.webContents.send("play:status-changed", false);
   });
   ipcMain.handle("play:preferences", (event) => {
     get(event);
@@ -323,6 +410,14 @@ export function createPlayService(options: {
     try {
       if (action.action === "latest") {
         const data = await snapshot(record.editor);
+        if (record.session.startLocation) {
+          const id = record.session.startLocation.documentId;
+          if (
+            data.documents.find((d) => d.id === id)?.text !==
+            record.session.documents.find((d) => d.id === id)?.text
+          )
+            throw Error("PLAY_START_SOURCE_CHANGED");
+        }
         const state = await record.runtime.request({
           action: "compile",
           documents: data.documents,
@@ -342,10 +437,21 @@ export function createPlayService(options: {
           record.session.state = await record.runtime.request({
             action: "start",
             scene: record.session.startScene,
+            location: record.session.startLocation,
           });
       } else {
-        record.session.state = await record.runtime.request(action);
+        record.session.state = await record.runtime.request(
+          action.action === "restart"
+            ? {
+                action: "start",
+                scene: record.session.startScene,
+                location: record.session.startLocation,
+              }
+            : action,
+        );
+        if (action.action === "restart") record.session.runId = randomUUID();
         if (action.action === "start") {
+          record.session.startLocation = undefined;
           record.session.startScene = action.scene;
           record.session.runId = randomUUID();
         }
@@ -476,6 +582,9 @@ export function createPlayService(options: {
   return {
     changed,
     close: () => {
+      for (const runtime of pendingRuntimes.values()) runtime.close();
+      for (const id of opening.keys())
+        generations.set(id, (generations.get(id) || 0) + 1);
       for (const record of records.values()) dispose(record);
     },
     list: (editorSessionId: string) =>

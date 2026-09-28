@@ -1,5 +1,15 @@
+export const validPlaySceneName = (value: unknown): value is string =>
+  typeof value === "string" &&
+  value.length <= 160 &&
+  value.trim() === value &&
+  value.length > 0 &&
+  !/[\x00-\x1f\x7f]/.test(value);
 /** Application-wide presentation preferences; omitted patch fields never reset peers. */
 export type PresentationPreferences = {
+  playLaunch?: {
+    mode?: "default" | "document" | "line";
+    defaultScene?: string;
+  };
   editorCharacters?: {
     showPortraits?: boolean;
     useNameColors?: boolean;
@@ -10,6 +20,16 @@ export type PresentationPreferences = {
 };
 export function resolvePresentation(value?: PresentationPreferences) {
   return {
+    playLaunch: {
+      mode: (["default", "document", "line"] as const).includes(
+        value?.playLaunch?.mode as "default",
+      )
+        ? value!.playLaunch!.mode!
+        : ("default" as const),
+      defaultScene: validPlaySceneName(value?.playLaunch?.defaultScene)
+        ? value!.playLaunch!.defaultScene!
+        : "Start",
+    },
     editorCharacters: {
       showPortraits: value?.editorCharacters?.showPortraits === true,
       useNameColors: value?.editorCharacters?.useNameColors !== false,
@@ -35,6 +55,17 @@ export function patchPresentation(
   patch: PresentationPreferences,
 ) {
   const next = resolvePresentation(current);
+  const launch = patch.playLaunch;
+  if (launch && typeof launch === "object") {
+    if (
+      launch.mode === "default" ||
+      launch.mode === "document" ||
+      launch.mode === "line"
+    )
+      next.playLaunch.mode = launch.mode;
+    if (validPlaySceneName(launch.defaultScene))
+      next.playLaunch.defaultScene = launch.defaultScene;
+  }
   for (const group of [
     "editorCharacters",
     "playPresentation",

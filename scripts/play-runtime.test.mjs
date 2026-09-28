@@ -229,3 +229,54 @@ test("once and visited state restore with the runtime checkpoint", async (t) => 
   const replayVisit = await call("choose", { optionId: 0 });
   assert.deepEqual(replayVisit.events, revisit.events);
 });
+
+test("current-line entry skips prior effects and preserves exact source and rewind", async (t) => {
+  const call = helper(t);
+  await call("compile", {
+    documents: docs(
+      "title: Start\n---\n<<declare $n = 0>>\n<<set $n = 8>>\nMira: Before\nMira: Target\nMira: After\n===",
+    ),
+  });
+  let state = await call("start", {
+    scene: "Start",
+    location: { documentId: "doc", line: 6 },
+  });
+  assert.equal(
+    state.events.filter((e) => e.kind === "line").at(-1).text,
+    "Mira: Target",
+  );
+  assert.equal(
+    state.events.filter((e) => e.kind === "line").at(-1).source.line,
+    6,
+  );
+  assert.equal(state.variables.find((v) => v.name === "$n").value, 0);
+  assert.equal(
+    state.events.some((e) => e.kind === "variable"),
+    false,
+  );
+  state = await call("next");
+  assert.equal(
+    state.events.filter((e) => e.kind === "line").at(-1).text,
+    "Mira: After",
+  );
+  state = await call("back");
+  assert.equal(
+    state.events.filter((e) => e.kind === "line").at(-1).text,
+    "Mira: Target",
+  );
+});
+
+test("current-line rejects structural, nested, interpolated and nonexistent entries", async (t) => {
+  const call = helper(t);
+  await call("compile", {
+    documents: docs(
+      "title: Start\n---\n<<declare $n = 0>>\n// Comment\nMira: {$n}\n<<if true>>\nMira: Nested\n<<endif>>\n-> Choice\n    Mira: Branch\nMira: End\n===",
+    ),
+  });
+  for (const line of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99]) {
+    await assert.rejects(
+      call("start", { scene: "Start", location: { documentId: "doc", line } }),
+      /PLAY_LINE_NOT_EXECUTABLE/,
+    );
+  }
+});

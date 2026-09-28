@@ -22,8 +22,42 @@ const { resolvePresentation, patchPresentation } = load(
 );
 const { ProjectCatalog } = load("desktop/project-catalog.ts");
 const { WorkspaceClient } = load("app/workspace/client.ts");
+test("Play launch settings merge independently, preserve Unicode and reject malformed values", () => {
+  const initial = patchPresentation(
+    {},
+    { playLaunch: { mode: "line", defaultScene: "序章_開始" } },
+  );
+  const changed = patchPresentation(initial, {
+    playLaunch: { mode: "document" },
+    playPresentation: { showPortraits: false },
+  });
+  assert.deepEqual(changed.playLaunch, {
+    mode: "document",
+    defaultScene: "序章_開始",
+  });
+  for (const defaultScene of [
+    "",
+    " Start",
+    "Start\nNext",
+    12,
+    "a".repeat(161),
+  ]) {
+    assert.deepEqual(
+      patchPresentation(changed, {
+        playLaunch: { mode: "bogus", defaultScene },
+      }).playLaunch,
+      changed.playLaunch,
+    );
+  }
+  assert.deepEqual(
+    resolvePresentation({ playLaunch: { mode: "bogus", defaultScene: "" } })
+      .playLaunch,
+    { mode: "default", defaultScene: "Start" },
+  );
+});
 test("defaults and invalid values resolve safely", () => {
   assert.deepEqual(resolvePresentation(), {
+    playLaunch: { mode: "default", defaultScene: "Start" },
     editorCharacters: {
       showPortraits: false,
       useNameColors: true,
@@ -71,6 +105,7 @@ test("ProjectCatalog persists presentation without overwriting unrelated prefere
     ...patchPresentation(catalog.preferences, {
       dialogueLength: { enabled: false, limit: 40 },
       editorCharacters: { showPortraits: true },
+      playLaunch: { mode: "document", defaultScene: "序章" },
     }),
   };
   catalog.persist();
@@ -82,6 +117,10 @@ test("ProjectCatalog persists presentation without overwriting unrelated prefere
     limit: 40,
   });
   assert.equal(reopened.preferences.editorCharacters.showPortraits, true);
+  assert.deepEqual(reopened.preferences.playLaunch, {
+    mode: "document",
+    defaultScene: "序章",
+  });
 });
 test("Browser clients serialize preference writes and merge persisted peer fields", async () => {
   const oldWindow = globalThis.window,

@@ -33,6 +33,7 @@ export type { SettingsSection } from "./settings-registry";
 import AppearanceSettings from "../appearance/AppearanceSettings";
 import type { AppearancePatch } from "../appearance/model";
 import { resolvePresentation } from "./presentation-preferences";
+import PlayLaunchSettings from "../play/PlayLaunchSettings";
 
 export type WorkspacePreferences = Pick<
   WindowSession,
@@ -370,6 +371,15 @@ export default function SettingsView({
               )}
               {category === "play" && (
                 <section className="settings-group">
+                  <PlayLaunchSettings
+                    value={presentation.playLaunch.defaultScene}
+                    change={
+                      onAppPreferences
+                        ? (defaultScene) =>
+                            onAppPreferences({ playLaunch: { defaultScene } })
+                        : undefined
+                    }
+                  />
                   {characterSwitches("playPresentation")}
                 </section>
               )}
