@@ -17,6 +17,7 @@
     "desktop:pack:portable": "pnpm desktop:stage && node scripts/package-desktop.mjs --portable-only",
     "desktop:pack": "pnpm desktop:stage && node scripts/package-desktop.mjs",
     "test:desktop-ui": "node scripts/test-desktop-ui.cjs",
+    "test:editor-scroll": "node scripts/test-source-scroll.cjs && node scripts/test-reading-scroll.cjs && node scripts/test-graph-scroll.cjs",
     "test:graph": "node --test scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs",
     "test:workspace": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs",
     "test:workspace-ui": "node scripts/test-workspace-ui.cjs",

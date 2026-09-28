@@ -178,3 +178,30 @@ Current-line validation previously rejected an entire compiled scene whenever it
 - Unit suite 282/282 passed, including 11 official-runtime tests and a highlight invalidation regression. Plain Chinese/emoji narration with CRLF and narration before/after unrelated branches are covered; the branch test failed before the fix.
 - Actual Play desktop workflow 10/10 passed, no renderer errors: `outputs/play-launch/1790588251905/result.json`. Mode selection now asserts the closing anchor retains its original coordinates.
 - TypeScript, lint (zero errors; seven existing image warnings), Web/desktop build and runtime staging passed. No CI, release or packaging. Physical IME, mixed-DPI and the exact user project remain unverified.
+
+## Follow-up scroll profiling and menu focus — 2026-09-28
+
+Branch: `fix/editor-scroll-performance`. The reported Read surface was confirmed as the editable reading mode. This follow-up profiles actual Electron rendering in isolated profiles; no user project is modified.
+
+Source was still publishing every scroll frame to Workbench and reapplying a freshly allocated Monaco options object. It now coalesces view persistence after 150ms while navigation/exit retain immediate capture. Reading's character context now has stable identity, and its variable/length decorations no longer rescan the document for viewport-only updates. Graph isolates exact zoom from semantic detail thresholds, retains route-card observers and saves the final pan viewport. Node positions, pins and layout history are preserved.
+
+| Probe | Before | After |
+| --- | --- | --- |
+| Source: 120 scroll steps, view captures / option updates | 120 / 119 | 1 / 0 |
+| Reading editor: 60 scroll steps, semantic refreshes / full-text reads | 60 / 132 | 0 / 0 |
+| Graph: 80 wheel inputs, observers / measurements | 3,888 / 1,968 | 0 / 0 |
+| Graph: 80 right-drag steps, observers / measurements | 3,840 / 3,744 | 0 / 0 |
+
+- Source baseline: `outputs/source-scroll/1790589018530/result.json`; final: `outputs/source-scroll/1790590604465/result.json`. A real 25-event wheel run also recorded one view capture and zero option updates, with a p95 frame interval of 8.6ms. The immediate tab-switch probe restored scrollTop 12000. The programmatic probe still recorded a 39ms maximum frame; these results do not guarantee frame-perfect scrolling.
+- Reading baseline: `outputs/reading-scroll/1790588974464/result.json`; final short and mixed long-wrapped fixtures: `outputs/reading-scroll/1790589780923/` and `1790589809779/`. Both 2,000-line fixtures reached the last line without sampled bottom gaps. Live character preferences, quiet typing, delayed diagnostic publication and correction passed. The user's exact loading discontinuity was **not reproduced**; removing the measured repeated scans does not establish that every visual gap is fixed. CodeMirror's virtualization remains intact.
+- Graph visible baseline: `outputs/graph-scroll/1790589875161/result.json`; final: `outputs/graph-scroll/1790590479078/`. Wheel p95 interval improved from 16.7ms to 8.5ms; frames over 25ms went from seven to zero. Both versions made zero routing-worker requests during the viewport probes. Manual node/pin geometry, full pan displacement, detail thresholds, equal-height font changes, larger font measurement and Escape cancellation passed. The fixture has 24 scenes/routes at 1440×960, with one full scene and partial neighbors visible; dense branching graphs and physical touchpads remain unverified.
+
+Play's menu now restores focus to its own trigger without requesting a tooltip. This also applies to shared action menus. Deliberate hover and Tab focus still show descriptions, and Escape dismisses without stealing focus. The explicit restoration guard is necessary because Chromium can keep `:focus-visible` when returning from a text field even after pointer menu selection.
+
+- Final Electron Play launch suite: **11/11 passed**, no renderer errors (`outputs/play-launch/1790590686575/result.json`), including pointer menu selection after a settings text field, deliberate hover, Tab, Escape and the existing launch/cancellation/current-line checks.
+- Complete unit/integration suite: **282/282 passed** (`outputs/scroll-unit.log`), including MCP, installer and official runtime tests. TypeScript passed; full lint has zero errors and seven existing image warnings, with a clean final scoped lint. Web build through `scripts/run-framework.mjs build` and the final desktop renderer build/stage passed. Existing bundle-size warnings remain. The unmodified desktop main process and runtime helper were reused; no standalone package was built.
+- One accidental direct Next/Turbopack invocation failed on the repository's Vite worker/WASM imports. It was not the supported build entry point; its generated type-validator files were removed before the successful final type check. Running that check concurrently with Web output replacement also produced transient missing generated files; the final check ran after the build. Neither attempt is counted as a successful build/check.
+
+Test development also caught and corrected two harness assumptions: Monaco normalizes wheel deltas instead of scrolling by the sum of raw input pixels, and Radix's hover grace area requires intermediate pointer moves rather than a single synthetic teleport. Earlier failing runs are retained as failures. Graph regression additionally caught early pan termination from bubbling child capture events; the final handler only accepts capture loss on its own canvas.
+
+Desktop UI/UX, game-art UI/UX, PM and adversarial QA subagent passes reviewed screenshots, interaction contracts and regression coverage. They are not independent human reviews. Physical Windows IME, OS-forced pointer cancellation, mixed-DPI/multiple monitors, prolonged use and the exact user project were not newly exercised. No CI, release or package was produced. Run `pnpm test:editor-scroll` after desktop staging to repeat the three scroll probes; use `node scripts/test-reading-scroll.cjs --wrapped` for the additional long-line fixture.

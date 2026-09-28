@@ -49,3 +49,7 @@ UI 与 MCP 共用解析、命令与变量辅助来源。`DiagnosticPresentation`
 `desktop/mcp-windows.cjs` 登记运行期会话 ID 并向 renderer 取得精确情境；`app/mcp/use-agent-context.ts` 提供实时来源位置。`desktop/mcp/application.ts` 管理快照、版本核对与去重；`desktop/mcp/runtime.ts` 负责 loopback HTTP、协议及凭证。外部行为见 [MCP 指南](mcp.zh-CN.md)。安装服务只修改指定的 Codex／Claude 用户配置与共用 Skill，记录所有权与恢复状态；不会安装第二个 server 或修改 Agent 的信任策略。
 
 `version.json` 是唯一人工维护的产品版本。`app/i18n/` 包含三种离线语言。`desktop/restart.cjs` 协调语言重启与更新前保存。`desktop/update-service.ts` 限定 GitHub 仓库、版本、平台和附件类型，安装前核对 SHA-256。安装版使用 electron-updater；Portable 使用独立 Windows 辅助程序与旧 exe 备份。自动检查仅接受公开稳定版，用户选择后才下载。测试边界见[发布流程](releases.zh-CN.md)与[验证报告](../releases/0.10.0/verification.md)。
+
+## 滚动与视口更新
+
+Source 的逐帧滚动由 Monaco 处理，停止 150ms 后合并保存视图；导航及离开工作区仍立即捕获当前视图。Monaco options 与角色呈现 context 只在输入改变时更新引用。阅读诊断装饰依据文档事务或明确的语义刷新更新，不因视口测量重算。图表的即时缩放百分比与场景细节阈值分开更新；分支卡保留尺寸监测器并复用测量。平移只保存最后视口，不触发重新布线或改动布局历史。
