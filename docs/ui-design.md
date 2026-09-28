@@ -57,3 +57,7 @@ Surfaces have four levels: shell, docked panels, editor and floating layers. Doc
 ## Play presentation
 
 Desktop Play uses the same shell/novel typography, surfaces, focus and control tokens as the editor. VN is an intentionally separate game-art surface with an inset translucent message window, attached name label and restrained choices. Game content never includes source-link icons; debugging stays in the side panel. Dialogue uses a fixed two-line capacity and local display pages; only long option lists scroll, VN text is not selectable (Novel reading interactions are unchanged), and reduced motion also disables the JavaScript typewriter. See [Play](play.md) for interaction and mode-switch rules.
+
+## Control tooltip focus
+
+A pointer-selected menu restores focus without opening a keyboard tooltip. Deliberate hover and keyboard-visible focus retain their descriptions; Escape dismisses a tooltip without moving focus. This applies to shared window/panel controls, including the Play launch-mode menu.

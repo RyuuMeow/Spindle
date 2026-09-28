@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Check, Pause, Play } from "lucide-react";
 import { DropdownMenu as Primitive } from "radix-ui";
 import { ChromeButton } from "@/components/ChromeButton";
+import { restoreControlFocus } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,7 @@ export default function PlayLaunchButton({
   const [menu, setMenu] = useState({ x: 0, y: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
   const inFlight = useRef<"open" | "close" | null>(null);
+  const launchButton = useRef<HTMLButtonElement>(null);
   const operation = useRef(0);
   const reportStatusError = useEffectEvent((error: unknown) =>
     notify(String(error)),
@@ -100,6 +102,7 @@ export default function PlayLaunchButton({
   return (
     <>
       <ChromeButton
+        ref={launchButton}
         title={title}
         className="play-launch-button"
         data-play-launch
@@ -131,10 +134,7 @@ export default function PlayLaunchButton({
         )}
         <span>{labels[launch.mode]}</span>
       </ChromeButton>
-      <DropdownMenu
-        open={menuOpen}
-        onOpenChange={setMenuOpen}
-      >
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger
           className="context-menu-anchor"
           tabIndex={-1}
@@ -146,9 +146,7 @@ export default function PlayLaunchButton({
           align="start"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            document
-              .querySelector<HTMLButtonElement>("[data-play-launch]")
-              ?.focus();
+            restoreControlFocus(launchButton.current);
           }}
         >
           <Primitive.RadioGroup

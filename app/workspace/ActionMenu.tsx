@@ -2,6 +2,7 @@
 import { t as tr } from "../i18n/index.ts";
 
 import { useState, type ReactNode } from "react";
+import { restoreControlFocus } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -58,7 +59,7 @@ export default function ActionMenu({
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          displayed?.origin?.focus();
+          restoreControlFocus(displayed?.origin);
         }}
       >
         {displayed?.actions.map((action, index) =>

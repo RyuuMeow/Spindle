@@ -100,6 +100,13 @@ async function chooseMode(name) {
     name,
     "Mode stays visible on editor Play button",
   );
+  await editor.mouse.move(400, 700, { steps: 8 });
+  await editor.waitForTimeout(600);
+  assert.equal(
+    await editor.getByRole("tooltip").count(),
+    0,
+    "Pointer menu selection must not leave a focus-triggered tooltip behind",
+  );
 }
 async function open() {
   const pending = app.waitForEvent("window");
@@ -142,6 +149,33 @@ async function record(name, fn) {
       .getByRole("button", { name: "Open project folder", exact: true })
       .click();
     await document("Other", 6);
+    await record(
+      "Play tooltip supports deliberate hover and keyboard focus without focus theft",
+      async () => {
+        await toggle().hover();
+        await editor.getByRole("tooltip").waitFor();
+        // Cross Radix's hover grace area with real intermediate moves. A single
+        // synthetic teleport never supplies the next pointermove it tracks.
+        await editor.mouse.move(400, 700, { steps: 8 });
+        await editor.getByRole("tooltip").waitFor({ state: "hidden" });
+        await toggle().focus();
+        await editor.keyboard.press("Shift+Tab");
+        await editor.keyboard.press("Tab");
+        assert(
+          await toggle().evaluate(
+            (button) => document.activeElement === button,
+          ),
+        );
+        await editor.getByRole("tooltip").waitFor();
+        await editor.keyboard.press("Escape");
+        await editor.getByRole("tooltip").waitFor({ state: "hidden" });
+        assert(
+          await toggle().evaluate(
+            (button) => document.activeElement === button,
+          ),
+        );
+      },
+    );
     await record(
       "Radio menu has exactly one selected launch mode",
       async () => {
