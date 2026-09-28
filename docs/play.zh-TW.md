@@ -1,8 +1,8 @@
 [English](play.md) · [繁體中文](play.zh-TW.md) · [简体中文](play.zh-CN.md)
 
-# Play 試跑：驗收版
+# Play 試跑
 
-本版實作 A–D 及編輯器啟動模式，不變更已發布的 0.10.0。Web Play、音訊、完整來源入口、命名測試與 agent 操控屬於後續階段。
+Spindle 0.11.0 Windows 版提供小說／VN 試跑、角色、執行狀態檢視、回溯及編輯器開始模式。Web Play、音訊、完整來源入口、命名測試與 agent 操控屬於後續階段。
 
 ## 操作
 

@@ -1,6 +1,6 @@
 [English](mcp.md) · [繁體中文](mcp.zh-TW.md) · [简体中文](mcp.zh-CN.md)
 
-> **Play 试跑 (A–D)** — 验收版新增两个只读工具：`list_play_sessions` 指定 `editorSessionId`；`get_play_context` 另指定 `playSessionId`，共 22 个工具。Play 情境与编辑器选区分离，包括固定文件版本、当前台词、选项、变量及有限的近期事件。A–D 不提供 MCP 试跑修改。详见 [Play](play.zh-CN.md)。
+> **0.11.0 Play 试跑** — 新增两个只读工具：`list_play_sessions` 指定 `editorSessionId`；`get_play_context` 另指定 `playSessionId`，共 22 个工具。Play 情境与编辑器选区分离，包括固定文件版本、当前台词、选项、变量及有限的近期事件，尚不提供 MCP 试跑修改。详见 [Play](play.zh-CN.md)。
 
 # Spindle MCP 与 Agent 接入
 

@@ -17,7 +17,7 @@ Windows 签名可选用 `WINDOWS_CSC_LINK` 与 `WINDOWS_CSC_KEY_PASSWORD`；没�
 
 `.github/workflows/verify.yml` 在 PR／main push 触发；`release.yml` 在版本 tag／手动触发并创建**草稿** Release，重新下载核对哈希。写入 Release 的权限只授予发布 job。账户额度或付款限制导致 Actions 未启动，不能算测试结果。额度恢复前保留触发、main 暂不要求此 check，本轮以完整本地验证及记录为依据。
 
-0.10.0 公开切换时，先将旧私有仓库改为 `Spindle-private-archive`，再建立全新的私有 `RyuuMeow/Spindle`，只推送整理后的 main 与重新创建的 `v0.10.0`。先备份旧 refs／附件；重用同名仓库后不可依赖 GitHub 的旧网址跳转。所有新附件从新 tag 构建、上传后重新下载核对哈希、源码及封装内容。公开前检查失败则新仓库继续私有，Release 保持草稿。公开后用未登录请求验证 README、文档、源码及下载，保护 main 禁止删除／强制推送，最后将旧私有仓库封存为只读。旧私有 0.10.0 测试者需手动安装同版本新成品。
+后续版本使用现有公开仓库：推送已验证的提交和对应版本 tag，创建 Release 草稿，上传本地成品，重新下载核对哈希后再发布。发布后以未登录请求验证说明、源码、下载及更新 metadata。首次仓库迁移属于历史记录，见 [0.10.0 报告](../releases/0.10.0/verification.md)。
 
 ## 更新边界
 

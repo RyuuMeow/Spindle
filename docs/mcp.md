@@ -1,6 +1,6 @@
 [English](mcp.md) · [繁體中文](mcp.zh-TW.md) · [简体中文](mcp.zh-CN.md)
 
-> **Play preview (A–D)** — Two read-only Play tools are available in the acceptance build: `list_play_sessions` requires `editorSessionId`; `get_play_context` also requires `playSessionId`. There are 22 tools. Play state is separate from editor selection and includes fixed program versions, current dialogue, choices, variables and bounded recent events. No MCP playback mutation is exposed in A–D. See [Play](play.md).
+> **Play in 0.11.0** — Two read-only Play tools join the existing editor tools: `list_play_sessions` requires `editorSessionId`; `get_play_context` also requires `playSessionId`. There are 22 tools. Play state is separate from editor selection and includes fixed program versions, current dialogue, choices, variables and bounded recent events. MCP playback mutation is not exposed. See [Play](play.md).
 
 # Spindle MCP and agent integration
 
@@ -69,4 +69,4 @@ Text edits use document IDs, expected versions and explicit source ranges. A bat
 
 Common failures include `EDITOR_SESSION_EXPIRED`, `SNAPSHOT_EXPIRED`, `VERSION_CONFLICT`, `INPUT_PENDING`, `MCP_READ_ONLY` and `OPERATION_ID_REUSED`. Re-enumerate an expired target; never redirect a stale ID to another project. The app keeps a limited operation summary without story text. MCP settings and credentials live in the local App profile, not `.spindle` or release assets.
 
-Run `pnpm test:mcp` for SDK/client and version checks; `pnpm test:mcp-ui` uses an isolated desktop profile after `pnpm desktop:stage`. The server exposes 22 tools in the Play acceptance build. Graph layout and pin modification, background editing without Spindle, remote access, Resources and Prompts are outside this version.
+Run `pnpm test:mcp` for SDK/client and version checks; `pnpm test:mcp-ui` uses an isolated desktop profile after `pnpm desktop:stage`. The server exposes 22 tools. Graph layout and pin modification, background editing without Spindle, remote access, Resources and Prompts are outside this version.

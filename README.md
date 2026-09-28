@@ -4,17 +4,46 @@
 
 # Spindle
 
-A local-first Yarn Spinner dialogue editor for writers and game developers. Write in source or a reading editor, arrange branches on a flowchart, and connect a local agent through MCP.
+A local-first Yarn Spinner dialogue editor for writers and game developers. Write, follow your branches, play the story—and work with an MCP assistant that understands where you are editing.
 
-[Download Windows x64](https://github.com/RyuuMeow/Spindle/releases) · [Release notes](releases/0.10.0/en.md) · [Report an issue](https://github.com/RyuuMeow/Spindle/issues)
+[Download 0.11.0 · Windows x64](https://github.com/RyuuMeow/Spindle/releases/latest) · [Release notes](releases/0.11.0/en.md) · [Report an issue](https://github.com/RyuuMeow/Spindle/issues)
 
-> Portable and installer builds are unsigned. Review the [verification report](releases/0.10.0/verification.md) before installing.
+> English · 繁體中文 · 简体中文. Windows x64 Portable and installer builds are unsigned; see the [verification report](releases/0.11.0/verification.md).
+
+## An assistant beside your editor
+
+Select a line in Spindle, switch to your agent and ask: **“Rewrite the passage I selected, keeping this character's voice.”** The agent can request the live editor context instead of asking you to paste the passage or describe which file you mean.
+
+Through MCP, a connected agent can read:
+
+- **Your current document and scene**, including its content version.
+- **Your cursor line and column**, nearby source and diagnostics.
+- **Exactly what you selected**, including multiple ranges; the last selection remains available when you switch away from Spindle.
+- **The chosen project and editor window**, so several open projects do not become one ambiguous “current file.”
+
+That context connects to tools for scene/variable queries, script validation, statistics, command registration, file/folder management and version-protected text edits. Ask “Why does this line have a warning?”, “Register the unknown commands in this project”, or “Shorten this selected dialogue.” Text edits go through Spindle's transactions and Undo. Play context can also report the current dialogue, choices and variables; agent playback controls are not yet available.
+
+**You control access.** MCP is off by default. Enable read-only or editing access in **Settings → MCP / Agent integration**, then install the user-level Codex or Claude Code connection and [Spindle Skill](skills/spindle/SKILL.md). Spindle must remain open. Context is fetched when requested; this is not eye tracking or continuous screen capture. Installing the Skill does not change agent approval rules.
+
+[Connect your assistant](docs/mcp.md)
+
+## Play, inspect and return to the source
+
+Open a separate Play window and switch between a scrolling Novel and a two-line VN presentation without restarting the story. Inspect variables, choices and command events, step back, or follow a source link to edit the original line. Each run keeps its captured version while you continue writing.
+
+| Scrolling Novel | VN presentation |
+| --- | --- |
+| ![Novel Play with variable inspection](docs/images/play-novel.png) | ![VN Play](docs/images/play-vn.png) |
+
+Characters support automatic name colors, portraits, sprite variants and backgrounds. Character changes autosave; display switches for the editor and Play are independent. Custom commands can have explicit preview effects, without executing arbitrary game code.
+
+Right-click the editor Play button to choose **Default**, **Current document** or a supported **Current line**. Search the default scene in Settings → Play. The official Yarn Spinner runtime is bundled for offline Windows use—no separate .NET installation is needed. [Play guide and current limits](docs/play.md)
 
 ## Three views of one story
 
 ### Source
 
-Write Yarn directly with completion, diagnostics and quick fixes. Completion includes built-in and project commands with parameter hints; hovering a registered custom command shows its description and signature.
+Write Yarn directly with completion, diagnostics and quick fixes. Completion includes built-in and project commands with parameter hints; hovering a registered custom command shows its description and signature. Variable types, declarations and source navigation work across project files. Diagnostics stay quiet while you type; configurable dialogue-length advice helps keep lines readable.
 
 ![Source command completion](docs/images/source.png)
 
@@ -53,14 +82,6 @@ Compare saved revisions before restoring them.
 Projects keep configuration, history and trash in `.spindle/`. An existing `.yarn` file can also open on its own. A new workspace starts empty.
 
 To explore branches, copy [The Last Light demo project](examples/demo-project/the-last-light/README.md) to a personal folder and open that folder in Spindle. Its three scripts and custom command definitions are not bundled as your default project.
-
-## MCP and Skill
-
-Enable read-only or editing access in **Settings → MCP / Agent integration**, then install a user-level Codex or Claude Code connection and the [Spindle Skill](skills/spindle/SKILL.md). Keep Spindle running. An agent can inspect selections, validate scripts, manage commands and make version-protected edits; Skill installation does not change agent approvals.
-
-![Agent integration](docs/images/agent.png)
-
-[Connection and installation guide](docs/mcp.md)
 
 ## Development and license
 

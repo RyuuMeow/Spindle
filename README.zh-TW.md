@@ -4,17 +4,46 @@
 
 # Spindle
 
-以本機資料為核心的 Yarn Spinner 劇本編輯器。使用純文字或閱讀編輯撰寫對話，在流程圖整理故事分支，也能透過 MCP 連接本機 Agent。
+以本機資料為核心的 Yarn Spinner 劇本編輯器。撰寫、整理分支、試跑故事，也能讓 MCP 助手理解你目前正在編輯的位置，陪你一起修改。
 
-[下載 Windows x64](https://github.com/RyuuMeow/Spindle/releases) · [版本說明](releases/0.10.0/zh-TW.md) · [回報問題](https://github.com/RyuuMeow/Spindle/issues)
+[下載 0.11.0 · Windows x64](https://github.com/RyuuMeow/Spindle/releases/latest) · [版本說明](releases/0.11.0/zh-TW.md) · [回報問題](https://github.com/RyuuMeow/Spindle/issues)
 
-> Portable 與安裝版尚未簽章。安裝前請參閱[驗證報告](releases/0.10.0/verification.md)。
+> English · 繁體中文 · 简体中文。Windows x64 Portable 與安裝版未簽章，詳見[驗證報告](releases/0.11.0/verification.md)。
+
+## 像坐在編輯器旁邊的助手
+
+在 Spindle 反白一句台詞，切到 Agent 說：**「幫我改寫剛剛反白的段落，保留這個角色的語氣。」** Agent 可以按請求讀取即時編輯情境，不必再請你貼上內容、解釋是哪份文件。
+
+透過 MCP，連線的助手能取得：
+
+- **目前文件與場景**，以及對應的內容版本。
+- **游標所在行、欄**，附近原文與診斷。
+- **精確反白內容**，包含多段選取；切到 Agent 後仍保留最後一次選取。
+- **指定專案與編輯器視窗**，同時開啟多個專案也能明確選定操作目標。
+
+情境可接著用於查詢場景／變數、檢查劇本、統計、註冊指令、管理文件／資料夾及版本保護修改。例如：「這行為什麼有警告？」「幫這個專案註冊未知指令」「把反白的對話縮短。」文字修改經過 Spindle 的交易與 Undo。助手也能讀取 Play 的目前台詞、選項與變數；尚不提供 Agent 操控播放。
+
+**存取由你決定。** MCP 預設停用。在「設定 → MCP／Agent 整合」選擇唯讀或允許修改，再安裝使用者層級的 Codex／Claude Code 連線與 [Spindle Skill](skills/spindle/SKILL.md)。Spindle 必須保持開啟；情境在請求時取得，不是眼球追蹤或持續錄製畫面。安裝 Skill 不會改變 Agent 的批准規則。
+
+[連接你的助手](docs/mcp.zh-TW.md)
+
+## 試跑、查看狀態、回到原文
+
+以獨立 Play 視窗試跑，在逐行小說與雙行 VN 之間切換而不重跑故事。查看變數、選項與指令事件，回到上一步，或定位原文修改。你繼續撰寫時，本輪試跑仍保留啟動時的內容版本。
+
+| 逐行小說 | VN 呈現 |
+| --- | --- |
+| ![小說 Play 與變數面板](docs/images/play-novel.png) | ![VN Play](docs/images/play-vn.png) |
+
+角色支援自動姓名配色、頭貼、立繪變體與背景。角色修改自動保存，編輯器與 Play 的顯示開關獨立控制。自訂指令可明確設定預覽效果，不執行任意遊戲程式。
+
+右鍵點擊編輯器 Play 按鈕，選擇「預設」「目前文件」或支援的「目前行」；在設定 → Play 搜尋預設場景。Windows 版內含官方 Yarn Spinner runtime，可離線試跑，不需另裝 .NET。[Play 操作與目前範圍](docs/play.zh-TW.md)
 
 ## 三種視角，同一份故事
 
 ### 純文字
 
-直接撰寫 Yarn，搭配補全、診斷與快速修正。補全包含內建及專案自訂指令與參數提示；滑鼠移到已註冊的自訂指令可查看說明及簽名。
+直接撰寫 Yarn，搭配補全、診斷與快速修正。補全包含內建及專案自訂指令與參數提示；滑鼠移到已註冊的自訂指令可查看說明及簽名。變數型別、宣告與來源導航支援跨檔案；輸入時保持安靜診斷，可設定台詞長度提醒。
 
 ![純文字指令補全](docs/images/source.png)
 
@@ -53,14 +82,6 @@
 設定、歷史與垃圾桶保存在 `.spindle/`；也能獨立開啟 `.yarn`。新工作區保持空白。
 
 想試用分支，可將 [The Last Light 示範專案](examples/demo-project/the-last-light/README.md) 複製到個人資料夾後在 Spindle 開啟。三份劇本及自訂指令定義不會成為預設專案。
-
-## MCP 與 Skill
-
-在「設定 → MCP／Agent 整合」啟用唯讀或修改存取，再安裝使用者層級的 Codex／Claude Code 連線與 [Spindle Skill](skills/spindle/SKILL.md)。Spindle 須持續執行。Agent 可讀取框選、檢查劇本、管理指令並進行版本保護修改；安裝 Skill 不改變 Agent 批准規則。
-
-![Agent 整合](docs/images/agent.png)
-
-[接入與安裝指南](docs/mcp.zh-TW.md)
 
 ## 開發與授權
 

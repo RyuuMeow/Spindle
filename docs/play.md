@@ -1,8 +1,8 @@
 [English](play.md) · [繁體中文](play.zh-TW.md) · [简体中文](play.zh-CN.md)
 
-# Play preview — acceptance build
+# Play preview
 
-This Windows desktop preview implements A–D plus editor launch modes. It does not change the published 0.10.0 release. Web Play, audio, unrestricted source entry, saved test cases and agent-controlled playback are deferred.
+Available in Spindle 0.11.0 on Windows: Novel/VN playback, characters, runtime inspection, backtracking and editor launch modes. Web Play, audio, unrestricted source entry, saved test cases and agent-controlled playback are deferred.
 
 ## Try a story
 
