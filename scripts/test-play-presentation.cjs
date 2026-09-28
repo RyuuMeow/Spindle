@@ -602,6 +602,16 @@ async function screenshot(name) {
     "Novel has a usable trailing blank advance surface",
   );
   const tailRect = await novelAdvance.boundingBox();
+  const cueRect = await novelCue.boundingBox();
+  assert(cueRect, "Novel ready cue is visible");
+  assert(
+    cueRect.y - tailRect.y <= 36,
+    "Novel cue stays near the top of the transparent advance surface",
+  );
+  assert(
+    Math.abs(cueRect.x + cueRect.width / 2 - tailRect.x - tailRect.width / 2) < 2,
+    "Novel cue remains horizontally centered",
+  );
   await play.mouse.move(tailRect.x + 25, tailRect.y + 25);
   await play.mouse.down();
   await play.mouse.move(tailRect.x + 100, tailRect.y + 40, { steps: 8 });

@@ -137,7 +137,9 @@
   flex: 1 0 96px;
   min-height: 96px;
   display: grid;
-  place-items: center;
+  justify-items: center;
+  align-items: start;
+  padding-top: 12px;
   color: var(--muted-foreground);
   cursor: pointer;
   user-select: none;
