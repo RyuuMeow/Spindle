@@ -33,6 +33,14 @@ export function PreviewProvider({
 }) {
   const [resources, setResources] = useState<PreviewResources | null>(null),
     [session, setSession] = useState<PlaySession | null>(null);
+  const { showPortraits, useNameColors, sourceNameColors } =
+    resolvePresentation(preferences).editorCharacters;
+  // A scroll updates the persisted tab view, not character presentation. Keep
+  // semantic context values stable so consumers don't rebuild decorations.
+  const presentation = useMemo(
+    () => ({ showPortraits, useNameColors, sourceNameColors }),
+    [showPortraits, useNameColors, sourceNameColors],
+  );
   useEffect(() => {
     let cancelled = false;
     const read = () => {
@@ -79,17 +87,11 @@ export function PreviewProvider({
           ];
     });
   }, [session, project]);
-  return (
-    <PreviewContext
-      value={{
-        resources,
-        visited,
-        presentation: resolvePresentation(preferences).editorCharacters,
-      }}
-    >
-      {children}
-    </PreviewContext>
+  const value = useMemo(
+    () => ({ resources, visited, presentation }),
+    [resources, visited, presentation],
   );
+  return <PreviewContext value={value}>{children}</PreviewContext>;
 }
 export function ReadingPortrait({ speaker }: { speaker: string }) {
   const { resources, presentation } = usePreview(),

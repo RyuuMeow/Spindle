@@ -4,6 +4,7 @@ import {
   ViewPlugin,
   hoverTooltip,
   type DecorationSet,
+  type ViewUpdate,
 } from "@codemirror/view";
 import type { Issue } from "../parser";
 import { DIALOGUE_LENGTH_CODE } from "./dialogue-length";
@@ -43,8 +44,9 @@ export function readingLengthWarnings(getIssues: () => Issue[]) {
             true,
           );
         }
-        update(update: { view: EditorView }) {
-          this.decorations = this.build(update.view);
+        update(update: ViewUpdate) {
+          if (update.docChanged || update.transactions.length)
+            this.decorations = this.build(update.view);
         }
       },
       { decorations: (v) => v.decorations },

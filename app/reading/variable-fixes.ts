@@ -74,7 +74,11 @@ export function variableFixes(
             this.decorations = this.build(view);
           }
           update(update: import("@codemirror/view").ViewUpdate) {
-            this.decorations = this.build(update.view);
+            // Viewport/geometry updates only mount existing decorations. They
+            // must not parse every variable and command in the document again.
+            // External diagnostics/definitions arrive through refresh effects.
+            if (update.docChanged || update.transactions.length)
+              this.decorations = this.build(update.view);
           }
           build(view: EditorView) {
             const vars = known(view),

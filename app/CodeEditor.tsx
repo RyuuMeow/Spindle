@@ -17,6 +17,7 @@ import {
   useEffectEvent,
   useCallback,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -171,6 +172,11 @@ export default function CodeEditor({
   const viewCallback = useRef(onView),
     navigationCallback = useRef(onNavigate),
     restoredView = useRef(persistedView);
+  const cancelScrollSave = useRef<(() => void) | null>(null);
+  useLayoutEffect(() => {
+    // A trailing scroll save belongs to the old tab/model, never its successor.
+    cancelScrollSave.current?.();
+  }, [viewKey]);
   useEffect(() => {
     viewCallback.current = onView;
     navigationCallback.current = onNavigate;
@@ -285,6 +291,44 @@ export default function CodeEditor({
       editorRef.current.focus();
     }
   }, [goTo, doc.name, editorRef]);
+  const options = useMemo<editor.IStandaloneEditorConstructionOptions>(
+    () => ({
+      editContext: false,
+      occurrencesHighlight: "off",
+      selectionHighlight: false,
+      fontFamily: fontStack(style.fontFamily),
+      fontSize: style.fontSize,
+      cursorHeight: style.fontSize + 2,
+      lineHeight: style.fontSize * style.lineHeight,
+      padding: { top: 16, bottom: 40 },
+      minimap: { enabled: false },
+      lineNumbers: appearance.source.lineNumbers ? "on" : "off",
+      lineDecorationsWidth: 16,
+      lineNumbersMinChars: 3,
+      overviewRulerLanes: 0,
+      hideCursorInOverviewRuler: true,
+      scrollbar: { verticalScrollbarSize: 7, horizontalScrollbarSize: 7 },
+      guides: {
+        indentation: appearance.source.indentGuides,
+        bracketPairs: false,
+      },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      tabSize: appearance.source.tabSize,
+      insertSpaces: appearance.source.insertSpaces,
+      renderWhitespace: appearance.source.whitespace,
+      renderLineHighlight: style.highlightLine ? "line" : "none",
+      smoothScrolling: true,
+      bracketPairColorization: { enabled: false },
+      glyphMargin: false,
+      folding: false,
+      quickSuggestions: true,
+      wordWrap: appearance.source.wordWrap ? "on" : "off",
+      wrappingIndent: "same",
+      fixedOverflowWidgets: true,
+    }),
+    [style, appearance.source],
+  );
   if (!localeReady)
     return <div className="editor-loading">{tr("m972a5d5f4976")}</div>;
   return (
@@ -833,12 +877,34 @@ export default function CodeEditor({
         editor.onDidChangeCursorPosition((e) =>
           cursorCallback.current(e.position),
         );
+        let scrollSave: ReturnType<typeof setTimeout> | undefined;
+        const cancelSave = () => {
+          clearTimeout(scrollSave);
+          scrollSave = undefined;
+        };
+        cancelScrollSave.current = cancelSave;
         const preserveView = () => {
+          cancelSave();
           const state = editor.saveViewState();
           if (state) viewCallback.current?.(state);
         };
         editor.onDidChangeCursorSelection(preserveView);
-        editor.onDidScrollChange(preserveView);
+        // Scroll paints stay inside Monaco. Persist once motion settles instead
+        // of sending every animation frame through the entire workbench tree.
+        editor.onDidScrollChange((event) => {
+          if (!event.scrollTopChanged && !event.scrollLeftChanged) return;
+          cancelSave();
+          scrollSave = setTimeout(preserveView, 150);
+        });
+        editor.onDidBlurEditorWidget(() => {
+          if (scrollSave !== undefined) preserveView();
+        });
+        editor.onDidChangeModel(cancelSave);
+        editor.onDidDispose(() => {
+          cancelSave();
+          if (cancelScrollSave.current === cancelSave)
+            cancelScrollSave.current = null;
+        });
         const linkAt = (position: import("monaco-editor").Position | null) => {
           const model = editor.getModel();
           if (!position || !model) return null;
@@ -993,41 +1059,7 @@ export default function CodeEditor({
         )
           editor.focus();
       }}
-      options={{
-        editContext: false,
-        occurrencesHighlight: "off",
-        selectionHighlight: false,
-        fontFamily: fontStack(style.fontFamily),
-        fontSize: style.fontSize,
-        cursorHeight: style.fontSize + 2,
-        lineHeight: style.fontSize * style.lineHeight,
-        padding: { top: 16, bottom: 40 },
-        minimap: { enabled: false },
-        lineNumbers: appearance.source.lineNumbers ? "on" : "off",
-        lineDecorationsWidth: 16,
-        lineNumbersMinChars: 3,
-        overviewRulerLanes: 0,
-        hideCursorInOverviewRuler: true,
-        scrollbar: { verticalScrollbarSize: 7, horizontalScrollbarSize: 7 },
-        guides: {
-          indentation: appearance.source.indentGuides,
-          bracketPairs: false,
-        },
-        scrollBeyondLastLine: false,
-        automaticLayout: true,
-        tabSize: appearance.source.tabSize,
-        insertSpaces: appearance.source.insertSpaces,
-        renderWhitespace: appearance.source.whitespace,
-        renderLineHighlight: style.highlightLine ? "line" : "none",
-        smoothScrolling: true,
-        bracketPairColorization: { enabled: false },
-        glyphMargin: false,
-        folding: false,
-        quickSuggestions: true,
-        wordWrap: appearance.source.wordWrap ? "on" : "off",
-        wrappingIndent: "same",
-        fixedOverflowWidgets: true,
-      }}
+      options={options}
     />
   );
 }
