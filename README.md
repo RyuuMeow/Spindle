@@ -6,9 +6,9 @@
 
 A local-first Yarn Spinner dialogue editor for writers and game developers. Write, follow your branches, play the story—and work with an MCP assistant that understands where you are editing.
 
-[Download 0.11.0 · Windows x64](https://github.com/RyuuMeow/Spindle/releases/latest) · [Release notes](releases/0.11.0/en.md) · [Report an issue](https://github.com/RyuuMeow/Spindle/issues)
+[Download 0.11.1 · Windows x64](https://github.com/RyuuMeow/Spindle/releases/latest) · [Release notes](releases/0.11.1/en.md) · [Report an issue](https://github.com/RyuuMeow/Spindle/issues)
 
-> English · 繁體中文 · 简体中文. Windows x64 Portable and installer builds are unsigned; see the [verification report](releases/0.11.0/verification.md).
+> English · 繁體中文 · 简体中文. Windows x64 Portable and installer builds are unsigned; see the [verification report](releases/0.11.1/verification.md).
 
 ## An assistant beside your editor
 

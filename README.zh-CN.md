@@ -6,9 +6,9 @@
 
 以本地数据为核心的 Yarn Spinner 剧本编辑器。编写、整理分支、试跑故事，还能让 MCP 助手理解你当前正在编辑的位置，陪你一起修改。
 
-[下载 0.11.0 · Windows x64](https://github.com/RyuuMeow/Spindle/releases/latest) · [版本说明](releases/0.11.0/zh-CN.md) · [报告问题](https://github.com/RyuuMeow/Spindle/issues)
+[下载 0.11.1 · Windows x64](https://github.com/RyuuMeow/Spindle/releases/latest) · [版本说明](releases/0.11.1/zh-CN.md) · [报告问题](https://github.com/RyuuMeow/Spindle/issues)
 
-> English · 繁體中文 · 简体中文。Windows x64 Portable 与安装版未签名，详见[验证报告](releases/0.11.0/verification.md)。
+> English · 繁體中文 · 简体中文。Windows x64 Portable 与安装版未签名，详见[验证报告](releases/0.11.1/verification.md)。
 
 ## 像坐在编辑器旁边的助手
 
