@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md) · [繁體中文詳細記錄](CHANGELOG.zh-TW.md)
 
+## Unreleased
+
+Fix Play compilation of UTF-8 BOM-prefixed scripts: an invisible encoding marker before `title:` could cause the official compiler to report “Nodes must have a title”. Compilation now treats only the leading marker as whitespace, without changing script content or source offsets. This fix is not included in the published 0.11.0 binaries.
+
 ## 0.11.0
 
 Adds Windows Play with Novel/VN presentation, reversible runtime checkpoints, source links, character/asset configuration and preview effects. Adds default/document/current-line launch modes, weighted dialogue-length advice and two read-only MCP Play tools. Improves character autosave, list editors, responsive panels, Source/Reading/Graph scrolling and menu tooltip behavior. Live MCP editor context includes the document, cursor and exact selected text; the README now foregrounds this workflow.

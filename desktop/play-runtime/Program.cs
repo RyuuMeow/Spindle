@@ -59,7 +59,7 @@ sealed class PlayEngine
         {
             documents = (JsonArray)request["documents"]!.DeepClone();
             var job = CompilationJob.CreateFromString("", "", new Dialogue(new MemoryVariableStore()).Library);
-            job.Inputs = documents.Select(d => new CompilationJob.File { FileName = d!["id"]!.GetValue<string>(), Source = d["text"]!.GetValue<string>() }).ToArray();
+            job.Inputs = documents.Select(d => new CompilationJob.File { FileName = d!["id"]!.GetValue<string>(), Source = CompilerSource(d["text"]!.GetValue<string>()) }).ToArray();
             program = Compiler.Compile(job);
             dialogue = null; events = events.Clear(); options.Clear(); history.Clear();
             status = program.ContainsErrors ? "error" : "ready";
@@ -197,6 +197,9 @@ sealed class PlayEngine
         if (events.Count >= 10000 && kind != "error") throw new Exception("PLAY_EVENT_LIMIT_EXCEEDED");
         events = events.Add(new JsonObject { ["id"] = events.Count + 1, ["kind"] = kind, ["text"] = text, ["source"] = source?.DeepClone() });
     }
+    // Memory inputs retain the UTF-8 BOM that file-based readers normally consume.
+    // Use one whitespace code unit so every source offset still addresses the original snapshot.
+    static string CompilerSource(string text) => text.StartsWith('\uFEFF') ? " " + text[1..] : text;
     string Render(Line line) => LineParser.ExpandSubstitutions(program!.StringTable![line.ID].text!, line.Substitutions);
     JsonNode? LineSource(Line line) { var info = program!.StringTable![line.ID]; return Source(info.fileName, info.lineNumber, 1); }
     JsonNode? Source(string? id, int line, int column)

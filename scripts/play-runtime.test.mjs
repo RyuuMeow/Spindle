@@ -41,6 +41,49 @@ function helper(t) {
     });
 }
 const docs = (text) => [{ id: "doc", name: "Story.yarn", version: 2, text }];
+
+test("UTF-8 BOM preserves titles, cross-file playback and original source offsets", async (t) => {
+  const call = helper(t);
+  const text =
+    "\uFEFFtitle: Opening\r\n---\r\n// Test\r\n我叫山田智也\r\n<<portrait_show left heroine normal fade 0.25>>\r\n我: 很好！\r\n<<jump Next>>\r\n===";
+  const second = "\uFEFFtitle: Next\n---\n內文\uFEFF保留 🌧️\n===";
+  const compiled = await call("compile", {
+    documents: [
+      ...docs(text),
+      { id: "second", name: "Next.yarn", version: 3, text: second },
+    ],
+  });
+  assert.equal(compiled.status, "ready");
+  assert.deepEqual(compiled.diagnostics, []);
+  let state = await call("start", { scene: "Opening" });
+  let line = state.events.find((e) => e.kind === "line");
+  assert.equal(line.text, "我叫山田智也");
+  assert.equal(line.source.from, text.indexOf("我叫"));
+  assert.equal(line.source.line, 4);
+  state = await call("next");
+  assert.equal(
+    state.events.filter((e) => e.kind === "line").at(-1).text,
+    "我: 很好！",
+  );
+  state = await call("next");
+  line = state.events.filter((e) => e.kind === "line").at(-1);
+  assert.equal(line.text, "內文\uFEFF保留 🌧️");
+  assert.equal(line.source.documentId, "second");
+  assert.equal(line.source.from, second.indexOf("內文"));
+  state = await call("start", {
+    scene: "Opening",
+    location: { documentId: "doc", line: 4 },
+  });
+  assert.equal(
+    state.events.filter((e) => e.kind === "line").at(-1).source.from,
+    text.indexOf("我叫"),
+  );
+
+  const invalid = "\uFEFFtitle: **Opening**\n---\nHello\n===";
+  const failed = await call("compile", { documents: docs(invalid) });
+  assert.equal(failed.status, "error");
+  assert.equal(failed.diagnostics[0].source.from, invalid.indexOf("*"));
+});
 test("official compiler, choices, variable override, detour and rewind", async (t) => {
   const call = helper(t);
   let state = await call("compile", {
