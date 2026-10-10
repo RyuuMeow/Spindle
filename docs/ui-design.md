@@ -32,6 +32,8 @@ The first Windows row is a 44 px title/tab bar with native caption safety space.
 
 A tab is a **view container**, not a unique file. Clicking the tree, an ordinary search result, the outline or a diagnostic navigates within the current TabId and retains its mode. Middle click, Ctrl+Enter, the tab plus, or an explicit new-tab action creates a new container. Each tab retains its own history, selection, scroll and graph viewport; all views of one document share text and Undo. Switching away from settings, commands or recovery does not reset that tab's controls or diff preview.
 
+Deleting a document preserves each tab's identity, order and pinned state. Affected tabs return to their latest surviving past document, or remain blank if none exists. Tab dragging uses one insertion rule for faces, gaps and both ends. Cancelling or leaving the strip clears the marker; a drop without a valid preview does not reorder tabs.
+
 New script/scene names appear inline in their owning list. Enter or valid blur commits; Escape cancels without creating a file/source block; IME Enter does not commit. Invalid names or I/O failures leave the input in place. Folder arrows have a fixed 24 px control column and a centered SVG, with no hover fill; arrow click expands, name click selects, double click renames. A project tree drag uses a white insertion line, and trash is the ordinary delete destination.
 
 ## Unified search and creation

@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url), out=path.resolve('outputs/navigation-tests');
 fs.mkdirSync(out,{recursive:true});
 function load(entry){ const target=path.join(out,path.basename(entry)+'.cjs');buildSync({entryPoints:[entry],outfile:target,bundle:true,platform:'node',format:'cjs'});return require(target); }
-const {navigateSession,navigateHistory}=load('app/workspace/navigation.ts');
+const {navigateSession,navigateHistory,removeSessionDocuments}=load('app/workspace/navigation.ts');
 const {orderedDocuments,uniqueDocumentName,reorderWithinFolder}=load('app/workspace/file-order.ts');
 const {defaultSession,makeDocument}=load('app/workspace/types.ts');
 const {restoreSession}=load('app/workspace/storage.ts');
@@ -43,6 +43,45 @@ test('navigation history skips deleted files and a normal same-file click does n
  let s=session([tab('one','a',{line:50,past:[{documentId:'gone',mode:'source',line:1,column:1}]})]);
  let n=navigateSession(s,'a',{},'unused');assert.equal(n.tabs[0].line,50);assert.equal(n.tabs[0].past.length,1);
  n=navigateHistory(n,true,new Set(['a']));assert.equal(n.tabs[0].documentId,'a');assert.equal(n.tabs[0].past.length,0);
+});
+
+test('deleting documents preserves tab identity and restores each latest surviving past view', () => {
+ const location = (documentId, extra = {}) => ({ documentId, mode: 'source', line: 8, column: 2, ...extra });
+ const previous = location('a', { mode: 'rendered', scrollTop: 90, folded: [{ from: 1, to: 7 }] });
+ const original = session([
+  tab('one', 'gone', { pinned: true, graph: { positions: {} }, past: [previous, location('also-gone')], future: [location('b'), location('gone')], views: { gone: { mode: 'source', line: 1, column: 1 } } }),
+  tab('two', 'gone', { line: 50, column: 20, scrollTop: 300, graph: { positions: {} }, past: [location('also-gone')] }),
+  tab('three', 'b'),
+  tab('settings', '@settings'),
+ ]);
+ const next = removeSessionDocuments(original, new Set(['gone', 'also-gone']), new Set(['a', 'b', '@settings']));
+ assert.deepEqual(next.tabs.map(t => t.id), original.tabs.map(t => t.id));
+ assert.equal(next.activeId, 'one');
+ assert.equal(next.tabs[0].pinned, true);
+ assert.equal(next.tabs[0].documentId, 'a');
+ assert.equal(next.tabs[0].scrollTop, 90);
+ assert.deepEqual(next.tabs[0].folded, previous.folded);
+ assert.equal(next.tabs[0].graph, undefined);
+ assert.deepEqual(next.tabs[0].past, []);
+ assert.deepEqual(next.tabs[0].future, [location('b')]);
+ assert.deepEqual(next.tabs[0].views, {});
+ assert.equal(next.tabs[1].documentId, '');
+ assert.equal(next.tabs[1].line, 1);
+ assert.equal(next.tabs[1].scrollTop, undefined);
+ assert.equal(next.tabs[1].graph, undefined);
+ assert.equal(next.tabs[2], original.tabs[2]);
+ assert.equal(next.tabs[3], original.tabs[3]);
+ assert.equal(original.tabs[0].past.length, 2, 'original session is immutable');
+ const restored = restoreSession(next, 'window', 'project');
+ assert.equal(restored.tabs[1].documentId, '');
+ const opened = navigateSession({ ...restored, activeId: 'two' }, 'b', {}, 'unused');
+ assert.equal(opened.tabs[1].id, 'two');
+ assert.deepEqual(opened.tabs[1].past, []);
+ assert.equal('' in opened.tabs[1].views, false);
+ const forward = navigateHistory(session([tab('blank', '', { future: [location('b')] })]), false, new Set(['b']));
+ assert.equal(forward.tabs[0].documentId, 'b');
+ assert.deepEqual(forward.tabs[0].past, []);
+ assert.equal('' in forward.tabs[0].views, false);
 });
 test('sorting is reversible, natural, and does not overwrite manual order; drag only reorders one folder',()=>{
  const ds=['part/Chapter10.yarn','B.yarn','part/Chapter2.yarn','A.yarn'].map(name=>makeDocument(name,''));

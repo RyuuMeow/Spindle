@@ -117,7 +117,11 @@ import RescueSettings from "./RescueSettings";
 import { HistoryList, HistoryPreview } from "./HistoryView";
 import RecoveryView from "./RecoveryView";
 import type { RecoveryEntry } from "./types";
-import { navigateSession, navigateHistory } from "./navigation";
+import {
+  navigateSession,
+  navigateHistory,
+  removeSessionDocuments,
+} from "./navigation";
 import { orderedDocuments, uniqueDocumentName, folderOf } from "./file-order";
 import { InlineNameEditor, type InlineDraft } from "./InlineNameEditor";
 import FileTree from "./FileTree";
@@ -264,11 +268,32 @@ function WorkbenchContent({
     snapshot.projects.find((p) => p.id === session.projectId) ||
     snapshot.projects[0];
   const standalone = project?.kind === "standalone";
-  const tabs = session.tabs.filter(
-    (t) =>
-      !!utilityNames[t.documentId] ||
-      project?.documents.some((d) => d.id === t.documentId),
-  );
+  const knownDocuments = useRef({
+    projectId: project?.id,
+    ids: new Set([
+      ...(project?.documents.map((d) => d.id) || []),
+      ...(session.projectId === project?.id
+        ? [...session.tabs, ...session.closedTabs]
+            .map((t) => t.documentId)
+            .filter((id) => id && !utilityNames[id])
+        : []),
+    ]),
+  });
+  useEffect(() => {
+    const previous = knownDocuments.current;
+    const ids = new Set(project?.documents.map((d) => d.id));
+    knownDocuments.current = { projectId: project?.id, ids };
+    if (!project || previous.projectId !== project.id) return;
+    const removed = new Set([...previous.ids].filter((id) => !ids.has(id)));
+    if (!removed.size) return;
+    const validIds = new Set([...ids, ...Object.keys(utilityNames)]);
+    setSession((current) =>
+      current.projectId === project.id
+        ? removeSessionDocuments(current, removed, validIds)
+        : current,
+    );
+  }, [project]);
+  const tabs = session.tabs;
   const active = tabs.find((t) => t.id === session.activeId) || tabs[0];
   const navigationAvailable = {
     back: !!active?.past?.length,

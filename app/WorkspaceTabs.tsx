@@ -60,6 +60,24 @@ export default function WorkspaceTabs({
   const [overflow, setOverflow] = useState(false);
   const [dragging, setDragging] = useState(""),
     [dropIndex, setDropIndex] = useState(-1);
+  const dropTarget = useRef(-1);
+
+  function previewDrop(index: number) {
+    dropTarget.current = index;
+    setDropIndex(index);
+  }
+
+  // Use the same geometry for tab faces, gaps, and the ends of the strip.
+  function insertionIndex(clientX: number) {
+    const elements =
+      viewport.current?.querySelectorAll<HTMLElement>(".tab-shell");
+    if (!elements) return 0;
+    for (let index = 0; index < elements.length; index++) {
+      const rect = elements[index].getBoundingClientRect();
+      if (clientX < rect.left + rect.width / 2) return index;
+    }
+    return elements.length;
+  }
 
   useEffect(() => {
     const scroller = viewport.current;
@@ -98,22 +116,36 @@ export default function WorkspaceTabs({
       onKeyDownCapture={(e) => {
         if (e.key === "Escape") {
           setDragging("");
-          setDropIndex(-1);
+          previewDrop(-1);
         }
       }}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("application/x-yarn-tab")) {
-          e.preventDefault();
-          setDropIndex(tabs.length);
+        if (!e.dataTransfer.types.includes("application/x-yarn-tab")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+        const scroller = viewport.current;
+        if (scroller) {
+          const bounds = scroller.getBoundingClientRect();
+          if (e.clientX < bounds.left + 30) scroller.scrollLeft -= 15;
+          else if (e.clientX > bounds.right - 30) scroller.scrollLeft += 15;
         }
+        previewDrop(insertionIndex(e.clientX));
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+          previewDrop(-1);
       }}
       onDrop={(e) => {
         if (!e.dataTransfer.types.includes("application/x-yarn-tab")) return;
         e.preventDefault();
+        e.stopPropagation();
+        if (dropTarget.current < 0) return;
         const id = e.dataTransfer.getData("application/x-yarn-tab");
-        if (tabs.some((t) => t.id === id)) onReorder?.(id, tabs.length);
-        else onExternalDrop?.(tabs.length);
-        setDropIndex(-1);
+        const index = insertionIndex(e.clientX);
+        if (tabs.some((t) => t.id === id)) onReorder?.(id, index);
+        else onExternalDrop?.(index);
+        previewDrop(-1);
         setDragging("");
       }}
     >
@@ -131,7 +163,8 @@ export default function WorkspaceTabs({
               "@settings": tr("m0d8619aae051"),
               "@recovery": tr("m525e69a5165d"),
             };
-            const name = utilityNames[tab.file] || tab.file;
+            const name =
+              utilityNames[tab.file] || tab.file || tr("ma38d62ae74d4");
             const mode = utilityNames[tab.file]
               ? tr("m0d8619aae051")
               : tab.mode === "graph"
@@ -195,43 +228,14 @@ export default function WorkspaceTabs({
                 }}
                 onDragStart={(e) => {
                   setDragging(tab.id);
+                  previewDrop(-1);
                   e.dataTransfer.setData("application/x-yarn-tab", tab.id);
                   e.dataTransfer.effectAllowed = "move";
                   onDragStart?.(tab.id);
                 }}
-                onDragOver={(e) => {
-                  if (!e.dataTransfer.types.includes("application/x-yarn-tab"))
-                    return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setDropIndex(
-                    index + (e.clientX > rect.x + rect.width / 2 ? 1 : 0),
-                  );
-                  const viewportBounds =
-                    viewport.current?.getBoundingClientRect();
-                  if (viewportBounds && viewport.current) {
-                    if (e.clientX < viewportBounds.left + 30)
-                      viewport.current.scrollLeft -= 15;
-                    if (e.clientX > viewportBounds.right - 30)
-                      viewport.current.scrollLeft += 15;
-                  }
-                }}
-                onDrop={(e) => {
-                  if (!e.dataTransfer.types.includes("application/x-yarn-tab"))
-                    return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const id = e.dataTransfer.getData("application/x-yarn-tab");
-                  if (tabs.some((t) => t.id === id))
-                    onReorder?.(id, dropIndex < 0 ? index : dropIndex);
-                  else onExternalDrop?.(dropIndex < 0 ? index : dropIndex);
-                  setDropIndex(-1);
-                  setDragging("");
-                }}
                 onDragEnd={(e) => {
                   setDragging("");
-                  setDropIndex(-1);
+                  previewDrop(-1);
                   onDragEnd?.(e);
                 }}
                 data-dragging={dragging === tab.id || undefined}
@@ -304,7 +308,9 @@ export default function WorkspaceTabs({
                       "@commands": tr("mae2f19d77e06"),
                       "@settings": tr("m0d8619aae051"),
                       "@recovery": tr("m525e69a5165d"),
-                    }[tab.file] || tab.file}
+                    }[tab.file] ||
+                      tab.file ||
+                      tr("ma38d62ae74d4")}
                   </strong>
                   <small>
                     {tr("m842433f0a425")}

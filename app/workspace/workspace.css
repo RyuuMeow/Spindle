@@ -178,15 +178,17 @@
 .tab-drop-after:after {
   content: "";
   position: absolute;
-  left: -4px;
+  left: 0;
   top: 3px;
   bottom: 3px;
   width: 2px;
   background: #a8c7e5;
+  z-index: 2;
+  pointer-events: none;
 }
 .tab-drop-after:after {
   left: auto;
-  right: -4px;
+  right: 0;
 }
 .tab-shell[data-dragging="true"] {
   opacity: 0.55;
