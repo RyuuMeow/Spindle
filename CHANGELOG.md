@@ -2,6 +2,12 @@
 
 [English](CHANGELOG.md) · [繁體中文詳細記錄](CHANGELOG.zh-TW.md)
 
+## 0.11.2
+
+Fix tab insertion markers and gap drop positions, prevent reordering without a valid preview, and preserve tabs after document deletion by returning to their previous surviving document or an empty view. Suppress ambiguous Unicode punctuation warnings while editing dialogue.
+
+[Release notes: English](releases/0.11.2/en.md) · [繁體中文](releases/0.11.2/zh-TW.md) · [简体中文](releases/0.11.2/zh-CN.md) · [Verification](releases/0.11.2/verification.md)
+
 ## 0.11.1
 
 Fix Play compilation of UTF-8 BOM-prefixed scripts: an invisible encoding marker before `title:` could cause the official compiler to report “Nodes must have a title”. Compilation now treats only the leading marker as whitespace, without changing script content or source offsets. Also prevent duplicated BOMs during Source editor synchronization from blocking a latest-content Play restart. The original 0.11.0 binaries are affected; update to 0.11.1.
