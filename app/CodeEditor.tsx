@@ -320,6 +320,8 @@ export default function CodeEditor({
       renderLineHighlight: style.highlightLine ? "line" : "none",
       smoothScrolling: true,
       bracketPairColorization: { enabled: false },
+      // Yarn dialogue is prose: full-width punctuation is intentional.
+      unicodeHighlight: { ambiguousCharacters: false, nonBasicASCII: false },
       glyphMargin: false,
       folding: false,
       quickSuggestions: true,
