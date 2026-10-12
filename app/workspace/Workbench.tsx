@@ -89,7 +89,8 @@ import { PanelResizeHandle } from "@/components/PanelResizeHandle";
 import ReadingEditor, { type ReadingActions } from "../reading/ReadingEditor";
 import DialogueReader from "../reading/DialogueReader";
 import StatisticsPanel from "./StatisticsPanel";
-import { parse, type Node as YarnNode } from "../parser";
+import { parse, expressionType, type Node as YarnNode } from "../parser";
+import { scanMarkup } from "../inline-markup";
 import { WorkspaceClient } from "./client";
 import { restoreSession } from "./storage";
 import { difference, monacoSourceEdits, validateCommands } from "./engine";
@@ -641,13 +642,22 @@ function WorkbenchContent({
   }, [doc?.name, project?.name]);
   function registerCommand(command: Command) {
     if (command.inline) {
-      openCommands();
-      setCommandTarget({
-        name: command.name,
-        nonce: Date.now(),
-        draft: command,
-      });
-      return;
+      const properties = scanMarkup(command.example)[0]?.properties || [];
+      const types = new Map(variables.map((v) => [v.name, v.type]));
+      command = {
+        ...command,
+        params: command.params.map((p) => {
+          const value = properties.find(
+            (property) => property.name === p.name,
+          )?.value;
+          const type = value?.startsWith("{")
+            ? expressionType(value.slice(1, -1), types)
+            : null;
+          return type === "string" || type === "number" || type === "boolean"
+            ? { ...p, type }
+            : p;
+        }),
+      };
     }
     void perform({ type: "registerCommand", projectId: project.id, command });
   }

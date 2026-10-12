@@ -104,6 +104,16 @@ test("unknown markup is a ranged warning with escape and nomarkup exclusions", (
   assert.equal(findings[0].endColumn, 22);
 });
 
+test("inline shorthand names the marker property, not an arbitrary first parameter", () => {
+  const timed = { ...pause, params: [{ ...pause.params[0], name: "time" }] };
+  assert.equal(
+    markupDiagnostics("[pause=normal/]", [timed])[0].code,
+    "command.noMatch",
+  );
+  assert.deepEqual(markupDiagnostics("[pause time=normal/]", [timed]), []);
+  assert.deepEqual(markupDiagnostics("[pause=normal/]", [pause]), []);
+});
+
 test("positional matching combines arity, types, allow lists and number limits", () => {
   const defs = [
     command("move", [parameter("string", { allowList: ["home"] })]),

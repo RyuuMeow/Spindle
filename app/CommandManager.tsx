@@ -6,6 +6,7 @@ import {
   useEffectEvent,
   useEffect,
   useId,
+  useLayoutEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -28,6 +29,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CompactSelect } from "@/components/CompactSelect";
+import { PanelResizeHandle } from "@/components/PanelResizeHandle";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ControlTooltip } from "@/components/ui/tooltip";
 import {
@@ -135,6 +137,20 @@ export default function CommandManager({
     JSON.stringify(commands[0] || emptyCommand()),
   );
   const [query, setQuery] = useState("");
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const [listWidth, setListWidth] = useState(208);
+  const [availableWidth, setAvailableWidth] = useState(800);
+  useLayoutEffect(() => {
+    const element = workspaceRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() =>
+      setAvailableWidth(element.clientWidth),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const maxListWidth = Math.max(160, Math.min(600, availableWidth - 300));
+  const visibleListWidth = Math.min(listWidth, maxListWidth);
   const matchesQuery = (command: Command) =>
     `${command.name} ${command.displayName || ""}`
       .toLocaleLowerCase()
@@ -428,70 +444,80 @@ export default function CommandManager({
     );
 
   return (
-    <div className="command-workspace">
-      <aside className="command-list" aria-label={tr("m945e6f8b3e4e")}>
-        <div className="section-heading">
-          <span>{tr("m945e6f8b3e4e")}</span>
-          <ControlTooltip label={tr("m05cc9992623a")}>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={tr("m05cc9992623a")}
+    <div className="command-workspace" ref={workspaceRef}>
+      <div className="command-list-panel" style={{ width: visibleListWidth }}>
+        <aside className="command-list" aria-label={tr("m945e6f8b3e4e")}>
+          <div className="section-heading">
+            <span>{tr("m945e6f8b3e4e")}</span>
+            <ControlTooltip label={tr("m05cc9992623a")}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={tr("m05cc9992623a")}
+                disabled={saving}
+                onClick={() => (dirty ? setPending(-1) : choose(-1))}
+              >
+                <Plus size={15} />
+              </Button>
+            </ControlTooltip>
+          </div>
+          <div className="node-search">
+            <Search size={13} />
+            <input
+              aria-label={tr("m756605eb7a31")}
+              placeholder={tr("m756605eb7a31")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          {commands.map((command, i) => (
+            <button
+              type="button"
+              hidden={!matchesQuery(command)}
+              className={`command-row ${i === index ? "active" : ""}`}
+              aria-current={i === index ? "true" : undefined}
+              key={commandKey(command)}
               disabled={saving}
-              onClick={() => (dirty ? setPending(-1) : choose(-1))}
+              onClick={() => {
+                if (i !== index) {
+                  if (dirty) setPending(i);
+                  else choose(i);
+                }
+              }}
             >
-              <Plus size={15} />
-            </Button>
-          </ControlTooltip>
-        </div>
-        <div className="node-search">
-          <Search size={13} />
-          <input
-            aria-label={tr("m756605eb7a31")}
-            placeholder={tr("m756605eb7a31")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        {commands.map((command, i) => (
-          <button
-            type="button"
-            hidden={!matchesQuery(command)}
-            className={`command-row ${i === index ? "active" : ""}`}
-            aria-current={i === index ? "true" : undefined}
-            key={commandKey(command)}
-            disabled={saving}
-            onClick={() => {
-              if (i !== index) {
-                if (dirty) setPending(i);
-                else choose(i);
-              }
-            }}
-          >
-            <Terminal size={15} />
-            <span className="command-row-label">
-              {command.displayName || command.name}
-              <small>{signature(command)}</small>
-              {command.inline && (
-                <small>
-                  {tr("markup.inline")} ·{" "}
-                  {tr(
-                    command.markupMode === "paired"
-                      ? "markup.paired"
-                      : "markup.selfClosing",
-                  )}
-                </small>
-              )}
-            </span>
-          </button>
-        ))}
-        {commands.length === 0 && (
-          <p className="command-empty">{tr("m88c3c3d38f24")}</p>
-        )}
-        {!!commands.length && !commands.some(matchesQuery) && (
-          <p className="command-empty">{tr("m46bcd0385c36")}</p>
-        )}
-      </aside>
+              <Terminal size={15} />
+              <span className="command-row-label">
+                {command.displayName || command.name}
+                <small>{signature(command)}</small>
+                {command.inline && (
+                  <small>
+                    {tr("markup.inline")} ·{" "}
+                    {tr(
+                      command.markupMode === "paired"
+                        ? "markup.paired"
+                        : "markup.selfClosing",
+                    )}
+                  </small>
+                )}
+              </span>
+            </button>
+          ))}
+          {commands.length === 0 && (
+            <p className="command-empty">{tr("m88c3c3d38f24")}</p>
+          )}
+          {!!commands.length && !commands.some(matchesQuery) && (
+            <p className="command-empty">{tr("m46bcd0385c36")}</p>
+          )}
+        </aside>
+        <PanelResizeHandle
+          side="left"
+          value={visibleListWidth}
+          min={160}
+          max={maxListWidth}
+          onResize={setListWidth}
+          label={tr("command.resizeList")}
+        />
+      </div>
 
       <form
         className="command-detail"

@@ -1072,5 +1072,6 @@
   "command.constraint": "{0}.{1} 必須符合：{2}",
   "markup.unknown": "尚未註冊的行內標記：{0}",
   "command.duplicate": "此重載已存在",
-  "command.addOverload": "新增重載"
+  "command.addOverload": "新增重載",
+  "command.resizeList": "調整指令清單寬度"
 }

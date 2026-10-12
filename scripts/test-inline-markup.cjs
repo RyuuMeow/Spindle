@@ -415,23 +415,6 @@ const errors = [],
       await page.keyboard.press("Home");
       for (let i = 0; i < 9; i++) await page.keyboard.press("ArrowRight");
       await page.keyboard.press("Alt+Enter");
-      await page
-        .getByRole("checkbox", { name: "行內標記", exact: true })
-        .waitFor();
-      assert(
-        await page
-          .getByRole("checkbox", { name: "行內標記", exact: true })
-          .isChecked(),
-      );
-      assert(
-        !(await savedCommands()).some((c) => c.name === unknown),
-        "quick fix opens an unsaved draft",
-      );
-      assert.equal(
-        await page.locator('[data-field="name"]').inputValue(),
-        unknown,
-      );
-      await page.getByRole("button", { name: "套用定義", exact: true }).click();
       await until(
         async () => (await savedCommands()).some((c) => c.name === unknown),
         "registered " + unknown,
@@ -451,15 +434,13 @@ const errors = [],
           ["enabled", "boolean"],
         ],
       );
-      await page
-        .locator(".tab-name")
-        .filter({ hasText: /^test$/ })
-        .click();
+      assert.equal(await page.locator(".command-workspace:visible").count(), 0);
+      assert(await page.locator(editor).first().isVisible());
       if (mode !== "流程圖") await page.locator(editor).first().focus();
       await expectText(`Mira: [${unknown} speed=2 enabled=true /]`);
       checks.push(
         mode +
-          ": unknown markup quick fix opens a draft and persists inferred inline metadata only on save",
+          ": unknown markup quick fix saves inferred inline metadata without leaving the editor",
       );
     }
     await page
@@ -478,34 +459,15 @@ const errors = [],
     await page.keyboard.press("Home");
     for (let i = 0; i < 9; i++) await page.keyboard.press("ArrowRight");
     await page.keyboard.press("Alt+Enter");
-    await page.locator('[data-field="name"]').waitFor();
-    await until(
-      async () =>
-        (await page.locator('[data-field="name"]').inputValue()) ===
-        "expression_fx",
-      "expression draft opened",
-    );
-    const expressionType = page
-      .locator('[data-field="param-0-type"]')
-      .getByRole("combobox");
-    assert.match(await expressionType.innerText(), /選擇型別/);
-    await page.getByRole("button", { name: "套用定義", exact: true }).click();
-    await page
-      .getByText("請先選擇運算式參數的型別，再儲存定義。", { exact: true })
-      .waitFor();
-    assert(!(await savedCommands()).some((c) => c.name === "expression_fx"));
-    await expressionType.click();
-    await page.getByRole("option", { name: "數字", exact: true }).click();
-    await page.getByRole("button", { name: "套用定義", exact: true }).click();
     await until(
       async () =>
         (await savedCommands()).some(
           (c) => c.name === "expression_fx" && c.params[0].type === "number",
         ),
-      "expression type confirmed and saved",
+      "expression type inferred and saved",
     );
     checks.push(
-      "Quick fix expression parameters require an explicit type choice",
+      "Quick fix infers expression parameter types and saves without switching tabs",
     );
     await page
       .getByRole("button", { name: "Inline markup test", exact: true })
@@ -546,6 +508,47 @@ const errors = [],
     assert.equal(
       await page.getByText("內建行內標記", { exact: true }).count(),
       0,
+    );
+    const sidebar = page.locator(".command-list-panel");
+    const grip = page.getByRole("separator", {
+      name: "調整指令清單寬度",
+      exact: true,
+    });
+    const original = (await sidebar.boundingBox()).width;
+    const box = await grip.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + 50);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + 50, {
+      steps: 6,
+    });
+    await page.mouse.up();
+    assert.equal((await sidebar.boundingBox()).width, original + 120);
+    await grip.press("Home");
+    assert.equal((await sidebar.boundingBox()).width, 160);
+    const geometry = await page
+      .locator(".command-list")
+      .evaluate((element) => ({
+        horizontalOverflow: element.scrollWidth - element.clientWidth,
+        clipped: [...element.querySelectorAll(".command-row-label")].every(
+          (label) =>
+            getComputedStyle(label).overflowX === "hidden" &&
+            label.getBoundingClientRect().right <=
+              label.closest("button").getBoundingClientRect().right,
+        ),
+      }));
+    assert.equal(geometry.horizontalOverflow, 0);
+    assert(geometry.clipped);
+    const narrow = await grip.boundingBox();
+    await page.mouse.move(narrow.x + 3, narrow.y + 50);
+    await page.mouse.down();
+    await page.mouse.move(narrow.x + 100, narrow.y + 50);
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    assert.equal((await sidebar.boundingBox()).width, 160);
+    await grip.press("ArrowRight");
+    assert.equal((await sidebar.boundingBox()).width, 168);
+    checks.push(
+      "Command sidebar clips long signatures, supports drag/keyboard resize and Escape cancellation",
     );
     await page.screenshot({ path: path.join(out, "settings.png") });
     checks.push(

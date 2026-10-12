@@ -1072,5 +1072,6 @@
   "command.constraint": "{0}.{1} must satisfy: {2}",
   "markup.unknown": "Unregistered inline markup: {0}",
   "command.duplicate": "This overload is already defined",
-  "command.addOverload": "Add overload"
+  "command.addOverload": "Add overload",
+  "command.resizeList": "Resize command list"
 }
