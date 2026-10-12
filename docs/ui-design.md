@@ -6,6 +6,8 @@
 
 ## Inline markup authoring
 
+Reading editors and flowchart scene editors render complete registered inline markers as compact name/parameter badges, using display names when available. Paired markers show a subtle range underline and a closing badge; overlapping ranges and `[/]` follow Yarn semantics. Clicking into the line restores the entire source syntax. Graph card summaries share the same badges and ranges. Unknown/incomplete markers, escaped brackets and `nomarkup` content retain source text. These decorations never rewrite dialogue or infer runtime visual effects from a marker name.
+
 The command list shares names, parameters, descriptions and project history between ordinary commands and inline markup. Enable **Inline markup** and choose **Self-closing** or **Paired**. The list contains custom definitions only; built-in inline definitions remain available through completion and hover. Ordinary `<<...>>` completion excludes inline definitions.
 
 In source and reading editors (including the graph's reading-based scene editor), `[` pairs with `]` and starts markup completion, including before existing dialogue. Completion never treats unbounded following dialogue as part of the marker name. Accepting a name inserts `[name /]` or `[name]…[/name]`; required parameter values are empty Tab stops, with quotes around string slots. Defaults remain in help instead of being inserted. Tab moves through parameters and then to the body/end; named-property completion offers missing optional properties. Typing an existing `]` advances over it. `[/` suggests open attributes in the current line, nearest first, including `nomarkup`'s own closer. Completion consumes an existing bracket and reuses an existing matching closing tag.

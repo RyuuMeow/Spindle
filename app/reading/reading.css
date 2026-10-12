@@ -125,6 +125,40 @@
 .reading-editor .reading-function {
   color: #a3afab;
 }
+:is(.reading-editor, .inline-presentation) .reading-inline-marker,
+:is(.reading-editor, .inline-presentation) .reading-inline-close {
+  color: var(--foreground, #d0d0d0);
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.82em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+:is(.reading-editor, .inline-presentation) .reading-inline-name {
+  font-weight: 500;
+}
+:is(.reading-editor, .inline-presentation)
+  .reading-inline-name
+  > .reading-icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 3px;
+}
+:is(.reading-editor, .inline-presentation)
+  .reading-inline-marker
+  .reading-parameter-hint {
+  font-size: 0.95em;
+}
+:is(.reading-editor, .inline-presentation) .reading-inline-close {
+  opacity: 0.7;
+}
+:is(.reading-editor, .inline-presentation) .reading-inline-scope {
+  border-bottom: 1px dotted color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 3%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
 .reading-editor .reading-target,
 .reading-editor .reading-option-marker {
   color: #aeb9c5;

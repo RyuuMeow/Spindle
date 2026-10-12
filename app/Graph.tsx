@@ -2,6 +2,7 @@
 import { t as tr } from "./i18n/index.ts";
 
 import { useEditorContext } from "./mcp/editor-context";
+import { InlinePreview } from "./reading/InlinePreview";
 import { usePreview, ReadingPortrait } from "./play/context";
 import {
   characterColor,
@@ -97,6 +98,7 @@ import type {
 export type { GraphState } from "./graph/layout-state";
 type RecordKind = SceneRecord["kind"];
 type CardData = SceneRecord & {
+  commands?: SceneEditorBindings["commands"];
   editor?: ReactNode;
   warning: boolean;
   compact: boolean;
@@ -272,13 +274,17 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
                   >
                     {summary.slice(speaker.from, speaker.to)}
                   </span>
-                  {summary.slice(speaker.to)}
+                  <InlinePreview
+                    text={summary.slice(speaker.to)}
+                    commands={data.commands}
+                  />
                 </>
+              ) : data.node?.summary ? (
+                <InlinePreview text={summary} commands={data.commands} />
+              ) : data.kind === "missing" ? (
+                tr("m57496d36d567")
               ) : (
-                data.node?.summary ||
-                (data.kind === "missing"
-                  ? tr("m57496d36d567")
-                  : tr("md8d9bccf322b"))
+                tr("md8d9bccf322b")
               )}
             </p>
           ) : null}
@@ -732,6 +738,7 @@ function Canvas({
         selected: nodeSelection.has(record.id),
         data: {
           ...record,
+          commands,
           editor: editing?.record.id === record.id ? nodeEditor : undefined,
           compact: detail < 2,
           distant: detail === 0,
@@ -751,6 +758,7 @@ function Canvas({
       })),
     [
       records,
+      commands,
       positions,
       automatic,
       nodeSelection,
@@ -1352,7 +1360,10 @@ function Canvas({
           const right = rightDrag.current;
           rightDrag.current = null;
           if (right?.moved) layout.persist();
-          if (right && canvasElement.current?.hasPointerCapture(right.pointerId))
+          if (
+            right &&
+            canvasElement.current?.hasPointerCapture(right.pointerId)
+          )
             canvasElement.current.releasePointerCapture(right.pointerId);
           setDragging(false);
           leftDragStart.current = null;

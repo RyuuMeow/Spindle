@@ -1,5 +1,6 @@
 import { t as tr } from "../i18n/index.ts";
 import { sourceTokens } from "./source-tokens";
+import { inlinePresentation } from "./inline-presentation";
 import { EditorState, RangeSetBuilder, type Range } from "@codemirror/state";
 import { Decoration, WidgetType } from "@codemirror/view";
 import {
@@ -265,8 +266,56 @@ export function readingDecorations(
     }
     if (line.kind === "blank") continue;
     if ((line.kind === "dialogue" || line.kind === "option") && !active) {
+      const inline = inlinePresentation(line.text, definitions);
+      for (const scope of inline.scopes)
+        mark(
+          line.from + scope.from,
+          line.from + scope.to,
+          "reading-inline-scope",
+        );
+      for (const { tag, command } of inline.markers) {
+        const start = line.from + tag.from;
+        const end = line.from + tag.to;
+        if (tag.closing) {
+          add(
+            start,
+            end,
+            tag.name ? "/" + commandLabel(command) : "/",
+            "reading-inline-close",
+            undefined,
+            undefined,
+            line.text.slice(tag.from, tag.to),
+          );
+          continue;
+        }
+        ranges.push(
+          Decoration.mark({
+            class: "reading-inline-marker",
+            inclusive: true,
+          }).range(start, end),
+        );
+        add(
+          start,
+          start + tag.name.length + 1,
+          commandLabel(command),
+          "reading-inline-name",
+          "command",
+          undefined,
+          commandHelp(command),
+        );
+        const tail = /\s*\/?\]$/.exec(line.text.slice(tag.from, tag.to));
+        if (tail) add(end - tail[0].length, end, "", "reading-hidden");
+      }
       for (const hint of inlineParameterLabels(line.text, definitions)) {
-        if (hint.shorthand && !hint.distinct) continue;
+        if (hint.shorthand && !hint.distinct) {
+          add(
+            line.from + hint.from,
+            line.from + hint.to,
+            " ",
+            "reading-inline-separator",
+          );
+          continue;
+        }
         add(
           line.from + hint.from,
           line.from + hint.to,

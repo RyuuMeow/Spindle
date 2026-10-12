@@ -200,6 +200,59 @@ const errors = [],
         }
         await page.keyboard.press("End");
       };
+      if (mode !== "純文字") {
+        const sample =
+          'Mira: [tint color="blue" strength=0.5]你好 [pause=500 /] 世界[/tint]\nMira: Next';
+        await reset(sample);
+        await page.keyboard.press("Control+End");
+        await page
+          .locator(".reading-inline-name")
+          .filter({ hasText: "tint" })
+          .waitFor();
+        assert.equal(
+          await page.locator(".reading-inline-close").innerText(),
+          "/tint",
+        );
+        assert((await page.locator(".reading-inline-scope").count()) > 0);
+        await expectText(sample);
+        await page.screenshot({
+          path: path.join(
+            out,
+            mode === "流程圖"
+              ? "graph-inline-style.png"
+              : "reading-inline-style.png",
+          ),
+        });
+        await page
+          .locator(".reading-inline-name")
+          .filter({ hasText: "tint" })
+          .click();
+        await page
+          .locator(".reading-source")
+          .filter({ hasText: '[tint color="blue" strength=0.5]' })
+          .waitFor();
+        assert.equal(await page.locator(".reading-inline-marker").count(), 0);
+        await expectText(sample);
+        if (mode === "流程圖") {
+          await page.keyboard.press("Escape");
+          await page
+            .locator(".flow-card-summary .reading-inline-marker")
+            .first()
+            .waitFor();
+          await page.screenshot({
+            path: path.join(out, "graph-inline-summary.png"),
+          });
+          await page
+            .locator(".flow-card-title")
+            .filter({ hasText: /^Start$/ })
+            .dblclick();
+          await page.locator(editor).first().focus();
+        }
+        checks.push(
+          mode +
+            ": inline markers and paired scopes render, clicking restores editable source without changing text",
+        );
+      }
       await reset();
       await page.keyboard.type("[pa", { delay: 90 });
       await page.locator(list).waitFor();

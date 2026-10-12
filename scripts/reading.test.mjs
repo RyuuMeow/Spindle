@@ -33,6 +33,83 @@ const {
 const source = (body) =>
   `title: Start\ntags: opening village\n---\n${body}\n===\n`;
 const bodyLine = (text) => readingStructure(source(text))[3];
+
+test("inline reading markers use display names and preserve editable source ranges", () => {
+  const commands = [
+    {
+      name: "wave",
+      displayName: "波動",
+      inline: true,
+      markupMode: "paired",
+      params: [],
+      description: "",
+      example: "",
+    },
+  ];
+  const text = source("Mira: [wave]Hello[pause=500 /]world[/wave]\nMira: Next");
+  const collect = (anchor) => {
+    const state = EditorState.create({ doc: text, selection: { anchor } });
+    const result = [];
+    readingDecorations(state, commands).between(
+      0,
+      text.length,
+      (from, to, value) => result.push({ from, to, spec: value.spec }),
+    );
+    assert.equal(state.doc.toString(), text);
+    return result;
+  };
+  const rendered = collect(text.indexOf("Next"));
+  const names = rendered.filter(
+    (r) => r.spec.widget?.className === "reading-inline-name",
+  );
+  assert.deepEqual(
+    names.map((r) => r.spec.widget.label),
+    ["波動", "pause"],
+  );
+  const scope = rendered.find((r) => r.spec.class === "reading-inline-scope");
+  assert.equal(text.slice(scope.from, scope.to), "Hello[pause=500 /]world");
+  assert(rendered.some((r) => r.spec.widget?.label === "/波動"));
+  const editing = collect(text.indexOf("Hello"));
+  assert(
+    !editing.some((r) =>
+      r.spec.widget?.className?.startsWith("reading-inline-"),
+    ),
+  );
+  assert(!editing.some((r) => r.spec.class === "reading-inline-scope"));
+});
+
+test("inline reading scope follows overlapping and close-all markers without styling literal markup", () => {
+  const commands = ["a", "b"].map((name) => ({
+    name,
+    inline: true,
+    markupMode: "paired",
+    params: [],
+    description: "",
+    example: "",
+  }));
+  const body =
+    "[a]one[b]two[/a]three[/] \\[a] [unknown]raw[/unknown] [nomarkup][a]literal[/a][/nomarkup]";
+  const text = source(body);
+  const state = EditorState.create({ doc: text, selection: { anchor: 0 } });
+  const result = [];
+  readingDecorations(state, commands).between(
+    0,
+    text.length,
+    (from, to, value) => result.push({ from, to, spec: value.spec }),
+  );
+  assert.deepEqual(
+    result
+      .filter((r) => r.spec.class === "reading-inline-scope")
+      .sort((a, b) => a.from - b.from)
+      .map((r) => text.slice(r.from, r.to)),
+    ["one[b]two", "two[/a]three", "[a]literal[/a]"],
+  );
+  assert.equal(
+    result.filter((r) => r.spec.widget?.className === "reading-inline-name")
+      .length,
+    3,
+  );
+});
 function decorations(text, cursor = text.length, readOnly = false) {
   const state = EditorState.create({
     doc: text,
