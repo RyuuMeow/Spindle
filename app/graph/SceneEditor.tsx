@@ -119,6 +119,10 @@ export default function SceneEditor(props: Props) {
   const recoveredMessage = recovered ? tr("mbd58c03493a4") : "";
   const source = useRef(recovered?.source || props.doc.text),
     scope = useRef(recovered?.scope || sceneScope(props.doc.text, props.node));
+  const receivedDocument = useRef({
+    text: props.doc.text,
+    version: props.doc.version,
+  });
   const blockedRef = useRef(recoveredMessage),
     composing = useRef(false);
   useEditorContext("graph-editor", () =>
@@ -182,14 +186,19 @@ export default function SceneEditor(props: Props) {
   }
   function reconcile() {
     const view = viewRef.current,
-      next = latest.current.doc.text;
+      incoming = latest.current.doc,
+      next = incoming.text;
+    if (!view || composing.current || blockedRef.current) return;
+    // Local edits advance source before the parent publishes its new snapshot.
+    // An unrelated render must not replay the previous prop over that edit:
+    // removing/reinserting it loses both the caret and active snippet fields.
     if (
-      !view ||
-      composing.current ||
-      blockedRef.current ||
-      next === source.current
+      receivedDocument.current.text === next &&
+      receivedDocument.current.version === incoming.version
     )
       return;
+    receivedDocument.current = { text: next, version: incoming.version };
+    if (next === source.current) return;
     const mapped = mapSceneScope(source.current, next, scope.current);
     if (!mapped) {
       block(tr("m7248cb873817"));

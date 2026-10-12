@@ -46,6 +46,10 @@ const server = await createServer({
       "@codemirror/autocomplete",
       "@codemirror/commands",
       "@codemirror/collab",
+      "@codemirror/language",
+      "@codemirror/search",
+      "elkjs/lib/elk-api.js",
+      "libavoid-js",
       "clsx",
       "tailwind-merge",
     ],
@@ -92,7 +96,10 @@ try {
     headless: true,
     channel: "msedge",
   });
-  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  page = await browser.newPage({
+    viewport: { width: 1440, height: 900 },
+    locale: "zh-TW",
+  });
   page.setDefaultTimeout(30000);
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(server.resolvedUrls.local[0], {
