@@ -26,14 +26,29 @@ import type { editor, Position, IDisposable } from "monaco-editor";
 import Editor, { loader } from "@monaco-editor/react";
 import type { Command, Doc, Issue, Node } from "./parser";
 import { commandCatalog } from "./command-catalog";
-import { markupCompletion, needsMarkupCloser } from "./inline-markup";
-import { inlineSnippet, inlineCatalog } from "./inline-catalog";
+import {
+  markupCompletion,
+  needsMarkupCloser,
+  markupPropertyCompletion,
+} from "./inline-markup";
+import {
+  inlineSnippet,
+  inlineCatalog,
+  inlinePropertySnippet,
+} from "./inline-catalog";
+import { sourceInlineEditing } from "./source-inline-editing";
+import { linkedEnd } from "./inline-editing";
 import {
   variableCompletionContext,
   variableAt,
   type YarnVariable,
 } from "./variable-completion";
-import { commandCall, parameterLabel, commandInput } from "./command-hints";
+import {
+  commandCall,
+  parameterLabel,
+  commandInput,
+  inlineParameterLabels,
+} from "./command-hints";
 import { appearanceTheme } from "./editor-theme";
 import { useAppearance } from "./appearance/context";
 import { fontStack } from "./appearance/model";
@@ -159,6 +174,9 @@ export default function CodeEditor({
     highlights.current?.refresh();
   }, [style]);
   const themeApi = useRef<typeof import("monaco-editor") | null>(null);
+  const inlineEditing = useRef<ReturnType<typeof sourceInlineEditing> | null>(
+    null,
+  );
   useEffect(() => {
     themeApi.current?.editor.defineTheme(
       "yarn-dark",
@@ -448,6 +466,31 @@ export default function CodeEditor({
                   endColumn: pos.column,
                 };
               const selection = editorRef.current?.getSelection();
+              const link = inlineEditing.current?.link;
+              if (link && editorRef.current?.getModel() === model) {
+                const start = model.getPositionAt(link.from),
+                  end = model.getPositionAt(linkedEnd(link));
+                return {
+                  suggestions: inlineCatalog(latest.current.commands)
+                    .filter((c) => c.markupMode === "paired")
+                    .map((c) => ({
+                      label: c.name,
+                      filterText: "[" + c.name,
+                      kind: m.languages.CompletionItemKind.Function,
+                      insertText: inlineSnippet(c, link.content),
+                      insertTextRules:
+                        m.languages.CompletionItemInsertTextRule
+                          .InsertAsSnippet,
+                      range: new m.Range(
+                        start.lineNumber,
+                        start.column,
+                        end.lineNumber,
+                        end.column,
+                      ),
+                      detail: c.description,
+                    })),
+                };
+              }
               if (
                 selection &&
                 !selection.isEmpty() &&
@@ -471,6 +514,27 @@ export default function CodeEditor({
                     })),
                 };
               }
+              const property = markupPropertyCompletion(
+                model.getLineContent(pos.lineNumber),
+                pos.column - 1,
+                latest.current.commands,
+              );
+              if (property)
+                return {
+                  suggestions: property.parameters.map((p) => ({
+                    label: p.name,
+                    kind: m.languages.CompletionItemKind.Property,
+                    insertText: inlinePropertySnippet(p),
+                    insertTextRules:
+                      m.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    range: {
+                      ...range,
+                      startColumn: property.from + 1,
+                      endColumn: property.to + 1,
+                    },
+                    detail: parameterLabel(p) + " · " + p.type,
+                  })),
+                };
               const markup = markupCompletion(
                 model.getLineContent(pos.lineNumber),
                 pos.column - 1,
@@ -572,6 +636,19 @@ export default function CodeEditor({
                 line <= range.endLineNumber;
                 line++
               ) {
+                for (const hint of inlineParameterLabels(
+                  model.getLineContent(line),
+                  latest.current.commands,
+                )) {
+                  if (!hint.distinct) continue;
+                  hints.push({
+                    position: { lineNumber: line, column: hint.from + 1 },
+                    label: hint.label + ":",
+                    tooltip: hint.help,
+                    kind: m.languages.InlayHintKind.Parameter,
+                    paddingRight: true,
+                  });
+                }
                 const call = commandCall(
                   model.getLineContent(line),
                   latest.current.commands,
@@ -615,6 +692,8 @@ export default function CodeEditor({
           }
         };
         syncModel();
+        inlineEditing.current = sourceInlineEditing(editor, m);
+        editor.onDidDispose(() => inlineEditing.current?.dispose());
         characters.current = sourceCharacters(
           editor,
           () => characterSettings.current,

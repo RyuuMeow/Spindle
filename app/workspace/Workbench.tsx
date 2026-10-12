@@ -247,6 +247,7 @@ function WorkbenchContent({
   const [commandTarget, setCommandTarget] = useState<{
     name: string;
     nonce: number;
+    draft?: Command;
   }>();
   const pendingDocument = useRef<{ tabId: string; origin: string } | null>(
     null,
@@ -639,6 +640,15 @@ function WorkbenchContent({
     document.title = `${doc?.name || project?.name || "Spindle"} — ${project?.name || ""} · Spindle`;
   }, [doc?.name, project?.name]);
   function registerCommand(command: Command) {
+    if (command.inline) {
+      openCommands();
+      setCommandTarget({
+        name: command.name,
+        nonce: Date.now(),
+        draft: command,
+      });
+      return;
+    }
     void perform({ type: "registerCommand", projectId: project.id, command });
   }
   async function perform(action: WorkspaceAction) {
@@ -2671,6 +2681,7 @@ function WorkbenchContent({
                   projectId={project.id}
                   revealName={commandTarget?.name}
                   revealNonce={commandTarget?.nonce}
+                  initialDraft={commandTarget?.draft}
                   commands={project.commands}
                   notify={notify}
                   onDirtyChange={setCommandDirty}

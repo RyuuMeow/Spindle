@@ -99,17 +99,8 @@ export function inlineSnippet(
                 p.name === "other"),
           )
           .map((p) => {
-            const value =
-              p.defaultValue ||
-              (p.type === "number"
-                ? "0"
-                : p.type === "boolean"
-                  ? "true"
-                  : '"text"');
-            const field =
-              dialect === "codemirror" && /[{}]/.test(value)
-                ? "${" + escape(value) + "}"
-                : "${" + ++index + ":" + escape(value) + "}";
+            const slot = "${" + ++index + ":}";
+            const field = p.type === "string" ? '"' + slot + '"' : slot;
             return (
               (p.name === command.name && index === 1 ? "=" : ` ${p.name}=`) +
               field
@@ -119,4 +110,9 @@ export function inlineSnippet(
       : escape(existingProperties);
   const cursor = dialect === "monaco" ? "$0" : "${0}";
   return `[${command.name}${properties}${command.markupMode === "selfClosing" ? " /]" + cursor : "]" + escape(selectedText) + cursor + (close ? "[/" + command.name + "]" : "")}`;
+}
+
+export function inlinePropertySnippet(parameter: Param) {
+  const value = parameter.type === "string" ? '"${1:}"' : "${1:}";
+  return parameter.name + "=" + value;
 }

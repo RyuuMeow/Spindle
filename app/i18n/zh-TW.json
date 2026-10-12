@@ -1042,6 +1042,8 @@
   "markup.selfClosing": "自閉合",
   "markup.paired": "成對",
   "markup.builtin": "內建行內標記",
+  "markup.confirmType": "請先選擇運算式參數的型別，再儲存定義。",
+  "markup.chooseType": "選擇型別",
   "markup.nomarkup": "將範圍內文字視為原文，不解析行內標記。",
   "markup.character": "以 name 屬性標示說話角色。",
   "markup.select": "依 value 選取同名屬性的文字；屬性名稱可自行定義。",

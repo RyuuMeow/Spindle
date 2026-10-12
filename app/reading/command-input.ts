@@ -38,8 +38,18 @@ import { indentUnit } from "@codemirror/language";
 import type { Command } from "../parser";
 import { unregisteredCommand } from "../command-quick-fix";
 import { commandCatalog } from "../command-catalog";
-import { markupCompletion, needsMarkupCloser } from "../inline-markup";
-import { inlineSnippet, inlineCatalog } from "../inline-catalog";
+import {
+  markupCompletion,
+  needsMarkupCloser,
+  markupPropertyCompletion,
+} from "../inline-markup";
+import {
+  inlineSnippet,
+  inlineCatalog,
+  inlinePropertySnippet,
+} from "../inline-catalog";
+import { inlineEditing, inlineLink, clearInlineLink } from "./inline-editing";
+import { linkedEnd } from "../inline-editing";
 import {
   variableCompletionContext,
   type YarnVariable,
@@ -144,6 +154,28 @@ export function commandEditing(
     if (context.view?.composing || context.state.readOnly) return null;
     const line = context.state.doc.lineAt(context.pos);
     const selection = context.state.selection.main;
+    const link = context.state.field(inlineLink);
+    if (link)
+      return {
+        from: link.from + 1,
+        to: context.pos,
+        options: inlineCatalog(commands())
+          .filter((c) => c.markupMode === "paired")
+          .map((c) => ({
+            label: c.name,
+            type: "function",
+            detail: c.description,
+            apply: (view, completion) => {
+              clearInlineLink(view);
+              snippet(inlineSnippet(c, link.content, "codemirror"))(
+                view,
+                completion,
+                link.from,
+                linkedEnd(link),
+              );
+            },
+          })),
+      };
     if (
       context.explicit &&
       !selection.empty &&
@@ -170,6 +202,22 @@ export function commandEditing(
           })),
       };
     const prefix = line.text.slice(0, context.pos - line.from);
+    const property = markupPropertyCompletion(
+      line.text,
+      context.pos - line.from,
+      commands(),
+    );
+    if (property)
+      return {
+        from: line.from + property.from,
+        to: line.from + property.to,
+        options: property.parameters.map((p) => ({
+          label: p.name,
+          type: "property",
+          detail: parameterLabel(p) + " · " + p.type,
+          apply: snippet(inlinePropertySnippet(p)),
+        })),
+      };
     const markup = markupCompletion(
       line.text,
       context.pos - line.from,
@@ -258,6 +306,7 @@ export function commandEditing(
     };
   };
   return [
+    inlineEditing,
     declarations.extension,
     EditorView.updateListener.of((update) => {
       if (update.selectionSet && !update.docChanged && !update.view.composing)
@@ -500,6 +549,8 @@ export function commandEditing(
     autocompletion({
       override: [source],
       activateOnTypingDelay: 80,
+      // A freshly opened list must accept Tab, rather than fall through to indent.
+      interactionDelay: 0,
       icons: false,
       tooltipClass: () => "spindle-completions",
       addToOptions: [

@@ -451,3 +451,8 @@ body:has(.find-widget:hover) .workbench-hover-container:has(.with-pointer) {
 .monaco-editor .selected-text {
   clip-path: inset(var(--spindle-selection-inset, 0px) 0);
 }
+.inline-mirror-caret {
+  border-left: 1px solid currentColor;
+  margin-left: -1px;
+  pointer-events: none;
+}

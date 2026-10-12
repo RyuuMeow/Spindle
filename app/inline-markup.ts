@@ -7,6 +7,7 @@ export type MarkupProperty = {
   value: string;
   from: number;
   to: number;
+  valueFrom: number;
 };
 export type MarkupTag = {
   name: string;
@@ -101,12 +102,36 @@ export function scanMarkup(text: string): MarkupTag[] {
         continue;
       }
       at++;
+      const afterEquals = at;
       while (/\s/.test(text[at] || "x")) at++;
       const start = at;
+      // Empty snippet slots may be followed by another named property. Keep
+      // that property's name out of this value so each slot retains its help.
+      if (
+        at > afterEquals &&
+        /^[\p{L}\p{N}_][\p{L}\p{N}_|]*\s*=/u.test(text.slice(at))
+      ) {
+        malformed = true;
+        properties.push({
+          name: prop,
+          value: "",
+          from: propFrom,
+          to: at,
+          valueFrom: afterEquals,
+        });
+        continue;
+      }
       at = skipValue(text, at);
       if (at === start) {
         malformed = true;
-        if (text[at] !== "]") at++;
+        properties.push({
+          name: prop,
+          value: "",
+          from: propFrom,
+          to: at,
+          valueFrom: start,
+        });
+        if (text[at] !== "]" && !/^\/\s*\]/.test(text.slice(at))) at++;
         continue;
       }
       properties.push({
@@ -114,6 +139,7 @@ export function scanMarkup(text: string): MarkupTag[] {
         value: text.slice(start, at),
         from: propFrom,
         to: at,
+        valueFrom: start,
       });
     }
     const complete = text[at] === "]";
@@ -201,21 +227,24 @@ export function markupCompletion(
           },
       )
     : definitions;
-  const suffix = /^[\p{L}\p{N}_|]*\]?/u.exec(text.slice(offset))?.[0] || "";
+  // A bare opener cannot distinguish following dialogue from a tag name.
+  // Only consume a right-hand name when its closing bracket proves the boundary.
+  const suffix = /^[\p{L}\p{N}_|]*\]/u.exec(text.slice(offset))?.[0] || "";
   const existing =
     !tag.closing &&
     scanMarkup(text).find(
-      (t) => t.from === tag.from && t.complete && t.properties.length > 0,
+      (t) => t.from === tag.from && t.complete && !t.malformed,
     );
   return {
     from: tag.from,
     to: existing ? existing.to : offset + suffix.length,
-    properties: existing
-      ? text
-          .slice(existing.from + 1 + existing.name.length, existing.to - 1)
-          .replace(/\/\s*$/, "")
-          .trimEnd()
-      : undefined,
+    properties:
+      existing && existing.properties.length > 0
+        ? text
+            .slice(existing.from + 1 + existing.name.length, existing.to - 1)
+            .replace(/\/\s*$/, "")
+            .trimEnd()
+        : undefined,
     closing: tag.closing,
     options,
   };
@@ -226,6 +255,45 @@ export function needsMarkupCloser(text: string, to: number, name: string) {
     (tag) => tag.name === name || (tag.closing && !tag.name),
   );
   return !next?.closing;
+}
+
+/** Named-property completion, separate from values/expressions and marker names. */
+export function markupPropertyCompletion(
+  text: string,
+  offset: number,
+  commands: Command[],
+) {
+  if (/^\s*(?:title|tags|tracking|when|position)\s*:/.test(text)) return null;
+  const tag = scanMarkup(text.slice(0, offset)).at(-1);
+  if (!tag || tag.complete || tag.closing || !tag.name || tag.to !== offset)
+    return null;
+  const tail = text.slice(tag.from + 1 + tag.name.length, offset);
+  const match = /(?:^|\s)([\p{L}\p{N}_]*)$/u.exec(tail);
+  if (!match || (!tail.startsWith(" ") && !tail.startsWith("\t"))) return null;
+  if (tag.properties.some((p) => !p.value && p.to === offset)) return null;
+  // The scanner consumes unfinished quoted/grouped values to the caret.
+  if (
+    tag.properties.some(
+      (p) =>
+        p.to === offset &&
+        p.value &&
+        ((p.value.startsWith('"') && !/^"(?:\\.|[^"\\])*"$/.test(p.value)) ||
+          (p.value.startsWith("{") && !p.value.endsWith("}"))),
+    )
+  )
+    return null;
+  const command = inlineCatalog(commands).find((c) => c.name === tag.name);
+  if (!command) return null;
+  const used = new Set(tag.properties.map((p) => p.name));
+  const from = offset - match[1].length;
+  const suffix = /^[\p{L}\p{N}_]*/u.exec(text.slice(offset))?.[0] || "";
+  // Do not overwrite an existing assignment's value when completing its name.
+  if (/^\s*=/.test(text.slice(offset + suffix.length))) return null;
+  return {
+    from,
+    to: offset + suffix.length,
+    parameters: command.params.filter((p) => !used.has(p.name)),
+  };
 }
 
 export function markupDiagnostics(text: string, commands: Command[]) {
@@ -279,7 +347,7 @@ export function markupDiagnostics(text: string, commands: Command[]) {
       if (property.value.startsWith("{")) continue; // The expression analyzer owns dynamic values.
       const type = /^(true|false)$/i.test(property.value)
         ? "boolean"
-        : /^-?\d+(?:\.\d+)?$/.test(property.value)
+        : /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(property.value)
           ? "number"
           : "string";
       if (

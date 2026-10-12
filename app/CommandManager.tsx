@@ -7,6 +7,7 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   type Ref,
@@ -47,7 +48,7 @@ import {
 import { type Command, type Param, validateCommand } from "./parser";
 import "./controls.css";
 import CommandPreviewBinding from "./play/CommandPreviewBinding";
-import { builtinInline } from "./inline-catalog";
+import { scanMarkup } from "./inline-markup";
 
 export type CommandActions = {
   save: () => Promise<boolean>;
@@ -108,6 +109,7 @@ export default function CommandManager({
   referenceCount,
   revealName,
   revealNonce,
+  initialDraft,
 }: {
   projectId?: string;
   commands: Command[];
@@ -122,6 +124,7 @@ export default function CommandManager({
   projectName?: string;
   revealName?: string;
   revealNonce?: number;
+  initialDraft?: Command;
 }) {
   const [index, setIndex] = useState(commands.length ? 0 : -1);
   const [draft, setDraft] = useState<Command>(() =>
@@ -151,13 +154,30 @@ export default function CommandManager({
   const formRef = useRef<HTMLFormElement>(null);
   const issueRef = useRef<CommandIssue | null>(null);
   const focusAfterSwitch = useRef(false);
+  const pendingDraft = useRef<Command | undefined>(undefined);
+  const [unconfirmedTypes, setUnconfirmedTypes] = useState<string[]>([]);
   const formId = useId();
   const errorId = `${formId}-error`;
   const dirty = JSON.stringify(draft) !== draftBase;
-  const draftIssue = commandIssue(
-    draft,
-    commands.filter((_, i) => i !== index),
+  const unresolvedIndex = draft.params.findIndex((p) =>
+    unconfirmedTypes.includes(p.name),
   );
+  const typeIssue = useMemo<CommandIssue | null>(
+    () =>
+      unresolvedIndex < 0
+        ? null
+        : {
+            message: tr("markup.confirmType"),
+            field: `param-${unresolvedIndex}-type`,
+          },
+    [unresolvedIndex],
+  );
+  const draftIssue =
+    typeIssue ||
+    commandIssue(
+      draft,
+      commands.filter((_, i) => i !== index),
+    );
 
   useEffect(() => {
     onDirtyChange(dirty);
@@ -178,17 +198,32 @@ export default function CommandManager({
       const target =
         element ||
         formRef.current?.querySelector<HTMLElement>("[data-command-error]");
-      target?.focus();
+      (
+        target?.querySelector<HTMLElement>('[role="combobox"]') || target
+      )?.focus();
       target?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
   }, []);
 
   const choose = (nextIndex: number) => {
+    const seed = nextIndex === -1 ? pendingDraft.current : undefined;
+    pendingDraft.current = undefined;
+    setUnconfirmedTypes(
+      seed
+        ? scanMarkup(seed.example).flatMap((tag) =>
+            tag.closing || tag.name !== seed.name
+              ? []
+              : tag.properties
+                  .filter((p) => p.value.startsWith("{"))
+                  .map((p) => p.name),
+          )
+        : [],
+    );
     commandBase.current = JSON.stringify(commands);
     setDraftBase(JSON.stringify(commands[nextIndex] || emptyCommand()));
     setHistory({ past: [], future: [] });
     setIndex(nextIndex);
-    setDraft(structuredClone(commands[nextIndex] || emptyCommand()));
+    setDraft(structuredClone(seed || commands[nextIndex] || emptyCommand()));
     reportIssue(null);
   };
 
@@ -199,10 +234,12 @@ export default function CommandManager({
       reportIssue({ message: tr("m16d034be25d9"), field: "save" });
       return false;
     }
-    const validation = commandIssue(
-      draft,
-      commands.filter((_, i) => i !== index),
-    );
+    const validation =
+      typeIssue ||
+      commandIssue(
+        draft,
+        commands.filter((_, i) => i !== index),
+      );
     if (validation) {
       reportIssue(validation);
       return false;
@@ -234,7 +271,17 @@ export default function CommandManager({
     } finally {
       setSaving(false);
     }
-  }, [commands, dirty, draft, index, notify, onChange, reportIssue, saving]);
+  }, [
+    commands,
+    dirty,
+    draft,
+    index,
+    notify,
+    onChange,
+    reportIssue,
+    saving,
+    typeIssue,
+  ]);
 
   useEffect(() => {
     const handler = () => {
@@ -255,10 +302,12 @@ export default function CommandManager({
         reportIssue({ message: tr("m3ed3208b3335"), field: "save" });
         return null;
       }
-      const validation = commandIssue(
-        draft,
-        commands.filter((_, i) => i !== index),
-      );
+      const validation =
+        typeIssue ||
+        commandIssue(
+          draft,
+          commands.filter((_, i) => i !== index),
+        );
       if (validation) {
         reportIssue(validation);
         return null;
@@ -272,6 +321,13 @@ export default function CommandManager({
 
   const reveal = useEffectEvent((name: string) => {
     const next = commands.findIndex((c) => c.name === name);
+    if (next < 0 && initialDraft) {
+      pendingDraft.current = initialDraft;
+      setQuery("");
+      if (dirty) setPending(-1);
+      else choose(-1);
+      return;
+    }
     if (next < 0 || next === index) return;
     setQuery("");
     if (dirty) setPending(next);
@@ -299,6 +355,12 @@ export default function CommandManager({
       );
   };
   const updateParam = (paramIndex: number, patch: Partial<Param>) => {
+    const oldName = draft.params[paramIndex].name;
+    setUnconfirmedTypes((names) =>
+      patch.type
+        ? names.filter((name) => name !== oldName)
+        : names.map((name) => (name === oldName ? (patch.name ?? name) : name)),
+    );
     updateDraft({
       ...draft,
       params: draft.params.map((param, i) =>
@@ -429,23 +491,6 @@ export default function CommandManager({
         {!!commands.length && !commands.some(matchesQuery) && (
           <p className="command-empty">{tr("m46bcd0385c36")}</p>
         )}
-        <details className="command-builtin-list">
-          <summary>{tr("markup.builtin")}</summary>
-          {builtinInline.filter(matchesQuery).map((command) => (
-            <details key={command.name}>
-              <summary>
-                {command.name} ·{" "}
-                {tr(
-                  command.markupMode === "paired"
-                    ? "markup.paired"
-                    : "markup.selfClosing",
-                )}
-              </summary>
-              <p>{command.description}</p>
-              <code>{command.example}</code>
-            </details>
-          ))}
-        </details>
       </aside>
 
       <form
@@ -740,12 +785,16 @@ export default function CommandManager({
                   <label
                     className="command-field"
                     htmlFor={`${formId}-param-${i}-type`}
+                    data-field={`param-${i}-type`}
                   >
                     <span>{tr("m3a5821e57dbf")}</span>
                     <CompactSelect
                       id={`${formId}-param-${i}-type`}
                       label={tr("m8cf4216a8657", [i + 1])}
-                      value={param.type}
+                      value={
+                        unconfirmedTypes.includes(param.name) ? "" : param.type
+                      }
+                      placeholder={tr("markup.chooseType")}
                       onChange={(value) =>
                         updateParam(i, { type: value as Param["type"] })
                       }
@@ -956,7 +1005,10 @@ export default function CommandManager({
       <AlertDialog
         open={pending !== null}
         onOpenChange={(open) => {
-          if (!open) setPending(null);
+          if (!open) {
+            setPending(null);
+            pendingDraft.current = undefined;
+          }
         }}
       >
         <AlertDialogContent
@@ -984,7 +1036,10 @@ export default function CommandManager({
               onClick={async () => {
                 if (await save()) {
                   if (pending !== null) choose(pending);
-                } else focusAfterSwitch.current = true;
+                } else {
+                  focusAfterSwitch.current = true;
+                  pendingDraft.current = undefined;
+                }
                 setPending(null);
               }}
             >

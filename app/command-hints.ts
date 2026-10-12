@@ -108,9 +108,7 @@ export function commandHover(
   column: number,
   commands: Command[],
 ) {
-  const tag = scanMarkup(text).find(
-    (t) => t.complete && column >= t.from && column < t.to,
-  );
+  const tag = scanMarkup(text).find((t) => column >= t.from && column < t.to);
   if (tag) {
     const command = findCommand(tag.name, commands, true);
     if (command) {
@@ -258,6 +256,25 @@ export function emptyParameterHint(
   column: number,
   commands: Command[],
 ) {
+  const tag = scanMarkup(text).find(
+    (t) => !t.closing && column > t.from && column <= t.to,
+  );
+  if (tag) {
+    const command = findCommand(tag.name, commands, true);
+    const property = tag.properties.find(
+      (p) => column >= text.indexOf("=", p.from) + 1 && column <= p.to,
+    );
+    const index =
+      command?.params.findIndex((p) => p.name === property?.name) ?? -1;
+    if (
+      command &&
+      property &&
+      index >= 0 &&
+      /^(?:""?|\{\}?)?$/.test(property.value)
+    )
+      return { command, index };
+    return null;
+  }
   const input = commandInput(text.slice(0, column));
   if (input?.kind !== "argument") return null;
   const command = findCommand(input.name, commands);
@@ -305,6 +322,31 @@ export function emptyParameterHint(
     if (!args || args[input.index]) return null;
   }
   return { command, index: input.index };
+}
+
+/** Presentation spans keep actual named properties intact in the source. */
+export function inlineParameterLabels(text: string, commands: Command[]) {
+  return scanMarkup(text).flatMap((tag) => {
+    const command = findCommand(tag.name, commands, true);
+    if (!command || tag.closing || !tag.complete) return [];
+    return tag.properties.flatMap((property) => {
+      const index = command.params.findIndex((p) => p.name === property.name);
+      if (index < 0) return [];
+      const parameter = command.params[index];
+      return [
+        {
+          from: property.from,
+          to: property.valueFrom,
+          label: parameterLabel(parameter),
+          help: parameterHelp(parameter, index),
+          shorthand: text[property.from] === "=",
+          distinct:
+            !!parameter.displayName?.trim() &&
+            parameter.displayName !== property.name,
+        },
+      ];
+    });
+  });
 }
 
 /** Is the caret at an existing closing delimiter, outside quoted arguments? */

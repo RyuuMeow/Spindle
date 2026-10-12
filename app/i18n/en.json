@@ -1042,6 +1042,8 @@
   "markup.selfClosing": "Self-closing",
   "markup.paired": "Paired",
   "markup.builtin": "Built-in inline markup",
+  "markup.confirmType": "Choose a type for the expression parameter before saving.",
+  "markup.chooseType": "Choose a type",
   "markup.nomarkup": "Treat the enclosed text as literal text, without parsing markup.",
   "markup.character": "Identify the speaker using the name property.",
   "markup.select": "Replace with the property matching value. Property names are your possible values.",

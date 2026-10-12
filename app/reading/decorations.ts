@@ -8,6 +8,7 @@ import {
   commandHelp,
   parameterHelp,
   parameterLabel,
+  inlineParameterLabels,
 } from "../command-hints";
 import type { Command } from "../parser";
 import { builtins } from "../parser";
@@ -263,6 +264,20 @@ export function readingDecorations(
         );
     }
     if (line.kind === "blank") continue;
+    if ((line.kind === "dialogue" || line.kind === "option") && !active) {
+      for (const hint of inlineParameterLabels(line.text, definitions)) {
+        if (hint.shorthand && !hint.distinct) continue;
+        add(
+          line.from + hint.from,
+          line.from + hint.to,
+          hint.label + ":",
+          "reading-parameter-hint",
+          undefined,
+          undefined,
+          hint.help,
+        );
+      }
+    }
     if (active && structural) continue;
     if (
       leading &&

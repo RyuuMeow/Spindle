@@ -17,8 +17,13 @@ function load(entry) {
   });
   return require(outfile);
 }
-const { scanMarkup, markupCompletion, markupDiagnostics, needsMarkupCloser } =
-  load("app/inline-markup.ts");
+const {
+  scanMarkup,
+  markupCompletion,
+  markupDiagnostics,
+  needsMarkupCloser,
+  markupPropertyCompletion,
+} = load("app/inline-markup.ts");
 const { inlineSnippet, builtinInline } = load("app/inline-catalog.ts");
 const { parse, validateCommand } = load("app/parser.ts");
 const { commandCatalog, findCommand } = load("app/command-catalog.ts");
@@ -158,8 +163,8 @@ test("parser publishes source ranges and does not accept inline registrations as
   assert(result.issues.some((d) => d.code === "diagnostic.f9bb37d04146"));
 });
 
-test("snippets select parameters, finish inside paired markup and escape selected text", () => {
-  assert.equal(inlineSnippet(single), "[flash=${1:100} /]$0");
+test("snippets leave parameter values empty, finish inside paired markup and escape selected text", () => {
+  assert.equal(inlineSnippet(single), "[flash=${1:} /]$0");
   assert.equal(inlineSnippet(paired), "[wave]$0[/wave]");
   assert.equal(inlineSnippet(paired, "", "monaco", false), "[wave]$0");
   assert.equal(
@@ -170,6 +175,127 @@ test("snippets select parameters, finish inside paired markup and escape selecte
     inlineSnippet(paired, "$gold", "monaco"),
     "[wave]\\$gold$0[/wave]",
   );
+});
+
+test("bare opener completion never replaces following dialogue", () => {
+  for (const text of ["[後面的文字", "[hello world", "[你好[wave]text[/wave]"])
+    assert.equal(markupCompletion(text, 1, commands).to, 1, text);
+  assert.equal(markupCompletion("[]後文", 1, commands).to, 2);
+  assert.equal(markupCompletion("[wa]後文", 2, commands).to, 4);
+  assert.equal(markupCompletion("[pa /]後文", 3, commands).to, 6);
+});
+
+test("inline help recognizes empty, unfinished and reordered named values", () => {
+  const { emptyParameterHint, commandHover, inlineParameterLabels } = load(
+    "app/command-hints.ts",
+  );
+  assert.equal(emptyParameterHint("[flash= /]", 7, commands).index, 0);
+  assert.equal(emptyParameterHint("[flash=20 /]", 7, commands), null);
+  const character = '[character name=""]text[/character]';
+  assert.equal(emptyParameterHint(character, 17, commands).index, 0);
+  assert.equal(
+    commandHover('[character name="unfinished', 20, commands).parameterIndex,
+    0,
+  );
+  const labels = inlineParameterLabels("[flash=20 /]", commands);
+  assert.equal(labels[0].label, "flash");
+  assert.equal(labels[0].shorthand, true);
+  const move = {
+    ...paired,
+    name: "move",
+    params: ["x", "y"].map((name) => ({
+      name,
+      type: "number",
+      required: true,
+      defaultValue: "",
+    })),
+  };
+  const slots = "[move x= y=]body[/move]";
+  assert.equal(
+    emptyParameterHint(slots, slots.indexOf("x=") + 2, [move]).index,
+    0,
+  );
+  assert.equal(
+    emptyParameterHint(slots, slots.indexOf("y=") + 2, [move]).index,
+    1,
+  );
+});
+
+test("property completion only offers missing definitions outside values", () => {
+  assert.deepEqual(
+    markupPropertyCompletion("[character ", 11, commands).parameters.map(
+      (p) => p.name,
+    ),
+    ["name"],
+  );
+  for (const text of [
+    '[character name="unfinished ',
+    "[character name={$foo ",
+    "[nomarkup][character ",
+    "// [character ",
+  ])
+    assert.equal(
+      markupPropertyCompletion(text, text.length, commands),
+      null,
+      text,
+    );
+  const text = '[character name="Mira" ';
+  assert.deepEqual(
+    markupPropertyCompletion(text, text.length, commands).parameters,
+    [],
+  );
+});
+
+test("unknown markup quick fixes infer shapes and literal parameter types without registering", () => {
+  const { unregisteredCommand } = load("app/command-quick-fix.ts");
+  const text = '[shake speed=2 enabled=true style="soft"]text[/shake]';
+  const candidate = unregisteredCommand(text, 3, commands);
+  assert.equal(candidate.command.inline, true);
+  assert.equal(candidate.command.markupMode, "paired");
+  assert.deepEqual(
+    candidate.command.params.map((p) => [p.name, p.type]),
+    [
+      ["speed", "number"],
+      ["enabled", "boolean"],
+      ["style", "string"],
+    ],
+  );
+  assert.equal(
+    unregisteredCommand(text, text.length - 3, commands).command.name,
+    "shake",
+  );
+  assert.equal(
+    unregisteredCommand("[shake=2 /]", 2, commands).command.markupMode,
+    "selfClosing",
+  );
+  const nested = "[shake speed=1]outer[shake speed=2]inner[/shake]tail[/shake]";
+  assert.equal(
+    unregisteredCommand(nested, nested.length - 3, commands).command.example,
+    nested,
+  );
+  assert.equal(
+    unregisteredCommand("[shake]ok[/shake][/shake]", 20, commands),
+    null,
+  );
+  const decimals = "[shake speed=.5 enabled=TRUE /]";
+  const definition = unregisteredCommand(decimals, 3, []).command;
+  assert.deepEqual(
+    definition.params.map((p) => p.type),
+    ["number", "boolean"],
+  );
+  assert.deepEqual(markupDiagnostics(decimals, [definition]), []);
+  for (const raw of [
+    "[pause=5 /]",
+    "[wave]text[/wave]",
+    "// [shake /]",
+    "[nomarkup][shake /][/nomarkup]",
+    "\\[shake /]",
+  ])
+    assert.equal(
+      unregisteredCommand(raw, raw.indexOf("shake") + 1, commands),
+      null,
+      raw,
+    );
 });
 
 test("MCP registration schema retains inline metadata and rejects invalid enum values", () => {

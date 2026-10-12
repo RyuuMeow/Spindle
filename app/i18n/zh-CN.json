@@ -1042,6 +1042,8 @@
   "markup.selfClosing": "自闭合",
   "markup.paired": "成对",
   "markup.builtin": "内建行内标记",
+  "markup.confirmType": "请先选择表达式参数的类型，再保存定义。",
+  "markup.chooseType": "选择类型",
   "markup.nomarkup": "将范围内文字视为原文，不解析行内标记。",
   "markup.character": "以 name 属性标示说话角色。",
   "markup.select": "依 value 选取同名属性的文字；属性名称可自行定义。",
