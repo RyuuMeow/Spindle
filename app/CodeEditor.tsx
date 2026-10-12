@@ -26,6 +26,8 @@ import type { editor, Position, IDisposable } from "monaco-editor";
 import Editor, { loader } from "@monaco-editor/react";
 import type { Command, Doc, Issue, Node } from "./parser";
 import { commandCatalog } from "./command-catalog";
+import { markupCompletion, needsMarkupCloser } from "./inline-markup";
+import { inlineSnippet, inlineCatalog } from "./inline-catalog";
 import {
   variableCompletionContext,
   variableAt,
@@ -372,17 +374,20 @@ export default function CodeEditor({
         m.languages.setLanguageConfiguration("yarn", {
           comments: { lineComment: "//" },
           brackets: [
+            ["[", "]"],
             ["{", "}"],
             ["(", ")"],
             ["<<", ">>"],
           ],
           autoClosingPairs: [
+            { open: "[", close: "]", notIn: ["comment", "string"] },
             { open: "{", close: "}" },
             { open: "(", close: ")" },
             { open: '"', close: '"' },
             { open: "<<", close: ">>" },
           ],
           surroundingPairs: [
+            { open: "[", close: "]" },
             { open: '"', close: '"' },
             { open: "{", close: "}" },
           ],
@@ -407,6 +412,8 @@ export default function CodeEditor({
               [/<<\s*[\w]+/, { token: "function", next: "@command" }],
               [/<< /, { token: "function", next: "@command" }],
               [/->/, "keyword.option"],
+              [/\\[\[\]\\]/, ""],
+              [/\[\/?[\w|]*(?:\s+[^\]\r\n]*|=[^\]\r\n]*)?\/?\]/, "tag"],
               [/\$[A-Za-z_]\w*/, "variable"],
               [/\{[^}]*\}/, "variable"],
               [/#[\w:]+/, "tag"],
@@ -428,7 +435,7 @@ export default function CodeEditor({
         providers.current.forEach((p) => p.dispose());
         providers.current = [
           m.languages.registerCompletionItemProvider("yarn", {
-            triggerCharacters: ["<", " ", "$"],
+            triggerCharacters: ["<", " ", "$", "[", "/"],
             provideCompletionItems(model: editor.ITextModel, pos: Position) {
               const word = model.getWordUntilPosition(pos),
                 prefix = model
@@ -439,6 +446,64 @@ export default function CodeEditor({
                   endLineNumber: pos.lineNumber,
                   startColumn: word.startColumn,
                   endColumn: pos.column,
+                };
+              const selection = editorRef.current?.getSelection();
+              if (
+                selection &&
+                !selection.isEmpty() &&
+                selection.startLineNumber === selection.endLineNumber &&
+                editorRef.current?.getModel() === model
+              ) {
+                const selected = model.getValueInRange(selection);
+                return {
+                  suggestions: inlineCatalog(latest.current.commands)
+                    .filter((c) => c.markupMode === "paired")
+                    .map((c) => ({
+                      label: c.name,
+                      filterText: selected,
+                      kind: m.languages.CompletionItemKind.Function,
+                      insertText: inlineSnippet(c, selected),
+                      range: selection,
+                      insertTextRules:
+                        m.languages.CompletionItemInsertTextRule
+                          .InsertAsSnippet,
+                      detail: tr("markup.wrap"),
+                    })),
+                };
+              }
+              const markup = markupCompletion(
+                model.getLineContent(pos.lineNumber),
+                pos.column - 1,
+                latest.current.commands,
+              );
+              if (markup)
+                return {
+                  suggestions: markup.options.map((c) => ({
+                    label: c.name,
+                    kind: m.languages.CompletionItemKind.Function,
+                    filterText: (markup.closing ? "[/" : "[") + c.name,
+                    insertText: markup.closing
+                      ? `[/${c.name}]`
+                      : inlineSnippet(
+                          c,
+                          "",
+                          "monaco",
+                          needsMarkupCloser(
+                            model.getLineContent(pos.lineNumber),
+                            markup.to,
+                            c.name,
+                          ),
+                          markup.properties,
+                        ),
+                    insertTextRules:
+                      m.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    detail: c.description,
+                    range: {
+                      ...range,
+                      startColumn: markup.from + 1,
+                      endColumn: markup.to + 1,
+                    },
+                  })),
                 };
               const variable = variableCompletionContext(prefix);
               if (variable)
@@ -476,18 +541,20 @@ export default function CodeEditor({
                 return { suggestions: [] };
               return {
                 suggestions: [
-                  ...commandCatalog(latest.current.commands).map((c) => ({
-                    label: c.name,
-                    kind: c.builtin ? 14 : 1,
-                    insertText: c.name === "declare" ? "declare $" : c.name,
-                    detail: c.params
-                      .map(
-                        (p) =>
-                          `${parameterLabel(p)}${p.required ? "" : "?"}: ${p.type}`,
-                      )
-                      .join(", "),
-                    range,
-                  })),
+                  ...commandCatalog(latest.current.commands)
+                    .filter((c) => !c.inline)
+                    .map((c) => ({
+                      label: c.name,
+                      kind: c.builtin ? 14 : 1,
+                      insertText: c.name === "declare" ? "declare $" : c.name,
+                      detail: c.params
+                        .map(
+                          (p) =>
+                            `${parameterLabel(p)}${p.required ? "" : "?"}: ${p.type}`,
+                        )
+                        .join(", "),
+                      range,
+                    })),
                 ],
               };
             },

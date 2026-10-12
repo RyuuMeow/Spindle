@@ -1,5 +1,6 @@
 import { t as tr } from "./i18n/index.ts";
 import type { Command } from "./parser";
+import { scanMarkup } from "./inline-markup";
 import {
   findCommand,
   builtinCommands,
@@ -107,6 +108,30 @@ export function commandHover(
   column: number,
   commands: Command[],
 ) {
+  const tag = scanMarkup(text).find(
+    (t) => t.complete && column >= t.from && column < t.to,
+  );
+  if (tag) {
+    const command = findCommand(tag.name, commands, true);
+    if (command) {
+      const property = tag.properties.find(
+        (p) => column >= p.from && column < p.to,
+      );
+      const parameterIndex = property
+        ? command.params.findIndex((p) => p.name === property.name)
+        : -1;
+      return {
+        command,
+        parameterIndex,
+        from: property?.from ?? tag.from,
+        to: property?.to ?? tag.to,
+        text:
+          parameterIndex >= 0
+            ? parameterHelp(command.params[parameterIndex], parameterIndex)
+            : commandHelp(command),
+      };
+    }
+  }
   const call = commandCall(text, commands);
   if (!call || column < text.indexOf("<<") || column >= call.end) return null;
   const index =

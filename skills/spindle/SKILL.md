@@ -31,6 +31,8 @@ Use a unique `operationId` for a logical write. If delivery is uncertain, retry 
 
 Use `apply_changes` for text and scene operations, `apply_quick_fixes` for selected diagnostic candidates, and `update_commands` for command definitions. Command history and text Undo are separate; re-read between the two. Version conflicts require re-analysis, not forced overwrites.
 
+Inline markup shares `update_commands`: include `inline: true` and `markupMode: "selfClosing"` or `"paired"`, alongside the existing name, description, example and params. Parameters are named properties; one matching the marker name supports shorthand `[name=value /]`. Omit inline fields for ordinary `<<commands>>`. Query `commands` to discover the read-only built-in markers; do not register them again. Editor registration provides parsing and completion, not a Play effect. `calls` still means ordinary command calls.
+
 Use `list_project_entries` for paths, empty folders, document IDs, and entry keys. Use `create_document`, `create_folder`, `move_entry`, `trash_entry`, `list_trash`, and `restore_trash` for project objects. Root parent is the empty string. New document names include `.yarn`. Preserve returned IDs; filename changes do not rename scene titles. Creation/restoration does not reveal a tab unless `reveal_location` is requested. Trash is reversible; permanent deletion is not an MCP tool.
 
 Graph context and source lookup are supported; graph layout, pins, and routing edits are not. If tools are unavailable, explain that Spindle must be running and its MCP connection enabled; do not claim to have read or changed the live editor.

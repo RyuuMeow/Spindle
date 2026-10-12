@@ -14,6 +14,14 @@ const scope = {
 const command = z
   .object({
     name: z.string().min(1).max(200),
+    inline: z
+      .boolean()
+      .optional()
+      .describe("Register an inline [...] markup instead of a <<command>>."),
+    markupMode: z
+      .enum(["selfClosing", "paired"])
+      .optional()
+      .describe("Required for inline markup: [name /] or [name]text[/name]."),
     displayName: z.string().max(500).optional(),
     description: z.string().max(10000),
     example: z.string().max(10000),

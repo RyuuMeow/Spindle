@@ -304,6 +304,68 @@ test("diagnostics match UI parser and selected quick fixes replace typed values"
   });
   assert(p.documents[0].text.includes("<<set $gold = 0>>"));
 });
+test("inline command registration persists shape, exposes builtins and rejects overrides", async (t) => {
+  const f = await fixture(t),
+    p = f.projects[0];
+  const command = {
+    name: "wave",
+    inline: true,
+    markupMode: "paired",
+    description: "Wave",
+    example: "[wave]hi[/wave]",
+    params: [],
+  };
+  const request = {
+    editorSessionId: "session-0",
+    snapshotId: (await f.ctx()).snapshotId,
+    operationId: "inline-create",
+    commands: [command],
+  };
+  const preview = await f.app.execute("update_commands", {
+    ...request,
+    preview: true,
+  });
+  assert.deepEqual(preview.commands, [command]);
+  assert.equal(p.commands.length, 0);
+  await f.app.execute("update_commands", request);
+  assert.deepEqual(p.commands, [command]);
+  const catalog = await f.app.execute("query_project", {
+    editorSessionId: "session-0",
+    kind: "commands",
+  });
+  assert(
+    catalog.items.some((c) => c.name === "pause" && c.builtin && c.inline),
+  );
+  assert(
+    catalog.items.some((c) => c.name === "wave" && c.markupMode === "paired"),
+  );
+  assert.deepEqual(
+    JSON.parse(
+      fs.readFileSync(path.join(p.root, ".spindle", "project.json"), "utf8"),
+    ).commands,
+    [command],
+  );
+  const latest = (await f.ctx()).snapshotId;
+  await assert.rejects(
+    f.app.execute("update_commands", {
+      ...request,
+      operationId: "inline-override",
+      snapshotId: latest,
+      commands: [{ ...command, name: "pause", markupMode: "selfClosing" }],
+    }),
+    /BUILTIN_COMMAND/,
+  );
+  await assert.rejects(
+    f.app.execute("update_commands", {
+      ...request,
+      operationId: "inline-invalid",
+      snapshotId: latest,
+      commands: [{ ...command, markupMode: undefined }],
+    }),
+  );
+  assert.deepEqual(p.commands, [command]);
+});
+
 test("command upserts preserve other definitions, create history and honor CAS", async (t) => {
   const f = await fixture(t),
     p = f.projects[0],

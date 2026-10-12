@@ -1,5 +1,6 @@
 import { t as tr } from "./i18n/index.ts";
 import type { Command, Param } from "./parser";
+import { builtinInline } from "./inline-catalog";
 /** Presentation metadata only; never persisted as custom command definitions. */
 export type HelpParameter = Omit<Param, "type"> & { type: string };
 export type CommandInfo = Omit<Command, "params"> & {
@@ -103,16 +104,23 @@ export const builtinCommands: CommandInfo[] = [
 export function findCommand(
   name: string,
   custom: Command[],
+  inline = false,
 ): CommandInfo | undefined {
   return (
-    builtinCommands.find((c) => c.name === name) ||
-    custom.find((c) => c.name === name)
+    (inline ? builtinInline : builtinCommands).find((c) => c.name === name) ||
+    custom.find((c) => c.name === name && !!c.inline === inline)
   );
 }
 export function commandCatalog(custom: Command[]): CommandInfo[] {
   return [
-    ...custom.filter((c) => !builtinCommands.some((b) => b.name === c.name)),
+    ...custom.filter(
+      (c) =>
+        !(c.inline ? builtinInline : builtinCommands).some(
+          (b) => b.name === c.name,
+        ),
+    ),
     ...builtinCommands,
+    ...builtinInline,
   ];
 }
 /** Built-in language expressions do not use whitespace-delimited positional arguments. */

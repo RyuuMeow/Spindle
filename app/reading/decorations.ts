@@ -110,7 +110,9 @@ export function readingDecorations(
   const definitions = commands.filter(
     (c): c is Command => typeof c !== "string",
   );
-  const names = commands.map((c) => (typeof c === "string" ? c : c.name));
+  const names = commands
+    .filter((c) => typeof c === "string" || !c.inline)
+    .map((c) => (typeof c === "string" ? c : c.name));
   const ranges: Range<Decoration>[] = [];
   const layout = readingLayout(lines);
   const touched = (from: number, to: number) =>

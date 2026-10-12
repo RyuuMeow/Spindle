@@ -1,4 +1,5 @@
 /** Source-only spans matching the existing Monaco Yarn palette. */
+import { scanMarkup } from "../inline-markup";
 export function sourceTokens(text: string) {
   const tokens: { from: number; to: number; className: string }[] = [];
   const add = (from: number, to: number, kind: string) => {
@@ -28,6 +29,7 @@ export function sourceTokens(text: string) {
   }
   const speaker = /^[ \t]*[^:<>]+:/.exec(text);
   if (speaker) add(0, speaker[0].length, "speaker");
+  for (const tag of scanMarkup(text)) add(tag.from, tag.to, "tag");
   let command = false;
   const pattern =
     /[/][/].*$|<<\s*\w*|>>|"(?:\\.|[^"\\])*"?|\$[A-Za-z_]\w*|->|#[\w:]+|\b(?:true|false|\d+(?:\.\d+)?)\b/g;

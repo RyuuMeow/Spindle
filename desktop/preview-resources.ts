@@ -75,8 +75,10 @@ export class PreviewResourcesStore {
       config,
       images,
       speakers,
-      commands: project.commands.map((c) => c.name),
-      commandDefinitions: structuredClone(project.commands),
+      commands: project.commands.filter((c) => !c.inline).map((c) => c.name),
+      commandDefinitions: structuredClone(
+        project.commands.filter((c) => !c.inline),
+      ),
     };
   }
   save(project: Project, input: unknown) {

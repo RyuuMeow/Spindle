@@ -2,6 +2,7 @@ import type { editor, IDisposable } from "monaco-editor";
 import { sceneAt, type SceneLocation } from "./scene-link";
 import type { Command } from "./parser";
 import { findCommand } from "./command-catalog";
+import { markupCompletion } from "./inline-markup";
 import { variableAt } from "./variable-completion";
 import type { YarnVariable } from "./variable-completion";
 import {
@@ -144,7 +145,16 @@ export function sourceCommandAssistance(
     const name = list?.querySelector(
       ".monaco-list-row.focused .label-name",
     )?.textContent;
-    const c = findCommand(name || "", commands());
+    const caret = editor.getPosition();
+    const inline =
+      caret &&
+      (markupCompletion(
+        editor.getModel()?.getLineContent(caret.lineNumber) || "",
+        caret.column - 1,
+        commands(),
+      ) ||
+        !editor.getSelection()?.isEmpty());
+    const c = findCommand(name || "", commands(), !!inline);
     const description =
       c?.description || variables().find((v) => v.name === name)?.description;
     if (!list || !description || composing) {

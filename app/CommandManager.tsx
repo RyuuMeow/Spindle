@@ -47,6 +47,7 @@ import {
 import { type Command, type Param, validateCommand } from "./parser";
 import "./controls.css";
 import CommandPreviewBinding from "./play/CommandPreviewBinding";
+import { builtinInline } from "./inline-catalog";
 
 export type CommandActions = {
   save: () => Promise<boolean>;
@@ -409,6 +410,16 @@ export default function CommandManager({
             <span className="command-row-label">
               {command.displayName || command.name}
               {command.displayName && <small>{command.name}</small>}
+              {command.inline && (
+                <small>
+                  {tr("markup.inline")} ·{" "}
+                  {tr(
+                    command.markupMode === "paired"
+                      ? "markup.paired"
+                      : "markup.selfClosing",
+                  )}
+                </small>
+              )}
             </span>
           </button>
         ))}
@@ -418,6 +429,23 @@ export default function CommandManager({
         {!!commands.length && !commands.some(matchesQuery) && (
           <p className="command-empty">{tr("m46bcd0385c36")}</p>
         )}
+        <details className="command-builtin-list">
+          <summary>{tr("markup.builtin")}</summary>
+          {builtinInline.filter(matchesQuery).map((command) => (
+            <details key={command.name}>
+              <summary>
+                {command.name} ·{" "}
+                {tr(
+                  command.markupMode === "paired"
+                    ? "markup.paired"
+                    : "markup.selfClosing",
+                )}
+              </summary>
+              <p>{command.description}</p>
+              <code>{command.example}</code>
+            </details>
+          ))}
+        </details>
       </aside>
 
       <form
@@ -542,6 +570,46 @@ export default function CommandManager({
         </div>
         <div className="command-form-body">
           {issue?.field === "save" && renderError()}
+          <div className="command-inline-settings">
+            <label>
+              <Checkbox
+                checked={!!draft.inline}
+                onCheckedChange={(value: boolean | "indeterminate") => {
+                  const next = { ...draft };
+                  if (value === true) {
+                    next.inline = true;
+                    next.markupMode = "selfClosing";
+                  } else {
+                    delete next.inline;
+                    delete next.markupMode;
+                  }
+                  updateDraft(next);
+                }}
+              />{" "}
+              {tr("markup.inline")}
+            </label>
+            {draft.inline && (
+              <>
+                <CompactSelect
+                  label={tr("markup.inline")}
+                  value={draft.markupMode || "selfClosing"}
+                  onChange={(value) =>
+                    updateDraft({
+                      ...draft,
+                      markupMode: value as Command["markupMode"],
+                    })
+                  }
+                  options={[
+                    { value: "selfClosing", label: tr("markup.selfClosing") },
+                    { value: "paired", label: tr("markup.paired") },
+                  ]}
+                />
+                <span className="command-field-hint">
+                  {tr("markup.namedParameters")}
+                </span>
+              </>
+            )}
+          </div>
           <div className="command-identity">
             <label className="command-field" htmlFor={`${formId}-name`}>
               <span>{tr("mdc8f0070a144")}</span>
@@ -821,14 +889,18 @@ export default function CommandManager({
               id={`${formId}-example`}
               className="mono"
               value={draft.example}
-              placeholder={`<<${draft.name || "command"}>>`}
+              placeholder={
+                draft.inline
+                  ? `[${draft.name || "markup"}${draft.markupMode === "paired" ? "]…[/" + (draft.name || "markup") + "]" : " /]"}`
+                  : `<<${draft.name || "command"}>>`
+              }
               spellCheck={false}
               onChange={(event) =>
                 updateDraft({ ...draft, example: event.target.value })
               }
             />
           </label>
-          {window.yarnDesktop && projectId && (
+          {window.yarnDesktop && projectId && !draft.inline && (
             <CommandPreviewBinding
               projectId={projectId}
               command={commands[index]?.name || ""}

@@ -17,6 +17,10 @@ export function tabOut(line: string, offset: number): number | null {
       }
       continue;
     }
+    if (c === "\\") {
+      i++;
+      continue;
+    }
     if (line.slice(i, i + 2) === "//") return null;
     if (
       c === '"' ||
@@ -31,7 +35,7 @@ export function tabOut(line: string, offset: number): number | null {
       const close = stack.pop()!;
       if (i === offset) return i + close.length;
       i += close.length - 1;
-    } else if (stack.length && "({[".includes(c)) {
+    } else if ((stack.length || c === "[") && "({[".includes(c)) {
       stack.push({ "(": ")", "{": "}", "[": "]" }[c]!);
     } else if (stack.length && ")}]".includes(c)) {
       return null;

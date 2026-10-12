@@ -9,6 +9,8 @@ import {
   type DialogueLengthPreference,
 } from "./diagnostics/dialogue-length.ts";
 export type AnalysisOptions = { dialogueLength?: DialogueLengthPreference };
+import { builtinInline } from "./inline-catalog.ts";
+import { markupDiagnostics } from "./inline-markup.ts";
 export type Param = {
   displayName?: string;
   description?: string;
@@ -18,6 +20,8 @@ export type Param = {
   defaultValue: string;
 };
 export type Command = {
+  inline?: boolean;
+  markupMode?: "selfClosing" | "paired";
   displayName?: string;
   name: string;
   description: string;
@@ -381,6 +385,18 @@ export function parse(
         return;
       }
       if (!s) return;
+      for (const finding of markupDiagnostics(raw, commands)) {
+        issues.push({
+          file: doc.name,
+          line,
+          column: finding.from + 1,
+          endColumn: finding.to + 1,
+          message: renderMessage(finding),
+          code: finding.code,
+          args: finding.args,
+          severity: "error",
+        });
+      }
       const optionLine = s.startsWith("->");
       let sibling: LinkContext | undefined;
       while (options.length && indent <= options[options.length - 1].indent) {
@@ -540,7 +556,7 @@ export function parse(
             });
           continue;
         }
-        const def = commands.find((c) => c.name === name);
+        const def = commands.find((c) => c.name === name && !c.inline);
         if (!def) {
           issue(
             doc.name,
@@ -668,7 +684,7 @@ export function parse(
             call.column,
           );
       }
-      const custom = commands.find((c) => c.name === call.name);
+      const custom = commands.find((c) => c.name === call.name && !c.inline);
       custom?.params.forEach((param, index) => {
         const arg = call.args[index];
         if (!arg || !(arg.startsWith("$") || arg.startsWith("{"))) return;
@@ -735,7 +751,18 @@ export function parse(
 }
 export function validateCommand(c: Command, others: Command[]) {
   if (!/^[A-Za-z_]\w*$/.test(c.name)) return tr("mb7b256c22693");
-  if (builtins.includes(c.name)) return tr("m3c2a16fcb0dc");
+  if (
+    c.inline
+      ? builtinInline.some((b) => b.name === c.name)
+      : builtins.includes(c.name)
+  )
+    return tr("m3c2a16fcb0dc");
+  if (
+    c.inline
+      ? !["selfClosing", "paired"].includes(c.markupMode || "")
+      : c.markupMode !== undefined
+  )
+    return tr("markup.invalidMode");
   if (others.some((x) => x.name === c.name)) return tr("ma9b64210374a");
   let optional = false;
   const names = new Set<string>();
@@ -744,7 +771,9 @@ export function validateCommand(c: Command, others: Command[]) {
       return tr("me286e1bc240d");
     names.add(p.name);
     if (!p.required) optional = true;
-    else if (optional) return tr("m958506619752");
+    else if (optional && !c.inline) return tr("m958506619752");
+    if (c.inline && p.defaultValue && literalType(p.defaultValue) !== p.type)
+      return tr("m55782245af4d");
     if (
       !p.required &&
       (!p.defaultValue || literalType(p.defaultValue) !== p.type)

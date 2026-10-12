@@ -119,6 +119,10 @@ export function validateCommands(commands: Command[]) {
     if (
       !c ||
       typeof c.name !== "string" ||
+      (c.inline !== undefined && typeof c.inline !== "boolean") ||
+      (c.inline
+        ? !["selfClosing", "paired"].includes(c.markupMode || "")
+        : c.markupMode !== undefined) ||
       (c.displayName !== undefined && typeof c.displayName !== "string") ||
       typeof c.description !== "string" ||
       typeof c.example !== "string" ||

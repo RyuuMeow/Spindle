@@ -725,7 +725,8 @@ export class AgentApplication {
       throw Error("DUPLICATE_COMMAND");
     const commands = [...p.commands];
     for (const command of a.commands) {
-      if (findCommand(command.name, [])) throw Error("BUILTIN_COMMAND");
+      if (findCommand(command.name, [], !!command.inline))
+        throw Error("BUILTIN_COMMAND");
       const index = commands.findIndex((c) => c.name === command.name);
       if (index < 0) commands.push(command);
       else commands[index] = command;

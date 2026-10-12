@@ -28,12 +28,18 @@ import {
   completionStatus,
   closeCompletion,
   startCompletion,
+  snippet,
+  nextSnippetField,
+  prevSnippetField,
+  clearSnippet,
   type CompletionSource,
 } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
 import type { Command } from "../parser";
 import { unregisteredCommand } from "../command-quick-fix";
 import { commandCatalog } from "../command-catalog";
+import { markupCompletion, needsMarkupCloser } from "../inline-markup";
+import { inlineSnippet, inlineCatalog } from "../inline-catalog";
 import {
   variableCompletionContext,
   type YarnVariable,
@@ -137,7 +143,60 @@ export function commandEditing(
   const source: CompletionSource = (context) => {
     if (context.view?.composing || context.state.readOnly) return null;
     const line = context.state.doc.lineAt(context.pos);
+    const selection = context.state.selection.main;
+    if (
+      context.explicit &&
+      !selection.empty &&
+      context.state.doc.lineAt(selection.from).number ===
+        context.state.doc.lineAt(selection.to).number
+    )
+      return {
+        from: selection.from,
+        to: selection.to,
+        filter: false,
+        options: inlineCatalog(commands())
+          .filter((c) => c.markupMode === "paired")
+          .map((c) => ({
+            label: c.name,
+            type: "function",
+            detail: tr("markup.wrap"),
+            apply: snippet(
+              inlineSnippet(
+                c,
+                context.state.sliceDoc(selection.from, selection.to),
+                "codemirror",
+              ),
+            ),
+          })),
+      };
     const prefix = line.text.slice(0, context.pos - line.from);
+    const markup = markupCompletion(
+      line.text,
+      context.pos - line.from,
+      commands(),
+    );
+    if (markup)
+      return {
+        from: line.from + markup.from + (markup.closing ? 2 : 1),
+        to: context.pos,
+        options: markup.options.map((c) => ({
+          label: c.name,
+          type: "function",
+          detail: c.description,
+          apply: (view, completion) =>
+            snippet(
+              markup.closing
+                ? `[/${c.name}]`
+                : inlineSnippet(
+                    c,
+                    "",
+                    "codemirror",
+                    needsMarkupCloser(line.text, markup.to, c.name),
+                    markup.properties,
+                  ),
+            )(view, completion, line.from + markup.from, line.from + markup.to),
+        })),
+      };
     const variable = variableCompletionContext(prefix);
     if (variable)
       return {
@@ -173,20 +232,22 @@ export function commandEditing(
       return {
         from: word.from,
         options: [
-          ...commandCatalog(commands()).map((c) => ({
-            label: c.name,
-            apply: c.name === "declare" ? "declare $" : c.name,
-            type: c.builtin ? "keyword" : "function",
-            detail: c.params
-              .map(
-                (p) =>
-                  parameterLabel(p) + (p.required ? "" : "?") + ": " + p.type,
-              )
-              .join(", "),
-            info: c.description
-              ? () => completionDescription(c.description!)
-              : undefined,
-          })),
+          ...commandCatalog(commands())
+            .filter((c) => !c.inline)
+            .map((c) => ({
+              label: c.name,
+              apply: c.name === "declare" ? "declare $" : c.name,
+              type: c.builtin ? "keyword" : "function",
+              detail: c.params
+                .map(
+                  (p) =>
+                    parameterLabel(p) + (p.required ? "" : "?") + ": " + p.type,
+                )
+                .join(", "),
+              info: c.description
+                ? () => completionDescription(c.description!)
+                : undefined,
+            })),
         ],
       };
     if (prefix.includes("<<") || (!context.explicit && word.from === word.to))
@@ -363,6 +424,9 @@ export function commandEditing(
     Prec.highest(
       keymap.of([
         { key: "Tab", run: acceptCompletion },
+        { key: "Tab", run: nextSnippetField },
+        { key: "Shift-Tab", run: prevSnippetField },
+        { key: "Escape", run: clearSnippet },
         {
           key: "Tab",
           run: (view) => {
@@ -430,7 +494,7 @@ export function commandEditing(
       ]),
     ),
     EditorState.languageData.of(() => [
-      { closeBrackets: { brackets: ["(", "{", '"'], before: " )}>" } },
+      { closeBrackets: { brackets: ["(", "{", "[", '"'], before: " )]}>" } },
     ]),
     closeBrackets(),
     autocompletion({

@@ -437,6 +437,34 @@
     padding: 12px 20px;
   }
 }
+.command-inline-settings {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.command-inline-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.command-inline-settings .command-field-hint {
+  flex-basis: 100%;
+}
+.command-builtin-list {
+  padding: 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.command-builtin-list details {
+  margin-top: 10px;
+}
+.command-builtin-list p {
+  margin: 8px 0;
+}
+.command-builtin-list summary {
+  cursor: pointer;
+}
 @media (prefers-reduced-motion: reduce) {
   .command-workspace input,
   .command-workspace textarea,
