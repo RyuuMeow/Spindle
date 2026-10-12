@@ -69,6 +69,8 @@ editorSessionId 只在本次 App 執行、同一視窗工作區綁定內有效�
 
 `query_project.kind` 可為 documents、scenes、links、variables、references、commands、calls、unknown_commands。查詢與診斷預設每頁 100 筆、最多 200；nextOffset 為 null 表示結束。未知指令提供呼叫資料而不是確定的定義；同名呼叫推測參數互相矛盾時不提供自動註冊候選。新增定義不表示遊戲端已有該指令實作。診斷為編輯器靜態檢查，不是完整 Yarn 執行驗證。
 
+`update_commands` 現在依名稱、語法、參數簽章及限制識別重載：相同簽章更新說明／預設值，不同簽章新增重載，同一批不可重複簽章。行內標記使用 `inline:true` 及 `markupMode:"selfClosing"|"paired"`；內建標記及 `wait` 可新增重載，原內建定義仍唯讀。字串參數可加 `allowList`，數字可加含邊界的 `min`／`max` 及 `integer`。完整規則見[指令重載與參數限制](workspace-architecture.zh-TW.md#指令重載與參數限制)。`validate_project` 也會回報未知行內標記的來源範圍警告；`calls`／`unknown_commands` 仍查詢 `<<...>>`。
+
 ## 即時情境
 
 快照從指定 renderer 主動取得，先同步已完成的交易，不強制結束組字。包含作用中頁面、模式、文件版本、目前場景、游標、多段正向／反向選取、主要選取索引、可視來源範圍、附近診斷及語義物件。

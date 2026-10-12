@@ -25,7 +25,8 @@ import {
 import type { editor, Position, IDisposable } from "monaco-editor";
 import Editor, { loader } from "@monaco-editor/react";
 import type { Command, Doc, Issue, Node } from "./parser";
-import { commandCatalog } from "./command-catalog";
+import { commandValueCompletion } from "./command-values";
+import { commandCompletionCatalog } from "./command-catalog";
 import {
   markupCompletion,
   needsMarkupCloser,
@@ -453,7 +454,7 @@ export default function CodeEditor({
         providers.current.forEach((p) => p.dispose());
         providers.current = [
           m.languages.registerCompletionItemProvider("yarn", {
-            triggerCharacters: ["<", " ", "$", "[", "/"],
+            triggerCharacters: ["<", " ", "$", "[", "/", "=", '"'],
             provideCompletionItems(model: editor.ITextModel, pos: Position) {
               const word = model.getWordUntilPosition(pos),
                 prefix = model
@@ -473,6 +474,10 @@ export default function CodeEditor({
                 return {
                   suggestions: inlineCatalog(latest.current.commands)
                     .filter((c) => c.markupMode === "paired")
+                    .filter(
+                      (c, i, all) =>
+                        all.findIndex((v) => v.name === c.name) === i,
+                    )
                     .map((c) => ({
                       label: c.name,
                       filterText: "[" + c.name,
@@ -501,6 +506,10 @@ export default function CodeEditor({
                 return {
                   suggestions: inlineCatalog(latest.current.commands)
                     .filter((c) => c.markupMode === "paired")
+                    .filter(
+                      (c, i, all) =>
+                        all.findIndex((v) => v.name === c.name) === i,
+                    )
                     .map((c) => ({
                       label: c.name,
                       filterText: selected,
@@ -514,6 +523,28 @@ export default function CodeEditor({
                     })),
                 };
               }
+              const values = commandValueCompletion(
+                model.getLineContent(pos.lineNumber),
+                pos.column - 1,
+                latest.current.commands,
+              );
+              if (values)
+                return {
+                  suggestions: values.values.map((v) => ({
+                    label: v.label,
+                    filterText:
+                      model
+                        .getLineContent(pos.lineNumber)
+                        .slice(values.from, pos.column - 1) + v.label,
+                    insertText: v.insertText,
+                    kind: m.languages.CompletionItemKind.Value,
+                    range: {
+                      ...range,
+                      startColumn: values.from + 1,
+                      endColumn: values.to + 1,
+                    },
+                  })),
+                };
               const property = markupPropertyCompletion(
                 model.getLineContent(pos.lineNumber),
                 pos.column - 1,
@@ -605,18 +636,20 @@ export default function CodeEditor({
                 return { suggestions: [] };
               return {
                 suggestions: [
-                  ...commandCatalog(latest.current.commands)
+                  ...commandCompletionCatalog(latest.current.commands)
                     .filter((c) => !c.inline)
                     .map((c) => ({
                       label: c.name,
                       kind: c.builtin ? 14 : 1,
                       insertText: c.name === "declare" ? "declare $" : c.name,
-                      detail: c.params
-                        .map(
-                          (p) =>
-                            `${parameterLabel(p)}${p.required ? "" : "?"}: ${p.type}`,
-                        )
-                        .join(", "),
+                      detail:
+                        c.overloads?.join("; ") ||
+                        c.params
+                          .map(
+                            (p) =>
+                              `${parameterLabel(p)}${p.required ? "" : "?"}: ${p.type}`,
+                          )
+                          .join(", "),
                       range,
                     })),
                 ],

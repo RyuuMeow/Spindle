@@ -33,6 +33,10 @@ const command = z
             type: z.enum(["string", "number", "boolean"]),
             required: z.boolean(),
             defaultValue: z.string().max(10000),
+            allowList: z.array(z.string().max(10000)).max(1000).optional(),
+            min: z.number().finite().optional(),
+            max: z.number().finite().optional(),
+            integer: z.boolean().optional(),
             displayName: z.string().max(500).optional(),
             description: z.string().max(10000).optional(),
           })
@@ -254,7 +258,7 @@ export const descriptions: Record<keyof typeof schemas, string> = {
   get_statistics:
     "Get author statistics using the same definitions as the UI. Optional document and scene scope; English words and dialogue characters are separate metrics.",
   update_commands:
-    "Upsert custom command definitions against a snapshot. Does not implement game runtime commands or overwrite unapplied UI drafts. Supports preview; writes require operationId.",
+    "Upsert custom command overloads by name, syntax and parameter signature (including limits) against a snapshot. A changed signature adds a new overload; identical signatures update metadata and defaults. Does not implement game runtime commands or overwrite unapplied UI drafts. Supports preview; writes require operationId.",
   apply_changes:
     "Apply a version-checked atomic text batch, create a scene, or rename a scene with static references. One Undo step. Supports preview; writes require unique operationId. Never silently overwrites stale versions.",
   apply_quick_fixes:

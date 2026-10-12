@@ -9,9 +9,23 @@ import {
   type DialogueLengthPreference,
 } from "./diagnostics/dialogue-length.ts";
 export type AnalysisOptions = { dialogueLength?: DialogueLengthPreference };
+import { builtinCommands } from "./command-catalog.ts";
 import { builtinInline } from "./inline-catalog.ts";
 import { markupDiagnostics } from "./inline-markup.ts";
+import {
+  accepts,
+  bestOverload,
+  commandKey,
+  constraintError,
+  mismatch,
+  parameterLimits,
+  signature,
+} from "./command-overloads.ts";
 export type Param = {
+  allowList?: string[];
+  min?: number;
+  max?: number;
+  integer?: boolean;
   displayName?: string;
   description?: string;
   name: string;
@@ -394,7 +408,7 @@ export function parse(
           message: renderMessage(finding),
           code: finding.code,
           args: finding.args,
-          severity: "error",
+          severity: finding.code === "markup.unknown" ? "warning" : "error",
         });
       }
       const optionLine = s.startsWith("->");
@@ -543,7 +557,7 @@ export function parse(
           }
           continue;
         }
-        if (builtins.includes(name)) {
+        if (builtins.includes(name) && name !== "wait") {
           if (
             ["declare", "set"].includes(name) &&
             !/^\$[A-Za-z_]\w*\s*(?:=|to|\+=|-=|\*=|\/=)\s*.+/.test(
@@ -556,7 +570,11 @@ export function parse(
             });
           continue;
         }
-        const def = commands.find((c) => c.name === name && !c.inline);
+        const candidates = [
+          ...commands,
+          ...builtinCommands.filter((c) => c.name === "wait"),
+        ].filter((c) => c.name === name && !c.inline);
+        const def = bestOverload(candidates, args);
         if (!def) {
           issue(
             doc.name,
@@ -565,6 +583,20 @@ export function parse(
             "warning",
             column,
           );
+          continue;
+        }
+        if (candidates.length > 1) {
+          if (!candidates.some((c) => mismatch(c, args) === 0))
+            issue(
+              doc.name,
+              line,
+              {
+                code: "command.noMatch",
+                args: [name, candidates.map(signature).join("; ")],
+              },
+              "error",
+              column,
+            );
           continue;
         }
         def.params.forEach((p, i) => {
@@ -581,6 +613,17 @@ export function parse(
                 column,
               );
           } else {
+            if (literalType(args[i]) === p.type && !accepts(p, args[i]))
+              issue(
+                doc.name,
+                line,
+                {
+                  code: "command.constraint",
+                  args: [name, p.name, parameterLimits(p)],
+                },
+                "error",
+                column,
+              );
             const actual = literalType(args[i]);
             if (actual && actual !== p.type)
               issue(
@@ -661,18 +704,10 @@ export function parse(
           "error",
           call.column,
         );
-      if (["if", "elseif", "wait"].includes(call.name)) {
-        const expected = call.name === "wait" ? "number" : "boolean";
+      if (["if", "elseif"].includes(call.name)) {
+        const expected = "boolean";
         const actual = expressionType(call.args.join(" "), declarations);
-        if (call.name === "wait" && !call.args.length)
-          issue(
-            n.file,
-            call.line,
-            { code: "diagnostic.62512d211a63", args: [] },
-            "error",
-            call.column,
-          );
-        else if (actual && actual !== "expression" && actual !== expected)
+        if (actual && actual !== "expression" && actual !== expected)
           issue(
             n.file,
             call.line,
@@ -684,23 +719,49 @@ export function parse(
             call.column,
           );
       }
-      const custom = commands.find((c) => c.name === call.name && !c.inline);
-      custom?.params.forEach((param, index) => {
-        const arg = call.args[index];
-        if (!arg || !(arg.startsWith("$") || arg.startsWith("{"))) return;
-        const type = expressionType(arg, declarations);
-        if (type && type !== "expression" && type !== param.type)
+      const alternatives = [
+        ...commands,
+        ...builtinCommands.filter((c) => c.name === "wait"),
+      ].filter((c) => c.name === call.name && !c.inline);
+      const resolveType = (arg: string) => expressionType(arg, declarations);
+      const custom = bestOverload(alternatives, call.args, false, resolveType);
+      if (alternatives.length > 1) {
+        // The literal pass already reported calls with no possible signature.
+        if (
+          alternatives.some((c) => mismatch(c, call.args) === 0) &&
+          !alternatives.some(
+            (c) => mismatch(c, call.args, false, resolveType) === 0,
+          )
+        )
           issue(
             n.file,
             call.line,
             {
-              code: "diagnostic.28b5e49e9854",
-              args: [call.name, param.name, param.type, type],
+              code: "command.noMatch",
+              args: [call.name, alternatives.map(signature).join("; ")],
             },
             "error",
             call.column,
           );
-      });
+      }
+      (alternatives.length <= 1 ? custom : undefined)?.params.forEach(
+        (param, index) => {
+          const arg = call.args[index];
+          if (!arg || !(arg.startsWith("$") || arg.startsWith("{"))) return;
+          const type = expressionType(arg, declarations);
+          if (type && type !== "expression" && type !== param.type)
+            issue(
+              n.file,
+              call.line,
+              {
+                code: "diagnostic.28b5e49e9854",
+                args: [call.name, param.name, param.type, type],
+              },
+              "error",
+              call.column,
+            );
+        },
+      );
       if (call.name === "set") {
         const error = assignmentDiagnostic(call.args.join(" "), declarations);
         if (error) issue(n.file, call.line, error, "error", call.column);
@@ -751,11 +812,7 @@ export function parse(
 }
 export function validateCommand(c: Command, others: Command[]) {
   if (!/^[A-Za-z_]\w*$/.test(c.name)) return tr("mb7b256c22693");
-  if (
-    c.inline
-      ? builtinInline.some((b) => b.name === c.name)
-      : builtins.includes(c.name)
-  )
+  if (!c.inline && c.name !== "wait" && builtins.includes(c.name))
     return tr("m3c2a16fcb0dc");
   if (
     c.inline
@@ -763,10 +820,20 @@ export function validateCommand(c: Command, others: Command[]) {
       : c.markupMode !== undefined
   )
     return tr("markup.invalidMode");
-  if (others.some((x) => x.name === c.name)) return tr("ma9b64210374a");
+  if (
+    [
+      ...others,
+      ...(c.inline
+        ? builtinInline
+        : builtinCommands.filter((b) => b.name === "wait")),
+    ].some((x) => commandKey(x) === commandKey(c))
+  )
+    return tr("command.duplicate");
   let optional = false;
   const names = new Set<string>();
   for (const p of c.params) {
+    const limits = constraintError(p);
+    if (limits) return limits;
     if (!/^[A-Za-z_]\w*$/.test(p.name) || names.has(p.name))
       return tr("me286e1bc240d");
     names.add(p.name);

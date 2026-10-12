@@ -351,9 +351,18 @@ test("inline command registration persists shape, exposes builtins and rejects o
       ...request,
       operationId: "inline-override",
       snapshotId: latest,
-      commands: [{ ...command, name: "pause", markupMode: "selfClosing" }],
+      commands: [
+        {
+          ...command,
+          name: "pause",
+          markupMode: "selfClosing",
+          params: [
+            { name: "pause", type: "number", required: true, defaultValue: "" },
+          ],
+        },
+      ],
     }),
-    /BUILTIN_COMMAND/,
+    /重載|overload|重载/,
   );
   await assert.rejects(
     f.app.execute("update_commands", {
@@ -364,6 +373,91 @@ test("inline command registration persists shape, exposes builtins and rejects o
     }),
   );
   assert.deepEqual(p.commands, [command]);
+});
+
+test("MCP overload batches persist constraints, preserve siblings and update exact signatures", async (t) => {
+  const f = await fixture(t),
+    p = f.projects[0];
+  const text = {
+    name: "pause",
+    inline: true,
+    markupMode: "selfClosing",
+    description: "",
+    example: "",
+    params: [
+      {
+        name: "pause",
+        type: "string",
+        required: true,
+        defaultValue: "",
+        allowList: ["short", "normal", "long"],
+      },
+    ],
+  };
+  const count = {
+    name: "count",
+    description: "",
+    example: "",
+    params: [
+      {
+        name: "value",
+        type: "number",
+        required: true,
+        defaultValue: "",
+        min: 1,
+        max: 10,
+        integer: true,
+      },
+    ],
+  };
+  const alias = { ...count, params: [{ ...text.params[0], name: "value" }] };
+  const write = async (commands, operationId, preview = false) =>
+    f.app.execute("update_commands", {
+      editorSessionId: "session-0",
+      snapshotId: (await f.ctx()).snapshotId,
+      commands,
+      operationId,
+      preview,
+    });
+  await write([text, count, alias], "overload-preview", true);
+  assert.equal(p.commands.length, 0);
+  await write([text, count, alias], "overload-create");
+  assert.equal(p.commands.length, 3);
+  await write(
+    [
+      {
+        ...count,
+        description: "Updated",
+        params: [{ ...count.params[0], name: "amount" }],
+      },
+    ],
+    "overload-update",
+  );
+  assert.equal(p.commands.length, 3);
+  assert.equal(
+    p.commands.find((c) => c.params[0].type === "number").description,
+    "Updated",
+  );
+  assert.deepEqual(
+    JSON.parse(
+      fs.readFileSync(path.join(p.root, ".spindle", "project.json"), "utf8"),
+    ).commands,
+    p.commands,
+  );
+  await assert.rejects(
+    write(
+      [count, { ...count, description: "duplicate" }],
+      "overload-duplicate",
+    ),
+    /DUPLICATE_COMMAND/,
+  );
+  await assert.rejects(
+    write(
+      [{ ...count, params: [{ ...count.params[0], min: 20 }] }],
+      "overload-invalid",
+    ),
+  );
+  assert.equal(p.commands.length, 3);
 });
 
 test("command upserts preserve other definitions, create history and honor CAS", async (t) => {

@@ -1,12 +1,18 @@
 import { t as tr } from "./i18n/index.ts";
 import type { Command, Param } from "./parser";
-import { builtinInline } from "./inline-catalog";
+import {
+  bestOverload,
+  signature,
+  type Arguments,
+} from "./command-overloads.ts";
+import { builtinInline } from "./inline-catalog.ts";
 /** Presentation metadata only; never persisted as custom command definitions. */
 export type HelpParameter = Omit<Param, "type"> & { type: string };
 export type CommandInfo = Omit<Command, "params"> & {
   params: HelpParameter[];
   builtin?: boolean;
   syntax?: string;
+  overloads?: string[];
 };
 const p = (
   name: string,
@@ -105,23 +111,37 @@ export function findCommand(
   name: string,
   custom: Command[],
   inline = false,
+  args?: Arguments,
+  partial = false,
+  markupMode?: Command["markupMode"],
+  expressionType?: (value: string) => string | null,
 ): CommandInfo | undefined {
-  return (
-    (inline ? builtinInline : builtinCommands).find((c) => c.name === name) ||
-    custom.find((c) => c.name === name && !!c.inline === inline)
+  const candidates = commandCatalog(custom).filter(
+    (c) => c.name === name && !!c.inline === inline,
   );
+  const shaped = markupMode
+    ? candidates.filter((c) => c.markupMode === markupMode)
+    : candidates;
+  const available = shaped.length ? shaped : candidates;
+  const selected = args
+    ? bestOverload(available, args, partial, expressionType)
+    : available[0];
+  return selected && candidates.length > 1
+    ? { ...selected, overloads: candidates.map(signature) }
+    : selected;
+}
+export function commandCompletionCatalog(custom: Command[]): CommandInfo[] {
+  const all = commandCatalog(custom);
+  return all
+    .filter(
+      (c, i) =>
+        all.findIndex((v) => v.name === c.name && !!v.inline === !!c.inline) ===
+        i,
+    )
+    .map((c) => findCommand(c.name, custom, !!c.inline)!);
 }
 export function commandCatalog(custom: Command[]): CommandInfo[] {
-  return [
-    ...custom.filter(
-      (c) =>
-        !(c.inline ? builtinInline : builtinCommands).some(
-          (b) => b.name === c.name,
-        ),
-    ),
-    ...builtinCommands,
-    ...builtinInline,
-  ];
+  return [...custom, ...builtinCommands, ...builtinInline];
 }
 /** Built-in language expressions do not use whitespace-delimited positional arguments. */
 export function builtinParameterIndex(name: string, text: string) {

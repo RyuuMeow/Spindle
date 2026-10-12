@@ -37,7 +37,8 @@ import {
 import { indentUnit } from "@codemirror/language";
 import type { Command } from "../parser";
 import { unregisteredCommand } from "../command-quick-fix";
-import { commandCatalog } from "../command-catalog";
+import { commandValueCompletion } from "../command-values";
+import { commandCompletionCatalog } from "../command-catalog";
 import {
   markupCompletion,
   needsMarkupCloser,
@@ -161,6 +162,7 @@ export function commandEditing(
         to: context.pos,
         options: inlineCatalog(commands())
           .filter((c) => c.markupMode === "paired")
+          .filter((c, i, all) => all.findIndex((v) => v.name === c.name) === i)
           .map((c) => ({
             label: c.name,
             type: "function",
@@ -188,6 +190,7 @@ export function commandEditing(
         filter: false,
         options: inlineCatalog(commands())
           .filter((c) => c.markupMode === "paired")
+          .filter((c, i, all) => all.findIndex((v) => v.name === c.name) === i)
           .map((c) => ({
             label: c.name,
             type: "function",
@@ -202,6 +205,22 @@ export function commandEditing(
           })),
       };
     const prefix = line.text.slice(0, context.pos - line.from);
+    const values = commandValueCompletion(
+      line.text,
+      context.pos - line.from,
+      commands(),
+    );
+    if (values)
+      return {
+        from: line.from + values.from,
+        to: line.from + values.to,
+        filter: false,
+        options: values.values.map((v) => ({
+          label: v.label,
+          apply: v.insertText,
+          type: "constant",
+        })),
+      };
     const property = markupPropertyCompletion(
       line.text,
       context.pos - line.from,
@@ -280,18 +299,23 @@ export function commandEditing(
       return {
         from: word.from,
         options: [
-          ...commandCatalog(commands())
+          ...commandCompletionCatalog(commands())
             .filter((c) => !c.inline)
             .map((c) => ({
               label: c.name,
               apply: c.name === "declare" ? "declare $" : c.name,
               type: c.builtin ? "keyword" : "function",
-              detail: c.params
-                .map(
-                  (p) =>
-                    parameterLabel(p) + (p.required ? "" : "?") + ": " + p.type,
-                )
-                .join(", "),
+              detail:
+                c.overloads?.join("; ") ||
+                c.params
+                  .map(
+                    (p) =>
+                      parameterLabel(p) +
+                      (p.required ? "" : "?") +
+                      ": " +
+                      p.type,
+                  )
+                  .join(", "),
               info: c.description
                 ? () => completionDescription(c.description!)
                 : undefined,

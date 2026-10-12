@@ -75,7 +75,11 @@ export class PreviewResourcesStore {
       config,
       images,
       speakers,
-      commands: project.commands.filter((c) => !c.inline).map((c) => c.name),
+      commands: [
+        ...new Set(
+          project.commands.filter((c) => !c.inline).map((c) => c.name),
+        ),
+      ],
       commandDefinitions: structuredClone(
         project.commands.filter((c) => !c.inline),
       ),

@@ -25,14 +25,14 @@
     "test:reading": "node --test scripts/reading.test.mjs",
     "test:ui-redesign": "node scripts/test-ui-redesign.cjs",
     "test:desktop-refinement": "node scripts/test-desktop-refinement.cjs",
-    "test:commands": "node --test scripts/command-hints.test.mjs",
+    "test:commands": "node --test scripts/command-hints.test.mjs scripts/command-overloads.test.mjs",
     "test:quiet-autosave": "node scripts/test-quiet-autosave.cjs",
     "desktop:assets": "node scripts/prepare-brand-assets.mjs",
     "test:spindle-ui": "node scripts/test-spindle-ui.cjs",
     "test:command-context-ui": "node scripts/test-command-context-ui.cjs",
     "test:editor-assistance": "node scripts/test-editor-assistance.cjs",
     "test:sync-language": "node scripts/test-sync-and-language.cjs",
-    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs scripts/project-lifecycle.test.mjs scripts/appearance.test.mjs scripts/diagnostic-presentation.test.mjs scripts/dialogue-length.test.mjs scripts/source-characters.test.mjs scripts/preview-autosave.test.mjs scripts/character-presentation.test.mjs scripts/panel-layout.test.mjs scripts/presentation-preferences.test.mjs scripts/inline-markup.test.mjs",
+    "test:unit": "node --test scripts/workspace.test.mjs scripts/navigation.test.mjs scripts/search.test.mjs scripts/graph-layout.test.mjs scripts/graph-edit.test.mjs scripts/reading.test.mjs scripts/command-hints.test.mjs scripts/file-tree.test.mjs scripts/graph-model.test.mjs scripts/graph-engine.test.mjs scripts/graph-sources.test.mjs scripts/route-quality.test.mjs scripts/project-lifecycle.test.mjs scripts/appearance.test.mjs scripts/diagnostic-presentation.test.mjs scripts/dialogue-length.test.mjs scripts/source-characters.test.mjs scripts/preview-autosave.test.mjs scripts/character-presentation.test.mjs scripts/panel-layout.test.mjs scripts/presentation-preferences.test.mjs scripts/inline-markup.test.mjs scripts/command-overloads.test.mjs",
     "test:hint-priority": "node scripts/test-hint-priority.cjs",
     "desktop:stage": "pnpm desktop:build && node scripts/prepare-desktop.mjs",
     "test:workspace-navigation": "node scripts/test-workspace-navigation.cjs",
@@ -60,7 +60,8 @@
     "demo:sync": "node scripts/sync-demo-fixture.mjs",
     "demo:check": "node scripts/sync-demo-fixture.mjs --check",
     "test:inline-markup": "node --test scripts/inline-markup.test.mjs",
-    "test:inline-markup-ui": "node scripts/test-inline-markup.cjs"
+    "test:inline-markup-ui": "node scripts/test-inline-markup.cjs",
+    "test:command-overloads-ui": "node scripts/test-command-overloads-ui.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

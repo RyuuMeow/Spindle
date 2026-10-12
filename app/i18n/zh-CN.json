@@ -1060,5 +1060,17 @@
   "markup.required": "标记 {0} 缺少必要属性 {1}。",
   "markup.invalidMode": "行内标记需指定自闭合或成对；一般指令不可设置标记形式。",
   "markup.namedParameters": "行内参数使用 name=value；与标记同名的参数可写成 [name=value /]。",
-  "markup.wrap": "以行内标记包住选取文字"
+  "markup.wrap": "以行内标记包住选取文字",
+  "command.integer": "仅限整数",
+  "command.allowList": "允许值（每行一个）",
+  "command.min": "最小值（含）",
+  "command.max": "最大值（含）",
+  "command.limits": "参数限制",
+  "command.invalidLimits": "参数限制无效",
+  "command.invalidDefault": "默认值不符合参数限制",
+  "command.noMatch": "{0} 没有符合的重载。接受：{1}",
+  "command.constraint": "{0}.{1} 必须符合：{2}",
+  "markup.unknown": "尚未注册的行内标记：{0}",
+  "command.duplicate": "此重载已存在",
+  "command.addOverload": "新增重载"
 }

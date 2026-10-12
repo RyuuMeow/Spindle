@@ -1,3 +1,10 @@
+import {
+  bestOverload,
+  accepts,
+  parameterLimits,
+  signature,
+  mismatch,
+} from "./command-overloads.ts";
 import type { Command } from "./parser";
 import { inlineCatalog } from "./inline-catalog.ts";
 import type { LocalizedMessage } from "./i18n/index.ts";
@@ -226,7 +233,14 @@ export function markupCompletion(
             markupMode: "paired" as const,
           },
       )
-    : definitions;
+    : definitions
+        .filter((c, i) => definitions.findIndex((v) => v.name === c.name) === i)
+        .map((c) => {
+          const variants = definitions.filter((v) => v.name === c.name);
+          return variants.length > 1
+            ? { ...c, description: variants.map(signature).join("; ") }
+            : c;
+        });
   // A bare opener cannot distinguish following dialogue from a tag name.
   // Only consume a right-hand name when its closing bracket proves the boundary.
   const suffix = /^[\p{L}\p{N}_|]*\]/u.exec(text.slice(offset))?.[0] || "";
@@ -282,7 +296,10 @@ export function markupPropertyCompletion(
     )
   )
     return null;
-  const command = inlineCatalog(commands).find((c) => c.name === tag.name);
+  const candidates = inlineCatalog(commands).filter(
+    (c) => c.name === tag.name && mismatch(c, tag.properties, true) === 0,
+  );
+  const command = candidates[0];
   if (!command) return null;
   const used = new Set(tag.properties.map((p) => p.name));
   const from = offset - match[1].length;
@@ -292,7 +309,12 @@ export function markupPropertyCompletion(
   return {
     from,
     to: offset + suffix.length,
-    parameters: command.params.filter((p) => !used.has(p.name)),
+    parameters: candidates
+      .flatMap((c) => c.params)
+      .filter(
+        (p, i, all) =>
+          !used.has(p.name) && all.findIndex((v) => v.name === p.name) === i,
+      ),
   };
 }
 
@@ -326,8 +348,31 @@ export function markupDiagnostics(text: string, commands: Command[]) {
       continue;
     }
     if (!tag.selfClosing) open.push(tag);
-    const command = catalog.find((c) => c.name === tag.name);
-    if (!command) continue; // Yarn permits application-defined attributes.
+    const candidates = catalog.filter((c) => c.name === tag.name);
+    const shaped = candidates.filter(
+      (c) => (c.markupMode === "selfClosing") === tag.selfClosing,
+    );
+    const command = bestOverload(
+      shaped.length ? shaped : candidates,
+      tag.properties,
+    );
+    if (!command) {
+      add(tag, "markup.unknown");
+      continue;
+    }
+    if (candidates.length > 1) {
+      if (!shaped.some((c) => mismatch(c, tag.properties) === 0))
+        add(tag, "command.noMatch", [
+          tag.name,
+          candidates.map(signature).join("; "),
+        ]);
+      const names = new Set<string>();
+      for (const p of tag.properties) {
+        if (names.has(p.name)) add(tag, "markup.duplicate", [p.name]);
+        names.add(p.name);
+      }
+      continue;
+    }
     if ((command.markupMode === "selfClosing") !== tag.selfClosing)
       add(tag, "markup.mode");
     const seen = new Set<string>();
@@ -350,6 +395,12 @@ export function markupDiagnostics(text: string, commands: Command[]) {
         : /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(property.value)
           ? "number"
           : "string";
+      if (type === parameter.type && !accepts(parameter, property.value))
+        add(tag, "command.constraint", [
+          tag.name,
+          property.name,
+          parameterLimits(parameter),
+        ]);
       if (
         type !== parameter.type &&
         !(command.name === "select" && property.name === "value")

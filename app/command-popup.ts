@@ -1,3 +1,4 @@
+import { parameterLimits } from "./command-overloads";
 import { t as tr } from "./i18n/index.ts";
 import type { CommandInfo } from "./command-catalog";
 import { commandLabel, parameterLabel } from "./command-hints";
@@ -29,6 +30,9 @@ export function commandPopup(
     add(heading, "code", "command-tip-id", command.name);
   if (command.description && !signature)
     add(dom, "p", "command-tip-description", command.description);
+  if (command.overloads)
+    for (const entry of command.overloads)
+      add(dom, "code", "command-tip-example", entry);
   if (command.syntax) add(dom, "code", "command-tip-example", command.syntax);
   if (signature) {
     const strip = add(dom, "div", "command-tip-signature", "");
@@ -52,6 +56,8 @@ export function commandPopup(
     add(label, "strong", "", parameterLabel(p));
     if (p.displayName?.trim()) add(label, "code", "command-tip-id", p.name);
     add(label, "span", "command-tip-type", p.type);
+    if (parameterLimits(p))
+      add(body, "p", "command-tip-description", parameterLimits(p));
     if (!p.required)
       add(label, "span", "command-tip-optional", tr("mefd49a86e463"));
     if (p.description) add(body, "p", "command-tip-description", p.description);

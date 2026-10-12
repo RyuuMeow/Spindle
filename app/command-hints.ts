@@ -1,3 +1,4 @@
+import { parameterLimits } from "./command-overloads";
 import { t as tr } from "./i18n/index.ts";
 import type { Command } from "./parser";
 import { scanMarkup } from "./inline-markup";
@@ -50,10 +51,14 @@ export function argumentSpans(text: string, offset = 0): ArgumentSpan[] | null {
     return null;
   return spans;
 }
-export function commandCall(text: string, commands: Command[]) {
+export function commandCall(
+  text: string,
+  commands: Command[],
+  expressionType?: (value: string) => string | null,
+) {
   const prefix = /^\s*<<\s*([A-Za-z_]\w*)\b\s*/.exec(text);
   if (!prefix) return null;
-  const command = findCommand(prefix[1], commands);
+  let command = findCommand(prefix[1], commands);
   if (!command) return null;
   let quote = "",
     escaped = false,
@@ -71,13 +76,28 @@ export function commandCall(text: string, commands: Command[]) {
     }
   }
   if (end < 0) return null;
-  const args = command.builtin
-    ? builtinArgumentSpans(
-        command.name,
-        text.slice(prefix[0].length, end),
-        prefix[0].length,
-      )
-    : argumentSpans(text.slice(prefix[0].length, end), prefix[0].length);
+  const raw = argumentSpans(
+    text.slice(prefix[0].length, end),
+    prefix[0].length,
+  );
+  if (raw && (!command.builtin || command.name === "wait"))
+    command = findCommand(
+      prefix[1],
+      commands,
+      false,
+      raw.map((s) => text.slice(s.from, s.to)),
+      false,
+      undefined,
+      expressionType,
+    )!;
+  const args =
+    command.builtin && command.name !== "wait"
+      ? builtinArgumentSpans(
+          command.name,
+          text.slice(prefix[0].length, end),
+          prefix[0].length,
+        )
+      : argumentSpans(text.slice(prefix[0].length, end), prefix[0].length);
   const nameFrom = text.indexOf(command.name, text.indexOf("<<") + 2);
   return {
     command,
@@ -94,14 +114,15 @@ export const parameterLabel = (parameter: HelpParameter) =>
 export function parameterHelp(parameter: HelpParameter, index: number) {
   return tr("m02d73521f6a3", [
     parameterLabel(parameter),
-    parameter.type,
+    parameter.type +
+      (parameterLimits(parameter) ? ` [${parameterLimits(parameter)}]` : ""),
     index + 1,
     parameter.required ? "" : tr("m49a0147d0c20"),
     parameter.description ? "\n" + parameter.description : "",
   ]);
 }
 export function commandHelp(command: CommandInfo) {
-  return `${commandLabel(command)}${command.displayName?.trim() ? " · " + command.name : ""}${command.description ? "\n" + command.description : ""}`;
+  return `${command.overloads?.join("\n") || commandLabel(command)}${command.displayName?.trim() ? " · " + command.name : ""}${command.description ? "\n" + command.description : ""}`;
 }
 export function commandHover(
   text: string,
@@ -110,7 +131,14 @@ export function commandHover(
 ) {
   const tag = scanMarkup(text).find((t) => column >= t.from && column < t.to);
   if (tag) {
-    const command = findCommand(tag.name, commands, true);
+    const command = findCommand(
+      tag.name,
+      commands,
+      true,
+      tag.properties,
+      !tag.complete,
+      tag.complete ? (tag.selfClosing ? "selfClosing" : "paired") : undefined,
+    );
     if (command) {
       const property = tag.properties.find(
         (p) => column >= p.from && column < p.to,
@@ -178,7 +206,9 @@ export function commandMarkdown(command: CommandInfo, parameterIndex = -1) {
             "**" +
             (p.displayName?.trim() ? " (" + esc(p.name) + ")" : "") +
             " | " +
-            esc(p.type) +
+            esc(
+              p.type + (parameterLimits(p) ? ` [${parameterLimits(p)}]` : ""),
+            ) +
             " | " +
             (p.required ? tr("m11da9dc44285") : tr("mefd49a86e463")) +
             " | " +
@@ -188,6 +218,7 @@ export function commandMarkdown(command: CommandInfo, parameterIndex = -1) {
   );
   return [
     title,
+    command.overloads?.map((s) => esc(s)).join("\n\n") || "",
     command.description ? esc(command.description) : "",
     rows.length
       ? [tr("m91800b12709f"), "| --- | --- | --- | --- | --- |", ...rows].join(
@@ -242,7 +273,7 @@ export function commandInput(
   return {
     kind: "argument",
     name: match[1],
-    index: builtinCommands.some((c) => c.name === match[1])
+    index: builtinCommands.some((c) => c.name === match[1] && c.name !== "wait")
       ? builtinParameterIndex(match[1], text)
       : index,
   };
@@ -260,7 +291,14 @@ export function emptyParameterHint(
     (t) => !t.closing && column > t.from && column <= t.to,
   );
   if (tag) {
-    const command = findCommand(tag.name, commands, true);
+    const command = findCommand(
+      tag.name,
+      commands,
+      true,
+      tag.properties,
+      !tag.complete,
+      tag.complete ? (tag.selfClosing ? "selfClosing" : "paired") : undefined,
+    );
     const property = tag.properties.find(
       (p) => column >= text.indexOf("=", p.from) + 1 && column <= p.to,
     );
@@ -277,7 +315,15 @@ export function emptyParameterHint(
   }
   const input = commandInput(text.slice(0, column));
   if (input?.kind !== "argument") return null;
-  const command = findCommand(input.name, commands);
+  const bodyPrefix = text.slice(0, column).replace(/^\s*<<\s*\w+\s+/, "");
+  const spans = argumentSpans(bodyPrefix);
+  const command = findCommand(
+    input.name,
+    commands,
+    false,
+    spans?.map((s) => bodyPrefix.slice(s.from, s.to)),
+    true,
+  );
   if (!command?.params[input.index]) return null;
   const prefix = /^\s*<<\s*[A-Za-z_]\w*[ \t]+/.exec(text)!;
   const start = prefix[0].length;
@@ -327,7 +373,14 @@ export function emptyParameterHint(
 /** Presentation spans keep actual named properties intact in the source. */
 export function inlineParameterLabels(text: string, commands: Command[]) {
   return scanMarkup(text).flatMap((tag) => {
-    const command = findCommand(tag.name, commands, true);
+    const command = findCommand(
+      tag.name,
+      commands,
+      true,
+      tag.properties,
+      !tag.complete,
+      tag.complete ? (tag.selfClosing ? "selfClosing" : "paired") : undefined,
+    );
     if (!command || tag.closing || !tag.complete) return [];
     return tag.properties.flatMap((property) => {
       const index = command.params.findIndex((p) => p.name === property.name);

@@ -1060,5 +1060,17 @@
   "markup.required": "Markup {0} requires property {1}.",
   "markup.invalidMode": "Inline markup requires a self-closing or paired setting; ordinary commands cannot have this setting.",
   "markup.namedParameters": "Inline parameters use name=value. A parameter matching the markup name supports [name=value /].",
-  "markup.wrap": "Wrap selection with inline markup"
+  "markup.wrap": "Wrap selection with inline markup",
+  "command.integer": "Integers only",
+  "command.allowList": "Allowed values (one per line)",
+  "command.min": "Minimum (inclusive)",
+  "command.max": "Maximum (inclusive)",
+  "command.limits": "Parameter limits",
+  "command.invalidLimits": "Invalid parameter limits",
+  "command.invalidDefault": "Default value does not satisfy parameter limits",
+  "command.noMatch": "No matching overload for {0}. Accepted: {1}",
+  "command.constraint": "{0}.{1} must satisfy: {2}",
+  "markup.unknown": "Unregistered inline markup: {0}",
+  "command.duplicate": "This overload is already defined",
+  "command.addOverload": "Add overload"
 }

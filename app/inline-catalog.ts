@@ -70,12 +70,7 @@ export const builtinInline: (Command & {
 ];
 
 export function inlineCatalog(commands: Command[]) {
-  return [
-    ...commands.filter(
-      (c) => c.inline && !builtinInline.some((b) => b.name === c.name),
-    ),
-    ...builtinInline,
-  ];
+  return [...commands.filter((c) => c.inline), ...builtinInline];
 }
 
 export function inlineSnippet(

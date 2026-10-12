@@ -95,10 +95,19 @@ test("completion respects escapes, comments, nomarkup and brackets already inser
 
 test("registered markup checks named properties, shapes and overlapping ranges", () => {
   assert.deepEqual(
-    markupDiagnostics("[wave][b]hi[/wave][/b] [flash=20 /]", commands),
+    markupDiagnostics("[wave][b]hi[/wave][/b] [flash=20 /]", [
+      ...commands,
+      { ...paired, name: "b" },
+    ]),
     [],
   );
-  assert.deepEqual(markupDiagnostics("[wave][b]hi[/]", commands), []);
+  assert.deepEqual(
+    markupDiagnostics("[wave][b]hi[/]", [
+      ...commands,
+      { ...paired, name: "b" },
+    ]),
+    [],
+  );
   assert.deepEqual(
     markupDiagnostics('[select value={$kind} yes="yes" no="no" /]', commands),
     [],

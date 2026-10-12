@@ -11,7 +11,7 @@ import { useCodeMirrorAppearance } from "../appearance/codemirror";
 import { appearanceVariables } from "../appearance/context";
 import type { YarnVariable } from "../variable-completion";
 import { commandEditing } from "./command-input";
-import { readingLengthWarnings } from "../diagnostics/reading-length";
+import { readingWarnings } from "../diagnostics/reading-warnings";
 import { colorSurface } from "../play/character-presentation";
 import { useAppearance } from "../appearance/context";
 import { sceneLinks } from "./scene-links";
@@ -355,7 +355,7 @@ export default function ReadingEditor(props: Props) {
           });
           return effects.length ? { effects } : null;
         }),
-        readingLengthWarnings(() =>
+        readingWarnings(() =>
           (latest.current.issues || []).filter(
             (i) =>
               i.file === latest.current.doc.name &&

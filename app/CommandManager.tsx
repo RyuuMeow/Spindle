@@ -45,6 +45,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import { commandKey, constraintError, signature } from "./command-overloads";
 import { type Command, type Param, validateCommand } from "./parser";
 import "./controls.css";
 import CommandPreviewBinding from "./play/CommandPreviewBinding";
@@ -69,34 +70,33 @@ function commandIssue(
   command: Command,
   others: Command[],
 ): CommandIssue | null {
-  const nameError = validateCommand({ ...command, params: [] }, others);
-  if (nameError) {
-    return {
-      field: "name",
-      message:
-        nameError === tr("mb7b256c22693") ? tr("mc2ac8caa3e6c") : nameError,
-    };
-  }
+  const message = validateCommand(command, others);
+  if (!message) return null;
   for (let i = 0; i < command.params.length; i++) {
-    const message = validateCommand(
-      { ...command, params: command.params.slice(0, i + 1) },
-      others,
-    );
-    if (!message) continue;
     const param = command.params[i];
-    const field =
-      !/^[A-Za-z_]\w*$/.test(param.name) ||
-      command.params.slice(0, i).some((p) => p.name === param.name)
+    const limits = constraintError(param);
+    const field = limits
+      ? "limits"
+      : !/^[A-Za-z_]\w*$/.test(param.name) ||
+          command.params.slice(0, i).some((p) => p.name === param.name)
         ? "name"
-        : param.required
+        : !command.inline &&
+            param.required &&
+            command.params.slice(0, i).some((p) => !p.required)
           ? "required"
-          : "defaultValue";
-    return {
-      message: tr("mb29bde06c083", [i + 1, message]),
-      field: `param-${i}-${field}`,
-    };
+          : !param.required && !param.defaultValue
+            ? "defaultValue"
+            : null;
+    if (field)
+      return {
+        field: `param-${i}-${field}`,
+        message: tr("mb29bde06c083", [i + 1, limits || message]),
+      };
   }
-  return null;
+  return {
+    field: "name",
+    message: message === tr("mb7b256c22693") ? tr("mc2ac8caa3e6c") : message,
+  };
 }
 
 export default function CommandManager({
@@ -459,7 +459,7 @@ export default function CommandManager({
             hidden={!matchesQuery(command)}
             className={`command-row ${i === index ? "active" : ""}`}
             aria-current={i === index ? "true" : undefined}
-            key={command.name}
+            key={commandKey(command)}
             disabled={saving}
             onClick={() => {
               if (i !== index) {
@@ -471,7 +471,7 @@ export default function CommandManager({
             <Terminal size={15} />
             <span className="command-row-label">
               {command.displayName || command.name}
-              {command.displayName && <small>{command.name}</small>}
+              <small>{signature(command)}</small>
               {command.inline && (
                 <small>
                   {tr("markup.inline")} ·{" "}
@@ -590,6 +590,17 @@ export default function CommandManager({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="desktop-menu">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setIndex(-1);
+                      setHistory({ past: [], future: [] });
+                      setDraft(structuredClone(draft));
+                      reportIssue(null);
+                    }}
+                  >
+                    <Plus size={14} />
+                    {tr("command.addOverload")}
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
                     onSelect={() => {
@@ -796,7 +807,13 @@ export default function CommandManager({
                       }
                       placeholder={tr("markup.chooseType")}
                       onChange={(value) =>
-                        updateParam(i, { type: value as Param["type"] })
+                        updateParam(i, {
+                          type: value as Param["type"],
+                          allowList: undefined,
+                          min: undefined,
+                          max: undefined,
+                          integer: undefined,
+                        })
                       }
                       options={[
                         { value: "string", label: tr("m14b69bd6eeb0") },
@@ -892,6 +909,70 @@ export default function CommandManager({
                     />
                   </label>
                 </div>
+                {param.type !== "boolean" && (
+                  <details
+                    className="param-description"
+                    open={issue?.field === `param-${i}-limits` || undefined}
+                  >
+                    <summary>{tr("command.limits")}</summary>
+                    <div {...fieldProps(`param-${i}-limits`)} tabIndex={-1}>
+                      {param.type === "string" ? (
+                        <label className="command-field">
+                          <span>{tr("command.allowList")}</span>
+                          <textarea
+                            rows={3}
+                            value={param.allowList?.join("\n") || ""}
+                            onChange={(e) =>
+                              updateParam(i, {
+                                allowList: e.target.value
+                                  ? e.target.value.split("\n")
+                                  : undefined,
+                              })
+                            }
+                          />
+                        </label>
+                      ) : (
+                        <>
+                          {(["min", "max"] as const).map((key) => (
+                            <label className="command-field" key={key}>
+                              <span>
+                                {tr(
+                                  key === "min" ? "command.min" : "command.max",
+                                )}
+                              </span>
+                              <input
+                                type="number"
+                                step="any"
+                                value={param[key] ?? ""}
+                                onChange={(e) =>
+                                  updateParam(i, {
+                                    [key]:
+                                      e.target.value === ""
+                                        ? undefined
+                                        : e.target.valueAsNumber,
+                                  })
+                                }
+                              />
+                            </label>
+                          ))}
+                          <label className="check">
+                            <Checkbox
+                              checked={param.integer === true}
+                              onCheckedChange={(
+                                value: boolean | "indeterminate",
+                              ) =>
+                                updateParam(i, {
+                                  integer: value === true ? true : undefined,
+                                })
+                              }
+                            />
+                            {tr("command.integer")}
+                          </label>
+                        </>
+                      )}
+                    </div>
+                  </details>
+                )}
                 <details
                   className="param-description"
                   key={`description-${index}-${i}`}

@@ -1,5 +1,6 @@
 import { t as tr } from "./i18n/index.ts";
 import { commandCall } from "./command-hints";
+import { parameterDefault } from "./command-overloads";
 import type { Command } from "./parser";
 import {
   bareAssignmentText,
@@ -153,18 +154,20 @@ export function variableQuickFix(
         label: tr("mf20c365309ac"),
       };
   }
-  const call = commandCall(line, commands);
+  const call = commandCall(line, commands, (value) =>
+    expressionType(value, types),
+  );
   if (call?.args && !["set", "declare"].includes(call.command.name)) {
     for (let i = 0; i < call.command.params.length; i++) {
       const param = call.command.params[i],
         span = call.args[i],
-        initial = defaults[param.type];
+        initial = parameterDefault(param);
       if (!initial) continue;
       if (!span && param.required) {
         const remaining = call.command.params
           .slice(i)
           .filter((p) => p.required);
-        if (remaining.some((p) => !defaults[p.type])) continue;
+        if (remaining.some((p) => parameterDefault(p) === undefined)) continue;
         const at = call.end - 2;
         return {
           name: "",
@@ -172,7 +175,7 @@ export function variableQuickFix(
           to: at,
           insert:
             (line[at - 1]?.match(/\s/) ? "" : " ") +
-            remaining.map((p) => defaults[p.type]).join(" "),
+            remaining.map(parameterDefault).join(" "),
           replace: true,
           label: tr("mcf348191b695"),
         };

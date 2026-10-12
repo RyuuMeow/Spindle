@@ -37,7 +37,7 @@ import { readingStructure } from "../reading/structure";
 import { readingDecorations } from "../reading/decorations";
 import { usePreview } from "../play/context";
 import { colorSurface } from "../play/character-presentation";
-import { readingLengthWarnings } from "../diagnostics/reading-length";
+import { readingWarnings } from "../diagnostics/reading-warnings";
 import {
   mapSceneScope,
   sceneEdits,
@@ -262,7 +262,7 @@ export default function SceneEditor(props: Props) {
             (file, line) => latest.current.onVariableNavigate?.(file, line),
           ),
           decorations,
-          readingLengthWarnings(() => {
+          readingWarnings(() => {
             const offset =
               source.current.slice(0, scope.current.from).split("\n").length -
               1;

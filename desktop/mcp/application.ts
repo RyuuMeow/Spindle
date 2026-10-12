@@ -7,6 +7,7 @@ import { treeEntries, projectFolders } from "../../app/workspace/file-tree";
 import { planProjectEntry } from "../project-entries";
 import { fileWriteTools, schemas } from "./schemas";
 import { semantics, projectQuery, statistics, type Fix } from "./semantics";
+import { commandKey } from "../../app/command-overloads";
 import { applyTextEdits, validateCommands } from "../../app/workspace/engine";
 import {
   appendedScene,
@@ -721,13 +722,19 @@ export class AgentApplication {
   private async commands(a: Input<"update_commands">) {
     const p = await this.prepare(a.editorSessionId, a.snapshotId);
     if (p.kind === "standalone") throw Error("PROJECT_REQUIRED");
-    if (new Set(a.commands.map((c) => c.name)).size !== a.commands.length)
+    if (new Set(a.commands.map(commandKey)).size !== a.commands.length)
       throw Error("DUPLICATE_COMMAND");
     const commands = [...p.commands];
     for (const command of a.commands) {
-      if (findCommand(command.name, [], !!command.inline))
+      if (
+        !command.inline &&
+        command.name !== "wait" &&
+        findCommand(command.name, [], false)
+      )
         throw Error("BUILTIN_COMMAND");
-      const index = commands.findIndex((c) => c.name === command.name);
+      const index = commands.findIndex(
+        (c) => commandKey(c) === commandKey(command),
+      );
       if (index < 0) commands.push(command);
       else commands[index] = command;
     }

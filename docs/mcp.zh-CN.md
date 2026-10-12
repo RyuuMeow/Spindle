@@ -61,6 +61,8 @@ Project 是共享内容；Editor Session 是绑定工作区的窗口；Context S
 
 项目目录工具只能操作指定项目，不能访问任意磁盘路径或独立单文件工作区。`list_project_entries` 包含空文件夹、树顺序、文档 ID 和相对路径。entry key 为 `file:<DocumentId>` 或 `folder:<相对路径>`。一次写入一个项目条目，支持 `preview`。创建文档可提供初始文本；同父目录的 `move_entry` 相当于改名。垃圾桶保留完整文件夹及非 Yarn 文件；恢复同名冲突使用唯一 recovered 名称。永久删除仍由 UI 确认，不提供 MCP 工具。
 
+`update_commands` 按名称、语法、参数签名及限制识别重载：相同签名更新说明／默认值，不同签名新增重载，同一批不可重复签名。行内标记使用 `inline:true` 及 `markupMode:"selfClosing"|"paired"`；内置标记及 `wait` 可新增重载，原内置定义仍只读。字符串参数可加 `allowList`，数字可加含边界的 `min`／`max` 及 `integer`。完整规则见[命令重载与参数限制](workspace-architecture.zh-CN.md#命令重载与参数限制)。`validate_project` 也会报告未知行内标记的来源范围警告；`calls`／`unknown_commands` 仍查询 `<<...>>`。
+
 ## 版本保护与恢复
 
 先读取快照并预览，再以其 `snapshotId` 与唯一的 `operationId` 提交。预览不写磁盘；提交时重新核对内容版本、目录状态、组字、共享窗口、路径边界和名称冲突。结果不明时**用同一 operationId 重试**。如果结果含 `applied:true` 与 `persistenceError` 或 `recoveryRequired`，操作已经发生，不要换 ID 再创建副本或重复修改。

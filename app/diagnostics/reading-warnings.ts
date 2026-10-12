@@ -10,12 +10,13 @@ import type { Issue } from "../parser";
 import { DIALOGUE_LENGTH_CODE } from "./dialogue-length";
 
 /** Receives published/visible diagnostics, so local typing follows the shared delay. */
-export function readingLengthWarnings(getIssues: () => Issue[]) {
+export function readingWarnings(getIssues: () => Issue[]) {
   const ranges = (view: EditorView) =>
     getIssues()
       .filter(
         (i) =>
-          i.code === DIALOGUE_LENGTH_CODE && i.line <= view.state.doc.lines,
+          (i.code === DIALOGUE_LENGTH_CODE || i.code === "markup.unknown") &&
+          i.line <= view.state.doc.lines,
       )
       .flatMap((i) => {
         const line = view.state.doc.line(i.line);
@@ -36,10 +37,12 @@ export function readingLengthWarnings(getIssues: () => Issue[]) {
         build(view: EditorView) {
           return Decoration.set(
             ranges(view).map((r) =>
-              Decoration.mark({ class: "reading-length-warning" }).range(
-                r.from,
-                r.to,
-              ),
+              Decoration.mark({
+                class:
+                  r.issue.code === "markup.unknown"
+                    ? "reading-markup-warning"
+                    : "reading-length-warning",
+              }).range(r.from, r.to),
             ),
             true,
           );
@@ -55,6 +58,8 @@ export function readingLengthWarnings(getIssues: () => Issue[]) {
       if (view.composing) return null;
       const range = ranges(view).find((r) => pos >= r.from && pos < r.to);
       if (!range) return null;
+      // The markup hover owns its registration action.
+      if (range.issue.code === "markup.unknown") return null;
       const line = view.state.doc.lineAt(pos);
       const local = pos - line.from;
       // Semantic hovers own commands, interpolation and role names.
@@ -84,7 +89,7 @@ export function readingLengthWarnings(getIssues: () => Issue[]) {
       };
     }),
     EditorView.baseTheme({
-      ".reading-length-warning": {
+      ".reading-length-warning, .reading-markup-warning": {
         textDecoration: "underline wavy var(--warning, #d9b96e)",
         textUnderlineOffset: "3px",
       },
