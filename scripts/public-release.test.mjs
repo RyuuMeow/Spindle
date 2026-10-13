@@ -45,12 +45,30 @@ test("release metadata accepts Windows checkout line endings", () => {
       "vendor-source.zip",
     ])
       fs.writeFileSync(path.join(root, "release", name), "source fixture");
+    const fixtureEnvironment = {
+      ...process.env,
+      GITHUB_REF_TYPE: "tag",
+      GITHUB_REF_NAME: "v0.10.0",
+    };
     execFileSync(
       process.execPath,
       [path.resolve("scripts/release-metadata.mjs")],
       {
         cwd: root,
+        env: fixtureEnvironment,
       },
+    );
+    assert.throws(() =>
+      execFileSync(
+        process.execPath,
+        [path.resolve("scripts/release-metadata.mjs")],
+        {
+          cwd: root,
+          env: { ...fixtureEnvironment, GITHUB_REF_NAME: "v0.10.1" },
+          stdio: "pipe",
+        },
+      ),
+      /Tag and version disagree/,
     );
     const metadata = JSON.parse(
       fs.readFileSync(
