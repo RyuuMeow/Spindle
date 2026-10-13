@@ -2,6 +2,12 @@
 
 [English](CHANGELOG.md) · [繁體中文詳細記錄](CHANGELOG.zh-TW.md)
 
+## 0.12.0
+
+Add inline markup authoring, linked pair editing, colored scope badges and command overloads with parameter constraints. Make the command sidebar resizable, register inline quick fixes in place, prevent stale Flowchart scene updates and collapse hidden-content gaps in pure reading.
+
+[Release notes: English](releases/0.12.0/en.md) · [繁體中文](releases/0.12.0/zh-TW.md) · [简体中文](releases/0.12.0/zh-CN.md) · [Verification](releases/0.12.0/verification.md)
+
 ## 0.11.2
 
 Fix tab insertion markers and gap drop positions, prevent reordering without a valid preview, and preserve tabs after document deletion by returning to their previous surviving document or an empty view. Suppress ambiguous Unicode punctuation warnings while editing dialogue.
