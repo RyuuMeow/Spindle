@@ -32,6 +32,7 @@ const {
   inlineReveal,
   revealInline,
   readerRuns,
+  readerLines,
 } = require(output);
 const source = (body) =>
   `title: Start\ntags: opening village\n---\n${body}\n===\n`;
@@ -629,4 +630,28 @@ test("reader hides markup, hidden-only lines and comments while retaining source
     for (const run of runs)
       assert.equal(source.slice(run.from, run.to), run.text);
   }
+});
+
+test("reader trims edge gaps and caps gaps across hidden content at one blank", () => {
+  const source =
+    "\n\n// leading\n\ntitle: Start\n---\nMira: first\n\n\n<<pause 100>>\n\n// hidden\n\n[pause=100 /]\n\nMira: second\n\n===\n\n// trailing\n";
+  const original = readingStructure(source);
+  const content = readerLines(original);
+  assert.deepEqual(
+    content.map((line) => line.text),
+    ["title: Start", "Mira: first", "", "Mira: second"],
+  );
+  for (const line of content) {
+    assert(original.includes(line));
+    assert.equal(source.slice(line.from, line.to), line.text);
+  }
+  assert.deepEqual(readerLines(readingStructure("\n// hidden\n\n")), []);
+  assert.deepEqual(
+    readerLines(
+      readingStructure(
+        "title: Start\n---\nMira: first\n<<pause 100>>\nMira: second\n===",
+      ),
+    ).map((line) => line.text),
+    ["title: Start", "Mira: first", "Mira: second"],
+  );
 });

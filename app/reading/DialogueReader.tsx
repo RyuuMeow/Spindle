@@ -2,7 +2,11 @@
 import { t as tr } from "../i18n/index.ts";
 
 import { useEditorContext } from "../mcp/editor-context";
-import { readerRuns, readerSelection } from "../mcp/reader-context";
+import {
+  readerLines,
+  readerRuns,
+  readerSelection,
+} from "../mcp/reader-context";
 import { sourceOffset } from "../workspace/engine";
 import type { SourceSelection } from "../mcp/types";
 import { useAppearance, appearanceVariables } from "../appearance/context";
@@ -66,7 +70,7 @@ export default function DialogueReader({
     };
   });
   const lines = useMemo(
-    () => readingStructure(text.replace(/\r\n/g, "\n")),
+    () => readerLines(readingStructure(text.replace(/\r\n/g, "\n"))),
     [text],
   );
   useEffect(() => {
@@ -78,12 +82,6 @@ export default function DialogueReader({
       items.find((e) => Number(e.dataset.line) >= target) || items.at(-1);
     item?.scrollIntoView({ block: "center" });
   }, [goTo, name]); // Cursor updates in the editor do not move this independent reader.
-  const content = lines.filter(
-    (l) =>
-      l.kind === "blank" ||
-      (["title", "dialogue", "option"].includes(l.kind) &&
-        readerRuns(l.text, l.kind).length > 0),
-  );
   return (
     <div
       ref={host}
@@ -101,7 +99,7 @@ export default function DialogueReader({
       }
     >
       <article>
-        {content.map((l) => {
+        {lines.map((l) => {
           const speaker = l.kind === "dialogue" ? speakerSpan(l.text) : null;
           const actor =
             speaker &&

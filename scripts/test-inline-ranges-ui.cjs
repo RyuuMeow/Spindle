@@ -12,7 +12,7 @@ fs.writeFileSync(
   JSON.stringify({ language: "zh-TW" }),
 );
 const text =
-  'title: Start\n---\nMira: [wave power=2]one[tint color="blue"]two[/wave]three[/tint] [wave power=1]four[/wave][pause=500 /]\n// hidden comment\n[pause=100 /]\n<<pause 100>>\n\nMira: tail // hidden inline comment\n===';
+  '\n\n// leading hidden\n\ntitle: Start\n---\nMira: [wave power=2]one[tint color="blue"]two[/wave]three[/tint] [wave power=1]four[/wave][pause=500 /]\n\n\n// hidden comment\n\n[pause=100 /]\n\n<<pause 100>>\n\n\nMira: tail // hidden inline comment\n\n===\n\n// trailing hidden\n';
 const commands = [
   ["wave", "power", "number"],
   ["tint", "color", "string"],
@@ -127,7 +127,12 @@ async function patch(value) {
       // Graph opening animates its viewport; follow the moving badge until settled.
       for (let attempt = 0; attempt < 20; attempt++) {
         await wave.first().hover();
-        if (await page.locator('.reading-inline-scope.reading-inline-active').count()) break;
+        if (
+          await page
+            .locator(".reading-inline-scope.reading-inline-active")
+            .count()
+        )
+          break;
         await page.waitForTimeout(100);
       }
       assert(
@@ -211,6 +216,14 @@ async function patch(value) {
     await reader.waitFor();
     assert.equal(await reader.locator("p").count(), 2);
     assert.equal(await reader.locator(".reader-blank").count(), 1);
+    assert.equal(
+      await reader.locator("article > :first-child").evaluate((e) => e.tagName),
+      "H2",
+    );
+    assert.equal(
+      await reader.locator("article > :last-child").evaluate((e) => e.tagName),
+      "P",
+    );
     const read = await reader.innerText();
     assert(read.includes("Mira: onetwothree four"));
     assert(!/\[wave|\[pause|hidden comment|hidden inline/.test(read));
@@ -227,7 +240,7 @@ async function patch(value) {
       assert.equal(text.slice(run.from, run.to), run.text);
     await page.screenshot({ path: path.join(out, "reader.png") });
     checks.push(
-      "Read-only removes inline syntax and empty hidden-content rows, preserves an authored blank and exact source offsets",
+      "Read-only trims edge gaps and caps gaps across hidden rows at one blank while preserving exact source offsets",
     );
     await page.getByRole("button", { name: "純閱讀", exact: true }).click();
     await page.getByRole("radio", { name: "純文字", exact: true }).click();

@@ -1,6 +1,29 @@
 import type { SourceSelection } from "./types";
 import { scanMarkup, skipValue } from "../inline-markup";
 import { commandEnd } from "../reading/tokens";
+import type { ReadingLine } from "../reading/structure";
+
+/** Collapse gaps after hidden rows are removed, preserving original source offsets. */
+export function readerLines(lines: ReadingLine[]): ReadingLine[] {
+  const content: ReadingLine[] = [];
+  let blank: ReadingLine | undefined;
+  for (const line of lines) {
+    if (line.kind === "blank") {
+      if (content.length) blank ??= line;
+      continue;
+    }
+    if (
+      !["title", "dialogue", "option"].includes(line.kind) ||
+      !readerRuns(line.text, line.kind).length
+    )
+      continue;
+    if (blank) content.push(blank);
+    content.push(line);
+    blank = undefined;
+  }
+  return content;
+}
+
 export function readerRuns(text: string, kind: string) {
   const excluded = new Set<number>();
   const hide = (from: number, to: number) => {
