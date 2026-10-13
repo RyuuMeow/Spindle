@@ -1073,5 +1073,13 @@
   "markup.unknown": "Unregistered inline markup: {0}",
   "command.duplicate": "This overload is already defined",
   "command.addOverload": "Add overload",
-  "command.resizeList": "Resize command list"
+  "command.resizeList": "Resize command list",
+  "inline.invalidPalette": "Use 2–12 valid colors for inline ranges.",
+  "inline.palette": "Inline range palette",
+  "inline.paletteHelp": "Markers cycle through these colors. Matching solid underlines show their ranges; overlapping ranges use separate lanes. Shared by reading and flowchart views.",
+  "inline.colorSlot": "Range color {0}",
+  "inline.resetPalette": "Reset range palette",
+  "inline.syntaxName": "Inline marker names",
+  "inline.syntaxParameter": "Inline parameter names",
+  "inline.syntaxDelimiter": "Inline delimiters"
 }

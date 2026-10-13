@@ -1,8 +1,51 @@
 import type { SourceSelection } from "./types";
+import { scanMarkup, skipValue } from "../inline-markup";
+import { commandEnd } from "../reading/tokens";
 export function readerRuns(text: string, kind: string) {
   const excluded = new Set<number>();
-  for (const m of text.matchAll(/<<[^>]*>>|\s+#\S+/g))
-    for (let i = m.index; i < m.index + m[0].length; i++) excluded.add(i);
+  const hide = (from: number, to: number) => {
+    for (let i = from; i < to; i++) excluded.add(i);
+  };
+  const tags = scanMarkup(text).filter((tag) => tag.complete && !tag.malformed);
+  let literal = false;
+  if (kind !== "title")
+    for (let i = 0; i < text.length; i++) {
+      const tag = tags.find((tag) => tag.from === i);
+      if (tag) {
+        hide(tag.from, tag.to);
+        if (tag.name === "nomarkup") literal = !tag.closing && !tag.selfClosing;
+        i = tag.to - 1;
+        continue;
+      }
+      if (literal) continue;
+      if (text[i] === "\\") {
+        i++;
+        continue;
+      }
+      if (text[i] === "{") {
+        i = skipValue(text, i) - 1;
+        continue;
+      }
+      if (text.startsWith("//", i)) {
+        hide(i, text.length);
+        break;
+      }
+      if (text.startsWith("<<", i)) {
+        const end = commandEnd(text.slice(i));
+        if (end >= 0) {
+          hide(i, i + end + 2);
+          i += end + 1;
+          continue;
+        }
+      }
+      if (text[i] === "#" && (i === 0 || /\s/.test(text[i - 1]))) {
+        const value = /^#\S+/.exec(text.slice(i))?.[0];
+        if (value) {
+          hide(i, i + value.length);
+          i += value.length - 1;
+        }
+      }
+    }
   const prefix =
     kind === "title"
       ? /^\s*title\s*:\s*/.exec(text)
@@ -26,6 +69,12 @@ export function readerRuns(text: string, kind: string) {
       last.text += text[i];
     } else runs.push({ from: i, to: i + 1, text: text[i], strong });
   }
+  if (
+    excluded.size &&
+    kind === "dialogue" &&
+    /^[^:]+:\s*$/.test(runs.map((r) => r.text).join(""))
+  )
+    return [];
   return runs;
 }
 export function readerSelection(host: HTMLElement): SourceSelection | null {

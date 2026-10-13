@@ -1,6 +1,8 @@
 import { t as tr } from "../i18n/index.ts";
 import { sourceTokens } from "./source-tokens";
-import { inlinePresentation } from "./inline-presentation";
+import { inlineDecorations } from "./inline-decorations";
+import { scanMarkup } from "../inline-markup";
+import { inlinePaletteDefaults } from "../appearance/model";
 import { EditorState, RangeSetBuilder, type Range } from "@codemirror/state";
 import { Decoration, WidgetType } from "@codemirror/view";
 import {
@@ -9,7 +11,6 @@ import {
   commandHelp,
   parameterHelp,
   parameterLabel,
-  inlineParameterLabels,
 } from "../command-hints";
 import type { Command } from "../parser";
 import { builtins } from "../parser";
@@ -108,6 +109,7 @@ export function readingDecorations(
   preview?: PreviewResources | null,
   presentation = resolvePresentation().editorCharacters,
   surface: "dark" | "light" = "dark",
+  palette = inlinePaletteDefaults,
 ) {
   const definitions = commands.filter(
     (c): c is Command => typeof c !== "string",
@@ -177,7 +179,10 @@ export function readingDecorations(
         }).range(line.from + speaker.from, line.from + speaker.to),
       );
     }
-    if (active) {
+    const hasInline =
+      ["dialogue", "option"].includes(line.kind) &&
+      scanMarkup(line.text).length > 0;
+    if (active && !hasInline) {
       ranges.push(
         Decoration.line({
           attributes: {
@@ -265,68 +270,17 @@ export function readingDecorations(
         );
     }
     if (line.kind === "blank") continue;
-    if ((line.kind === "dialogue" || line.kind === "option") && !active) {
-      const inline = inlinePresentation(line.text, definitions);
-      for (const scope of inline.scopes)
-        mark(
-          line.from + scope.from,
-          line.from + scope.to,
-          "reading-inline-scope",
-        );
-      for (const { tag, command } of inline.markers) {
-        const start = line.from + tag.from;
-        const end = line.from + tag.to;
-        if (tag.closing) {
-          add(
-            start,
-            end,
-            tag.name ? "/" + commandLabel(command) : "/",
-            "reading-inline-close",
-            undefined,
-            undefined,
-            line.text.slice(tag.from, tag.to),
-          );
-          continue;
-        }
-        ranges.push(
-          Decoration.mark({
-            class: "reading-inline-marker",
-            inclusive: true,
-          }).range(start, end),
-        );
-        add(
-          start,
-          start + tag.name.length + 1,
-          commandLabel(command),
-          "reading-inline-name",
-          "command",
-          undefined,
-          commandHelp(command),
-        );
-        const tail = /\s*\/?\]$/.exec(line.text.slice(tag.from, tag.to));
-        if (tail) add(end - tail[0].length, end, "", "reading-hidden");
-      }
-      for (const hint of inlineParameterLabels(line.text, definitions)) {
-        if (hint.shorthand && !hint.distinct) {
-          add(
-            line.from + hint.from,
-            line.from + hint.to,
-            " ",
-            "reading-inline-separator",
-          );
-          continue;
-        }
-        add(
-          line.from + hint.from,
-          line.from + hint.to,
-          hint.label + ":",
-          "reading-parameter-hint",
-          undefined,
-          undefined,
-          hint.help,
-        );
-      }
-    }
+    const inlineSource = hasInline
+      ? inlineDecorations(
+          state,
+          line.text,
+          line.from,
+          definitions,
+          palette,
+          readOnly,
+        )
+      : undefined;
+    if (inlineSource) ranges.push(...inlineSource.ranges);
     if (active && structural) continue;
     if (
       leading &&
@@ -506,6 +460,12 @@ export function readingDecorations(
       if (role) mark(from, line.from + role[0].length, "reading-role");
     }
     for (const variable of readingVariables(line)) {
+      if (
+        inlineSource?.raw.some(
+          (span) => variable.from >= span.from && variable.to <= span.to,
+        )
+      )
+        continue;
       if (
         rawInline &&
         line.from + variable.from >= rawInline.from &&

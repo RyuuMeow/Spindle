@@ -17,6 +17,9 @@ export const yarnEditorTheme: editor.IStandaloneThemeData = {
     { token: "number", foreground: "C6AF96" },
     { token: "delimiter.node", foreground: "999999" },
     { token: "tag", foreground: "AAAAAA" },
+    { token: "markup.name", foreground: "99BDB5" },
+    { token: "markup.parameter", foreground: "8EAAC9" },
+    { token: "markup.delimiter", foreground: "969696" },
   ],
   colors: {
     focusBorder: "#999999",

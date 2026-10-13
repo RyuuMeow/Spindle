@@ -11,7 +11,7 @@ const output = path.resolve("outputs/tests/reading.cjs");
 fs.mkdirSync(path.dirname(output), { recursive: true });
 buildSync({
   stdin: {
-    contents: `export * from './app/reading/decorations'; export * from './app/reading/structure'; export * from './app/reading/tokens'; export * from './app/reading/layout';`,
+    contents: `export * from './app/reading/decorations'; export * from './app/reading/structure'; export * from './app/reading/tokens'; export * from './app/reading/layout'; export * from './app/reading/inline-reveal'; export * from './app/mcp/reader-context';`,
     resolveDir: process.cwd(),
     loader: "ts",
   },
@@ -29,6 +29,9 @@ const {
   readingDecorations,
   readingSceneRanges,
   restoreReadingFolds,
+  inlineReveal,
+  revealInline,
+  readerRuns,
 } = require(output);
 const source = (body) =>
   `title: Start\ntags: opening village\n---\n${body}\n===\n`;
@@ -68,14 +71,28 @@ test("inline reading markers use display names and preserve editable source rang
   );
   const scope = rendered.find((r) => r.spec.class === "reading-inline-scope");
   assert.equal(text.slice(scope.from, scope.to), "Hello[pause=500 /]world");
-  assert(rendered.some((r) => r.spec.widget?.label === "/波動"));
-  const editing = collect(text.indexOf("Hello"));
-  assert(
-    !editing.some((r) =>
-      r.spec.widget?.className?.startsWith("reading-inline-"),
-    ),
+  assert(!rendered.some((r) => r.spec.widget?.label === "/波動"));
+  const bodyEditing = collect(text.indexOf("Hello") + 2);
+  assert.equal(
+    bodyEditing.filter(
+      (r) => r.spec.widget?.className === "reading-inline-name",
+    ).length,
+    2,
   );
-  assert(!editing.some((r) => r.spec.class === "reading-inline-scope"));
+  const editing = collect(text.indexOf("[wave]") + 2);
+  assert.deepEqual(
+    editing
+      .filter((r) => r.spec.widget?.className === "reading-inline-name")
+      .map((r) => r.spec.widget.label),
+    ["pause"],
+  );
+  assert.deepEqual(
+    editing
+      .filter((r) => r.spec.class === "reading-inline-source")
+      .map((r) => text.slice(r.from, r.to)),
+    ["[wave]", "[/wave]"],
+  );
+  assert(editing.some((r) => r.spec.class === "reading-inline-scope"));
 });
 
 test("inline reading scope follows overlapping and close-all markers without styling literal markup", () => {
@@ -102,7 +119,7 @@ test("inline reading scope follows overlapping and close-all markers without sty
       .filter((r) => r.spec.class === "reading-inline-scope")
       .sort((a, b) => a.from - b.from)
       .map((r) => text.slice(r.from, r.to)),
-    ["one[b]two", "two[/a]three", "[a]literal[/a]"],
+    ["one[b]", "two", "[/a]three", "[a]literal[/a]"],
   );
   assert.equal(
     result.filter((r) => r.spec.widget?.className === "reading-inline-name")
@@ -570,4 +587,46 @@ test("blank spacing keeps condition and option border padding", () => {
   assert.equal(item("Mira: branch").before, 0);
   assert.equal(item("Mira: branch").after, 0);
   assert(item("-> Pick").before >= 16);
+});
+
+test("inline reveal maps edits and stays open until incomplete head and tail are repaired", () => {
+  const doc = "[wave]body[/wave] outside";
+  let state = EditorState.create({ doc, extensions: [inlineReveal] });
+  state = state.update({
+    effects: revealInline.of({
+      from: 0,
+      openTo: 6,
+      closeFrom: 10,
+      to: 17,
+      paired: true,
+    }),
+    selection: { anchor: 2 },
+  }).state;
+  state = state.update({ changes: { from: 1, to: 5, insert: "tint" } }).state;
+  state = state.update({ selection: { anchor: state.doc.length } }).state;
+  assert(state.field(inlineReveal), "mismatched closing must stay exposed");
+  state = state.update({ changes: { from: 12, to: 16, insert: "tint" } }).state;
+  state = state.update({ selection: { anchor: state.doc.length } }).state;
+  assert.equal(state.field(inlineReveal), null);
+});
+
+test("reader hides markup, hidden-only lines and comments while retaining source-linked literal content", () => {
+  for (const [source, visible] of [
+    ["Mira: [wave]你好[/wave][pause=500 /] world // note", "Mira: 你好 world"],
+    ["[pause=500 /]", ""],
+    ["Mira: [pause=500 /]", ""],
+    ["// comment", ""],
+    [
+      'Mira: {"https://example/#path"} end // note',
+      'Mira: {"https://example/#path"} end',
+    ],
+    ["[nomarkup][wave]literal[/wave][/nomarkup]", "[wave]literal[/wave]"],
+    ["Mira: \\[wave]literal", "Mira: \\[wave]literal"],
+    ["Mira: [unfinished", "Mira: [unfinished"],
+  ]) {
+    const runs = readerRuns(source, "dialogue");
+    assert.equal(runs.map((run) => run.text).join(""), visible);
+    for (const run of runs)
+      assert.equal(source.slice(run.from, run.to), run.text);
+  }
 });

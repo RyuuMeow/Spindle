@@ -1,4 +1,5 @@
 "use client";
+import { inlineReveal, inlineHover } from "./inline-reveal";
 import { t as tr } from "../i18n/index.ts";
 
 import {
@@ -118,16 +119,23 @@ export default function ReadingEditor(props: Props) {
   const { resources, presentation } = usePreview();
   const { style: characterStyle } = useAppearance("rendered");
   const presentationRef = useRef(presentation);
+  const paletteRef = useRef(appearanceConfig.appearance.inlinePalette);
   const surfaceRef = useRef(colorSurface(characterStyle.background));
   const previewRef = useRef(resources);
   useEffect(() => {
+    paletteRef.current = appearanceConfig.appearance.inlinePalette;
     previewRef.current = resources;
     presentationRef.current = presentation;
     surfaceRef.current = colorSurface(characterStyle.background);
     const view = viewRef.current;
     if (view && !view.composing)
       view.dispatch({ effects: refreshDecorations.of(null) });
-  }, [resources, presentation, characterStyle.background]);
+  }, [
+    resources,
+    presentation,
+    characterStyle.background,
+    appearanceConfig.appearance.inlinePalette,
+  ]);
   useEffect(() => {
     latest.current = props;
   });
@@ -178,6 +186,7 @@ export default function ReadingEditor(props: Props) {
           previewRef.current,
           presentationRef.current,
           surfaceRef.current,
+          paletteRef.current,
         ),
       update: (value, tr) =>
         composing
@@ -194,6 +203,7 @@ export default function ReadingEditor(props: Props) {
                 previewRef.current,
                 presentationRef.current,
                 surfaceRef.current,
+                paletteRef.current,
               )
             : value,
       provide: (field) => EditorView.decorations.from(field),
@@ -201,6 +211,8 @@ export default function ReadingEditor(props: Props) {
     const state = EditorState.create({
       doc: normalized(config.doc.text),
       extensions: [
+        inlineReveal,
+        inlineHover,
         sceneLinks(
           (name) => !!latest.current.canNavigate?.(name),
           (name) => latest.current.onNavigate?.(name),

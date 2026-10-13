@@ -18,6 +18,7 @@ import {
   type EditorAppearance,
   type AppearanceMode,
   syntaxDefaults,
+  inlinePaletteDefaults,
 } from "./model";
 import "./settings.css";
 import {
@@ -661,6 +662,7 @@ export default function AppearanceSettings({
       if (/^(source|syntax)\./.test(navigation.field!)) setMode("source");
       if (navigation.field === "reader.width") setMode("reader");
       if (navigation.field === "rendered.width") setMode("rendered");
+      if (navigation.field === "inlinePalette") setMode("rendered");
     });
     return () => cancelAnimationFrame(frame);
   }, [navigation]);
@@ -730,6 +732,42 @@ export default function AppearanceSettings({
                 }
               />
             </div>
+          )}
+          {(m === "rendered" || m === "graph") && (
+            <details data-setting="inlinePalette">
+              <summary>{tr("inline.palette")}</summary>
+              <p className="setting-description">{tr("inline.paletteHelp")}</p>
+              {appearance.inlinePalette.map((color, index) => (
+                <div className="appearance-field" key={index}>
+                  <label htmlFor={`${id}-${m}-inline-${index}`}>
+                    {tr("inline.colorSlot", [index + 1])}
+                  </label>
+                  <ValueInput
+                    id={`${id}-${m}-inline-${index}`}
+                    field="foreground"
+                    syntax
+                    value={color}
+                    onCommit={(value) =>
+                      onChange({
+                        inlinePalette: appearance.inlinePalette.map(
+                          (previous, i) =>
+                            i === index ? String(value) : previous,
+                        ),
+                      })
+                    }
+                  />
+                </div>
+              ))}
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  onChange({ inlinePalette: [...inlinePaletteDefaults] })
+                }
+              >
+                <RotateCcw size={14} />
+                {tr("inline.resetPalette")}
+              </Button>
+            </details>
           )}
           {m === "source" && (
             <>

@@ -412,6 +412,7 @@ export default function CodeEditor({
           ],
         });
         m.languages.setMonarchTokensProvider("yarn", {
+          unicode: true,
           tokenizer: {
             root: [
               [/\/\/.*$/, "comment"],
@@ -432,11 +433,60 @@ export default function CodeEditor({
               [/<< /, { token: "function", next: "@command" }],
               [/->/, "keyword.option"],
               [/\\[\[\]\\]/, ""],
-              [/\[\/?[\w|]*(?:\s+[^\]\r\n]*|=[^\]\r\n]*)?\/?\]/, "tag"],
+              [
+                /(\[)(nomarkup)(\])/,
+                [
+                  "markup.delimiter",
+                  "markup.name",
+                  { token: "markup.delimiter", next: "@nomarkup" },
+                ],
+              ],
+              [
+                /(\[\/?)([\p{L}\p{N}_|]+)/u,
+                ["markup.delimiter", { token: "markup.name", next: "@markup" }],
+              ],
+              [/\[\/\]/, "markup.delimiter"],
               [/\$[A-Za-z_]\w*/, "variable"],
               [/\{[^}]*\}/, "variable"],
               [/#[\w:]+/, "tag"],
               [/^[ \t]*[^:<>]+:/, "type.identifier"],
+            ],
+            nomarkup: [
+              [
+                /(\[\/)(nomarkup)(\])/,
+                [
+                  "markup.delimiter",
+                  "markup.name",
+                  { token: "markup.delimiter", next: "@pop" },
+                ],
+              ],
+              [/[^\[]+/, ""],
+              [/\[/, ""],
+              [/$/, { token: "", next: "@pop" }],
+            ],
+            markup: [
+              [/\/?\]/, { token: "markup.delimiter", next: "@pop" }],
+              [
+                /([\p{L}\p{N}_|]+)(\s*)(=)/u,
+                ["markup.parameter", "", "markup.delimiter"],
+              ],
+              [/=/, "markup.delimiter"],
+              [/"(?:\\.|[^"\\])*"?/, "string"],
+              [/\{/, { token: "markup.delimiter", next: "@markupExpression" }],
+              [/-?(?:\d+(?:\.\d*)?|\.\d+)\b/, "number"],
+              [/\b(true|false)\b/, "number"],
+              [/[^\s\]\/=]+/, "string"],
+              [/$/, { token: "", next: "@pop" }],
+            ],
+            markupExpression: [
+              [/\}/, { token: "markup.delimiter", next: "@pop" }],
+              [/\{/, { token: "markup.delimiter", next: "@push" }],
+              [/"(?:\\.|[^"\\])*"?/, "string"],
+              [/\$[A-Za-z_]\w*/, "variable"],
+              [/-?(?:\d+(?:\.\d*)?|\.\d+)/, "number"],
+              [/\b(true|false)\b/, "number"],
+              [/[A-Za-z_]\w*/, "function"],
+              [/$/, { token: "", next: "@popall" }],
             ],
             command: [
               [/>>/, { token: "function", next: "@pop" }],

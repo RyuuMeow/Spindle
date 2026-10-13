@@ -1073,5 +1073,13 @@
   "markup.unknown": "尚未註冊的行內標記：{0}",
   "command.duplicate": "此重載已存在",
   "command.addOverload": "新增重載",
-  "command.resizeList": "調整指令清單寬度"
+  "command.resizeList": "調整指令清單寬度",
+  "inline.invalidPalette": "行內範圍色盤須包含 2–12 個有效顏色。",
+  "inline.palette": "行內範圍色盤",
+  "inline.paletteHelp": "標記依序輪替使用色盤；同色實線表示作用範圍，重疊範圍分層顯示。閱讀編輯與流程圖共用。",
+  "inline.colorSlot": "範圍顏色 {0}",
+  "inline.resetPalette": "重設範圍色盤",
+  "inline.syntaxName": "行內標記名稱",
+  "inline.syntaxParameter": "行內參數名稱",
+  "inline.syntaxDelimiter": "行內語法分隔符"
 }

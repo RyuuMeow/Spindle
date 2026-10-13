@@ -27,7 +27,7 @@ export type MarkupTag = {
   malformed: boolean;
 };
 const identifier = /^[\p{L}\p{N}_][\p{L}\p{N}_|]*/u;
-function skipValue(text: string, start: number): number {
+export function skipValue(text: string, start: number): number {
   if (text[start] === '"') {
     for (let i = start + 1; i < text.length; i++) {
       if (text[i] === "\\") i++;

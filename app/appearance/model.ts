@@ -49,7 +49,18 @@ export const syntaxDefaults = {
   number: "#c6af96",
   "delimiter.node": "#999999",
   tag: "#aaaaaa",
+  "markup.name": "#99bdb5",
+  "markup.parameter": "#8eaac9",
+  "markup.delimiter": "#969696",
 };
+export const inlinePaletteDefaults = [
+  "#91b9df",
+  "#c7a1d8",
+  "#a6c48a",
+  "#d6ae7c",
+  "#79c4bf",
+  "#d69ba7",
+];
 export type SourceOptions = {
   lineNumbers: boolean;
   wordWrap: boolean;
@@ -64,6 +75,7 @@ export type EditorAppearance = {
   modes: Record<AppearanceMode, Partial<Typography>>;
   source: SourceOptions;
   syntax: typeof syntaxDefaults;
+  inlinePalette: string[];
   widths: Record<"rendered" | "reader", "standard" | "wide">;
 };
 type Nullable<T> = { [K in keyof T]?: T[K] | null };
@@ -72,6 +84,7 @@ export type AppearancePatch = {
   modes?: Partial<Record<AppearanceMode, Nullable<Typography> | null>>;
   source?: Partial<SourceOptions>;
   syntax?: Partial<typeof syntaxDefaults>;
+  inlinePalette?: string[];
   widths?: Partial<EditorAppearance["widths"]>;
   reset?: "global" | AppearanceMode;
 };
@@ -94,6 +107,7 @@ export function defaultAppearance(): EditorAppearance {
       indentGuides: false,
     },
     syntax: { ...syntaxDefaults },
+    inlinePalette: [...inlinePaletteDefaults],
     widths: { rendered: "standard", reader: "standard" },
   };
 }
@@ -162,7 +176,19 @@ export function normalizeAppearance(raw: unknown): EditorAppearance {
     for (const mode of ["reader", "rendered"] as const)
       if (["standard", "wide"].includes(String(raw.widths[mode])))
         next.widths[mode] = raw.widths[mode] as "standard" | "wide";
+  if (validInlinePalette(raw.inlinePalette))
+    next.inlinePalette = [...(raw.inlinePalette as string[])];
   return next;
+}
+function validInlinePalette(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    value.length <= 12 &&
+    value.every(
+      (color) => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color),
+    )
+  );
 }
 function validSource(key: string, value: unknown) {
   if (key === "tabSize")
@@ -221,6 +247,11 @@ export function patchAppearance(
     )
       throw Error(tr("m6b226d3eee00"));
     Object.assign(next.syntax, { [key]: value });
+  }
+  if (patch.inlinePalette !== undefined) {
+    if (!validInlinePalette(patch.inlinePalette))
+      throw Error(tr("inline.invalidPalette"));
+    next.inlinePalette = [...patch.inlinePalette];
   }
   for (const mode of ["rendered", "reader"] as const)
     if (patch.widths?.[mode] !== undefined) {

@@ -169,3 +169,28 @@ test("project declarations enable symbol references in document and scene editor
     1,
   );
 });
+
+test("inline colors persist independently with strict palette validation and old-profile defaults", () => {
+  const before = defaultAppearance();
+  const after = patchAppearance(before, {
+    inlinePalette: ["#123456", "#abcdef"],
+    syntax: { "markup.name": "#987654" },
+  });
+  assert.deepEqual(
+    normalizeAppearance(JSON.parse(JSON.stringify(after))),
+    after,
+  );
+  assert.deepEqual(after.inlinePalette, ["#123456", "#abcdef"]);
+  assert.equal(after.syntax["markup.name"], "#987654");
+  assert.throws(() => patchAppearance(before, { inlinePalette: ["red"] }));
+  assert.throws(() =>
+    patchAppearance(before, {
+      inlinePalette: ["#123456", "#aaa;display:none"],
+    }),
+  );
+  assert.deepEqual(
+    normalizeAppearance({ version: 1 }).inlinePalette,
+    before.inlinePalette,
+  );
+  assert.notDeepEqual(before.inlinePalette, after.inlinePalette);
+});

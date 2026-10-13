@@ -10,10 +10,34 @@ import {
 import { searchPanelOpen, getSearchQuery } from "@codemirror/search";
 import { highlightRanges } from "./highlights";
 import { useAppearance } from "./context";
-import { fontStack, type AppearanceMode, type Typography } from "./model";
-function theme(s: Typography, declarations: string[]) {
+import {
+  fontStack,
+  type AppearanceMode,
+  type Typography,
+  type EditorAppearance,
+} from "./model";
+function theme(
+  s: Typography,
+  declarations: string[],
+  syntax: EditorAppearance["syntax"],
+) {
   return [
     EditorView.theme({
+      ...Object.fromEntries(
+        Object.entries(syntax).map(([key, color]) => [
+          ".yarn-source-" +
+            (key === "keyword.header"
+              ? "header"
+              : key === "type.identifier"
+                ? "speaker"
+                : key === "keyword.option"
+                  ? "option"
+                  : key === "delimiter.node"
+                    ? "delimiter"
+                    : key.replaceAll(".", "-")),
+          { color },
+        ]),
+      ),
       "&": { backgroundColor: s.background, color: s.foreground },
       ".cm-scroller": {
         fontFamily: fontStack(s.fontFamily),
@@ -103,8 +127,8 @@ export function useCodeMirrorAppearance(
       .sort(),
   );
   const extension = useMemo(
-    () => theme(style, JSON.parse(declared)),
-    [style, declared],
+    () => theme(style, JSON.parse(declared), appearance.syntax),
+    [style, declared, appearance.syntax],
   );
   useEffect(() => {
     const view = ref.current;

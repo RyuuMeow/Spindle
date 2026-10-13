@@ -1,17 +1,26 @@
-import { Fragment } from "react";
+import { Fragment, type CSSProperties } from "react";
+import { useAppearance } from "../appearance/context";
+import { highlightInlineRange } from "./inline-reveal";
 import { commandLabel, parameterLabel } from "../command-hints";
 import type { Command } from "../parser";
-import { inlinePresentation } from "./inline-presentation";
+import { inlinePresentation, inlineRangeStyle } from "./inline-presentation";
 
 /** Compact graph summaries share marker names and scopes with reading editors. */
 export function InlinePreview({
   text,
   commands = [],
+  onReveal,
 }: {
   text: string;
   commands?: Command[];
+  onReveal?: (index: number) => void;
 }) {
-  const { markers, scopes } = inlinePresentation(text, commands);
+  const { appearance } = useAppearance("graph");
+  const { groups, markers, scopes } = inlinePresentation(
+    text,
+    commands,
+    appearance.inlinePalette,
+  );
   const boundaries = [
     ...new Set([
       0,
@@ -21,28 +30,45 @@ export function InlinePreview({
     ]),
   ].sort((a, b) => a - b);
   return (
-    <span className="inline-presentation">
+    <span
+      className="inline-presentation"
+      onMouseOver={(event) =>
+        highlightInlineRange(event.currentTarget, event.target)
+      }
+      onMouseOut={(event) =>
+        highlightInlineRange(event.currentTarget, event.relatedTarget)
+      }
+    >
       {boundaries.slice(0, -1).map((from, index) => {
         const to = boundaries[index + 1];
         const marker = markers.find(
           ({ tag }) => tag.from === from && tag.to === to,
         );
         if (marker) {
-          const { tag, command } = marker;
+          const { tag, command, group } = marker;
+          if (tag.closing) return null;
+          if (!tag.selfClosing && !group.closing)
+            return <Fragment key={from}>{text.slice(from, to)}</Fragment>;
           return (
             <span
               key={from}
-              className={
-                tag.closing ? "reading-inline-close" : "reading-inline-marker"
-              }
+              className="reading-inline-marker"
+              data-inline-groups={group.tag.from}
+              style={{ "--inline-color": group.color } as CSSProperties}
               title={text.slice(from, to)}
             >
-              <span className="reading-inline-name">
-                {tag.closing
-                  ? tag.name
-                    ? "/" + commandLabel(command)
-                    : "/"
-                  : commandLabel(command)}
+              <span
+                className="reading-inline-name nodrag nopan"
+                onClick={
+                  onReveal
+                    ? (event) => {
+                        event.stopPropagation();
+                        onReveal(groups.indexOf(group));
+                      }
+                    : undefined
+                }
+              >
+                {commandLabel(command)}
               </span>
               {tag.properties.map((property) => {
                 const parameter = command.params.find(
@@ -68,9 +94,24 @@ export function InlinePreview({
         return (
           <span
             key={from}
+            data-inline-groups={
+              scopes
+                .filter((scope) => from >= scope.from && to <= scope.to)
+                .map((scope) => scope.group.tag.from)
+                .join(" ") || undefined
+            }
             className={
               scopes.some((scope) => from >= scope.from && to <= scope.to)
                 ? "reading-inline-scope"
+                : undefined
+            }
+            style={
+              scopes.some((scope) => from >= scope.from && to <= scope.to)
+                ? inlineRangeStyle(
+                    scopes
+                      .filter((scope) => from >= scope.from && to <= scope.to)
+                      .map((scope) => scope.group),
+                  )
                 : undefined
             }
           >

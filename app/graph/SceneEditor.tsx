@@ -1,4 +1,10 @@
 "use client";
+import {
+  inlineReveal,
+  inlineHover,
+  revealInline,
+} from "../reading/inline-reveal";
+import { inlinePresentation } from "../reading/inline-presentation";
 import { t as tr } from "../i18n/index.ts";
 
 import {
@@ -74,6 +80,7 @@ export type SceneEditorBindings = {
   ) => Promise<boolean>;
 };
 type Props = SceneEditorBindings & {
+  initialInline?: number;
   issues?: import("../parser").Issue[];
   doc: DocumentRecord;
   node: Node;
@@ -105,13 +112,19 @@ export default function SceneEditor(props: Props) {
   );
   const preview = usePreview();
   const previewRef = useRef(preview);
+  const paletteRef = useRef(appearanceConfig.appearance.inlinePalette);
   const surfaceRef = useRef(colorSurface(appearanceConfig.style.background));
   useEffect(() => {
+    paletteRef.current = appearanceConfig.appearance.inlinePalette;
     previewRef.current = preview;
     surfaceRef.current = colorSurface(appearanceConfig.style.background);
     const view = viewRef.current;
     if (view && !view.composing) view.dispatch({ effects: refresh.of(null) });
-  }, [preview, appearanceConfig.style.background]);
+  }, [
+    preview,
+    appearanceConfig.style.background,
+    appearanceConfig.appearance.inlinePalette,
+  ]);
   latest.current = props;
   const [recovered] = useState(() =>
     loadSceneDraft(props.doc.id, props.node.name),
@@ -224,6 +237,7 @@ export default function SceneEditor(props: Props) {
           previewRef.current.resources,
           previewRef.current.presentation,
           surfaceRef.current,
+          paletteRef.current,
         ),
       update: (value, tr) =>
         composing.current
@@ -239,6 +253,7 @@ export default function SceneEditor(props: Props) {
                 previewRef.current.resources,
                 previewRef.current.presentation,
                 surfaceRef.current,
+                paletteRef.current,
               )
             : value,
       provide: (field) => EditorView.decorations.from(field),
@@ -248,6 +263,8 @@ export default function SceneEditor(props: Props) {
       state: EditorState.create({
         doc: recovered?.text ?? sceneText(source.current, scope.current),
         extensions: [
+          inlineReveal,
+          inlineHover,
           sceneLinks(
             (name) =>
               !composing.current &&
@@ -481,6 +498,31 @@ export default function SceneEditor(props: Props) {
       }),
     });
     viewRef.current = view;
+    if (props.initialInline !== undefined) {
+      const line = bodyStructure(view.state.doc.toString()).find(
+        (line) =>
+          line.text
+            .trim()
+            .replace(/#[\w:]+/g, "")
+            .trim() === props.node.summary,
+      );
+      const group =
+        line &&
+        inlinePresentation(line.text, props.commands).groups[
+          props.initialInline
+        ];
+      if (line && group)
+        view.dispatch({
+          effects: revealInline.of({
+            from: line.from + group.tag.from,
+            openTo: line.from + group.tag.to,
+            closeFrom: line.from + (group.closing?.from ?? group.tag.to),
+            to: line.from + (group.closing?.to ?? group.tag.to),
+            paired: !group.tag.selfClosing,
+          }),
+          selection: { anchor: line.from + group.tag.from + 1 },
+        });
+    }
     view.focus();
     return () => {
       if (composing.current)

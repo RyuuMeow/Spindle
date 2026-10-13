@@ -29,13 +29,35 @@ export function sourceTokens(text: string) {
   }
   const speaker = /^[ \t]*[^:<>]+:/.exec(text);
   if (speaker) add(0, speaker[0].length, "speaker");
-  for (const tag of scanMarkup(text)) add(tag.from, tag.to, "tag");
+  const markup = scanMarkup(text);
+  for (const tag of markup) {
+    const nameFrom = tag.from + (tag.closing ? 2 : 1);
+    add(tag.from, nameFrom, "markup-delimiter");
+    add(nameFrom, nameFrom + tag.name.length, "markup-name");
+    for (const property of tag.properties) {
+      add(property.from, property.valueFrom, "markup-parameter");
+      add(
+        property.valueFrom,
+        property.to,
+        property.value.startsWith("{")
+          ? "variable"
+          : /^(?:true|false|-?(?:\d+(?:\.\d*)?|\.\d+))$/i.test(property.value)
+            ? "number"
+            : "string",
+      );
+    }
+    if (tag.complete) {
+      const tail = /\s*\/?\]$/.exec(text.slice(tag.from, tag.to));
+      if (tail) add(tag.to - tail[0].length, tag.to, "markup-delimiter");
+    }
+  }
   let command = false;
   const pattern =
     /[/][/].*$|<<\s*\w*|>>|"(?:\\.|[^"\\])*"?|\$[A-Za-z_]\w*|->|#[\w:]+|\b(?:true|false|\d+(?:\.\d+)?)\b/g;
   for (const m of text.matchAll(pattern)) {
     const value = m[0],
       from = m.index!;
+    if (markup.some((tag) => from >= tag.from && from < tag.to)) continue;
     if (value.startsWith("//")) {
       add(from, text.length, "comment");
       break;

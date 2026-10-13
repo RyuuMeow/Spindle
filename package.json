@@ -61,6 +61,7 @@
     "demo:check": "node scripts/sync-demo-fixture.mjs --check",
     "test:inline-markup": "node --test scripts/inline-markup.test.mjs",
     "test:inline-markup-ui": "node scripts/test-inline-markup.cjs",
+    "test:inline-ranges-ui": "node scripts/test-inline-ranges-ui.cjs",
     "test:command-overloads-ui": "node scripts/test-command-overloads-ui.cjs"
   },
   "dependencies": {

@@ -1073,5 +1073,13 @@
   "markup.unknown": "尚未注册的行内标记：{0}",
   "command.duplicate": "此重载已存在",
   "command.addOverload": "新增重载",
-  "command.resizeList": "调整指令列表宽度"
+  "command.resizeList": "调整指令列表宽度",
+  "inline.invalidPalette": "行内范围色盘须包含 2–12 个有效颜色。",
+  "inline.palette": "行内范围色盘",
+  "inline.paletteHelp": "标记依次轮替使用色盘；同色实线表示作用范围，重叠范围分层显示。阅读编辑与流程图共用。",
+  "inline.colorSlot": "范围颜色 {0}",
+  "inline.resetPalette": "重置范围色盘",
+  "inline.syntaxName": "行内标记名称",
+  "inline.syntaxParameter": "行内参数名称",
+  "inline.syntaxDelimiter": "行内语法分隔符"
 }

@@ -104,6 +104,7 @@ type CardData = SceneRecord & {
   compact: boolean;
   distant: boolean;
   open: () => void;
+  openInline?: (index: number) => void;
   menu?: (event: React.KeyboardEvent) => void;
 };
 type SceneFlowNode = FlowNode<CardData, "scene">;
@@ -129,6 +130,7 @@ export type GraphProps = {
 } & Partial<SceneEditorBindings>;
 const EDIT_WIDTH = 480;
 type EditSession = {
+  initialInline?: number;
   documentId: string;
   record: SceneRecord;
   records: SceneRecord[];
@@ -277,10 +279,15 @@ function SceneCard({ data, selected }: NodeProps<SceneFlowNode>) {
                   <InlinePreview
                     text={summary.slice(speaker.to)}
                     commands={data.commands}
+                    onReveal={data.openInline}
                   />
                 </>
               ) : data.node?.summary ? (
-                <InlinePreview text={summary} commands={data.commands} />
+                <InlinePreview
+                  text={summary}
+                  commands={data.commands}
+                  onReveal={data.openInline}
+                />
               ) : data.kind === "missing" ? (
                 tr("m57496d36d567")
               ) : (
@@ -578,7 +585,7 @@ function Canvas({
     [own, onGoTo, onOpen],
   );
   const openRecord = useCallback(
-    (record: SceneRecord) => {
+    (record: SceneRecord, initialInline?: number) => {
       if (
         record.node &&
         documents &&
@@ -596,7 +603,13 @@ function Canvas({
           ]),
         );
         setPositions(nextPositions);
-        setEditing({ documentId: doc.id, record, records, groups });
+        setEditing({
+          documentId: doc.id,
+          record,
+          records,
+          groups,
+          initialInline,
+        });
         const position = nextPositions[record.id],
           surface = canvasElement.current;
         const viewport = flow.getViewport(),
@@ -684,6 +697,7 @@ function Canvas({
           doc={editorDocument}
           node={editing.record.node}
           commands={commands || []}
+          initialInline={editing.initialInline}
           onRegisterCommand={onRegisterCommand}
           onDocumentEdit={onDocumentEdit}
           onDocumentSave={onDocumentSave}
@@ -743,6 +757,7 @@ function Canvas({
           compact: detail < 2,
           distant: detail === 0,
           open: () => openRecord(record),
+          openInline: (index) => openRecord(record, index),
           menu: record.node
             ? (event) => onNodeMenu?.(record.node!, event)
             : undefined,

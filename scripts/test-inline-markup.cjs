@@ -209,10 +209,7 @@ const errors = [],
           .locator(".reading-inline-name")
           .filter({ hasText: "tint" })
           .waitFor();
-        assert.equal(
-          await page.locator(".reading-inline-close").innerText(),
-          "/tint",
-        );
+        assert.equal(await page.locator(".reading-inline-close").count(), 0);
         assert((await page.locator(".reading-inline-scope").count()) > 0);
         await expectText(sample);
         await page.screenshot({
@@ -228,10 +225,19 @@ const errors = [],
           .filter({ hasText: "tint" })
           .click();
         await page
-          .locator(".reading-source")
+          .locator(".reading-inline-source")
           .filter({ hasText: '[tint color="blue" strength=0.5]' })
           .waitFor();
-        assert.equal(await page.locator(".reading-inline-marker").count(), 0);
+        assert.equal(await page.locator(".reading-inline-marker").count(), 1);
+        await page
+          .locator(".reading-inline-source")
+          .filter({ hasText: "[/tint]" })
+          .waitFor();
+        await page.keyboard.press("Control+End");
+        await page
+          .locator(".reading-inline-name")
+          .filter({ hasText: "tint" })
+          .waitFor();
         await expectText(sample);
         if (mode === "流程圖") {
           await page.keyboard.press("Escape");

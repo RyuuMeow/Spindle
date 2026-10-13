@@ -125,39 +125,36 @@
 .reading-editor .reading-function {
   color: #a3afab;
 }
-:is(.reading-editor, .inline-presentation) .reading-inline-marker,
-:is(.reading-editor, .inline-presentation) .reading-inline-close {
-  color: var(--foreground, #d0d0d0);
-  background: color-mix(in srgb, currentColor 9%, transparent);
+:is(.reading-editor, .inline-presentation) .reading-inline-marker {
+  color: var(--inline-color);
+  background: color-mix(in srgb, var(--inline-color) 13%, transparent);
   border-radius: 4px;
   padding: 1px 4px;
-  font-size: 0.82em;
+  font-size: 0.86em;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
 :is(.reading-editor, .inline-presentation) .reading-inline-name {
   font-weight: 500;
-}
-:is(.reading-editor, .inline-presentation)
-  .reading-inline-name
-  > .reading-icon {
-  width: 12px;
-  height: 12px;
-  margin-right: 3px;
+  cursor: text;
 }
 :is(.reading-editor, .inline-presentation)
   .reading-inline-marker
   .reading-parameter-hint {
   font-size: 0.95em;
-}
-:is(.reading-editor, .inline-presentation) .reading-inline-close {
-  opacity: 0.7;
+  color: inherit;
+  opacity: 0.85;
 }
 :is(.reading-editor, .inline-presentation) .reading-inline-scope {
-  border-bottom: 1px dotted color-mix(in srgb, currentColor 35%, transparent);
-  background: color-mix(in srgb, currentColor 3%, transparent);
+  background-repeat: no-repeat;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+}
+.reading-inline-source {
+  font-family: Consolas, monospace;
+}
+.reading-inline-active {
+  filter: brightness(1.3);
 }
 .reading-editor .reading-target,
 .reading-editor .reading-option-marker {

@@ -82,6 +82,9 @@ export const syntaxLabels = {
   number: tr("m365bd33d1106"),
   "delimiter.node": tr("mc988f6a2601b"),
   tag: tr("m9b423a3fa339"),
+  "markup.name": tr("inline.syntaxName"),
+  "markup.parameter": tr("inline.syntaxParameter"),
+  "markup.delimiter": tr("inline.syntaxDelimiter"),
 };
 export const sourceLabels = {
   lineNumbers: tr("mb353609d2d21"),
@@ -99,6 +102,13 @@ export const extraSettingLabels = {
   "mcp.port": tr("ma73bbb476e36"),
 };
 export const settingEntries: SettingEntry[] = [
+  {
+    id: "inlinePalette",
+    field: "inlinePalette",
+    section: "reading",
+    label: tr("inline.palette"),
+    keywords: "inline markup palette range 行內 範圍 色盤 颜色",
+  },
   {
     id: "playLaunch.defaultScene",
     field: "playLaunch.defaultScene",
